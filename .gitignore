@@ -35,6 +35,12 @@ logs/
 .vscode/
 *.DotSettings.user
 
+# Plugin build output
+Plugins/
+
+# Claude
+.claude/
+
 # OS files
 Thumbs.db
 Desktop.ini

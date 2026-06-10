@@ -8,15 +8,24 @@ namespace LongBetterWindows.Host.Engine
     public class PluginScanner
     {
         private readonly PluginLoader _loader = new();
-        private readonly string _pluginsDir;
+        private readonly List<string> _scanDirs = new();
 
         public PluginScanner(string? pluginsDir = null)
         {
-            _pluginsDir = pluginsDir ?? Path.Combine(
+            var primary = pluginsDir ?? Path.Combine(
                 AppContext.BaseDirectory, "Plugins");
+            _scanDirs.Add(primary);
 
-            if (!Directory.Exists(_pluginsDir))
-                Directory.CreateDirectory(_pluginsDir);
+            // 开发环境：向上查找解决方案级 Plugins 目录
+            var devDir = FindDevPluginsDir();
+            if (devDir != null && devDir != primary)
+                _scanDirs.Add(devDir);
+
+            foreach (var dir in _scanDirs)
+            {
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+            }
         }
 
         public List<PluginManifest> DiscoveredManifests { get; } = new();
@@ -24,18 +33,56 @@ namespace LongBetterWindows.Host.Engine
 
         public async Task ScanAsync()
         {
-            Log.Information("开始扫描插件目录: {Dir}", _pluginsDir);
+            var allDirs = new HashSet<string>();
 
-            var subdirs = Directory.GetDirectories(_pluginsDir);
-            Log.Information("发现 {Count} 个插件目录", subdirs.Length);
+            foreach (var scanDir in _scanDirs)
+            {
+                Log.Information("扫描插件目录: {Dir}", scanDir);
 
-            foreach (var dir in subdirs)
+                if (!Directory.Exists(scanDir))
+                    continue;
+
+                foreach (var dir in Directory.GetDirectories(scanDir))
+                {
+                    allDirs.Add(dir);
+                }
+            }
+
+            Log.Information("发现 {Count} 个插件目录", allDirs.Count);
+
+            foreach (var dir in allDirs)
             {
                 await TryLoadPluginAsync(dir);
             }
 
             Log.Information("插件扫描完成: {Loaded}/{Total} 加载成功",
                 LoadedPlugins.Count, DiscoveredManifests.Count);
+        }
+
+        private static string? FindDevPluginsDir()
+        {
+            try
+            {
+                var dir = AppContext.BaseDirectory;
+
+                for (int i = 0; i < 5; i++)
+                {
+                    var parent = Directory.GetParent(dir);
+                    if (parent == null) break;
+
+                    dir = parent.FullName;
+                    var pluginsDir = Path.Combine(dir, "Plugins");
+
+                    if (Directory.Exists(pluginsDir))
+                        return pluginsDir;
+                }
+            }
+            catch
+            {
+                // 权限不足等场景
+            }
+
+            return null;
         }
 
         private async Task TryLoadPluginAsync(string pluginDir)

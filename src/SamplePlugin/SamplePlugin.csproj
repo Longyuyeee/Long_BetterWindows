@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>SamplePlugin</AssemblyName>
+    <!-- 禁止复制宿主依赖，运行时由 ALC 从宿主进程解析 -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LongBetterWindows.Host\LongBetterWindows.Host.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- 构建后复制到解决方案级 Plugins 目录 -->
+  <Target Name="CopyToPlugins" AfterTargets="Build">
+    <MakeDir Directories="$(SolutionDir)Plugins\SamplePlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)Plugins\SamplePlugin" />
+    <Copy SourceFiles="$(TargetPath).pdb" DestinationFolder="$(SolutionDir)Plugins\SamplePlugin" Condition="Exists('$(TargetPath).pdb')" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(SolutionDir)Plugins\SamplePlugin" />
+  </Target>
+
+</Project>
