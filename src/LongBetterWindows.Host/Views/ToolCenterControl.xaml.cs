@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 
@@ -225,7 +226,28 @@ namespace LongBetterWindows.Host.Views
             });
             infoStack.Children.Add(metaRow);
 
-            // 右侧按钮
+            // 右侧按钮区域
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal };
+
+            // 插件有自定义设置 UI 时显示齿轮按钮
+            if (plugin.Instance is IHasSettingsUI)
+            {
+                var settingsBtn = new Button
+                {
+                    Content = "\u2699",
+                    Width = 28, Height = 28,
+                    FontSize = 14,
+                    Foreground = GrayBrush,
+                    Background = Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Cursor = Cursors.Hand,
+                    Margin = new Thickness(0, 0, 6, 0),
+                    Tag = plugin,
+                };
+                settingsBtn.Click += PluginSettings_Click;
+                btnPanel.Children.Add(settingsBtn);
+            }
+
             var btnText = isRunning ? "禁用" : "启用";
             var btnBrush = isRunning
                 ? new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30))
@@ -239,19 +261,20 @@ namespace LongBetterWindows.Host.Views
                 Foreground = Brushes.White,
                 Background = btnBrush,
                 BorderThickness = new Thickness(0),
-                Cursor = System.Windows.Input.Cursors.Hand,
+                Cursor = Cursors.Hand,
                 Tag = new ToggleState { PluginId = plugin.Id, Version = version },
             };
             toggleBtn.Click += PluginToggle_Click;
+            btnPanel.Children.Add(toggleBtn);
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             Grid.SetColumn(infoStack, 0);
-            Grid.SetColumn(toggleBtn, 1);
+            Grid.SetColumn(btnPanel, 1);
             grid.Children.Add(infoStack);
-            grid.Children.Add(toggleBtn);
+            grid.Children.Add(btnPanel);
 
             return new Border
             {
@@ -288,6 +311,30 @@ namespace LongBetterWindows.Host.Views
 
             btn.IsEnabled = true;
             RefreshPluginList();
+        }
+
+        private void PluginSettings_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not PluginEntry entry) return;
+            if (entry.Instance is not IHasSettingsUI hasUI) return;
+
+            var settingsUI = hasUI.CreateSettingsUI();
+            if (settingsUI == null) return;
+
+            var popup = new Window
+            {
+                Title = $"{entry.Manifest.Name} - 设置",
+                Content = settingsUI,
+                Width = 420,
+                Height = 320,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Window.GetWindow(this),
+                ResizeMode = ResizeMode.NoResize,
+                WindowStyle = WindowStyle.ToolWindow,
+                ShowInTaskbar = false,
+            };
+
+            popup.ShowDialog();
         }
 
         private class ToggleState

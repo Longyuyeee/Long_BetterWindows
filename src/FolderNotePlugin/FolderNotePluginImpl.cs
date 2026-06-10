@@ -1,6 +1,8 @@
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Views;
@@ -8,7 +10,7 @@ using Serilog;
 
 namespace FolderNotePlugin;
 
-public class FolderNotePluginImpl : ILongPlugin
+public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
 {
     private IHostApi? _host;
     private IHotKeyService? _hotKey;
@@ -136,6 +138,69 @@ public class FolderNotePluginImpl : ILongPlugin
                     Log.Information("[FolderNotePlugin] 备注已保存: {Path}", folderPath);
                 });
         });
+    }
+
+    public FrameworkElement CreateSettingsUI()
+    {
+        var panel = new StackPanel { Margin = new Thickness(20) };
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = "文件夹备注助手",
+            FontSize = 16,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 16),
+        });
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = "快捷键",
+            FontSize = 12,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),
+        });
+
+        var hotkeyBadge = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(0x15, 0x00, 0x7A, 0xFF)),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(12, 4, 12, 4),
+            Margin = new Thickness(0, 4, 0, 16),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Child = new TextBlock
+            {
+                Text = "Alt + M",
+                FontSize = 18,
+                FontWeight = FontWeights.Medium,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+            },
+        };
+        panel.Children.Add(hotkeyBadge);
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = "使用方法",
+            FontSize = 12,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),
+        });
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = "1. 打开资源管理器\n2. 选中任意文件夹\n3. 按下 Alt+M\n4. 在弹出的窗口中输入备注\n5. 点击空白处自动保存",
+            FontSize = 12,
+            Margin = new Thickness(0, 4, 0, 16),
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 20,
+        });
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = "备注存储在 NTFS 备用数据流中，\n完全不可见，不影响文件。",
+            FontSize = 11,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),
+            TextWrapping = TextWrapping.Wrap,
+        });
+
+        return panel;
     }
 
     [DllImport("user32.dll")]
