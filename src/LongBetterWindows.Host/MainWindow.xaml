@@ -7,7 +7,8 @@
         xmlns:views="clr-namespace:LongBetterWindows.Host.Views"
         mc:Ignorable="d"
         Title="Long窗口·全能助手"
-        Height="600" Width="1000"
+        MinWidth="420" MinHeight="360"
+        Width="500" Height="520"
         WindowStartupLocation="CenterScreen"
         ExtendsContentIntoTitleBar="True"
         WindowBackdropType="None"
@@ -25,8 +26,11 @@
 
         <ui:TitleBar
             Title="Long窗口·全能助手"
-            Grid.Row="0"
-            Icon="pack://application:,,,/assets/app_icon.png" />
+            Grid.Row="0">
+            <ui:TitleBar.Icon>
+                <ui:SymbolIcon Symbol="Window20" FontSize="18" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
 
         <Grid Grid.Row="1" x:Name="RootGrid">
             <views:ToolCenterControl />

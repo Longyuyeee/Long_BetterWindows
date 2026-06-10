@@ -10,6 +10,11 @@ namespace LongBetterWindows.Host.Views
 {
     public partial class ToolCenterControl : UserControl
     {
+        private static readonly SolidColorBrush GreenBrush =
+            new(Color.FromRgb(0x34, 0xC7, 0x59));
+        private static readonly SolidColorBrush GrayBrush =
+            new(Color.FromRgb(0x80, 0x80, 0x80));
+
         private readonly FolderNoteTool _folderNoteTool = new();
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
@@ -25,7 +30,7 @@ namespace LongBetterWindows.Host.Views
 
             _pluginRefreshTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromSeconds(2),
+                Interval = TimeSpan.FromSeconds(3),
             };
             _pluginRefreshTimer.Tick += (_, _) => RefreshPluginList();
             _pluginRefreshTimer.Start();
@@ -36,13 +41,9 @@ namespace LongBetterWindows.Host.Views
             ToggleButton.IsEnabled = false;
 
             if (_folderNoteTool.IsEnabled)
-            {
                 await _folderNoteTool.DisableAsync();
-            }
             else
-            {
                 await _folderNoteTool.EnableAsync();
-            }
 
             UpdateUI();
             ToggleButton.IsEnabled = true;
@@ -57,57 +58,31 @@ namespace LongBetterWindows.Host.Views
             {
                 var result = await ServicesInitializer.ColumnInjection
                     .DisableCommentColumnAsync();
-
                 if (result.IsSuccess)
                 {
                     _columnEnabled = false;
                     ColumnStatusText.Text = "备注列已移除";
+                    ColumnStatusText.Foreground = GrayBrush;
                 }
                 else
-                {
                     ColumnStatusText.Text = "移除失败";
-                }
             }
             else
             {
                 var result = await ServicesInitializer.ColumnInjection
                     .EnableCommentColumnAsync();
-
                 if (result.IsSuccess)
                 {
                     _columnEnabled = true;
                     ColumnStatusText.Text = "备注列已启用 · Explorer 已刷新";
-                    ColumnStatusText.Foreground = new SolidColorBrush(
-                        Color.FromRgb(0x34, 0xC7, 0x59));
+                    ColumnStatusText.Foreground = GreenBrush;
                 }
                 else
-                {
                     ColumnStatusText.Text = "注入失败";
-                }
             }
 
             ColumnButton.Content = _columnEnabled ? "移除" : "一键开启";
             ColumnButton.IsEnabled = true;
-        }
-
-        private void RefreshColumnStatus()
-        {
-            _columnEnabled = ServicesInitializer.ColumnInjection.IsCommentColumnEnabled;
-
-            ColumnButton.Content = _columnEnabled ? "移除" : "一键开启";
-
-            if (_columnEnabled)
-            {
-                ColumnStatusText.Text = "已启用";
-                ColumnStatusText.Foreground = new SolidColorBrush(
-                    Color.FromRgb(0x34, 0xC7, 0x59));
-            }
-            else
-            {
-                ColumnStatusText.Text = "未启用";
-                ColumnStatusText.Foreground = new SolidColorBrush(
-                    Color.FromRgb(0x80, 0x80, 0x80));
-            }
         }
 
         private async void ContextMenuButton_Click(object sender, RoutedEventArgs e)
@@ -122,11 +97,10 @@ namespace LongBetterWindows.Host.Views
                 {
                     _contextMenuRegistered = false;
                     ContextMenuStatusText.Text = "已移除";
+                    ContextMenuStatusText.Foreground = GrayBrush;
                 }
                 else
-                {
                     ContextMenuStatusText.Text = "移除失败";
-                }
             }
             else
             {
@@ -135,43 +109,53 @@ namespace LongBetterWindows.Host.Views
                 {
                     _contextMenuRegistered = true;
                     ContextMenuStatusText.Text = "已注册 · 右键文件夹即可使用";
-                    ContextMenuStatusText.Foreground = new SolidColorBrush(
-                        Color.FromRgb(0x34, 0xC7, 0x59));
+                    ContextMenuStatusText.Foreground = GreenBrush;
                 }
                 else
-                {
                     ContextMenuStatusText.Text = "注册失败";
-                }
             }
 
             ContextMenuButton.Content = _contextMenuRegistered ? "移除" : "注册";
             ContextMenuButton.IsEnabled = true;
         }
 
+        private void RefreshColumnStatus()
+        {
+            _columnEnabled = ServicesInitializer.ColumnInjection.IsCommentColumnEnabled;
+            ColumnButton.Content = _columnEnabled ? "移除" : "一键开启";
+
+            if (_columnEnabled)
+            {
+                ColumnStatusText.Text = "已启用";
+                ColumnStatusText.Foreground = GreenBrush;
+            }
+            else
+            {
+                ColumnStatusText.Text = "未启用";
+                ColumnStatusText.Foreground = GrayBrush;
+            }
+        }
+
         private void RefreshContextMenuStatus()
         {
             _contextMenuRegistered = ServicesInitializer.ContextMenu.IsRegistered;
-
             ContextMenuButton.Content = _contextMenuRegistered ? "移除" : "注册";
 
             if (_contextMenuRegistered)
             {
                 ContextMenuStatusText.Text = "已注册";
-                ContextMenuStatusText.Foreground = new SolidColorBrush(
-                    Color.FromRgb(0x34, 0xC7, 0x59));
+                ContextMenuStatusText.Foreground = GreenBrush;
             }
             else
             {
                 ContextMenuStatusText.Text = "未注册";
-                ContextMenuStatusText.Foreground = new SolidColorBrush(
-                    Color.FromRgb(0x80, 0x80, 0x80));
+                ContextMenuStatusText.Foreground = GrayBrush;
             }
         }
 
         private void RefreshPluginList()
         {
             PluginsPanel.Children.Clear();
-
             var plugins = HostProvider.Instance.PluginStore.GetAll();
 
             if (plugins.Count == 0)
@@ -184,7 +168,7 @@ namespace LongBetterWindows.Host.Views
 
             var header = new TextBlock
             {
-                Text = "已加载插件",
+                Text = "外部插件",
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 14,
                 Margin = new Thickness(0, 0, 0, 12),
@@ -193,26 +177,25 @@ namespace LongBetterWindows.Host.Views
 
             foreach (var plugin in plugins)
             {
-                var card = CreatePluginCard(plugin);
-                PluginsPanel.Children.Add(card);
+                PluginsPanel.Children.Add(CreatePluginCard(plugin));
             }
         }
 
-        private Border CreatePluginCard(LongBetterWindows.Host.Engine.PluginEntry plugin)
+        private static Border CreatePluginCard(PluginEntry plugin)
         {
             var stateColor = plugin.State switch
             {
-                LongBetterWindows.Host.Core.PluginState.Running => Color.FromRgb(0x34, 0xC7, 0x59),
-                LongBetterWindows.Host.Core.PluginState.Error => Color.FromRgb(0xFF, 0x3B, 0x30),
-                _ => Color.FromRgb(0x80, 0x80, 0x80),
+                Core.PluginState.Running => GreenBrush,
+                Core.PluginState.Error => new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30)),
+                _ => GrayBrush,
             };
 
             var stateText = plugin.State switch
             {
-                LongBetterWindows.Host.Core.PluginState.Running => "运行中",
-                LongBetterWindows.Host.Core.PluginState.Loaded => "已加载",
-                LongBetterWindows.Host.Core.PluginState.Error => "错误",
-                LongBetterWindows.Host.Core.PluginState.Disabled => "已禁用",
+                Core.PluginState.Running => "运行中",
+                Core.PluginState.Loaded => "已加载",
+                Core.PluginState.Error => "错误",
+                Core.PluginState.Disabled => "已禁用",
                 _ => "未知",
             };
 
@@ -233,17 +216,16 @@ namespace LongBetterWindows.Host.Views
             {
                 Text = $"v{plugin.Manifest.Version} · 能力: {capabilitiesText}",
                 FontSize = 11,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),
+                Foreground = GrayBrush,
                 Margin = new Thickness(0, 2, 0, 4),
             });
 
-            var stateBlock = new TextBlock
+            stack.Children.Add(new TextBlock
             {
                 Text = stateText,
                 FontSize = 11,
-                Foreground = new SolidColorBrush(stateColor),
-            };
-            stack.Children.Add(stateBlock);
+                Foreground = stateColor,
+            });
 
             return new Border
             {
@@ -261,15 +243,13 @@ namespace LongBetterWindows.Host.Views
             {
                 ToggleButton.Content = "禁用";
                 StatusText.Text = "已启用 · 热键 Alt+M";
-                StatusText.Foreground = new SolidColorBrush(
-                    Color.FromRgb(0x34, 0xC7, 0x59));
+                StatusText.Foreground = GreenBrush;
             }
             else
             {
                 ToggleButton.Content = "启用";
                 StatusText.Text = "未启用";
-                StatusText.Foreground = new SolidColorBrush(
-                    Color.FromRgb(0x80, 0x80, 0x80));
+                StatusText.Foreground = GrayBrush;
             }
         }
     }
