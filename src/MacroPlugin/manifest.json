@@ -1,0 +1,16 @@
+{
+  "id": "com.long.macro",
+  "version": "1.0.0",
+  "name": "宏录制器",
+  "author": "Long",
+  "entry_point": "MacroPlugin.dll",
+  "capabilities": [
+    "system.hotkey"
+  ],
+  "default_settings": {
+    "record_hotkey": "F6",
+    "play_once_hotkey": "F7",
+    "play_loop_hotkey": "F8",
+    "loop_interval": 100
+  }
+}
