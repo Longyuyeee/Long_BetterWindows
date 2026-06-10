@@ -86,31 +86,62 @@ namespace LongBetterWindows.Host.Services
                                     continue;
 
                                 var items = new List<string>();
-                                int count;
+                                var iidShellItemArray = ShellIIDs.IShellItemArray;
 
-                                if (folderView.ItemCount(0, out count) != 0 || count <= 0)
-                                    return HostApiResponse<List<string>>.Success(items);
+                                IntPtr shellItemArrayPtr;
+                                int hr = folderView.Items(
+                                    ShellConsts.SVGIO_SELECTION,
+                                    ref iidShellItemArray,
+                                    out shellItemArrayPtr);
 
-                                for (int i = 0; i < count; i++)
+                                if (hr != 0 || shellItemArrayPtr == IntPtr.Zero)
                                 {
-                                    try
+                                    return HostApiResponse<List<string>>.Failure(
+                                        ApiErrorCode.ShellSelectionEmpty, "未选中任何项目。");
+                                }
+
+                                try
+                                {
+                                    var shellItemArray = (IShellItemArray)Marshal
+                                        .GetTypedObjectForIUnknown(
+                                            shellItemArrayPtr, typeof(IShellItemArray));
+
+                                    if (shellItemArray.GetCount(out uint count) != 0 || count == 0)
                                     {
-                                        if (folderView.Item(i, out var pidl) != 0)
-                                            continue;
+                                        return HostApiResponse<List<string>>.Failure(
+                                            ApiErrorCode.ShellSelectionEmpty, "未选中任何项目。");
+                                    }
 
-                                        if (pidl != IntPtr.Zero)
+                                    for (uint i = 0; i < count; i++)
+                                    {
+                                        try
                                         {
-                                            var path = PidlToPath(pidl);
-                                            Shell32.ILFree(pidl);
+                                            if (shellItemArray.GetItemAt(i, out object itemObj) != 0)
+                                                continue;
 
-                                            if (path != null)
-                                                items.Add(path);
+                                            if (itemObj is IShellItem shellItem)
+                                            {
+                                                if (shellItem.GetDisplayName(
+                                                    Shell32.SIGDN_FILESYSPATH,
+                                                    out IntPtr namePtr) == 0 && namePtr != IntPtr.Zero)
+                                                {
+                                                    var path = Marshal.PtrToStringUni(namePtr);
+                                                    Marshal.FreeCoTaskMem(namePtr);
+
+                                                    if (!string.IsNullOrEmpty(path))
+                                                        items.Add(path);
+                                                }
+                                            }
+                                        }
+                                        catch
+                                        {
+                                            continue;
                                         }
                                     }
-                                    catch
-                                    {
-                                        continue;
-                                    }
+                                }
+                                finally
+                                {
+                                    Marshal.Release(shellItemArrayPtr);
                                 }
 
                                 if (items.Count == 0)

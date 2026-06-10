@@ -87,6 +87,30 @@ namespace LongBetterWindows.Host.Services
             IntPtr apt, uint dwFlags);
     }
 
+    [ComImport, Guid("B63EA76D-1F85-456F-A19C-48159EFA858B")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface IShellItemArray
+    {
+        [PreserveSig] int BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppvOut);
+        [PreserveSig] int GetPropertyStore(int flags, ref Guid riid, out IntPtr ppv);
+        [PreserveSig] int GetPropertyDescriptionList(ref IntPtr pkey, ref Guid riid, out IntPtr ppv);
+        [PreserveSig] int GetAttributes(int dwAttribFlags, uint sfgaoMask, out uint psfgaoAttribs);
+        [PreserveSig] int GetCount(out uint pdwNumItems);
+        [PreserveSig] int GetItemAt(uint dwIndex, [MarshalAs(UnmanagedType.IUnknown)] out object ppsi);
+        [PreserveSig] int EnumItems(out IntPtr ppenumShellItems);
+    }
+
+    [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface IShellItem
+    {
+        [PreserveSig] int BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+        [PreserveSig] int GetParent([MarshalAs(UnmanagedType.IUnknown)] out object ppsi);
+        [PreserveSig] int GetDisplayName(uint sigdnName, out IntPtr ppszName);
+        [PreserveSig] int GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+        [PreserveSig] int Compare([MarshalAs(UnmanagedType.IUnknown)] object psi, uint hint, out int piOrder);
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct RECT
     {
@@ -103,6 +127,13 @@ namespace LongBetterWindows.Host.Services
     {
         public static readonly Guid IFolderView2 = new("1DE3DF80-4FED-4A71-B8E0-8C36C0BDD16F");
         public static readonly Guid IShellBrowser = new("000214E2-0000-0000-C000-000000000046");
+        public static readonly Guid IShellItemArray = new("B63EA76D-1F85-456F-A19C-48159EFA858B");
+    }
+
+    internal static class ShellConsts
+    {
+        public const uint SVGIO_SELECTION = 0x1;
+        public const uint SVGIO_ALLVIEW = 0x2;
     }
 
     internal static class Shell32
