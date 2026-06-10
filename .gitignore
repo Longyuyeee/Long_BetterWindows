@@ -1,0 +1,44 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww]in32/
+[Dd]ebugPublic/
+[Rr]eleasePublic/
+
+# Logs
+logs/
+*.log
+
+# NuGet packages
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+# IDE
+.idea/
+*.swp
+*~
+.vscode/
+*.DotSettings.user
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Rider
+.idea/
