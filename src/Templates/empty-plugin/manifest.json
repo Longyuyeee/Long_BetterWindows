@@ -1,0 +1,9 @@
+{
+  "id": "com.example.empty",
+  "version": "1.0.0",
+  "name": "空插件模板",
+  "author": "",
+  "entry_point": "EmptyPlugin.dll",
+  "capabilities": [],
+  "default_settings": {}
+}

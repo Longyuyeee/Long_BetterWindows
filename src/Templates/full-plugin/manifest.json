@@ -1,0 +1,16 @@
+{
+  "id": "com.example.full",
+  "version": "1.0.0",
+  "name": "全功能插件模板",
+  "author": "",
+  "entry_point": "FullPlugin.dll",
+  "capabilities": [
+    "system.hotkey",
+    "shell.selection",
+    "storage.local"
+  ],
+  "default_settings": {
+    "hotkey": "Ctrl+Shift+X",
+    "auto_start": true
+  }
+}

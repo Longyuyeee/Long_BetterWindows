@@ -3,30 +3,102 @@ using Serilog;
 
 namespace SamplePlugin;
 
+/// <summary>
+/// SamplePlugin — 参考实现。
+///
+/// 本文件展示了 ILongPlugin 接口的完整实现模式。
+/// 阅读顺序：从上到下，每个区域有注释说明其职责。
+///
+/// 插件生命周期：
+///   PluginScanner 发现 → Loaded
+///     → InitializeAsync() → StartAsync() → Running
+///       → (用户禁用或宿主退出) → StopAsync() → Disabled
+///
+/// 关键约定：
+///   1. Id/Name/Version 必须与 manifest.json 一致
+///   2. 所有能力通过 IHostApi 访问，未声明的能力返回 null
+///   3. 日志使用 Serilog，格式: [插件名] 消息
+///   4. InitializeAsync 返回 false → 状态变为 Error
+///   5. StartAsync 返回 false → 插件不会进入 Running
+/// </summary>
 public class HelloPlugin : ILongPlugin
 {
+    // ═══════════════════════════════════════════════
+    // 元数据 — 必须与 manifest.json 保持一致
+    // ═══════════════════════════════════════════════
     public string Id => "com.long.sample";
     public string Name => "示例插件";
     public string Version => "1.0.0";
+
+    // 当前状态：Loaded → Running → Disabled
     public PluginState State { get; private set; } = PluginState.Loaded;
 
+    // ═══════════════════════════════════════════════
+    // InitializeAsync — 阶段 1: 初始化
+    // 此时可访问 IHostApi 检查能力是否已授权。
+    // 在此完成：配置加载、资源分配、能力验证。
+    // ═══════════════════════════════════════════════
     public Task<bool> InitializeAsync(IHostApi host)
     {
-        Log.Information("[示例插件] 初始化完成");
+        // host.HotKey  — 热键服务（需要 system.hotkey 能力）
+        // host.ShellSelection — Explorer 感知（需要 shell.selection 能力）
+        // host.ADS     — NTFS 备用数据流（需要 fs.ads.access 能力）
+        // host.Registry — 注册表操作（需要 system.registry.* 能力）
+        // host.Storage — 本地 KV 存储（需要 storage.local 能力）
+
+        // 示例：检查能力授权
+        // if (host.HotKey == null) {
+        //     Log.Error("[SamplePlugin] 未获得热键能力");
+        //     return Task.FromResult(false);  // 返回 false → Error 状态
+        // }
+
+        Log.Information("[SamplePlugin] 初始化完成");
         return Task.FromResult(true);
     }
 
+    // ═══════════════════════════════════════════════
+    // StartAsync — 阶段 2: 启动
+    // 初始化成功后调用。在此注册热键、启动定时器、打开监听等。
+    // ═══════════════════════════════════════════════
     public Task<bool> StartAsync()
     {
+        // 示例：注册热键
+        // await host.HotKey!.RegisterAsync("Alt+X", OnHotkey);
+
         State = PluginState.Running;
-        Log.Information("[示例插件] 已启动");
+        Log.Information("[SamplePlugin] 已启动");
         return Task.FromResult(true);
     }
 
+    // ═══════════════════════════════════════════════
+    // StopAsync — 阶段 3: 停止
+    // 插件禁用/宿主退出时调用。释放所有资源。
+    // ═══════════════════════════════════════════════
     public Task<bool> StopAsync()
     {
+        // 示例：注销热键
+        // await host.HotKey!.UnregisterAsync("Alt+X");
+
         State = PluginState.Disabled;
-        Log.Information("[示例插件] 已停止");
+        Log.Information("[SamplePlugin] 已停止");
         return Task.FromResult(true);
     }
+
+    // ═══════════════════════════════════════════════
+    // 扩展提示：
+    //
+    // 1. 自定义设置 UI: 让类实现 IHasSettingsUI 接口
+    //    public class HelloPlugin : ILongPlugin, IHasSettingsUI { ... }
+    //
+    // 2. 配置持久化: 通过 host.Storage 存取配置
+    //    await host.Storage.SetAsync("key", "value");
+    //    var v = await host.Storage.GetAsync("key");
+    //
+    // 3. 使用 Explorer 能力:
+    //    var path = await host.ShellSelection.GetActiveExplorerFolderPathAsync();
+    //
+    // 4. NTFS ADS 存储:
+    //    await host.ADS.WriteAsync(path, "stream", "content");
+    //    var content = await host.ADS.ReadAsync(path, "stream");
+    // ═══════════════════════════════════════════════
 }

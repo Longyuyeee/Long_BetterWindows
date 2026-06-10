@@ -1,0 +1,14 @@
+{
+  "id": "com.example.hotkey",
+  "version": "1.0.0",
+  "name": "热键插件模板",
+  "author": "",
+  "entry_point": "HotkeyPlugin.dll",
+  "capabilities": [
+    "system.hotkey"
+  ],
+  "default_settings": {
+    "hotkey": "Alt+X",
+    "auto_start": true
+  }
+}
