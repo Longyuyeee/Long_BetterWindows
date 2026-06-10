@@ -18,13 +18,39 @@ namespace LongBetterWindows.Host.Views
 
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
+        private bool _startupEnabled;
 
         public ToolCenterControl()
         {
             InitializeComponent();
             RefreshColumnStatus();
             RefreshContextMenuStatus();
+            RefreshStartupStatus();
             RefreshPluginList();
+        }
+
+        private void StartupButton_Click(object sender, RoutedEventArgs e)
+        {
+            _startupEnabled = !_startupEnabled;
+            ServicesInitializer.Startup.SetAutoStart(_startupEnabled);
+            RefreshStartupStatus();
+        }
+
+        private void RefreshStartupStatus()
+        {
+            _startupEnabled = ServicesInitializer.Startup.IsAutoStartEnabled;
+            StartupButton.Content = _startupEnabled ? "禁用" : "启用";
+
+            if (_startupEnabled)
+            {
+                StartupStatusText.Text = "已启用";
+                StartupStatusText.Foreground = GreenBrush;
+            }
+            else
+            {
+                StartupStatusText.Text = "未启用";
+                StartupStatusText.Foreground = GrayBrush;
+            }
         }
 
         private async void ColumnButton_Click(object sender, RoutedEventArgs e)
@@ -141,14 +167,6 @@ namespace LongBetterWindows.Host.Views
             PluginsPanel.Children.Clear();
             var plugins = HostProvider.Instance.PluginStore.GetAll();
 
-            if (plugins.Count == 0)
-            {
-                PluginsPanel.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            PluginsPanel.Visibility = Visibility.Visible;
-
             var header = new TextBlock
             {
                 Text = "插件",
@@ -158,6 +176,58 @@ namespace LongBetterWindows.Host.Views
                 Margin = new Thickness(0, 4, 0, 12),
             };
             PluginsPanel.Children.Add(header);
+
+            if (plugins.Count == 0)
+            {
+                PluginsPanel.Visibility = Visibility.Visible;
+
+                var emptyCard = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(0x08, 0x00, 0x7A, 0xFF)),
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(20, 20, 20, 20),
+                    Child = new StackPanel
+                    {
+                        Children =
+                        {
+                            new TextBlock
+                            {
+                                Text = "暂无插件",
+                                FontSize = 14,
+                                FontWeight = FontWeights.Medium,
+                                Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                            },
+                            new TextBlock
+                            {
+                                Text = "使用脚手架快速创建:",
+                                FontSize = 11,
+                                Foreground = GrayBrush,
+                                Margin = new Thickness(0, 8, 0, 4),
+                            },
+                            new TextBlock
+                            {
+                                Text = ".\\new-plugin.ps1 -Name \"名称\" -Id \"com.example.id\"",
+                                FontSize = 11,
+                                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                                Foreground = GrayBrush,
+                                Margin = new Thickness(0, 2, 0, 0),
+                            },
+                            new TextBlock
+                            {
+                                Text = "模板: empty / hotkey / full",
+                                FontSize = 10,
+                                Foreground = new SolidColorBrush(Color.FromRgb(0xA0, 0xA0, 0xA0)),
+                                Margin = new Thickness(0, 4, 0, 0),
+                            },
+                        },
+                    },
+                };
+
+                PluginsPanel.Children.Add(emptyCard);
+                return;
+            }
+
+            PluginsPanel.Visibility = Visibility.Visible;
 
             foreach (var plugin in plugins)
             {

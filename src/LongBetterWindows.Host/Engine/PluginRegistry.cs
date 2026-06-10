@@ -110,6 +110,7 @@ namespace LongBetterWindows.Host.Engine
                     if (ok)
                     {
                         SetState(pluginId, PluginState.Running);
+                        entry.SetSetting("auto_start", "true");
                         Log.Information("插件 {PluginId} 已启用", pluginId);
                     }
                     return ok;
@@ -140,6 +141,7 @@ namespace LongBetterWindows.Host.Engine
                     await entry.Instance.StopAsync();
                 }
                 SetState(pluginId, PluginState.Disabled);
+                entry.SetSetting("auto_start", "false");
                 Log.Information("插件 {PluginId} 已禁用", pluginId);
                 return true;
             }

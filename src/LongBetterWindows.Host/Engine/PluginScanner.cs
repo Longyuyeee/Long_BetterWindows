@@ -247,23 +247,37 @@ namespace LongBetterWindows.Host.Engine
                     _loader.Unload(loadResult.Context!);
                     return;
                 }
-
-                var startOk = await plugin.StartAsync();
-                if (!startOk)
-                {
-                    Log.Error("插件 {PluginId} 启动失败", manifest.Id);
-                    _loader.Unload(loadResult.Context!);
-                    return;
-                }
             }
 
             registry.Register(manifest, plugin, loadResult.Context!, pluginDir);
-            registry.SetState(manifest.Id, PluginState.Running);
-
             _dirToPluginId[pluginDir] = manifest.Id;
 
-            LoadedPlugins.Add(registry.Get(manifest.Id)!);
-            Log.Information("插件 {PluginId} 已启动", manifest.Id);
+            // 检查用户配置：仅 auto_start=true 时自动启动
+            var entry = registry.Get(manifest.Id)!;
+            var autoStart = entry.GetSetting("auto_start") ?? "true";
+
+            if (autoStart == "true")
+            {
+                using (PluginAccessContext.Enter(manifest.Id))
+                {
+                    var startOk = await plugin.StartAsync();
+                    if (!startOk)
+                    {
+                        Log.Error("插件 {PluginId} 启动失败", manifest.Id);
+                        _loader.Unload(loadResult.Context!);
+                        return;
+                    }
+                }
+
+                registry.SetState(manifest.Id, PluginState.Running);
+                Log.Information("插件 {PluginId} 已自动启动", manifest.Id);
+            }
+            else
+            {
+                Log.Information("插件 {PluginId} 已加载（auto_start=false，待用户启用）", manifest.Id);
+            }
+
+            LoadedPlugins.Add(entry);
         }
 
         public void Dispose()

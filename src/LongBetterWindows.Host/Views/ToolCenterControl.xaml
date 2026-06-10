@@ -68,6 +68,48 @@
                 </Grid>
             </Border>
 
+            <Border Background="#10000000" CornerRadius="12" Padding="20,16"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="开机自启"
+                                   FontSize="14" FontWeight="Medium" />
+                        <TextBlock Text="系统启动时自动运行 Long窗口"
+                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                        <TextBlock x:Name="StartupStatusText" Text=""
+                                   FontSize="11" Foreground="#80000000" Margin="0,6,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <Button x:Name="StartupButton"
+                                Content="启用"
+                                Width="80" Height="32"
+                                Click="StartupButton_Click"
+                                FontSize="12" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Background="#10000000" CornerRadius="12" Padding="20,16"
+                    Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="关于 Long窗口"
+                               FontSize="14" FontWeight="Medium" />
+                    <TextBlock Text="v0.2.0-alpha · .NET 8.0 · WPF"
+                               FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                               Margin="0,4,0,0" />
+                    <TextBlock Text="打造极致优雅、深度集成的 Windows 效率增强中枢。"
+                               FontSize="11" Foreground="#80000000"
+                               TextWrapping="Wrap" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+
             <StackPanel x:Name="PluginsPanel" Margin="0,8,0,0" />
         </StackPanel>
     </ScrollViewer>
