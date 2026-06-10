@@ -12,6 +12,7 @@ namespace LongBetterWindows.Host.Services
         public static ADSService ADS { get; private set; } = null!;
         public static ShellSelectionService ShellSelection { get; private set; } = null!;
         public static ColumnInjectionService ColumnInjection { get; private set; } = null!;
+        public static ContextMenuService ContextMenu { get; private set; } = null!;
 
         public static void Initialize()
         {
@@ -35,6 +36,8 @@ namespace LongBetterWindows.Host.Services
             provider.RegisterService<IShellSelectionService>(ShellSelection);
 
             ColumnInjection = new ColumnInjectionService();
+
+            ContextMenu = new ContextMenuService();
         }
     }
 }

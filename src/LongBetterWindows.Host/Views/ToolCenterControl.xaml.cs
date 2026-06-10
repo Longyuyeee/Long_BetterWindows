@@ -12,6 +12,7 @@ namespace LongBetterWindows.Host.Views
     {
         private readonly FolderNoteTool _folderNoteTool = new();
         private bool _columnEnabled;
+        private bool _contextMenuRegistered;
         private readonly DispatcherTimer _pluginRefreshTimer;
 
         public ToolCenterControl()
@@ -19,6 +20,7 @@ namespace LongBetterWindows.Host.Views
             InitializeComponent();
             UpdateUI();
             RefreshColumnStatus();
+            RefreshContextMenuStatus();
             RefreshPluginList();
 
             _pluginRefreshTimer = new DispatcherTimer
@@ -104,6 +106,64 @@ namespace LongBetterWindows.Host.Views
             {
                 ColumnStatusText.Text = "未启用";
                 ColumnStatusText.Foreground = new SolidColorBrush(
+                    Color.FromRgb(0x80, 0x80, 0x80));
+            }
+        }
+
+        private async void ContextMenuButton_Click(object sender, RoutedEventArgs e)
+        {
+            ContextMenuButton.IsEnabled = false;
+            ContextMenuStatusText.Text = "处理中...";
+
+            if (_contextMenuRegistered)
+            {
+                var result = await ServicesInitializer.ContextMenu.UnregisterAsync();
+                if (result.IsSuccess)
+                {
+                    _contextMenuRegistered = false;
+                    ContextMenuStatusText.Text = "已移除";
+                }
+                else
+                {
+                    ContextMenuStatusText.Text = "移除失败";
+                }
+            }
+            else
+            {
+                var result = await ServicesInitializer.ContextMenu.RegisterAsync();
+                if (result.IsSuccess)
+                {
+                    _contextMenuRegistered = true;
+                    ContextMenuStatusText.Text = "已注册 · 右键文件夹即可使用";
+                    ContextMenuStatusText.Foreground = new SolidColorBrush(
+                        Color.FromRgb(0x34, 0xC7, 0x59));
+                }
+                else
+                {
+                    ContextMenuStatusText.Text = "注册失败";
+                }
+            }
+
+            ContextMenuButton.Content = _contextMenuRegistered ? "移除" : "注册";
+            ContextMenuButton.IsEnabled = true;
+        }
+
+        private void RefreshContextMenuStatus()
+        {
+            _contextMenuRegistered = ServicesInitializer.ContextMenu.IsRegistered;
+
+            ContextMenuButton.Content = _contextMenuRegistered ? "移除" : "注册";
+
+            if (_contextMenuRegistered)
+            {
+                ContextMenuStatusText.Text = "已注册";
+                ContextMenuStatusText.Foreground = new SolidColorBrush(
+                    Color.FromRgb(0x34, 0xC7, 0x59));
+            }
+            else
+            {
+                ContextMenuStatusText.Text = "未注册";
+                ContextMenuStatusText.Foreground = new SolidColorBrush(
                     Color.FromRgb(0x80, 0x80, 0x80));
             }
         }

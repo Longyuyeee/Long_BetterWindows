@@ -65,6 +65,34 @@
                 </Grid>
             </Border>
 
+            <Border Background="#10000000" CornerRadius="12" Padding="20,16"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="右键菜单"
+                                   FontSize="14" FontWeight="Medium" />
+                        <TextBlock Text="在文件夹右键菜单中显示「备注此文件夹」"
+                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                        <TextBlock x:Name="ContextMenuStatusText" Text=""
+                                   FontSize="11" Foreground="#80000000" Margin="0,6,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <Button x:Name="ContextMenuButton"
+                                Content="注册"
+                                Width="80" Height="32"
+                                Click="ContextMenuButton_Click"
+                                FontSize="12" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
             <StackPanel x:Name="PluginsPanel" Margin="0,8,0,0" />
         </StackPanel>
     </ScrollViewer>

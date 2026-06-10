@@ -5,10 +5,14 @@ using Serilog;
 
 namespace LongBetterWindows.Host.Engine
 {
-    public class PluginScanner
+    public class PluginScanner : IDisposable
     {
         private readonly PluginLoader _loader = new();
         private readonly List<string> _scanDirs = new();
+        private readonly List<FileSystemWatcher> _watchers = new();
+        private readonly Dictionary<string, string> _dirToPluginId = new(); // pluginDir → pluginId
+        private readonly object _reloadLock = new();
+        private CancellationTokenSource? _debounceCts;
 
         public PluginScanner(string? pluginsDir = null)
         {
@@ -16,7 +20,6 @@ namespace LongBetterWindows.Host.Engine
                 AppContext.BaseDirectory, "Plugins");
             _scanDirs.Add(primary);
 
-            // 开发环境：向上查找解决方案级 Plugins 目录
             var devDir = FindDevPluginsDir();
             if (devDir != null && devDir != primary)
                 _scanDirs.Add(devDir);
@@ -57,6 +60,122 @@ namespace LongBetterWindows.Host.Engine
 
             Log.Information("插件扫描完成: {Loaded}/{Total} 加载成功",
                 LoadedPlugins.Count, DiscoveredManifests.Count);
+
+            StartFileWatchers();
+        }
+
+        public void StartFileWatchers()
+        {
+            foreach (var scanDir in _scanDirs)
+            {
+                if (!Directory.Exists(scanDir)) continue;
+
+                var watcher = new FileSystemWatcher(scanDir)
+                {
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                    IncludeSubdirectories = true,
+                    EnableRaisingEvents = true,
+                };
+
+                watcher.Changed += OnPluginFileChanged;
+                watcher.Created += OnPluginFileChanged;
+                watcher.Deleted += OnPluginFileChanged;
+                watcher.Renamed += OnPluginFileRenamed;
+
+                _watchers.Add(watcher);
+                Log.Debug("文件监控已启动: {Dir}", scanDir);
+            }
+        }
+
+        private void OnPluginFileChanged(object sender, FileSystemEventArgs e)
+        {
+            if (!IsPluginFile(e.FullPath)) return;
+            DebounceReload(e.FullPath);
+        }
+
+        private void OnPluginFileRenamed(object sender, RenamedEventArgs e)
+        {
+            if (!IsPluginFile(e.FullPath)) return;
+            DebounceReload(e.FullPath);
+        }
+
+        private static bool IsPluginFile(string path)
+        {
+            var ext = Path.GetExtension(path).ToLowerInvariant();
+            var name = Path.GetFileName(path).ToLowerInvariant();
+            return ext == ".dll" || name == "manifest.json";
+        }
+
+        private void DebounceReload(string filePath)
+        {
+            lock (_reloadLock)
+            {
+                _debounceCts?.Cancel();
+                _debounceCts = new CancellationTokenSource();
+                var token = _debounceCts.Token;
+
+                Task.Delay(1000, token).ContinueWith(async _ =>
+                {
+                    if (!token.IsCancellationRequested)
+                    {
+                        await ReloadPluginByFileAsync(filePath);
+                    }
+                }, TaskScheduler.Default);
+            }
+        }
+
+        private async Task ReloadPluginByFileAsync(string filePath)
+        {
+            var pluginDir = FindPluginRootDir(filePath);
+            if (pluginDir == null) return;
+
+            Log.Information("检测到插件变更: {Dir}", pluginDir);
+
+            // 卸载旧版本
+            lock (_reloadLock)
+            {
+                if (_dirToPluginId.TryGetValue(pluginDir, out var oldId))
+                {
+                    var registry = HostProvider.Instance.PluginStore;
+                    var entry = registry.Get(oldId);
+
+                    if (entry != null)
+                    {
+                        Log.Information("卸载旧版插件: {PluginId}", oldId);
+
+                        using (PluginAccessContext.Enter(oldId))
+                        {
+                            entry.Instance.StopAsync().ContinueWith(_ => { });
+                        }
+
+                        registry.Unregister(oldId);
+                    }
+
+                    LoadedPlugins.RemoveAll(p => p.Id == oldId);
+                    DiscoveredManifests.RemoveAll(m => m.Id == oldId);
+                    _dirToPluginId.Remove(pluginDir);
+                }
+            }
+
+            // 加载新版本
+            await TryLoadPluginAsync(pluginDir);
+        }
+
+        private static string? FindPluginRootDir(string filePath)
+        {
+            var dir = Path.GetDirectoryName(filePath);
+            if (dir == null) return null;
+
+            // 检查是否为插件根目录（包含 manifest.json）
+            for (int i = 0; i < 3 && dir != null; i++)
+            {
+                if (File.Exists(Path.Combine(dir, "manifest.json")))
+                    return dir;
+
+                dir = Path.GetDirectoryName(dir);
+            }
+
+            return null;
         }
 
         private static string? FindDevPluginsDir()
@@ -77,10 +196,7 @@ namespace LongBetterWindows.Host.Engine
                         return pluginsDir;
                 }
             }
-            catch
-            {
-                // 权限不足等场景
-            }
+            catch { }
 
             return null;
         }
@@ -144,8 +260,25 @@ namespace LongBetterWindows.Host.Engine
             registry.Register(manifest, plugin, loadResult.Context!, pluginDir);
             registry.SetState(manifest.Id, PluginState.Running);
 
+            _dirToPluginId[pluginDir] = manifest.Id;
+
             LoadedPlugins.Add(registry.Get(manifest.Id)!);
             Log.Information("插件 {PluginId} 已启动", manifest.Id);
+        }
+
+        public void Dispose()
+        {
+            foreach (var watcher in _watchers)
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Dispose();
+            }
+
+            _watchers.Clear();
+            _debounceCts?.Cancel();
+            _debounceCts?.Dispose();
+
+            Log.Information("PluginScanner 已释放，文件监控已停止。");
         }
     }
 }
