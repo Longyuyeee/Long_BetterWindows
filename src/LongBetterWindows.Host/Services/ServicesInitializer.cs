@@ -24,10 +24,10 @@ namespace LongBetterWindows.Host.Services
             HotKey = new HotKeyService();
             provider.RegisterService<IHotKeyService>(HotKey);
 
-            Registry = new RegistryService();
+            Registry = new RegistryService(Rollback);
             provider.RegisterService<IRegistryService>(Registry);
 
-            ADS = new ADSService();
+            ADS = new ADSService(Rollback);
             provider.RegisterService<IADSService>(ADS);
 
             ShellSelection = new ShellSelectionService();

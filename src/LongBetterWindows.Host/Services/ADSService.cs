@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Engine;
 using Serilog;
 using static LongBetterWindows.Host.Services.NativeMethods;
 
@@ -12,6 +13,12 @@ namespace LongBetterWindows.Host.Services
     {
         private const string DefaultStreamName = "long_note";
         private const string FallbackFileName = "long_note.json";
+        private readonly RollbackEngine _rollback;
+
+        public ADSService(RollbackEngine rollback)
+        {
+            _rollback = rollback;
+        }
 
         public Task<HostApiResponse<string>> ReadAsync(string filePath, string streamName)
         {
@@ -91,11 +98,13 @@ namespace LongBetterWindows.Host.Services
                         {
                             WriteFallback(filePath, content);
                             Log.Information("非 NTFS 卷，使用回退文件: {Path}", filePath);
+                            RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName);
                             return HostApiResponse.Success();
                         }
 
                         Log.Warning("ADS 写入失败, Win32Error={Error}, 回退到文件方案", error);
                         WriteFallback(filePath, content);
+                        RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName);
                         return HostApiResponse.Success();
                     }
 
@@ -116,6 +125,8 @@ namespace LongBetterWindows.Host.Services
 
                     Log.Debug("ADS 写入成功: {Path}:{Stream}, {Bytes} 字节",
                         filePath, streamName, content.Length);
+
+                    RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName);
                     return HostApiResponse.Success();
                 }
                 catch (Exception ex)
@@ -141,6 +152,7 @@ namespace LongBetterWindows.Host.Services
                         if (error == 2 || error == 3)
                         {
                             DeleteFallback(filePath);
+                            RecordAdsChange(ChangeAction.AdsDelete, filePath, streamName);
                             return HostApiResponse.Success();
                         }
 
@@ -150,6 +162,7 @@ namespace LongBetterWindows.Host.Services
 
                     DeleteFallback(filePath);
                     Log.Debug("ADS 已删除: {Path}:{Stream}", filePath, streamName);
+                    RecordAdsChange(ChangeAction.AdsDelete, filePath, streamName);
                     return HostApiResponse.Success();
                 }
                 catch (Exception ex)
@@ -314,6 +327,16 @@ namespace LongBetterWindows.Host.Services
         private static bool DeleteFileNative(string path)
         {
             return DeleteFileW(path);
+        }
+
+        private void RecordAdsChange(ChangeAction action, string filePath, string streamName)
+        {
+            var pluginId = PluginAccessContext.CurrentPluginId ?? "builtin";
+            _rollback.RecordChange(pluginId, new ChangeRecord
+            {
+                Action = action,
+                Target = BuildAdsPath(filePath, streamName),
+            });
         }
     }
 }

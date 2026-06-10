@@ -9,31 +9,12 @@ namespace LongBetterWindows.Host.Services
     public class RegistryService : IRegistryService
     {
         private const string RootKeyPath = @"Software\LongBetterWindows";
-
-        private readonly List<RegistryChangeRecord> _changes = new();
+        private readonly RollbackEngine _rollback;
         private readonly object _lock = new();
 
-        public IReadOnlyList<RegistryChangeRecord> Changes
+        public RegistryService(RollbackEngine rollback)
         {
-            get { lock (_lock) return _changes.ToList(); }
-        }
-
-        public IReadOnlyList<RegistryChangeRecord> GetChangesForPlugin(string pluginId)
-        {
-            lock (_lock)
-            {
-                return _changes
-                    .Where(c => c.PluginId == pluginId)
-                    .ToList();
-            }
-        }
-
-        public void RemoveChangesForPlugin(string pluginId)
-        {
-            lock (_lock)
-            {
-                _changes.RemoveAll(c => c.PluginId == pluginId);
-            }
+            _rollback = rollback;
         }
 
         public Task<HostApiResponse<string?>> ReadValueAsync(string key, string valueName)
@@ -84,21 +65,16 @@ namespace LongBetterWindows.Host.Services
                         regKey.SetValue(valueName, value);
                     }
 
-                    var pluginId = PluginAccessContext.CurrentPluginId ?? "unknown";
+                    var pluginId = PluginAccessContext.CurrentPluginId ?? "builtin";
 
-                    lock (_lock)
+                    _rollback.RecordChange(pluginId, new ChangeRecord
                     {
-                        _changes.Add(new RegistryChangeRecord
-                        {
-                            PluginId = pluginId,
-                            Timestamp = DateTime.UtcNow,
-                            Action = RegistryAction.Write,
-                            Key = key,
-                            ValueName = valueName,
-                            OldValue = oldValue,
-                            NewValue = value,
-                        });
-                    }
+                        Action = ChangeAction.RegistryWrite,
+                        Target = fullPath,
+                        ValueName = valueName,
+                        OldValue = oldValue,
+                        NewValue = value,
+                    });
 
                     Log.Debug("注册表写入: {Key}\\{ValueName} = {Value}", key, valueName, value);
                     return HostApiResponse.Success();
@@ -132,20 +108,15 @@ namespace LongBetterWindows.Host.Services
                         regKey.DeleteValue(valueName, throwOnMissingValue: false);
                     }
 
-                    var pluginId = PluginAccessContext.CurrentPluginId ?? "unknown";
+                    var pluginId = PluginAccessContext.CurrentPluginId ?? "builtin";
 
-                    lock (_lock)
+                    _rollback.RecordChange(pluginId, new ChangeRecord
                     {
-                        _changes.Add(new RegistryChangeRecord
-                        {
-                            PluginId = pluginId,
-                            Timestamp = DateTime.UtcNow,
-                            Action = RegistryAction.Delete,
-                            Key = key,
-                            ValueName = valueName,
-                            OldValue = oldValue,
-                        });
-                    }
+                        Action = ChangeAction.RegistryDelete,
+                        Target = fullPath,
+                        ValueName = valueName,
+                        OldValue = oldValue,
+                    });
 
                     Log.Debug("注册表删除: {Key}\\{ValueName}", key, valueName);
                     return HostApiResponse.Success();
@@ -161,68 +132,7 @@ namespace LongBetterWindows.Host.Services
 
         public Task<HostApiResponse> RollbackAsync(string pluginId)
         {
-            return Task.Run(() =>
-            {
-                List<RegistryChangeRecord> pluginChanges;
-
-                lock (_lock)
-                {
-                    pluginChanges = _changes
-                        .Where(c => c.PluginId == pluginId)
-                        .OrderByDescending(c => c.Timestamp)
-                        .ToList();
-                }
-
-                Log.Information("开始回滚插件 {PluginId} 的 {Count} 条注册表变更",
-                    pluginId, pluginChanges.Count);
-
-                foreach (var change in pluginChanges)
-                {
-                    try
-                    {
-                        var fullPath = ResolveKeyPath(change.Key);
-
-                        using var regKey = Registry.CurrentUser.OpenSubKey(
-                            fullPath, writable: true);
-
-                        if (regKey == null)
-                            continue;
-
-                        if (change.Action == RegistryAction.Write)
-                        {
-                            if (change.OldValue == null)
-                            {
-                                regKey.DeleteValue(change.ValueName, throwOnMissingValue: false);
-                            }
-                            else
-                            {
-                                regKey.SetValue(change.ValueName, change.OldValue);
-                            }
-                        }
-                        else if (change.Action == RegistryAction.Delete)
-                        {
-                            if (change.OldValue != null)
-                            {
-                                regKey.SetValue(change.ValueName, change.OldValue);
-                            }
-                        }
-
-                        Log.Debug("回滚: {Key}\\{ValueName}", change.Key, change.ValueName);
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error(ex, "回滚失败: {Key}\\{ValueName}", change.Key, change.ValueName);
-                    }
-                }
-
-                lock (_lock)
-                {
-                    _changes.RemoveAll(c => c.PluginId == pluginId);
-                }
-
-                Log.Information("插件 {PluginId} 注册表回滚完成", pluginId);
-                return HostApiResponse.Success();
-            });
+            return _rollback.RollbackAsync(pluginId);
         }
 
         private static string ResolveKeyPath(string key)
@@ -231,22 +141,5 @@ namespace LongBetterWindows.Host.Services
                 ? RootKeyPath
                 : $@"{RootKeyPath}\{key.Trim('\\')}";
         }
-    }
-
-    public enum RegistryAction
-    {
-        Write,
-        Delete,
-    }
-
-    public class RegistryChangeRecord
-    {
-        public string PluginId { get; init; } = string.Empty;
-        public DateTime Timestamp { get; init; }
-        public RegistryAction Action { get; init; }
-        public string Key { get; init; } = string.Empty;
-        public string ValueName { get; init; } = string.Empty;
-        public string? OldValue { get; init; }
-        public string? NewValue { get; init; }
     }
 }
