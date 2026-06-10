@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:views="clr-namespace:LongBetterWindows.Host.Views"
         mc:Ignorable="d"
         Title="Long窗口·全能助手"
         Height="600" Width="1000"
@@ -28,12 +29,7 @@
             Icon="pack://application:,,,/assets/app_icon.png" />
 
         <Grid Grid.Row="1" x:Name="RootGrid">
-            <ui:TextBlock
-                Text="欢迎使用 Long窗口·全能助手"
-                FontTypography="Title"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"/>
+            <views:ToolCenterControl />
         </Grid>
     </Grid>
 </ui:FluentWindow>

@@ -1,4 +1,5 @@
 using System.Windows;
+using LongBetterWindows.Host.Services;
 using Serilog;
 
 namespace LongBetterWindows.Host
@@ -15,6 +16,9 @@ namespace LongBetterWindows.Host
                 .CreateLogger();
 
             Log.Information("Long窗口·全能助手 正在启动...");
+
+            ServicesInitializer.Initialize();
+            Log.Information("所有服务已初始化。");
 
             AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
             {
