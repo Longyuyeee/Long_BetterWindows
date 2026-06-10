@@ -1,4 +1,5 @@
 using System.Windows;
+using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 using Serilog;
 
@@ -19,6 +20,15 @@ namespace LongBetterWindows.Host
 
             ServicesInitializer.Initialize();
             Log.Information("所有服务已初始化。");
+
+            var scanner = new PluginScanner();
+            _ = scanner.ScanAsync().ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    Log.Error(t.Exception, "插件扫描失败");
+                else
+                    Log.Information("插件扫描完成，加载 {Count} 个插件", scanner.LoadedPlugins.Count);
+            });
 
             AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
             {

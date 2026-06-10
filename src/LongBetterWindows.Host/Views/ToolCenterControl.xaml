@@ -36,6 +36,34 @@
                     </StackPanel>
                 </Grid>
             </Border>
+
+            <Border Background="#10000000" CornerRadius="12" Padding="20,16"
+                    Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Text="备注列注入"
+                                   FontSize="14" FontWeight="Medium" />
+                        <TextBlock Text="在资源管理器中显示「备注」列 (System.Comment)"
+                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                        <TextBlock x:Name="ColumnStatusText" Text=""
+                                   FontSize="11" Foreground="#80000000" Margin="0,6,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <Button x:Name="ColumnButton"
+                                Content="一键开启"
+                                Width="80" Height="32"
+                                Click="ColumnButton_Click"
+                                FontSize="12" />
+                    </StackPanel>
+                </Grid>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

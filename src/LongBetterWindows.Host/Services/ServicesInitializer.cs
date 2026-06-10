@@ -11,6 +11,7 @@ namespace LongBetterWindows.Host.Services
         public static RollbackEngine Rollback { get; private set; } = null!;
         public static ADSService ADS { get; private set; } = null!;
         public static ShellSelectionService ShellSelection { get; private set; } = null!;
+        public static ColumnInjectionService ColumnInjection { get; private set; } = null!;
 
         public static void Initialize()
         {
@@ -32,6 +33,8 @@ namespace LongBetterWindows.Host.Services
 
             ShellSelection = new ShellSelectionService();
             provider.RegisterService<IShellSelectionService>(ShellSelection);
+
+            ColumnInjection = new ColumnInjectionService();
         }
     }
 }
