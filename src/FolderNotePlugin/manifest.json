@@ -1,0 +1,16 @@
+{
+  "id": "com.long.folder-note",
+  "version": "1.0.0",
+  "name": "文件夹备注助手",
+  "author": "Long",
+  "entry_point": "FolderNotePlugin.dll",
+  "capabilities": [
+    "system.hotkey",
+    "shell.selection",
+    "fs.ads.access"
+  ],
+  "default_settings": {
+    "hotkey": "Alt+M",
+    "auto_start": true
+  }
+}

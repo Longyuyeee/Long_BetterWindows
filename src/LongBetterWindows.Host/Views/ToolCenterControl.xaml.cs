@@ -4,7 +4,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
-using LongBetterWindows.Host.Tools;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -15,7 +14,6 @@ namespace LongBetterWindows.Host.Views
         private static readonly SolidColorBrush GrayBrush =
             new(Color.FromRgb(0x80, 0x80, 0x80));
 
-        private readonly FolderNoteTool _folderNoteTool = new();
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
         private readonly DispatcherTimer _pluginRefreshTimer;
@@ -23,7 +21,6 @@ namespace LongBetterWindows.Host.Views
         public ToolCenterControl()
         {
             InitializeComponent();
-            UpdateUI();
             RefreshColumnStatus();
             RefreshContextMenuStatus();
             RefreshPluginList();
@@ -34,19 +31,6 @@ namespace LongBetterWindows.Host.Views
             };
             _pluginRefreshTimer.Tick += (_, _) => RefreshPluginList();
             _pluginRefreshTimer.Start();
-        }
-
-        private async void ToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            ToggleButton.IsEnabled = false;
-
-            if (_folderNoteTool.IsEnabled)
-                await _folderNoteTool.DisableAsync();
-            else
-                await _folderNoteTool.EnableAsync();
-
-            UpdateUI();
-            ToggleButton.IsEnabled = true;
         }
 
         private async void ColumnButton_Click(object sender, RoutedEventArgs e)
@@ -168,10 +152,11 @@ namespace LongBetterWindows.Host.Views
 
             var header = new TextBlock
             {
-                Text = "外部插件",
+                Text = "已加载插件",
                 FontWeight = FontWeights.SemiBold,
-                FontSize = 14,
-                Margin = new Thickness(0, 0, 0, 12),
+                FontSize = 13,
+                Foreground = GrayBrush,
+                Margin = new Thickness(0, 4, 0, 12),
             };
             PluginsPanel.Children.Add(header);
 
@@ -235,22 +220,6 @@ namespace LongBetterWindows.Host.Views
                 Margin = new Thickness(0, 0, 0, 6),
                 Child = stack,
             };
-        }
-
-        private void UpdateUI()
-        {
-            if (_folderNoteTool.IsEnabled)
-            {
-                ToggleButton.Content = "禁用";
-                StatusText.Text = "已启用 · 热键 Alt+M";
-                StatusText.Foreground = GreenBrush;
-            }
-            else
-            {
-                ToggleButton.Content = "启用";
-                StatusText.Text = "未启用";
-                StatusText.Foreground = GrayBrush;
-            }
         }
     }
 }

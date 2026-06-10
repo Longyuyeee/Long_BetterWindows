@@ -5,37 +5,12 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24,16">
-            <TextBlock Text="工具中心" FontWeight="SemiBold" FontSize="16"
+            <TextBlock Text="Long窗口·全能助手" FontWeight="SemiBold" FontSize="16"
                        Margin="0,0,0,16" />
 
-            <Border Background="#10000000" CornerRadius="12" Padding="20,16"
-                    Margin="0,0,0,12">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel>
-                        <TextBlock x:Name="ToolNameText" Text="文件夹备注助手"
-                                   FontSize="14" FontWeight="Medium" />
-                        <TextBlock x:Name="ToolDescText"
-                                   Text="为文件夹添加备注，热键 Alt+M"
-                                   FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
-                                   TextWrapping="Wrap" Margin="0,4,0,0" />
-                        <TextBlock x:Name="StatusText" Text="未启用"
-                                   FontSize="11" Foreground="#80000000" Margin="0,6,0,0" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <Button x:Name="ToggleButton"
-                                Content="启用"
-                                Width="80" Height="32"
-                                Click="ToggleButton_Click"
-                                FontSize="12" />
-                    </StackPanel>
-                </Grid>
-            </Border>
+            <TextBlock Text="系统功能" FontWeight="SemiBold" FontSize="13"
+                       Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                       Margin="0,0,0,10" />
 
             <Border Background="#10000000" CornerRadius="12" Padding="20,16"
                     Margin="0,0,0,12">

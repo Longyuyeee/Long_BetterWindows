@@ -1,0 +1,15 @@
+{
+  "id": "com.long.quicklaunch",
+  "version": "1.0.0",
+  "name": "快捷启动器",
+  "author": "Long",
+  "entry_point": "QuickLaunchPlugin.dll",
+  "capabilities": [
+    "system.hotkey",
+    "shell.selection"
+  ],
+  "default_settings": {
+    "hotkey": "Ctrl+Shift+Space",
+    "auto_start": true
+  }
+}
