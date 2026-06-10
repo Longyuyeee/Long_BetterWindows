@@ -77,6 +77,61 @@ namespace LongBetterWindows.Host.Views
             HintText.Text = _dirty ? "已修改 · Ctrl+Enter 保存" : "";
         }
 
+        public static void ShowToast(string message)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                var workArea = SystemParameters.WorkArea;
+                int x = (int)(workArea.Right - 340);
+                int y = (int)(workArea.Bottom - 80);
+
+                var window = new Window
+                {
+                    WindowStyle = WindowStyle.None,
+                    AllowsTransparency = true,
+                    Background = System.Windows.Media.Brushes.Transparent,
+                    Topmost = true,
+                    ShowInTaskbar = false,
+                    SizeToContent = SizeToContent.WidthAndHeight,
+                    Left = x,
+                    Top = y,
+                };
+
+                var border = new System.Windows.Controls.Border
+                {
+                    Background = new System.Windows.Media.SolidColorBrush(
+                        System.Windows.Media.Color.FromArgb(0xE0, 0x32, 0x32, 0x32)),
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(16, 10, 16, 10),
+                    Child = new System.Windows.Controls.TextBlock
+                    {
+                        Text = message,
+                        Foreground = System.Windows.Media.Brushes.White,
+                        FontSize = 13,
+                    },
+                };
+
+                window.Content = border;
+                window.Show();
+
+                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
+                window.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+
+                var timer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(2),
+                };
+                timer.Tick += (_, _) =>
+                {
+                    timer.Stop();
+                    var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
+                    fadeOut.Completed += (_, _) => window.Close();
+                    window.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+                };
+                timer.Start();
+            });
+        }
+
         private void SaveAndClose()
         {
             if (_isClosing) return;

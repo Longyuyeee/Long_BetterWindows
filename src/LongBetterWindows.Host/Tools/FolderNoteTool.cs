@@ -70,6 +70,7 @@ namespace LongBetterWindows.Host.Tools
             if (!folderResult.IsSuccess || folderResult.Data == null)
             {
                 Log.Debug("未找到活跃的 Explorer 文件夹");
+                FloatingHudWindow.ShowToast("请先打开一个资源管理器窗口，并选中文件夹。");
                 return;
             }
 

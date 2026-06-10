@@ -33,16 +33,25 @@ namespace LongBetterWindows.Host.Engine
         private T? GetService<T>() where T : class
         {
             var pluginId = PluginAccessContext.CurrentPluginId;
+
+            // 内置工具（无插件上下文）：直接返回已注册服务
             if (pluginId == null)
             {
-                Log.Warning("尝试在插件上下文之外访问服务 {ServiceType}", typeof(T).Name);
+                if (_services.TryGetValue(typeof(T), out var builtinService))
+                {
+                    return (T)builtinService;
+                }
+
+                Log.Debug("服务 {ServiceType} 未注册", typeof(T).Name);
                 return null;
             }
 
+            // 外部插件：校验 manifest.capabilities 权限
             var capability = GetCapabilityForService<T>();
             if (capability != null && !_registry.HasCapability(pluginId, capability))
             {
-                Log.Warning("插件 {PluginId} 未声明能力 {Capability}", pluginId, capability);
+                Log.Warning("插件 {PluginId} 未声明能力 {Capability}，拒绝访问 {ServiceType}",
+                    pluginId, capability, typeof(T).Name);
                 return null;
             }
 
@@ -51,7 +60,7 @@ namespace LongBetterWindows.Host.Engine
                 return (T)service;
             }
 
-            Log.Debug("服务 {ServiceType} 未注册（将在阶段四实现）", typeof(T).Name);
+            Log.Debug("服务 {ServiceType} 未注册", typeof(T).Name);
             return null;
         }
 
