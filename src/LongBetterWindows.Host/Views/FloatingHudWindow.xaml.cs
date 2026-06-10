@@ -1,5 +1,7 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 
 namespace LongBetterWindows.Host.Views
@@ -18,6 +20,7 @@ namespace LongBetterWindows.Host.Views
         public static FloatingHudWindow ShowAt(
             double x, double y,
             string? existingNote,
+            string? folderPath,
             Action<string> onSave)
         {
             var window = new FloatingHudWindow
@@ -26,6 +29,11 @@ namespace LongBetterWindows.Host.Views
                 Top = y,
                 _onSave = onSave,
             };
+
+            if (!string.IsNullOrEmpty(folderPath))
+            {
+                window.FolderLabel.Text = Path.GetFileName(folderPath);
+            }
 
             if (!string.IsNullOrEmpty(existingNote))
             {
@@ -39,13 +47,40 @@ namespace LongBetterWindows.Host.Views
             return window;
         }
 
+        public static void ShowToast(string message)
+        {
+            ToastWindow.Show(message);
+        }
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200))
+            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(350))
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = new ElasticEase
+                {
+                    EasingMode = EasingMode.EaseOut,
+                    Oscillations = 2,
+                    Springiness = 4,
+                },
             };
             BeginAnimation(OpacityProperty, fadeIn);
+
+            var scaleTransform = new ScaleTransform(0.85, 0.85);
+            RenderTransform = scaleTransform;
+            RenderTransformOrigin = new Point(0.5, 0.5);
+
+            var scaleAnim = new DoubleAnimation(0.85, 1, TimeSpan.FromMilliseconds(400))
+            {
+                EasingFunction = new ElasticEase
+                {
+                    EasingMode = EasingMode.EaseOut,
+                    Oscillations = 2,
+                    Springiness = 5,
+                },
+            };
+
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
         }
 
         private void Window_LostFocus(object sender, RoutedEventArgs e)
@@ -71,65 +106,11 @@ namespace LongBetterWindows.Host.Views
         {
         }
 
-        private void NoteTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        private void NoteTextBox_TextChanged(
+            object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
             _dirty = true;
             HintText.Text = _dirty ? "已修改 · Ctrl+Enter 保存" : "";
-        }
-
-        public static void ShowToast(string message)
-        {
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                var workArea = SystemParameters.WorkArea;
-                int x = (int)(workArea.Right - 340);
-                int y = (int)(workArea.Bottom - 80);
-
-                var window = new Window
-                {
-                    WindowStyle = WindowStyle.None,
-                    AllowsTransparency = true,
-                    Background = System.Windows.Media.Brushes.Transparent,
-                    Topmost = true,
-                    ShowInTaskbar = false,
-                    SizeToContent = SizeToContent.WidthAndHeight,
-                    Left = x,
-                    Top = y,
-                };
-
-                var border = new System.Windows.Controls.Border
-                {
-                    Background = new System.Windows.Media.SolidColorBrush(
-                        System.Windows.Media.Color.FromArgb(0xE0, 0x32, 0x32, 0x32)),
-                    CornerRadius = new CornerRadius(10),
-                    Padding = new Thickness(16, 10, 16, 10),
-                    Child = new System.Windows.Controls.TextBlock
-                    {
-                        Text = message,
-                        Foreground = System.Windows.Media.Brushes.White,
-                        FontSize = 13,
-                    },
-                };
-
-                window.Content = border;
-                window.Show();
-
-                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
-                window.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-
-                var timer = new System.Windows.Threading.DispatcherTimer
-                {
-                    Interval = TimeSpan.FromSeconds(2),
-                };
-                timer.Tick += (_, _) =>
-                {
-                    timer.Stop();
-                    var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
-                    fadeOut.Completed += (_, _) => window.Close();
-                    window.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-                };
-                timer.Start();
-            });
         }
 
         private void SaveAndClose()

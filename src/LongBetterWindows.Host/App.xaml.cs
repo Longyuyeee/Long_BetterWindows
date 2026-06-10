@@ -9,6 +9,7 @@ namespace LongBetterWindows.Host
 {
     public partial class App : Application
     {
+        public static bool IsExiting { get; set; }
         private string? _directNotePath;
 
         protected override void OnStartup(StartupEventArgs e)
@@ -103,7 +104,7 @@ namespace LongBetterWindows.Host
                 double x = area.Left + (area.Width - 320) / 2;
                 double y = area.Top + (area.Height - 150) / 2;
 
-                FloatingHudWindow.ShowAt(x, y, existingNote, async (text) =>
+                FloatingHudWindow.ShowAt(x, y, existingNote, folderPath, async (text) =>
                 {
                     if (string.IsNullOrEmpty(text))
                         await ServicesInitializer.ADS.DeleteAsync(folderPath, "long_note");

@@ -19,8 +19,14 @@
         </Border.Effect>
 
         <StackPanel Width="320">
-            <TextBlock Text="备注" FontSize="12"
-                       Foreground="#80000000" Margin="0,0,0,8" />
+            <TextBlock x:Name="TitleLabel" Text="备注"
+                       FontSize="11" FontWeight="Medium"
+                       Foreground="#FF007AFF" Margin="0,0,0,4"
+                       TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="FolderLabel" Text=""
+                       FontSize="10"
+                       Foreground="#80000000" Margin="0,0,0,10"
+                       TextTrimming="CharacterEllipsis" />
 
             <TextBox x:Name="NoteTextBox"
                      FontSize="14"

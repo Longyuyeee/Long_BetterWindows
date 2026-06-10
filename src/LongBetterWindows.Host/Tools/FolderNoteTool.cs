@@ -104,10 +104,11 @@ namespace LongBetterWindows.Host.Tools
 
             Application.Current.Dispatcher.Invoke(() =>
             {
-                FloatingHudWindow.ShowAt(hudX, hudY, existingNote, async (text) =>
-                {
-                    await SaveNoteAsync(folderPath, text);
-                });
+                FloatingHudWindow.ShowAt(hudX, hudY, existingNote, folderPath,
+                    async (text) =>
+                    {
+                        await SaveNoteAsync(folderPath, text);
+                    });
             });
         }
 
