@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using Serilog;
@@ -89,6 +90,81 @@ namespace LongBetterWindows.Host.Engine
             var entry = Get(pluginId);
             return entry?.Manifest.Capabilities.AsReadOnly()
                 ?? (IReadOnlyList<string>)Array.Empty<string>();
+        }
+
+        public async Task<bool> StartPluginAsync(string pluginId)
+        {
+            PluginEntry? entry;
+            lock (_lock)
+            {
+                entry = Get(pluginId);
+            }
+
+            if (entry == null || entry.State == PluginState.Running) return false;
+
+            try
+            {
+                using (PluginAccessContext.Enter(pluginId))
+                {
+                    var ok = await entry.Instance.StartAsync();
+                    if (ok)
+                    {
+                        SetState(pluginId, PluginState.Running);
+                        Log.Information("插件 {PluginId} 已启用", pluginId);
+                    }
+                    return ok;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "插件 {PluginId} 启动失败", pluginId);
+                SetState(pluginId, PluginState.Error);
+                return false;
+            }
+        }
+
+        public async Task<bool> StopPluginAsync(string pluginId)
+        {
+            PluginEntry? entry;
+            lock (_lock)
+            {
+                entry = Get(pluginId);
+            }
+
+            if (entry == null || entry.State != PluginState.Running) return false;
+
+            try
+            {
+                using (PluginAccessContext.Enter(pluginId))
+                {
+                    await entry.Instance.StopAsync();
+                }
+                SetState(pluginId, PluginState.Disabled);
+                Log.Information("插件 {PluginId} 已禁用", pluginId);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "插件 {PluginId} 停止失败", pluginId);
+                return false;
+            }
+        }
+
+        public static string? GetPluginHotkey(PluginEntry entry)
+        {
+            var settings = entry.Manifest.DefaultSettings;
+            if (settings == null) return null;
+
+            foreach (var key in new[] { "hotkey", "record_hotkey", "play_once_hotkey" })
+            {
+                if (settings.TryGetValue(key, out var val) && val is JsonElement el)
+                {
+                    var s = el.GetString();
+                    if (!string.IsNullOrEmpty(s)) return s;
+                }
+            }
+
+            return null;
         }
     }
 }

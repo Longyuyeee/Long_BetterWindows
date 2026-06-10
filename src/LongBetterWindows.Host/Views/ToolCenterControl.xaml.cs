@@ -1,7 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
+using System.Windows.Shapes;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 
@@ -16,7 +17,6 @@ namespace LongBetterWindows.Host.Views
 
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
-        private readonly DispatcherTimer _pluginRefreshTimer;
 
         public ToolCenterControl()
         {
@@ -24,13 +24,6 @@ namespace LongBetterWindows.Host.Views
             RefreshColumnStatus();
             RefreshContextMenuStatus();
             RefreshPluginList();
-
-            _pluginRefreshTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(3),
-            };
-            _pluginRefreshTimer.Tick += (_, _) => RefreshPluginList();
-            _pluginRefreshTimer.Start();
         }
 
         private async void ColumnButton_Click(object sender, RoutedEventArgs e)
@@ -137,8 +130,13 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
+        private int _pluginCardVersion;
+
         private void RefreshPluginList()
         {
+            _pluginCardVersion++;
+            var version = _pluginCardVersion;
+
             PluginsPanel.Children.Clear();
             var plugins = HostProvider.Instance.PluginStore.GetAll();
 
@@ -152,7 +150,7 @@ namespace LongBetterWindows.Host.Views
 
             var header = new TextBlock
             {
-                Text = "已加载插件",
+                Text = "插件",
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 13,
                 Foreground = GrayBrush,
@@ -162,64 +160,140 @@ namespace LongBetterWindows.Host.Views
 
             foreach (var plugin in plugins)
             {
-                PluginsPanel.Children.Add(CreatePluginCard(plugin));
+                PluginsPanel.Children.Add(CreatePluginCard(plugin, version));
             }
         }
 
-        private static Border CreatePluginCard(PluginEntry plugin)
+        private Border CreatePluginCard(PluginEntry plugin, int version)
         {
-            var stateColor = plugin.State switch
+            var isRunning = plugin.State == Core.PluginState.Running;
+            var stateColor = isRunning ? GreenBrush : GrayBrush;
+            var stateText = isRunning ? "运行中" : "已停止";
+
+            var hotkey = PluginRegistry.GetPluginHotkey(plugin);
+            var capText = plugin.Manifest.Capabilities.Count > 0
+                ? string.Join(", ", plugin.Manifest.Capabilities) : "无";
+
+            // 左侧信息区
+            var infoStack = new StackPanel();
+
+            // 第一行: 状态点 + 名称
+            var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
+            nameRow.Children.Add(new Ellipse
             {
-                Core.PluginState.Running => GreenBrush,
-                Core.PluginState.Error => new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30)),
-                _ => GrayBrush,
-            };
-
-            var stateText = plugin.State switch
-            {
-                Core.PluginState.Running => "运行中",
-                Core.PluginState.Loaded => "已加载",
-                Core.PluginState.Error => "错误",
-                Core.PluginState.Disabled => "已禁用",
-                _ => "未知",
-            };
-
-            var capabilitiesText = plugin.Manifest.Capabilities.Count > 0
-                ? string.Join(", ", plugin.Manifest.Capabilities)
-                : "无";
-
-            var stack = new StackPanel();
-
-            stack.Children.Add(new TextBlock
-            {
-                Text = $"{plugin.Manifest.Name} ({plugin.Manifest.Id})",
-                FontSize = 12,
-                FontWeight = FontWeights.Medium,
+                Width = 8, Height = 8,
+                Fill = stateColor,
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
             });
-
-            stack.Children.Add(new TextBlock
+            nameRow.Children.Add(new TextBlock
             {
-                Text = $"v{plugin.Manifest.Version} · 能力: {capabilitiesText}",
+                Text = plugin.Manifest.Name,
+                FontSize = 13,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            infoStack.Children.Add(nameRow);
+
+            // 第二行: 快捷键 + 状态
+            var metaRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
+
+            if (hotkey != null)
+            {
+                var hotkeyBadge = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(0x15, 0x00, 0x7A, 0xFF)),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 2, 6, 2),
+                    Margin = new Thickness(0, 0, 8, 0),
+                    Child = new TextBlock
+                    {
+                        Text = hotkey,
+                        FontSize = 10,
+                        Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                    },
+                };
+                metaRow.Children.Add(hotkeyBadge);
+            }
+
+            metaRow.Children.Add(new TextBlock
+            {
+                Text = $"{stateText} · v{plugin.Manifest.Version}",
                 FontSize = 11,
                 Foreground = GrayBrush,
-                Margin = new Thickness(0, 2, 0, 4),
+                VerticalAlignment = VerticalAlignment.Center,
             });
+            infoStack.Children.Add(metaRow);
 
-            stack.Children.Add(new TextBlock
+            // 右侧按钮
+            var btnText = isRunning ? "禁用" : "启用";
+            var btnBrush = isRunning
+                ? new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30))
+                : GreenBrush;
+
+            var toggleBtn = new Button
             {
-                Text = stateText,
+                Content = btnText,
+                Width = 56, Height = 28,
                 FontSize = 11,
-                Foreground = stateColor,
-            });
+                Foreground = Brushes.White,
+                Background = btnBrush,
+                BorderThickness = new Thickness(0),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Tag = new ToggleState { PluginId = plugin.Id, Version = version },
+            };
+            toggleBtn.Click += PluginToggle_Click;
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            Grid.SetColumn(infoStack, 0);
+            Grid.SetColumn(toggleBtn, 1);
+            grid.Children.Add(infoStack);
+            grid.Children.Add(toggleBtn);
 
             return new Border
             {
                 Background = new SolidColorBrush(Color.FromArgb(0x10, 0x00, 0x00, 0x00)),
                 CornerRadius = new CornerRadius(10),
                 Padding = new Thickness(14, 10, 14, 10),
-                Margin = new Thickness(0, 0, 0, 6),
-                Child = stack,
+                Margin = new Thickness(0, 0, 0, 8),
+                Child = grid,
             };
+        }
+
+        private async void PluginToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not ToggleState state) return;
+            btn.IsEnabled = false;
+
+            var registry = HostProvider.Instance.PluginStore;
+            var entry = registry.Get(state.PluginId);
+
+            if (entry == null)
+            {
+                btn.IsEnabled = true;
+                return;
+            }
+
+            if (entry.State == Core.PluginState.Running)
+            {
+                await registry.StopPluginAsync(state.PluginId);
+            }
+            else
+            {
+                await registry.StartPluginAsync(state.PluginId);
+            }
+
+            btn.IsEnabled = true;
+            RefreshPluginList();
+        }
+
+        private class ToggleState
+        {
+            public string PluginId { get; init; } = string.Empty;
+            public int Version { get; init; }
         }
     }
 }
