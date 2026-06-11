@@ -89,41 +89,36 @@ dotnet run --project src/LongBetterWindows.Host
 
 ## 插件开发
 
-### 脚手架一键创建
+### 三种方式，自由选择
+
+| 方式 | 语言 | 编译 | 适合 |
+|---|---|---|---|
+| **HTML/JS** | HTML+CSS+JS | 不需要 | Web 开发者、富 UI 工具 |
+| **C# 脚本** | C# (.csx) | 不需要 | 快速自动化 |
+| **DLL 插件** | C# (.NET) | 需要 | 复杂系统插件 |
+
+### HTML/JS 插件 — 1 分钟上手
+
+```html
+<!-- index.html -->
+<button onclick="go()">备注此文件夹</button>
+<script>
+async function go() {
+  let f = await long.shell.getActiveFolder();
+  let t = await long.clipboard.getText();
+  await long.fs.ads.write(f.data, t.data);
+  long.ui.showToast('已保存！');
+}
+</script>
+```
+
+### 打包分发
 
 ```powershell
-.\new-plugin.ps1 -Name "我的插件" -Id "com.example.myplugin" -Template hotkey
+.\pack-plugin.ps1 -PluginDir "src/MyPlugin"   # → dist/MyPlugin-v1.0.0.lpak
 ```
 
-### 三级模板
-
-| 模板 | 说明 |
-|---|---|
-| `empty` | 最小骨架，仅实现生命周期 |
-| `hotkey` | 注册全局热键 + 能力调用 |
-| `full` | 多能力 + 自定义设置 UI + 配置持久化 |
-
-### 核心接口
-
-```csharp
-public class MyPlugin : ILongPlugin
-{
-    public string Id => "com.example.myplugin";
-    public string Name => "我的插件";
-    public string Version => "1.0.0";
-    public PluginState State { get; private set; }
-
-    public Task<bool> InitializeAsync(IHostApi host) { /* 获取能力 */ }
-    public Task<bool> StartAsync() { /* 注册热键、启动任务 */ }
-    public Task<bool> StopAsync() { /* 释放资源 */ }
-}
-
-// 可选：自定义设置面板
-public class MyPlugin : ILongPlugin, IHasSettingsUI
-{
-    public FrameworkElement CreateSettingsUI() { /* 返回 WPF 面板 */ }
-}
-```
+用户拖放 `.lpak` 文件到 ToolCenter 即完成安装。
 
 详细文档见 [`docs/插件开发指南.md`](docs/插件开发指南.md)
 
