@@ -230,7 +230,7 @@ namespace LongBetterWindows.Host.Engine
             ILongPlugin plugin;
             PluginLoadContext? loadContext = null;
 
-            // 检测脚本插件
+            // 检测脚本插件 (.csx)
             if (string.Equals(manifest.Runtime, "csharp-script", StringComparison.OrdinalIgnoreCase))
             {
                 var scriptResult = await _scriptLoader.LoadAsync(pluginDir, manifest);
@@ -243,6 +243,21 @@ namespace LongBetterWindows.Host.Engine
 
                 plugin = new ScriptPluginAdapter(
                     scriptResult.Globals!, manifest.Id, manifest.Name, manifest.Version);
+            }
+            // 检测 Web 插件 (HTML/JS)
+            else if (string.Equals(manifest.Runtime, "webview", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var webRuntime = new WebPluginRuntime(manifest, pluginDir);
+                    plugin = new WebPluginAdapter(
+                        webRuntime, manifest.Id, manifest.Name, manifest.Version);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Web 插件 {PluginId} 创建失败: {Error}", manifest.Id, ex.Message);
+                    return;
+                }
             }
             else
             {
