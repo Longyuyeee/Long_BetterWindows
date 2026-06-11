@@ -1,0 +1,14 @@
+{
+  "id": "com.example.script",
+  "version": "1.0.0",
+  "name": "脚本插件模板",
+  "author": "",
+  "entry_point": "plugin.csx",
+  "runtime": "csharp-script",
+  "capabilities": [
+    "system.hotkey"
+  ],
+  "default_settings": {
+    "hotkey": "Alt+X"
+  }
+}

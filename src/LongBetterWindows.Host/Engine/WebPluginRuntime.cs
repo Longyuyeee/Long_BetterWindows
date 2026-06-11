@@ -118,7 +118,9 @@ namespace LongBetterWindows.Host.Engine
             return method switch
             {
                 // === long.app ===
-                "app.showNotification" => await AppShowNotification(args),
+                "app.openUrl" => Task.FromResult<object?>(AppOpenUrl(Arg(args, 0))),
+                "app.openFolder" => Task.FromResult<object?>(AppOpenFolder(Arg(args, 0))),
+                "app.showNotification" => Task.FromResult<object?>(UIToast(Arg(args, 0) + "\n" + Arg(args, 1))),
 
                 // === long.clipboard ===
                 "clipboard.getText" => Ok(h.Clipboard!.GetTextAsync()),
@@ -179,11 +181,18 @@ namespace LongBetterWindows.Host.Engine
             return OkObj();
         }
 
-        private async Task<object> AppShowNotification(object?[] args)
+        private object AppOpenUrl(string url)
         {
-            var title = Arg(args, 0);
-            var body = Arg(args, 1);
-            UIToast($"{title}\n{body}");
+            if (!string.IsNullOrEmpty(url))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                { FileName = url, UseShellExecute = true });
+            return OkObj();
+        }
+
+        private object AppOpenFolder(string path)
+        {
+            if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
+                System.Diagnostics.Process.Start("explorer.exe", path);
             return OkObj();
         }
 
@@ -219,6 +228,8 @@ function call(method,args){
 }
 window.long = {
   app: {
+    openUrl: function(url){return call('app.openUrl',[url]);},
+    openFolder: function(path){return call('app.openFolder',[path]);},
     showNotification: function(title,body){return call('app.showNotification',[title,body]);}
   },
   clipboard: {
