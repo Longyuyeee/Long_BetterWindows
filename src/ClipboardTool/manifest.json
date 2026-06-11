@@ -1,0 +1,17 @@
+{
+  "id": "com.long.clipboard-tool",
+  "version": "1.0.0",
+  "name": "剪贴板工具箱",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": [
+    "system.clipboard",
+    "system.hotkey",
+    "shell.selection",
+    "storage.local"
+  ],
+  "default_settings": {
+    "hotkey": "Ctrl+Shift+V"
+  }
+}

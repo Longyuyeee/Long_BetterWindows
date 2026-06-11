@@ -20,4 +20,14 @@
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
   </ItemGroup>
 
+  <!-- 复制 Web 插件源码到 Plugins 输出目录 -->
+  <Target Name="CopyWebPlugins" AfterTargets="Build">
+    <ItemGroup>
+      <WebPluginFiles Include="$(SolutionDir)src\ClipboardTool\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WebPluginFiles)"
+          DestinationFiles="@(WebPluginFiles->'$(SolutionDir)Plugins\ClipboardTool\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
