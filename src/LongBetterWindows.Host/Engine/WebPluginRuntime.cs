@@ -113,175 +113,166 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task<object?> DispatchJsCall(string method, object?[] args)
         {
-            var host = HostProvider.Instance;
+            var h = HostProvider.Instance;
 
             return method switch
             {
+                // === long.app ===
+                "app.showNotification" => await AppShowNotification(args),
+
+                // === long.clipboard ===
+                "clipboard.getText" => Ok(h.Clipboard!.GetTextAsync()),
+                "clipboard.setText" => Ok(h.Clipboard!.SetTextAsync(Arg(args, 0))),
+                "clipboard.clear" => Ok(h.Clipboard!.ClearAsync()),
+
+                // === long.shell ===
+                "shell.getActiveFolder" => Ok(h.ShellSelection!.GetActiveExplorerFolderPathAsync()),
+                "shell.getSelectedItems" => OkList(h.ShellSelection!.GetSelectedItemsAsync()),
+                "shell.getItemScreenRect" => Ok(h.ShellSelection!.GetSelectedItemScreenRectAsync()),
+
+                // === long.fs.ads ===
+                "fs.ads.read" => Ok(h.ADS!.ReadAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
+                "fs.ads.write" => Ok(h.ADS!.WriteAsync(Arg(args, 0), Arg(args, 1, "long_note"), Arg(args, 2))),
+                "fs.ads.delete" => Ok(h.ADS!.DeleteAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
+                "fs.ads.exists" => Ok(h.ADS!.ExistsAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
+                "fs.ads.isNTFS" => Ok(h.ADS!.IsNTFSVolumeAsync(Arg(args, 0))),
+
+                // === long.hotkey ===
                 "hotkey.register" => await HotKeyRegister(args),
                 "hotkey.unregister" => await HotKeyUnregister(args),
-                "clipboard.getText" => await ClipboardGetText(),
-                "clipboard.setText" => await ClipboardSetText(args),
-                "shell.getActiveFolder" => await ShellGetFolder(),
-                "storage.get" => await StorageGet(args),
-                "storage.set" => await StorageSet(args),
-                "ads.read" => await AdsRead(args),
-                "ads.write" => await AdsWrite(args),
-                _ => null,
+                "hotkey.isConflict" => Ok(h.HotKey!.IsConflictAsync(Arg(args, 0))),
+
+                // === long.registry ===
+                "registry.read" => Ok(h.Registry!.ReadValueAsync(Arg(args, 0), Arg(args, 1))),
+                "registry.write" => Ok(h.Registry!.WriteValueAsync(Arg(args, 0), Arg(args, 1), Arg(args, 2))),
+                "registry.delete" => Ok(h.Registry!.DeleteValueAsync(Arg(args, 0), Arg(args, 1))),
+
+                // === long.storage ===
+                "storage.get" => Ok(h.Storage!.GetAsync(Arg(args, 0))),
+                "storage.set" => Ok(h.Storage!.SetAsync(Arg(args, 0), Arg(args, 1))),
+                "storage.delete" => Ok(h.Storage!.DeleteAsync(Arg(args, 0))),
+                "storage.containsKey" => Ok(h.Storage!.ContainsKeyAsync(Arg(args, 0))),
+
+                // === long.ui ===
+                "ui.showToast" => Task.FromResult<object?>(UIToast(Arg(args, 0))),
+
+                _ => Task.FromResult<object?>(new { success = false, error = $"未知方法: {method}" }),
             };
+        }
+
+        // 辅助方法
+        private static string Arg(object?[] args, int i, string def = "") =>
+            args.Length > i ? args[i]?.ToString() ?? def : def;
+
+        private static async Task<object> Ok<T>(Task<HostApiResponse<T>> t) { var r = await t; return new { r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
+
+        private static async Task<object> Ok(Task<HostApiResponse> t) { var r = await t; return new { r.IsSuccess, error = r.ErrorMessage }; }
+
+        private static async Task<object> OkList<T>(Task<HostApiResponse<List<T>>> t) { var r = await t; return new { r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
+
+        private static object OkObj() => new { success = true };
+
+        private object UIToast(string msg)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                Views.FloatingHudWindow.ShowToast(msg));
+            return OkObj();
+        }
+
+        private async Task<object> AppShowNotification(object?[] args)
+        {
+            var title = Arg(args, 0);
+            var body = Arg(args, 1);
+            UIToast($"{title}\n{body}");
+            return OkObj();
         }
 
         private async Task<object> HotKeyRegister(object?[] args)
         {
-            var hotkey = args[0]?.ToString() ?? "";
-            var id = _manifest.Id;
-            var host = HostProvider.Instance;
-
-            var result = await host.HotKey!.RegisterAsync(hotkey, () =>
+            var hotkey = Arg(args, 0);
+            var r = await HostProvider.Instance.HotKey!.RegisterAsync(hotkey, () =>
             {
                 _webView.CoreWebView2.PostWebMessageAsJson(
-                    System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        type = "hotkey",
-                        hotkey,
-                    }));
+                    System.Text.Json.JsonSerializer.Serialize(new { type = "hotkey", hotkey }));
             });
-
-            return new { success = result.IsSuccess, error = result.ErrorMessage };
+            return new { r.IsSuccess, error = r.ErrorMessage };
         }
 
-        private Task<object> HotKeyUnregister(object?[] args)
+        private async Task<object> HotKeyUnregister(object?[] args)
         {
-            var hotkey = args[0]?.ToString() ?? "";
-            return Task.FromResult<object>(new { unregistered = hotkey });
-        }
-
-        private async Task<object> ClipboardGetText()
-        {
-            var host = HostProvider.Instance;
-            var result = await host.Clipboard!.GetTextAsync();
-            return new { success = result.IsSuccess, text = result.Data };
-        }
-
-        private async Task<object> ClipboardSetText(object?[] args)
-        {
-            var text = args[0]?.ToString() ?? "";
-            var host = HostProvider.Instance;
-            var result = await host.Clipboard!.SetTextAsync(text);
-            return new { success = result.IsSuccess };
-        }
-
-        private async Task<object> ShellGetFolder()
-        {
-            var host = HostProvider.Instance;
-            var result = await host.ShellSelection!.GetActiveExplorerFolderPathAsync();
-            return new { success = result.IsSuccess, path = result.Data };
-        }
-
-        private async Task<object> StorageGet(object?[] args)
-        {
-            var key = args[0]?.ToString() ?? "";
-            var host = HostProvider.Instance;
-            var result = await host.Storage!.GetAsync(key);
-            return new { success = result.IsSuccess, value = result.Data };
-        }
-
-        private async Task<object> StorageSet(object?[] args)
-        {
-            var key = args[0]?.ToString() ?? "";
-            var value = args[1]?.ToString() ?? "";
-            var host = HostProvider.Instance;
-            var result = await host.Storage!.SetAsync(key, value);
-            return new { success = result.IsSuccess };
-        }
-
-        private async Task<object> AdsRead(object?[] args)
-        {
-            var path = args[0]?.ToString() ?? "";
-            var stream = args[1]?.ToString() ?? "long_note";
-            var host = HostProvider.Instance;
-            var result = await host.ADS!.ReadAsync(path, stream);
-            return new { success = result.IsSuccess, content = result.Data };
-        }
-
-        private async Task<object> AdsWrite(object?[] args)
-        {
-            var path = args[0]?.ToString() ?? "";
-            var content = args[1]?.ToString() ?? "";
-            var stream = args[2]?.ToString() ?? "long_note";
-            var host = HostProvider.Instance;
-            var result = await host.ADS!.WriteAsync(path, stream, content);
-            return new { success = result.IsSuccess };
+            var hotkey = Arg(args, 0);
+            var r = await HostProvider.Instance.HotKey!.UnregisterAsync(hotkey);
+            return new { r.IsSuccess, error = r.ErrorMessage };
         }
 
         private static string BuildJsBridge(IHostApi host, string pluginId)
         {
-            return $@"
-// Long窗口 WebView2 JS Bridge
-window.long = {{
-    _callId: 0,
-    _pending: {{}},
+            var js = @"
+(function() {
+var _id=0,_pending={};
+function call(method,args){
+  return new Promise(function(resolve,reject){
+    var id=++_id;
+    _pending[id]={resolve:resolve,reject:reject};
+    window.chrome.webview.postMessage(JSON.stringify({id:id,method:method,args:args||[]}));
+  });
+}
+window.long = {
+  app: {
+    showNotification: function(title,body){return call('app.showNotification',[title,body]);}
+  },
+  clipboard: {
+    getText: function(){return call('clipboard.getText',[]);},
+    setText: function(t){return call('clipboard.setText',[t]);},
+    clear: function(){return call('clipboard.clear',[]);}
+  },
+  shell: {
+    getActiveFolder: function(){return call('shell.getActiveFolder',[]);},
+    getSelectedItems: function(){return call('shell.getSelectedItems',[]);},
+    getItemScreenRect: function(){return call('shell.getItemScreenRect',[]);}
+  },
+  fs: { ads: {
+    read: function(p,s){return call('fs.ads.read',[p,s||'long_note']);},
+    write: function(p,c,s){return call('fs.ads.write',[p,c,s||'long_note']);},
+    delete: function(p,s){return call('fs.ads.delete',[p,s||'long_note']);},
+    exists: function(p,s){return call('fs.ads.exists',[p,s||'long_note']);},
+    isNTFS: function(p){return call('fs.ads.isNTFS',[p]);}
+  }},
+  hotkey: {
+    register: function(h){return call('hotkey.register',[h]);},
+    unregister: function(h){return call('hotkey.unregister',[h]);},
+    isConflict: function(h){return call('hotkey.isConflict',[h]);}
+  },
+  registry: {
+    read: function(k,v){return call('registry.read',[k,v]);},
+    write: function(k,n,v){return call('registry.write',[k,n,v]);},
+    delete: function(k,v){return call('registry.delete',[k,v]);}
+  },
+  storage: {
+    get: function(k){return call('storage.get',[k]);},
+    set: function(k,v){return call('storage.set',[k,v]);},
+    delete: function(k){return call('storage.delete',[k]);},
+    containsKey: function(k){return call('storage.containsKey',[k]);}
+  },
+  ui: {
+    showToast: function(m){return call('ui.showToast',[m]);}
+  }
+};
+window.chrome.webview.addEventListener('message',function(e){
+  try{
+    var m=JSON.parse(e.data);
+    if(m.id&&window.long._pending[m.id]){
+      if(m.error)window.long._pending[m.id].reject(new Error(m.error));
+      else window.long._pending[m.id].resolve(m.result);
+      delete window.long._pending[m.id];
+    }
+    if(m.type==='hotkey')console.log('[Long] key:',m.hotkey);
+  }catch(ex){}
+});
+console.log('[Long] Bridge ready · __PLUGIN_ID__');
+})();";
 
-    _call: function(method, args) {{
-        var id = ++window.long._callId;
-        return new Promise(function(resolve, reject) {{
-            window.long._pending[id] = {{ resolve, reject }};
-            window.chrome.webview.postMessage(JSON.stringify({{
-                id: id,
-                method: method,
-                args: args || [],
-            }}));
-        }});
-    }},
-
-    hotkey: {{
-        register: function(hotkey, callback) {{
-            return window.long._call('hotkey.register', [hotkey]);
-        }},
-        unregister: function(hotkey) {{
-            return window.long._call('hotkey.unregister', [hotkey]);
-        }},
-    }},
-
-    clipboard: {{
-        getText: function() {{ return window.long._call('clipboard.getText', []); }},
-        setText: function(text) {{ return window.long._call('clipboard.setText', [text]); }},
-    }},
-
-    shell: {{
-        getActiveFolder: function() {{ return window.long._call('shell.getActiveFolder', []); }},
-    }},
-
-    storage: {{
-        get: function(key) {{ return window.long._call('storage.get', [key]); }},
-        set: function(key, value) {{ return window.long._call('storage.set', [key, value]); }},
-    }},
-
-    ads: {{
-        read: function(path, stream) {{ return window.long._call('ads.read', [path, stream || 'long_note']); }},
-        write: function(path, content, stream) {{ return window.long._call('ads.write', [path, content, stream || 'long_note']); }},
-    }},
-}};
-
-// 接收来自 .NET 的响应和热键事件
-window.chrome.webview.addEventListener('message', function(e) {{
-    try {{
-        var msg = JSON.parse(e.data);
-        if (msg.id && window.long._pending[msg.id]) {{
-            if (msg.error) {{
-                window.long._pending[msg.id].reject(new Error(msg.error));
-            }} else {{
-                window.long._pending[msg.id].resolve(msg.result);
-            }}
-            delete window.long._pending[msg.id];
-        }}
-        if (msg.type === 'hotkey') {{
-            console.log('[Long] 热键触发:', msg.hotkey);
-        }}
-    }} catch(ex) {{ }}
-}});
-
-console.log('[Long] JS Bridge 就绪, 插件ID: {pluginId}');
-";
+            return js.Replace("__PLUGIN_ID__", pluginId);
         }
     }
 
