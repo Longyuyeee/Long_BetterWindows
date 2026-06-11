@@ -32,7 +32,7 @@ namespace LongBetterWindows.Host.Engine
             }
         }
 
-        public bool Register(PluginManifest manifest, ILongPlugin instance, PluginLoadContext context, string directory)
+        public bool Register(PluginManifest manifest, ILongPlugin instance, PluginLoadContext? context, string directory)
         {
             lock (_lock)
             {

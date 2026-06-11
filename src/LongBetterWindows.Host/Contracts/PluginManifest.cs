@@ -22,6 +22,9 @@ namespace LongBetterWindows.Host.Contracts
         [JsonPropertyName("capabilities")]
         public List<string> Capabilities { get; init; } = new();
 
+        [JsonPropertyName("runtime")]
+        public string? Runtime { get; init; }
+
         [JsonPropertyName("default_settings")]
         public Dictionary<string, object>? DefaultSettings { get; init; }
     }

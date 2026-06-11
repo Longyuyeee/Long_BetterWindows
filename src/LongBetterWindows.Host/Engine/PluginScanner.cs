@@ -8,6 +8,7 @@ namespace LongBetterWindows.Host.Engine
     public class PluginScanner : IDisposable
     {
         private readonly PluginLoader _loader = new();
+        private readonly ScriptPluginLoader _scriptLoader = new();
         private readonly List<string> _scanDirs = new();
         private readonly List<FileSystemWatcher> _watchers = new();
         private readonly Dictionary<string, string> _dirToPluginId = new(); // pluginDir → pluginId
@@ -226,16 +227,37 @@ namespace LongBetterWindows.Host.Engine
                 return;
             }
 
-            var loadResult = await _loader.LoadAsync(pluginDir, manifest);
+            ILongPlugin plugin;
+            PluginLoadContext? loadContext = null;
 
-            if (!loadResult.IsSuccess)
+            // 检测脚本插件
+            if (string.Equals(manifest.Runtime, "csharp-script", StringComparison.OrdinalIgnoreCase))
             {
-                Log.Error("插件 {PluginId} 加载失败: {Error}",
-                    manifest.Id, loadResult.Error);
-                return;
+                var scriptResult = await _scriptLoader.LoadAsync(pluginDir, manifest);
+                if (!scriptResult.IsSuccess)
+                {
+                    Log.Error("脚本插件 {PluginId} 加载失败: {Error}",
+                        manifest.Id, scriptResult.Error);
+                    return;
+                }
+
+                plugin = new ScriptPluginAdapter(
+                    scriptResult.Globals!, manifest.Id, manifest.Name, manifest.Version);
+            }
+            else
+            {
+                var loadResult = await _loader.LoadAsync(pluginDir, manifest);
+                if (!loadResult.IsSuccess)
+                {
+                    Log.Error("插件 {PluginId} 加载失败: {Error}",
+                        manifest.Id, loadResult.Error);
+                    return;
+                }
+
+                plugin = loadResult.Instance!;
+                loadContext = loadResult.Context;
             }
 
-            var plugin = loadResult.Instance!;
             var hostApi = HostProvider.Instance;
 
             using (PluginAccessContext.Enter(manifest.Id))
@@ -244,12 +266,13 @@ namespace LongBetterWindows.Host.Engine
                 if (!initOk)
                 {
                     Log.Error("插件 {PluginId} 初始化失败", manifest.Id);
-                    _loader.Unload(loadResult.Context!);
+                    if (loadContext != null) _loader.Unload(loadContext);
+                    else _scriptLoader.Unload(manifest.Id);
                     return;
                 }
             }
 
-            registry.Register(manifest, plugin, loadResult.Context!, pluginDir);
+            registry.Register(manifest, plugin, loadContext, pluginDir);
             _dirToPluginId[pluginDir] = manifest.Id;
 
             // 检查用户配置：仅 auto_start=true 时自动启动
@@ -264,7 +287,8 @@ namespace LongBetterWindows.Host.Engine
                     if (!startOk)
                     {
                         Log.Error("插件 {PluginId} 启动失败", manifest.Id);
-                        _loader.Unload(loadResult.Context!);
+                        if (loadContext != null) _loader.Unload(loadContext);
+                        else _scriptLoader.Unload(manifest.Id);
                         return;
                     }
                 }
