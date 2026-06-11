@@ -23,6 +23,7 @@ namespace LongBetterWindows.Host.Engine
             "fs.ads.access",
             "system.registry.read",
             "system.registry.write",
+            "system.clipboard",
             "storage.local",
         };
 

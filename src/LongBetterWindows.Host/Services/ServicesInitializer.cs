@@ -13,6 +13,7 @@ namespace LongBetterWindows.Host.Services
         public static ShellSelectionService ShellSelection { get; private set; } = null!;
         public static ColumnInjectionService ColumnInjection { get; private set; } = null!;
         public static ContextMenuService ContextMenu { get; private set; } = null!;
+        public static ClipboardService Clipboard { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
 
         public static void Initialize()
@@ -39,6 +40,9 @@ namespace LongBetterWindows.Host.Services
             ColumnInjection = new ColumnInjectionService();
 
             ContextMenu = new ContextMenuService();
+
+            Clipboard = new ClipboardService();
+            provider.RegisterService<IClipboardService>(Clipboard);
 
             Startup = new StartupService();
         }

@@ -47,16 +47,26 @@ namespace LongBetterWindows.Host
                 args.Handled = true;
             };
 
-            // 非 --note 模式：正常启动，扫描插件
+            // 非 --note 模式：正常启动，安装 .lpak → 扫描插件
             if (_directNotePath == null)
             {
                 var scanner = new PluginScanner();
-                _ = scanner.ScanAsync().ContinueWith(t =>
+                var installer = new LpakInstaller(scanner);
+
+                _ = Task.Run(async () =>
+                {
+                    // 先安装 .lpak 包
+                    var installed = await installer.InstallAllFromDirectoryAsync();
+                    if (installed > 0)
+                        Log.Information("安装了 {Count} 个 .lpak 插件", installed);
+
+                    // 再扫描已解压的插件
+                    await scanner.ScanAsync();
+                    Log.Information("插件加载完成，共 {Count} 个", scanner.LoadedPlugins.Count);
+                }).ContinueWith(t =>
                 {
                     if (t.IsFaulted)
-                        Log.Error(t.Exception, "插件扫描失败");
-                    else
-                        Log.Information("插件扫描完成，加载 {Count} 个插件", scanner.LoadedPlugins.Count);
+                        Log.Error(t.Exception, "插件加载失败");
                 });
             }
         }

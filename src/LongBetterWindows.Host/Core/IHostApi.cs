@@ -9,5 +9,6 @@ namespace LongBetterWindows.Host.Core
         IADSService? ADS { get; }
         IRegistryService? Registry { get; }
         IStorageService? Storage { get; }
+        IClipboardService? Clipboard { get; }
     }
 }

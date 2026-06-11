@@ -76,6 +76,8 @@ namespace LongBetterWindows.Host.Engine
                 return "system.registry.write";
             if (typeof(T) == typeof(IStorageService))
                 return "storage.local";
+            if (typeof(T) == typeof(IClipboardService))
+                return "system.clipboard";
             return null;
         }
 
@@ -84,5 +86,6 @@ namespace LongBetterWindows.Host.Engine
         public IADSService? ADS => GetService<IADSService>();
         public IRegistryService? Registry => GetService<IRegistryService>();
         public IStorageService? Storage => GetService<IStorageService>();
+        public IClipboardService? Clipboard => GetService<IClipboardService>();
     }
 }
