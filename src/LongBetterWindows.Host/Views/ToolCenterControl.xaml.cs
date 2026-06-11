@@ -1,11 +1,12 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
+using Ellipse = System.Windows.Shapes.Ellipse;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -26,7 +27,71 @@ namespace LongBetterWindows.Host.Views
             RefreshColumnStatus();
             RefreshContextMenuStatus();
             RefreshStartupStatus();
+            RefreshDocLinks();
             RefreshPluginList();
+        }
+
+        private void RefreshDocLinks()
+        {
+            DocLinksPanel.Children.Clear();
+
+            // 查找 docs 目录
+            var docsDir = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "docs");
+
+            if (!Directory.Exists(docsDir))
+            {
+                // 尝试发布路径
+                docsDir = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "docs");
+            }
+
+            if (!Directory.Exists(docsDir))
+            {
+                DocLinksPanel.Children.Add(new TextBlock
+                {
+                    Text = "文档目录未找到",
+                    FontSize = 11,
+                    Foreground = GrayBrush,
+                });
+                return;
+            }
+
+            var docFiles = Directory.GetFiles(docsDir, "*.md")
+                .OrderBy(f => f)
+                .ToList();
+
+            foreach (var file in docFiles)
+            {
+                var name = Path.GetFileNameWithoutExtension(file)
+                    .Replace("设计文档_", "")
+                    .Replace("第一部分_", "Part1 ")
+                    .Replace("第二部分_", "Part2 ")
+                    .Replace("第四部分_", "Part4 ")
+                    .Replace("插件开发指南", "插件开发指南 ⭐")
+                    .Replace("基础能力_API_手册", "API 手册");
+
+                var link = new TextBlock
+                {
+                    Text = name,
+                    FontSize = 12,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                    Cursor = Cursors.Hand,
+                    Margin = new Thickness(0, 2, 0, 2),
+                    Tag = file,
+                };
+                link.MouseLeftButtonDown += (_, _) =>
+                {
+                    var path = (string)link.Tag;
+                    var content = File.ReadAllText(path);
+                    DocViewer.ShowDoc(
+                        Window.GetWindow(this)!,
+                        Path.GetFileNameWithoutExtension(path),
+                        content);
+                };
+
+                DocLinksPanel.Children.Add(link);
+            }
         }
 
         private void StartupButton_Click(object sender, RoutedEventArgs e)

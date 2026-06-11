@@ -99,6 +99,18 @@
             <Border Background="#10000000" CornerRadius="12" Padding="20,16"
                     Margin="0,0,0,12">
                 <StackPanel>
+                    <TextBlock Text="开发文档"
+                               FontSize="14" FontWeight="Medium" />
+                    <TextBlock Text="点击查看开发指南和设计文档"
+                               FontSize="12" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="0,4,0,8" />
+                    <StackPanel x:Name="DocLinksPanel" />
+                </StackPanel>
+            </Border>
+
+            <Border Background="#10000000" CornerRadius="12" Padding="20,16"
+                    Margin="0,0,0,12">
+                <StackPanel>
                     <TextBlock Text="关于 Long窗口"
                                FontSize="14" FontWeight="Medium" />
                     <TextBlock Text="v0.2.0-alpha · .NET 8.0 · WPF"
