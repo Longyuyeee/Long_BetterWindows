@@ -61,6 +61,7 @@ namespace LongBetterWindows.Host.Views
                 case "listFiles": ListFiles(msg.Path ?? ""); break;
                 case "openFile": OpenFile(msg.Path ?? ""); break;
                 case "saveFile": SaveFile(msg.Path ?? "", msg.Content ?? ""); break;
+                case "preview": PreviewFile(msg.Path ?? ""); break;
                 case "newPlugin": NewPlugin(msg.Template ?? "web", msg.Name ?? "my-plugin", msg.Id ?? "com.example.plugin"); break;
             }
         }
@@ -112,6 +113,25 @@ namespace LongBetterWindows.Host.Views
                 SendJs("fileSaved", new { path, success = true });
             }
             catch (Exception ex) { SendJs("fileSaved", new { path, success = false, error = ex.Message }); }
+        }
+
+        private void PreviewFile(string path)
+        {
+            if (!File.Exists(path) || !path.EndsWith(".html")) return;
+            var w = new Window
+            {
+                Title = "预览: " + Path.GetFileName(path),
+                Width = 500, Height = 500,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            };
+            var wv = new Microsoft.Web.WebView2.Wpf.WebView2();
+            w.Content = wv;
+            w.Loaded += async (_, _) =>
+            {
+                await wv.EnsureCoreWebView2Async();
+                wv.CoreWebView2.Navigate(new Uri(path).AbsoluteUri);
+            };
+            w.Show();
         }
 
         private void NewPlugin(string template, string name, string id)

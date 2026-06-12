@@ -49,7 +49,9 @@ textarea{position:absolute;top:0;left:0;width:100%;height:100%;background:transp
   <div id='toolbar'>
     <button onclick='showNewDialog()'>+ 新建插件</button>
     <button class='secondary' onclick='saveCurrent()'>保存 (Ctrl+S)</button>
+    <button class='secondary' onclick='previewCurrent()'>预览</button>
     <button class='secondary' onclick='location.reload()'>刷新</button>
+    <span style='color:#888;font-size:11px;margin-left:12px' id='fileInfo'></span>
   </div>
   <div id='tabs'></div>
   <div id='editor'>
@@ -152,6 +154,17 @@ function createPlugin(){
   api('newPlugin',{template:t,name:n,id:id});
   document.getElementById('newDialog').style.display='none';
 }
+function previewCurrent(){
+  if(currentTab<0||!tabs[currentTab])return;
+  saveCurrent();
+  api('preview',{path:tabs[currentTab].path});
+  showStatus('预览中...');
+}
 function showStatus(msg){var s=document.getElementById('status');s.textContent=msg;s.classList.add('show');setTimeout(function(){s.classList.remove('show')},3000)}
+function updateFileInfo(){
+  if(currentTab>=0&&tabs[currentTab]){
+    document.getElementById('fileInfo').textContent=tabs[currentTab].path.split('/').slice(-2).join('/');
+  }
+}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 </script></body></html>
