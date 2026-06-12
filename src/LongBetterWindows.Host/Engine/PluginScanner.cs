@@ -251,7 +251,8 @@ namespace LongBetterWindows.Host.Engine
                 {
                     var webRuntime = new WebPluginRuntime(manifest, pluginDir);
                     plugin = new WebPluginAdapter(
-                        webRuntime, manifest.Id, manifest.Name, manifest.Version);
+                        webRuntime, manifest.Id, manifest.Name, manifest.Version,
+                        pluginDir, manifest.EntryPoint);
                 }
                 catch (Exception ex)
                 {

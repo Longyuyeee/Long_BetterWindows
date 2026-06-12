@@ -6,7 +6,7 @@ using Serilog;
 
 namespace QuickLaunchPlugin;
 
-public class QuickLaunchPluginImpl : ILongPlugin, IHasSettingsUI
+public class QuickLaunchPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
 {
     private IHostApi? _host;
     private bool _isActive;
@@ -102,5 +102,16 @@ public class QuickLaunchPluginImpl : ILongPlugin, IHasSettingsUI
                 _hotkey = newHotkey;
                 _host?.Storage?.SetAsync("quicklaunch_hotkey", newHotkey);
             });
+    }
+
+    public void ShowMainUI()
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+            LaunchWindow.Show(path =>
+            {
+                if (!string.IsNullOrEmpty(path))
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    { FileName = path, UseShellExecute = true });
+            }));
     }
 }

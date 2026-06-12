@@ -8,7 +8,7 @@ using Serilog;
 
 namespace ColorPickerPlugin;
 
-public class ColorPickerPluginImpl : ILongPlugin, IHasSettingsUI
+public class ColorPickerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
 {
     private IHostApi? _host;
     private string _hotkey = "Ctrl+Shift+P";
@@ -55,6 +55,8 @@ public class ColorPickerPluginImpl : ILongPlugin, IHasSettingsUI
         return new LongBetterWindows.Host.Views.HotkeySettingsControl(
             "颜色拾取器", Id, _hotkey, hk => _hotkey = hk);
     }
+
+    public void ShowMainUI() => OnPickColor();
 }
 
 /// <summary>

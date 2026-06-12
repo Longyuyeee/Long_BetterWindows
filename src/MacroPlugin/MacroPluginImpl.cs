@@ -5,7 +5,7 @@ using Serilog;
 
 namespace MacroPlugin;
 
-public class MacroPluginImpl : ILongPlugin, IHasSettingsUI
+public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
 {
     private IHostApi? _host;
     private MacroEngine? _engine;
@@ -162,16 +162,15 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI
     public FrameworkElement CreateSettingsUI()
     {
         var panel = new StackPanel { Margin = new Thickness(16) };
-
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl(
-            "录制", Id, "F6", _ => { }));
-
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl(
-            "播放单次", Id, "F7", _ => { }));
-
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl(
-            "循环播放", Id, "F8", _ => { }));
-
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("录制", Id, "F6", _ => { }));
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("播放单次", Id, "F7", _ => { }));
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("循环播放", Id, "F8", _ => { }));
         return panel;
+    }
+
+    public void ShowMainUI()
+    {
+        EnsureOverlay();
+        if (_overlay != null) _overlay.SetIdle();
     }
 }

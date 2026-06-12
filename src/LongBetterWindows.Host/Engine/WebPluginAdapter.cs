@@ -7,21 +7,45 @@ namespace LongBetterWindows.Host.Engine
     /// 将 WebView2 插件适配为 ILongPlugin。
     /// WebView2 生命周期与插件生命周期保持一致。
     /// </summary>
-    public class WebPluginAdapter : ILongPlugin, IDisposable
+    public class WebPluginAdapter : ILongPlugin, IHasMainUI, IDisposable
     {
         private readonly WebPluginRuntime _runtime;
+        private readonly string _pluginDir;
+        private readonly string _entryPoint;
 
         public string Id { get; }
         public string Name { get; }
         public string Version { get; }
         public PluginState State { get; private set; } = PluginState.Loaded;
 
-        public WebPluginAdapter(WebPluginRuntime runtime, string id, string name, string version)
+        public WebPluginAdapter(WebPluginRuntime runtime, string id, string name, string version, string pluginDir, string entryPoint)
         {
             _runtime = runtime;
+            _pluginDir = pluginDir;
+            _entryPoint = entryPoint;
             Id = id;
             Name = name;
             Version = version;
+        }
+
+        public void ShowMainUI()
+        {
+            var w = new System.Windows.Window
+            {
+                Title = Name,
+                Width = 480, Height = 520,
+                WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen,
+            };
+            var wv = new Microsoft.Web.WebView2.Wpf.WebView2();
+            w.Content = wv;
+            w.Loaded += async (_, _) =>
+            {
+                await wv.EnsureCoreWebView2Async();
+                var path = System.IO.Path.Combine(_pluginDir, _entryPoint);
+                if (System.IO.File.Exists(path))
+                    wv.CoreWebView2.Navigate(new Uri(path).AbsoluteUri);
+            };
+            w.Show();
         }
 
         public async Task<bool> InitializeAsync(IHostApi host)

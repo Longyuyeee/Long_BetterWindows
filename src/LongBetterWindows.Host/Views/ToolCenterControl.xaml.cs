@@ -369,6 +369,25 @@ namespace LongBetterWindows.Host.Views
             // 右侧按钮区域
             var btnPanel = new StackPanel { Orientation = Orientation.Horizontal };
 
+            // 插件有主 UI 时显示「打开」按钮
+            if (plugin.Instance is IHasMainUI hasUI)
+            {
+                var openBtn = new Button
+                {
+                    Content = "打开",
+                    Width = 48, Height = 24,
+                    FontSize = 11,
+                    Foreground = Brushes.White,
+                    Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                    BorderThickness = new Thickness(0),
+                    Cursor = Cursors.Hand,
+                    Margin = new Thickness(0, 0, 6, 0),
+                    Tag = hasUI,
+                };
+                openBtn.Click += (_, _) => hasUI.ShowMainUI();
+                btnPanel.Children.Add(openBtn);
+            }
+
             // 插件有自定义设置 UI 时显示齿轮按钮
             if (plugin.Instance is IHasSettingsUI)
             {
