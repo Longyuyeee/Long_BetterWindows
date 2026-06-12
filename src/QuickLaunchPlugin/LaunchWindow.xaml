@@ -11,23 +11,25 @@
         Loaded="Window_Loaded"
         Deactivated="Window_Deactivated">
 
-    <Border Background="#F0F0F5" CornerRadius="14" Padding="14"
+    <Border Background="#F5F5F7" CornerRadius="14" Padding="16"
             BorderBrush="#20000000" BorderThickness="0.5"
-            Width="400">
+            Width="440">
         <Border.Effect>
             <DropShadowEffect BlurRadius="24" ShadowDepth="6" Opacity="0.2" />
         </Border.Effect>
 
         <StackPanel>
             <TextBox x:Name="SearchBox"
-                     FontSize="16"
+                     FontSize="18"
                      BorderThickness="0"
                      Background="Transparent"
-                     TextChanged="SearchBox_TextChanged"
-                     PreviewKeyDown="SearchBox_PreviewKeyDown" />
+                     Foreground="#1D1D1F"
+                     CaretBrush="#007AFF"
+                     PreviewKeyDown="SearchBox_PreviewKeyDown"
+                     TextChanged="SearchBox_TextChanged" />
 
             <ListBox x:Name="ResultsList"
-                     MaxHeight="280"
+                     MaxHeight="320"
                      BorderThickness="0"
                      Background="Transparent"
                      Visibility="Collapsed"
@@ -35,11 +37,22 @@
                      Margin="0,8,0,0">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding Name}" FontSize="13"
-                                   Margin="0,4" />
+                        <StackPanel Orientation="Horizontal" Margin="0,3">
+                            <TextBlock Text="{Binding Icon}" FontSize="14"
+                                       Width="24" VerticalAlignment="Center" />
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontSize="13" />
+                                <TextBlock Text="{Binding Subtitle}" FontSize="10"
+                                           Foreground="#80000000" />
+                            </StackPanel>
+                        </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+
+            <TextBlock x:Name="HintText" Text="搜索应用..."
+                       FontSize="11" Foreground="#80000000"
+                       Margin="0,8,0,0" />
         </StackPanel>
     </Border>
 </Window>
