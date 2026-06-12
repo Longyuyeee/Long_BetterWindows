@@ -22,19 +22,14 @@
 
   <!-- 复制 Web 插件源码到 Plugins 输出目录 -->
   <Target Name="CopyWebPlugins" AfterTargets="Build">
-    <!-- ClipboardTool -->
+    <!-- 自动复制所有 Web 插件目录到 Plugins/ -->
     <ItemGroup>
-      <_ClipFiles Include="$(SolutionDir)src\ClipboardTool\**\*" />
+      <_WebPlugins Include="$(SolutionDir)src\ClipboardTool\**\*" />
+      <_WebPlugins Include="$(SolutionDir)src\QuickNotePlugin\**\*" />
+      <_WebPlugins Include="$(SolutionDir)src\TranslatePlugin\**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(_ClipFiles)"
-          DestinationFiles="@(_ClipFiles->'$(SolutionDir)Plugins\ClipboardTool\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-    <!-- QuickNotePlugin -->
-    <ItemGroup>
-      <_QnFiles Include="$(SolutionDir)src\QuickNotePlugin\**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_QnFiles)"
-          DestinationFiles="@(_QnFiles->'$(SolutionDir)Plugins\QuickNotePlugin\%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(_WebPlugins)"
+          DestinationFiles="@(_WebPlugins->'$(SolutionDir)Plugins\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 
