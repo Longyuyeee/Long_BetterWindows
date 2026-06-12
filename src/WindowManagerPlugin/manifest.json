@@ -1,0 +1,13 @@
+{
+  "id": "com.long.window-manager",
+  "version": "1.0.0",
+  "name": "窗口管理",
+  "author": "Long",
+  "entry_point": "WindowManagerPlugin.dll",
+  "capabilities": [
+    "system.hotkey"
+  ],
+  "default_settings": {
+    "auto_start": true
+  }
+}

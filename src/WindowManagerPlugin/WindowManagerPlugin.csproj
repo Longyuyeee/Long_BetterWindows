@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>WindowManagerPlugin</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LongBetterWindows.Host\LongBetterWindows.Host.csproj">
+      <Private>false</Private><ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+  <Target Name="CopyToPlugins" AfterTargets="Build">
+    <MakeDir Directories="$(SolutionDir)Plugins\WindowManagerPlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)Plugins\WindowManagerPlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(SolutionDir)Plugins\WindowManagerPlugin" />
+  </Target>
+</Project>
