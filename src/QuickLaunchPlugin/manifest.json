@@ -5,8 +5,7 @@
   "author": "Long",
   "entry_point": "QuickLaunchPlugin.dll",
   "capabilities": [
-    "system.hotkey",
-    "shell.selection"
+    "system.hotkey"
   ],
   "default_settings": {
     "hotkey": "Ctrl+Shift+Space",

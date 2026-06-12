@@ -1,10 +1,11 @@
 using System.Windows;
+using System.Windows.Controls;
 using LongBetterWindows.Host.Core;
 using Serilog;
 
 namespace MacroPlugin;
 
-public class MacroPluginImpl : ILongPlugin
+public class MacroPluginImpl : ILongPlugin, IHasSettingsUI
 {
     private IHostApi? _host;
     private MacroEngine? _engine;
@@ -156,5 +157,21 @@ public class MacroPluginImpl : ILongPlugin
                     break;
             }
         });
+    }
+
+    public FrameworkElement CreateSettingsUI()
+    {
+        var panel = new StackPanel { Margin = new Thickness(16) };
+
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl(
+            "录制", Id, "F6", _ => { }));
+
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl(
+            "播放单次", Id, "F7", _ => { }));
+
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl(
+            "循环播放", Id, "F8", _ => { }));
+
+        return panel;
     }
 }

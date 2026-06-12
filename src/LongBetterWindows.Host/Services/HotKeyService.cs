@@ -51,14 +51,21 @@ namespace LongBetterWindows.Host.Services
 
         public Task<HostApiResponse> RegisterAsync(string hotkey, Action callback)
         {
+            var pluginId = Engine.PluginAccessContext.CurrentPluginId ?? "builtin";
+            return RegisterAsync(hotkey, pluginId, callback);
+        }
+
+        public Task<HostApiResponse> RegisterAsync(string hotkey, string pluginId, Action callback)
+        {
             lock (_lock)
             {
                 var normalized = Normalize(hotkey);
 
-                if (_entries.ContainsKey(normalized))
+                if (_entries.TryGetValue(normalized, out var existing))
                 {
                     return Task.FromResult(HostApiResponse.Failure(
-                        ApiErrorCode.HotKeyConflict, $"热键 '{hotkey}' 已被注册。"));
+                        ApiErrorCode.HotKeyConflict,
+                        $"热键 '{hotkey}' 已被「{existing.OwnerName}」占用。"));
                 }
 
                 if (!TryParseHotkey(hotkey, out var modifiers, out var vk, out var error))
@@ -89,6 +96,7 @@ namespace LongBetterWindows.Host.Services
                 {
                     Id = id,
                     Original = hotkey,
+                    PluginId = pluginId,
                     Modifiers = modifiers,
                     Key = vk,
                     Callback = callback,
@@ -127,6 +135,52 @@ namespace LongBetterWindows.Host.Services
                 bool conflict = _entries.ContainsKey(normalized);
                 return Task.FromResult(HostApiResponse<bool>.Success(conflict));
             }
+        }
+
+        public string? GetOwner(string hotkey)
+        {
+            lock (_lock)
+            {
+                var normalized = Normalize(hotkey);
+                return _entries.TryGetValue(normalized, out var entry)
+                    ? entry.PluginId : null;
+            }
+        }
+
+        public IReadOnlyDictionary<string, string> GetAllHotkeys()
+        {
+            lock (_lock)
+            {
+                return _entries.ToDictionary(
+                    kv => kv.Value.Original,
+                    kv => kv.Value.PluginId);
+            }
+        }
+
+        public async Task<HostApiResponse> ChangeHotkeyAsync(
+            string oldHotkey, string newHotkey, string pluginId, Action callback)
+        {
+            // 检查新热键是否冲突（排除自己的旧热键）
+            var conflict = await IsConflictAsync(newHotkey);
+            if (conflict.IsSuccess && conflict.Data)
+            {
+                var owner = GetOwner(newHotkey);
+                if (owner != pluginId)
+                {
+                    return HostApiResponse.Failure(ApiErrorCode.HotKeyConflict,
+                        $"热键 '{newHotkey}' 已被其他插件占用。");
+                }
+            }
+
+            // 注销旧热键
+            var unreg = await UnregisterAsync(oldHotkey);
+            if (!unreg.IsSuccess && unreg.ErrorMessage != null)
+            {
+                // 旧热键可能不存在（首次设置），忽略
+            }
+
+            // 注册新热键
+            return await RegisterAsync(newHotkey, pluginId, callback);
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -235,6 +289,8 @@ namespace LongBetterWindows.Host.Services
     {
         public int Id { get; init; }
         public string Original { get; init; } = string.Empty;
+        public string PluginId { get; init; } = string.Empty;
+        public string OwnerName => PluginId;
         public uint Modifiers { get; init; }
         public uint Key { get; init; }
         public Action? Callback { get; init; }

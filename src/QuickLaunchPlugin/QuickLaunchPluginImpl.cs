@@ -6,10 +6,11 @@ using Serilog;
 
 namespace QuickLaunchPlugin;
 
-public class QuickLaunchPluginImpl : ILongPlugin
+public class QuickLaunchPluginImpl : ILongPlugin, IHasSettingsUI
 {
     private IHostApi? _host;
     private bool _isActive;
+    private string _hotkey = "Ctrl+Shift+Space";
 
     public string Id => "com.long.quicklaunch";
     public string Name => "快捷启动器";
@@ -90,5 +91,16 @@ public class QuickLaunchPluginImpl : ILongPlugin
         {
             Log.Error(ex, "[QuickLaunch] 启动失败: {Path}", path);
         }
+    }
+
+    public FrameworkElement CreateSettingsUI()
+    {
+        return new LongBetterWindows.Host.Views.HotkeySettingsControl(
+            "快捷启动器", Id, _hotkey,
+            newHotkey =>
+            {
+                _hotkey = newHotkey;
+                _host?.Storage?.SetAsync("quicklaunch_hotkey", newHotkey);
+            });
     }
 }
