@@ -25,6 +25,9 @@ namespace LongBetterWindows.Host.Contracts
         [JsonPropertyName("runtime")]
         public string? Runtime { get; init; }
 
+        [JsonPropertyName("min_api_version")]
+        public string? MinApiVersion { get; init; }
+
         [JsonPropertyName("default_settings")]
         public Dictionary<string, object>? DefaultSettings { get; init; }
     }

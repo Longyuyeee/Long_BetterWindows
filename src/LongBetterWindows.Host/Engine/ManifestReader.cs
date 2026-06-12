@@ -82,6 +82,17 @@ namespace LongBetterWindows.Host.Engine
                     errors.Add($"未知能力声明: '{cap}'");
             }
 
+            // ApiVersion 兼容性检查
+            if (!string.IsNullOrWhiteSpace(manifest.MinApiVersion))
+            {
+                if (TryParseVersion(manifest.MinApiVersion, out var reqMajor, out var reqMinor, out _))
+                {
+                    var requested = new Contracts.ApiVersion(reqMajor, reqMinor, 0);
+                    if (!Contracts.ApiVersion.Current.IsCompatibleWith(requested))
+                        errors.Add($"API 版本不兼容: 插件要求 {requested}, 当前 {Contracts.ApiVersion.Current}");
+                }
+            }
+
             if (errors.Count > 0)
                 return ManifestResult.Fail(string.Join("; ", errors));
 
@@ -90,20 +101,17 @@ namespace LongBetterWindows.Host.Engine
 
         private static bool IsValidVersion(string version)
         {
-            if (string.IsNullOrWhiteSpace(version))
-                return false;
+            return TryParseVersion(version, out _, out _, out _);
+        }
 
+        private static bool TryParseVersion(string version, out int major, out int minor, out int patch)
+        {
+            major = minor = patch = 0;
+            if (string.IsNullOrWhiteSpace(version)) return false;
             var parts = version.Split('.');
-            if (parts.Length < 2 || parts.Length > 3)
-                return false;
-
-            foreach (var part in parts)
-            {
-                if (!int.TryParse(part, out _))
-                    return false;
-            }
-
-            return true;
+            if (parts.Length < 2 || parts.Length > 3) return false;
+            return int.TryParse(parts[0], out major) && int.TryParse(parts[1], out minor)
+                && (parts.Length == 2 || int.TryParse(parts[2], out patch));
         }
     }
 
