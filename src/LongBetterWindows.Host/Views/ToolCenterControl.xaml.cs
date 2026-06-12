@@ -31,6 +31,11 @@ namespace LongBetterWindows.Host.Views
             RefreshPluginList();
         }
 
+        private void DevTools_Click(object sender, RoutedEventArgs e)
+        {
+            PluginDevTools.Open(Window.GetWindow(this)!);
+        }
+
         private void RefreshDocLinks()
         {
             DocLinksPanel.Children.Clear();
