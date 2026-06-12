@@ -1,0 +1,15 @@
+{
+  "id": "com.long.color-picker",
+  "version": "1.0.0",
+  "name": "颜色拾取器",
+  "author": "Long",
+  "entry_point": "ColorPickerPlugin.dll",
+  "capabilities": [
+    "system.hotkey",
+    "system.clipboard"
+  ],
+  "default_settings": {
+    "hotkey": "Ctrl+Shift+P",
+    "auto_start": true
+  }
+}
