@@ -49,8 +49,8 @@ namespace LongBetterWindows.Host.Engine
                 HandleJsMessage(e.WebMessageAsJson);
             };
 
-            // 在页面加载前注入初始化脚本
-            _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+            // 在页面加载前注入初始化脚本（fire-and-forget，与导航并行）
+            _ = _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
                 BuildJsBridge(host, _manifest.Id));
 
             // 加载插件 HTML

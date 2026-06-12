@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>快速便签</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,sans-serif;background:#FFFBEB;color:#1d1d1f;padding:16px;min-height:100vh}
+h2{font-size:14px;color:#B45309;margin-bottom:12px}
+textarea{width:100%;height:200px;border:1px solid #FDE68A;border-radius:10px;padding:12px;
+  font-size:14px;resize:vertical;font-family:inherit;line-height:1.6;background:#FFFDEF}
+textarea:focus{outline:none;border-color:#F59E0B}
+.btn-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+button{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-primary{background:#F59E0B;color:#fff}.btn-primary:hover{background:#D97706}
+.btn-secondary{background:#FEF3C7;color:#92400E}.btn-secondary:hover{background:#FDE68A}
+.note-list{margin-top:16px}
+.note-item{background:#fff;border:1px solid #FDE68A;border-radius:8px;padding:12px;margin-bottom:8px;
+  cursor:pointer;transition:all .15s;display:flex;justify-content:space-between;align-items:flex-start}
+.note-item:hover{border-color:#F59E0B}
+.note-text{flex:1;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.note-meta{font-size:10px;color:#aaa;margin-left:12px;white-space:nowrap}
+.status{font-size:11px;color:#34C759;margin-top:8px;display:none}.status.show{display:block}
+.empty{text-align:center;color:#aaa;font-size:12px;padding:24px}
+</style>
+</head>
+<body>
+<h2>快速便签</h2>
+<textarea id="noteInput" placeholder="写点什么..."></textarea>
+<div class="btn-row">
+  <button class="btn-primary" onclick="saveNote()">保存便签</button>
+  <button class="btn-secondary" onclick="clearNote()">清空</button>
+</div>
+<div class="status" id="saveStatus"></div>
+
+<div class="note-list">
+  <h2>历史便签</h2>
+  <div id="noteList"></div>
+</div>
+
+<script>
+var notes = [];
+
+async function init() {
+  try {
+    var r = await long.storage.get('quick_notes');
+    if (r.success && r.data) { notes = JSON.parse(r.data); }
+  } catch(e) {}
+  renderNotes();
+}
+
+function saveNote() {
+  var text = document.getElementById('noteInput').value.trim();
+  if (!text) return;
+  notes.unshift({ text: text, time: Date.now() });
+  if (notes.length > 30) notes = notes.slice(0, 30);
+  document.getElementById('noteInput').value = '';
+  persist();
+  renderNotes();
+  showStatus('已保存 (' + text.length + ' 字符)');
+}
+
+function clearNote() { document.getElementById('noteInput').value = ''; }
+
+function deleteNote(i) {
+  notes.splice(i, 1); persist(); renderNotes();
+}
+
+async function persist() {
+  try { await long.storage.set('quick_notes', JSON.stringify(notes)); } catch(e) {}
+}
+
+function renderNotes() {
+  var h = '';
+  notes.forEach(function(n, i) {
+    var ago = Math.floor((Date.now() - n.time) / 1000);
+    var timeStr = ago < 60 ? ago+'s' : ago < 3600 ? Math.floor(ago/60)+'m' : Math.floor(ago/3600)+'h';
+    var preview = n.text.length > 100 ? n.text.substring(0,100)+'...' : n.text;
+    h += '<div class="note-item" onclick="editNote('+i+')">' +
+      '<span class="note-text">'+esc(preview)+'</span>' +
+      '<span class="note-meta">'+timeStr+'<br/><button class="btn-secondary" style="margin-top:4px;font-size:10px;padding:2px 8px" onclick="event.stopPropagation();deleteNote('+i+')">删除</button></span>' +
+      '</div>';
+  });
+  document.getElementById('noteList').innerHTML = h || '<div class="empty">暂无便签</div>';
+}
+
+function editNote(i) {
+  document.getElementById('noteInput').value = notes[i].text;
+  notes.splice(i, 1); persist(); renderNotes();
+}
+
+function showStatus(msg) {
+  var el = document.getElementById('saveStatus');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(function() { el.classList.remove('show'); }, 2500);
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+init();
+</script>
+</body>
+</html>

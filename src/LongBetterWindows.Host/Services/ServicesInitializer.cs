@@ -14,6 +14,7 @@ namespace LongBetterWindows.Host.Services
         public static ColumnInjectionService ColumnInjection { get; private set; } = null!;
         public static ContextMenuService ContextMenu { get; private set; } = null!;
         public static ClipboardService Clipboard { get; private set; } = null!;
+        public static NotificationService Notification { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
 
         public static void Initialize()
@@ -43,6 +44,9 @@ namespace LongBetterWindows.Host.Services
 
             Clipboard = new ClipboardService();
             provider.RegisterService<IClipboardService>(Clipboard);
+
+            Notification = new NotificationService();
+            provider.RegisterService<INotificationService>(Notification);
 
             Startup = new StartupService();
         }

@@ -1,0 +1,15 @@
+{
+  "id": "com.long.quick-note",
+  "version": "1.0.0",
+  "name": "快速便签",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": [
+    "storage.local",
+    "system.notification"
+  ],
+  "default_settings": {
+    "auto_start": true
+  }
+}

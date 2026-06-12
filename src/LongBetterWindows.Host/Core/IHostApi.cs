@@ -10,5 +10,6 @@ namespace LongBetterWindows.Host.Core
         IRegistryService? Registry { get; }
         IStorageService? Storage { get; }
         IClipboardService? Clipboard { get; }
+        INotificationService? Notification { get; }
     }
 }
