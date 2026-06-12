@@ -27,6 +27,7 @@
       <_WebPlugins Include="$(SolutionDir)src\ClipboardTool\**\*" />
       <_WebPlugins Include="$(SolutionDir)src\QuickNotePlugin\**\*" />
       <_WebPlugins Include="$(SolutionDir)src\TranslatePlugin\**\*" />
+      <_WebPlugins Include="$(SolutionDir)src\FileRenamerPlugin\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(_WebPlugins)"
           DestinationFiles="@(_WebPlugins->'$(SolutionDir)Plugins\%(RecursiveDir)%(Filename)%(Extension)')"

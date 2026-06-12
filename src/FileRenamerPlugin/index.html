@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><title>批量重命名</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,sans-serif;background:#f5f5f7;color:#1d1d1f;padding:20px}
+h2{font-size:15px;font-weight:600;margin-bottom:10px;color:#007AFF}
+.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+input,select{padding:6px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:12px}
+input:focus,select:focus{outline:none;border-color:#007AFF}
+.btn-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center}
+button{padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer}
+.btn-primary{background:#007AFF;color:#fff}.btn-primary:hover{background:#0062CC}
+.btn-secondary{background:#f0f0f0;color:#333}.btn-secondary:hover{background:#e0e0e0}
+.file-list{max-height:300px;overflow-y:auto;margin-top:8px}
+.file-item{display:flex;align-items:center;padding:6px 8px;font-size:12px;border-bottom:1px solid #f0f0f0}
+.file-item input{flex:1;margin-right:8px}
+.file-item .orig{color:#888;font-size:11px;margin-right:8px;text-decoration:line-through}
+.file-item .arrow{color:#007AFF;margin:0 6px;font-size:11px}
+.preview-badge{background:#FFD60A;color:#333;padding:2px 8px;border-radius:10px;font-size:10px;margin-left:6px}
+.status{font-size:11px;margin-top:6px;display:none}.status.show{display:block}.status.ok{color:#34C759}.status.err{color:#FF3B30}
+.empty{color:#aaa;font-size:12px;text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<h2>批量重命名</h2>
+
+<div class="card">
+  <div class="btn-row">
+    <button class="btn-primary" onclick="loadFromExplorer()">从资源管理器加载</button>
+    <span id="fileCount" style="font-size:12px;color:#888;margin-left:8px"></span>
+  </div>
+</div>
+
+<div class="card" id="ruleCard" style="display:none">
+  <h2>重命名规则</h2>
+  <div class="btn-row">
+    <select id="ruleType" onchange="applyRule()">
+      <option value="none">选择规则...</option>
+      <option value="prefix">添加前缀</option>
+      <option value="suffix">添加后缀</option>
+      <option value="replace">查找替换</option>
+      <option value="number">编号重命名</option>
+      <option value="ext">修改扩展名</option>
+    </select>
+    <input id="ruleParam1" placeholder="参数" oninput="applyRule()" style="width:120px" />
+    <input id="ruleParam2" placeholder="参数2" oninput="applyRule()" style="width:120px;display:none" />
+  </div>
+  <div class="file-list" id="fileList"></div>
+  <div class="btn-row">
+    <button class="btn-primary" onclick="executeRename()">执行重命名</button>
+    <span class="status" id="renameStatus"></span>
+  </div>
+</div>
+
+<script>
+var files = [];
+var previewNames = [];
+
+async function loadFromExplorer() {
+  try {
+    var r = await long.shell.getSelectedItems();
+    if (r.success && r.data && r.data.length > 0) {
+      files = r.data;
+      document.getElementById('fileCount').textContent = files.length + ' 个文件';
+      document.getElementById('ruleCard').style.display = 'block';
+      applyRule();
+    } else {
+      // fallback: get active folder and list files
+      var f = await long.shell.getActiveFolder();
+      if (f.success && f.data) {
+        var lr = await long.shell.listFiles(f.data);
+        if (lr.success && lr.files) {
+          files = lr.files;
+          document.getElementById('fileCount').textContent = files.length + ' 个文件（文件夹全部）';
+          document.getElementById('ruleCard').style.display = 'block';
+          applyRule();
+          return;
+        }
+      }
+      document.getElementById('fileCount').textContent = '未选中文件';
+    }
+  } catch(e) {
+    document.getElementById('fileCount').textContent = '加载失败';
+  }
+}
+
+function applyRule() {
+  var type = document.getElementById('ruleType').value;
+  var p1 = document.getElementById('ruleParam1').value;
+  var p2 = document.getElementById('ruleParam2').value;
+  document.getElementById('ruleParam2').style.display = type === 'replace' ? 'inline' : 'none';
+
+  previewNames = [];
+  var html = '';
+  files.forEach(function(oldPath, i) {
+    var oldName = oldPath.split('/').pop().split('\\').pop();
+    var name = oldName;
+    var ext = name.lastIndexOf('.') > 0 ? name.substring(name.lastIndexOf('.')) : '';
+    var base = name.lastIndexOf('.') > 0 ? name.substring(0, name.lastIndexOf('.')) : name;
+
+    if (type === 'prefix') name = (p1||'') + oldName;
+    else if (type === 'suffix') name = base + (p1||'') + ext;
+    else if (type === 'replace' && p1) name = oldName.replace(new RegExp(p1,'g'), p2||'');
+    else if (type === 'number') name = (p1||'file_') + (i+1) + ext;
+    else if (type === 'ext') name = base + '.' + (p1||'txt');
+
+    previewNames.push(name);
+    var changed = name !== oldName;
+    html += '<div class="file-item">' +
+      '<span class="orig">'+esc(oldName)+'</span>' +
+      '<span class="arrow">→</span>' +
+      '<input value="'+esc(name)+'" onchange="editPreview('+i+',this.value)"/>' +
+      (changed ? '<span class="preview-badge">已修改</span>' : '') +
+      '</div>';
+  });
+  document.getElementById('fileList').innerHTML = html || '<div class="empty">无文件</div>';
+}
+
+function editPreview(i, val) { previewNames[i] = val; }
+
+async function executeRename() {
+  var count = 0;
+  for (var i = 0; i < files.length; i++) {
+    var oldName = files[i].split('/').pop().split('\\').pop();
+    if (previewNames[i] !== oldName) {
+      try {
+        var r = await long.shell.renameFile(files[i], previewNames[i]);
+        if (r.success) count++;
+      } catch(e) {}
+    }
+  }
+  var s = document.getElementById('renameStatus');
+  s.textContent = '已完成: '+count+'/'+files.length+' 个文件重命名';
+  s.classList.add('show','ok');
+  setTimeout(function(){s.classList.remove('show')}, 4000);
+  if (count > 0) { files = []; applyRule(); loadFromExplorer(); }
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+</script>
+</body>
+</html>

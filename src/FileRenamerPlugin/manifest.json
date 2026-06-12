@@ -1,0 +1,14 @@
+{
+  "id": "com.long.file-renamer",
+  "version": "1.0.0",
+  "name": "批量重命名",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": [
+    "shell.selection"
+  ],
+  "default_settings": {
+    "auto_start": true
+  }
+}

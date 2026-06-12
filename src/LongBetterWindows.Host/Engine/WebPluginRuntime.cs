@@ -155,6 +155,10 @@ namespace LongBetterWindows.Host.Engine
                 "storage.delete" => Ok(h.Storage!.DeleteAsync(Arg(args, 0))),
                 "storage.containsKey" => Ok(h.Storage!.ContainsKeyAsync(Arg(args, 0))),
 
+                // === long.shell file ops ===
+                "shell.listFiles" => Task.FromResult<object?>(ShellListFiles(Arg(args, 0))),
+                "shell.renameFile" => Task.FromResult<object?>(ShellRenameFile(Arg(args, 0), Arg(args, 1))),
+
                 // === long.ui ===
                 "ui.showToast" => Task.FromResult<object?>(UIToast(Arg(args, 0))),
 
@@ -173,6 +177,27 @@ namespace LongBetterWindows.Host.Engine
         private static async Task<object> OkList<T>(Task<HostApiResponse<List<T>>> t) { var r = await t; return new { r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
 
         private static object OkObj() => new { success = true };
+
+        private object ShellListFiles(string dir)
+        {
+            if (!Directory.Exists(dir)) return new { success = false };
+            var files = Directory.GetFiles(dir).Select(f => new { name = Path.GetFileName(f), path = f.Replace("\\", "/") }).ToList();
+            return new { success = true, files };
+        }
+
+        private object ShellRenameFile(string oldPath, string newName)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(oldPath);
+                if (dir == null) return new { success = false };
+                var newPath = Path.Combine(dir, newName);
+                if (File.Exists(newPath)) return new { success = false, error = "目标文件已存在" };
+                File.Move(oldPath, newPath);
+                return new { success = true };
+            }
+            catch (Exception ex) { return new { success = false, error = ex.Message }; }
+        }
 
         private object UIToast(string msg)
         {
@@ -240,7 +265,9 @@ window.long = {
   shell: {
     getActiveFolder: function(){return call('shell.getActiveFolder',[]);},
     getSelectedItems: function(){return call('shell.getSelectedItems',[]);},
-    getItemScreenRect: function(){return call('shell.getItemScreenRect',[]);}
+    getItemScreenRect: function(){return call('shell.getItemScreenRect',[]);},
+    listFiles: function(dir){return call('shell.listFiles',[dir]);},
+    renameFile: function(oldPath,newName){return call('shell.renameFile',[oldPath,newName]);}
   },
   fs: { ads: {
     read: function(p,s){return call('fs.ads.read',[p,s||'long_note']);},
