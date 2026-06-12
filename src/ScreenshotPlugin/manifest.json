@@ -1,0 +1,15 @@
+{
+  "id": "com.long.screenshot",
+  "version": "1.0.0",
+  "name": "截图工具",
+  "author": "Long",
+  "entry_point": "ScreenshotPlugin.dll",
+  "capabilities": [
+    "system.hotkey",
+    "system.clipboard"
+  ],
+  "default_settings": {
+    "hotkey": "Ctrl+Shift+S",
+    "auto_start": true
+  }
+}
