@@ -31,7 +31,9 @@ button{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight
 <div class="btn-row">
   <button class="btn-primary" onclick="saveNote()">保存便签</button>
   <button class="btn-secondary" onclick="clearNote()">清空</button>
+  <button class="btn-secondary" onclick="togglePreview()" id="previewBtn">预览</button>
 </div>
+<div id="previewArea" style="display:none;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px;margin-top:8px;max-height:200px;overflow:auto;font-size:13px;line-height:1.8"></div>
 <div class="status" id="saveStatus"></div>
 
 <div class="note-list">
@@ -61,6 +63,23 @@ function saveNote() {
   showStatus('已保存 (' + text.length + ' 字符)');
 }
 
+function togglePreview(){
+  var area=document.getElementById('previewArea');
+  var btn=document.getElementById('previewBtn');
+  if(area.style.display==='none'){
+    var md=document.getElementById('noteInput').value;
+    area.innerHTML=md
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+      .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+      .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g,'<em>$1</em>')
+      .replace(/`([^`]+)`/g,'<code>$1</code>')
+      .replace(/\n\n/g,'<br><br>');
+    area.style.display='block';btn.textContent='编辑';
+  }else{area.style.display='none';btn.textContent='预览';}
+}
 function clearNote() { document.getElementById('noteInput').value = ''; }
 
 function deleteNote(i) {
