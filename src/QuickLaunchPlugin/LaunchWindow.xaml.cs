@@ -105,9 +105,16 @@ public partial class LaunchWindow : Window
         // 3. 应用搜索
         var appResults = _apps
             .Where(a => a.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .Take(6)
+            .Take(5)
             .ToList();
         results.AddRange(appResults);
+
+        // 4. 文件搜索（桌面/文档/下载）
+        if (query.Length >= 2)
+        {
+            var fileResults = SearchFiles(query).Take(4).ToList();
+            results.AddRange(fileResults);
+        }
 
         ResultsList.ItemsSource = results;
         ResultsList.Visibility = results.Count > 0
@@ -139,6 +146,38 @@ public partial class LaunchWindow : Window
         catch
         {
             return false;
+        }
+    }
+
+    private static IEnumerable<SmartEntry> SearchFiles(string query)
+    {
+        var dirs = new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
+        };
+
+        foreach (var dir in dirs)
+        {
+            if (!Directory.Exists(dir)) continue;
+            IEnumerable<string> files;
+            try { files = Directory.GetFiles(dir, "*" + query + "*", SearchOption.TopDirectoryOnly); }
+            catch { continue; }
+
+            foreach (var f in files.Take(8))
+            {
+                var name = Path.GetFileName(f);
+                var ext = Path.GetExtension(f).ToLower();
+                var icon = ext switch
+                {
+                    ".pdf" => "📕", ".doc" or ".docx" => "📝", ".xls" or ".xlsx" => "📊",
+                    ".png" or ".jpg" or ".jpeg" or ".gif" => "🖼",
+                    ".txt" or ".md" => "📄", ".zip" or ".rar" or ".7z" => "📦",
+                    _ => "📁"
+                };
+                yield return new SmartEntry { Name = name, Path = f, Icon = icon, Category = "文件", Subtitle = dir };
+            }
         }
     }
 
