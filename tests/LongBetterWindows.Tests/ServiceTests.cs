@@ -78,4 +78,106 @@ public class ServiceTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    // ===== HotKeyService 测试 =====
+
+    [Fact]
+    public async Task HotKeyService_IsConflict_NoConflict_ReturnsFalse()
+    {
+        var svc = new HotKeyService();
+        var r = await svc.IsConflictAsync("Ctrl+Shift+X");
+        Assert.True(r.IsSuccess);
+        Assert.False(r.Data); // 无注册，无冲突
+    }
+
+    [Fact]
+    public async Task HotKeyService_Register_InvalidFormat_Fails()
+    {
+        var svc = new HotKeyService();
+        var r = await svc.RegisterAsync("InvalidKey", () => { });
+        Assert.False(r.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HotKeyService_Unregister_NotFound_Fails()
+    {
+        var svc = new HotKeyService();
+        var r = await svc.UnregisterAsync("Ctrl+Z");
+        Assert.False(r.IsSuccess);
+    }
+
+    [Fact]
+    public async Task HotKeyService_Register_NeedHWnd_Fails()
+    {
+        var svc = new HotKeyService();
+        // 未初始化 HWnd，注册应失败
+        var r = await svc.RegisterAsync("Ctrl+K", () => { });
+        Assert.False(r.IsSuccess);
+    }
+
+    [Fact]
+    public void HotKeyService_GetOwner_NoEntry_ReturnsNull()
+    {
+        var svc = new HotKeyService();
+        Assert.Null(svc.GetOwner("Ctrl+X"));
+    }
+
+    [Fact]
+    public void HotKeyService_GetAllHotkeys_Empty_ReturnsEmpty()
+    {
+        var svc = new HotKeyService();
+        var all = svc.GetAllHotkeys();
+        Assert.Empty(all);
+    }
+
+    // ===== ADSService 测试 =====
+
+    [Fact]
+    public async Task ADSService_WriteRead_TextFile_Works()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"test_ads_{Guid.NewGuid():N}");
+        var file = Path.Combine(dir, "test.txt");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(file, "base");
+
+            var rb = new RollbackEngine();
+            var svc = new ADSService(rb);
+
+            // 写入 ADS
+            var w = await svc.WriteAsync(file, "note", "hello world");
+            Assert.True(w.IsSuccess);
+
+            // 读取 ADS
+            var r = await svc.ReadAsync(file, "note");
+            Assert.True(r.IsSuccess);
+            Assert.Equal("hello world", r.Data);
+
+            // 删除 ADS
+            var d = await svc.DeleteAsync(file, "note");
+            Assert.True(d.IsSuccess);
+        }
+        finally { if (Directory.Exists(dir)) try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task ADSService_WriteRead_Directory_Works()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"test_ads_dir_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var rb = new RollbackEngine();
+            var svc = new ADSService(rb);
+
+            var w = await svc.WriteAsync(dir, "note", "dir note");
+            Assert.True(w.IsSuccess);
+
+            var r = await svc.ReadAsync(dir, "note");
+            Assert.True(r.IsSuccess);
+            Assert.Equal("dir note", r.Data);
+        }
+        finally { if (Directory.Exists(dir)) try { Directory.Delete(dir, true); } catch { } }
+    }
 }
