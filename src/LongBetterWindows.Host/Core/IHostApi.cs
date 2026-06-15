@@ -13,5 +13,7 @@ namespace LongBetterWindows.Host.Core
         INotificationService? Notification { get; }
         IFileOpsService? FileOps { get; }
         IWindowInfoService? WindowInfo { get; }
+        IScreenCaptureService? ScreenCapture { get; }
+        IInputService? Input { get; }
     }
 }

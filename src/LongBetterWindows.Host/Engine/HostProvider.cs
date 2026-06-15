@@ -84,6 +84,10 @@ namespace LongBetterWindows.Host.Engine
                 return "file.ops";
             if (typeof(T) == typeof(IWindowInfoService))
                 return "window.info";
+            if (typeof(T) == typeof(IScreenCaptureService))
+                return "system.screenshot";
+            if (typeof(T) == typeof(IInputService))
+                return "system.input";
             return null;
         }
 
@@ -96,5 +100,7 @@ namespace LongBetterWindows.Host.Engine
         public INotificationService? Notification => GetService<INotificationService>();
         public IFileOpsService? FileOps => GetService<IFileOpsService>();
         public IWindowInfoService? WindowInfo => GetService<IWindowInfoService>();
+        public IScreenCaptureService? ScreenCapture => GetService<IScreenCaptureService>();
+        public IInputService? Input => GetService<IInputService>();
     }
 }

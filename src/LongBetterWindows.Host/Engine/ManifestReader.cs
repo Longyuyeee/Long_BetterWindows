@@ -26,6 +26,8 @@ namespace LongBetterWindows.Host.Engine
             "system.clipboard",
             "file.ops",
             "window.info",
+            "system.screenshot",
+            "system.input",
             "storage.local",
         };
 

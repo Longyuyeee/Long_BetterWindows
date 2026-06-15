@@ -17,6 +17,8 @@ namespace LongBetterWindows.Host.Services
         public static NotificationService Notification { get; private set; } = null!;
         public static FileOpsService FileOps { get; private set; } = null!;
         public static WindowInfoService WindowInfo { get; private set; } = null!;
+        public static ScreenCaptureService ScreenCapture { get; private set; } = null!;
+        public static InputService Input { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
 
         public static void Initialize()
@@ -55,6 +57,12 @@ namespace LongBetterWindows.Host.Services
 
             WindowInfo = new WindowInfoService();
             provider.RegisterService<IWindowInfoService>(WindowInfo);
+
+            ScreenCapture = new ScreenCaptureService();
+            provider.RegisterService<IScreenCaptureService>(ScreenCapture);
+
+            Input = new InputService();
+            provider.RegisterService<IInputService>(Input);
 
             I18nService.Initialize();
 
