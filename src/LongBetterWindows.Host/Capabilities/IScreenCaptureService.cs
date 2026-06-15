@@ -7,5 +7,6 @@ namespace LongBetterWindows.Host.Capabilities
     {
         Task<HostApiResponse> CaptureFullScreenAsync();
         Task<HostApiResponse<BitmapSource>> CaptureToBitmapAsync();
+        Task<HostApiResponse<BitmapSource>> CaptureRegionAsync(int x, int y, int width, int height);
     }
 }

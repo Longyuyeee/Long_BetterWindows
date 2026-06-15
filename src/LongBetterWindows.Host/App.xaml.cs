@@ -4,6 +4,7 @@ using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
 using Serilog;
+using Wpf.Ui.Appearance;
 
 namespace LongBetterWindows.Host
 {
@@ -25,6 +26,9 @@ namespace LongBetterWindows.Host
 
             ServicesInitializer.Initialize();
             Log.Information("所有服务已初始化。");
+
+            // WPF-UI 主题必须在窗口创建前应用
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
 
             // 检查命令行 --note 参数（右键菜单触发）
             for (int i = 0; i < e.Args.Length; i++)

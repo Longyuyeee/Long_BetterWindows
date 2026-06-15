@@ -9,7 +9,7 @@ namespace WindowManagerPlugin;
 
 public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
 {
-    private IHostApi? _host;
+    private IHostApi _host = null!;
 
     public string Id => "com.long.window-manager";
     public string Name => "窗口管理";
@@ -21,20 +21,27 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hWnd, IntPtr hAfter, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hWnd, int index);
     [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr hWnd, int index, int newStyle);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint dwFlags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFO lpmi);
     static readonly IntPtr HWND_TOPMOST = new(-1), HWND_NOTOPMOST = new(-2);
     const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_SHOWWINDOW = 0x0040;
     const int GWL_EXSTYLE = -20, WS_EX_TOPMOST = 0x0008;
+    const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct MONITORINFO { public uint cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
+    [StructLayout(LayoutKind.Sequential)]
+    struct RECT { public int Left, Top, Right, Bottom; }
 
     public Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
-        if (host.HotKey == null) { State = PluginState.Error; return Task.FromResult(false); }
         return Task.FromResult(true);
     }
 
     public async Task<bool> StartAsync()
     {
-        var hk = _host!.HotKey!;
+        var hk = _host.HotKey;
         // 置顶
         var r1 = await hk.RegisterAsync("Ctrl+Alt+T", Id, ToggleTopmost);
         // 半屏
@@ -58,7 +65,7 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
 
     public async Task<bool> StopAsync()
     {
-        var hk = _host!.HotKey!;
+        var hk = _host.HotKey;
         foreach (var key in new[] { "Ctrl+Alt+T", "Ctrl+Alt+Left", "Ctrl+Alt+Right", "Ctrl+Alt+Up", "Ctrl+Alt+Down",
             "Ctrl+Alt+1","Ctrl+Alt+2","Ctrl+Alt+3","Ctrl+Alt+4","Ctrl+Alt+Shift+Left","Ctrl+Alt+Shift+Right" })
             await hk.UnregisterAsync(key);
@@ -126,8 +133,15 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
         {
             var hwnd = GetForegroundWindow();
             if (hwnd == IntPtr.Zero) return;
-            var area = SystemParameters.WorkArea;
-            int L = (int)area.Left, T = (int)area.Top, W = (int)area.Width, H = (int)area.Height;
+
+            // 获取窗口所在显示器的工作区域（支持多屏）
+            var hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            var mi = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+            GetMonitorInfoW(hMonitor, ref mi);
+
+            int L = mi.rcWork.Left, T = mi.rcWork.Top;
+            int W = mi.rcWork.Right - mi.rcWork.Left;
+            int H = mi.rcWork.Bottom - mi.rcWork.Top;
 
             (int x, int y, int w, int h) = layout switch
             {

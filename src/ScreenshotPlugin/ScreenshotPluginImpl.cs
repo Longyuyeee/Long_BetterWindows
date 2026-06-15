@@ -11,7 +11,7 @@ namespace ScreenshotPlugin;
 
 public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
 {
-    private IHostApi? _host;
+    private IHostApi _host = null!;
     private string _fullHotkey = "Ctrl+Shift+S";
     private string _regionHotkey = "Ctrl+Shift+A";
 
@@ -33,14 +33,13 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
     public Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
-        if (host.HotKey == null) { State = PluginState.Error; return Task.FromResult(false); }
         return Task.FromResult(true);
     }
 
     public async Task<bool> StartAsync()
     {
-        var r1 = await _host!.HotKey!.RegisterAsync(_fullHotkey, Id, CaptureFullScreen);
-        var r2 = await _host!.HotKey!.RegisterAsync(_regionHotkey, Id, CaptureRegion);
+        var r1 = await _host.HotKey.RegisterAsync(_fullHotkey, Id, CaptureFullScreen);
+        var r2 = await _host.HotKey.RegisterAsync(_regionHotkey, Id, CaptureRegion);
         if (!r1.IsSuccess || !r2.IsSuccess) { State = PluginState.Error; return false; }
         State = PluginState.Running;
         return true;
@@ -48,8 +47,8 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
 
     public async Task<bool> StopAsync()
     {
-        await _host!.HotKey!.UnregisterAsync(_fullHotkey);
-        await _host!.HotKey!.UnregisterAsync(_regionHotkey);
+        await _host.HotKey.UnregisterAsync(_fullHotkey);
+        await _host.HotKey.UnregisterAsync(_regionHotkey);
         State = PluginState.Disabled;
         return true;
     }
@@ -62,15 +61,16 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
         {
             try
             {
-                var screen = SystemParameters.PrimaryScreenWidth;
-                var screenH = SystemParameters.PrimaryScreenHeight;
-                int w = (int)screen, h = (int)screenH;
+                int x = (int)SystemParameters.VirtualScreenLeft;
+                int y = (int)SystemParameters.VirtualScreenTop;
+                int w = (int)SystemParameters.VirtualScreenWidth;
+                int h = (int)SystemParameters.VirtualScreenHeight;
 
                 var dc = GetDC(IntPtr.Zero);
                 var memDc = CreateCompatibleDC(dc);
                 var bmp = CreateCompatibleBitmap(dc, w, h);
                 SelectObject(memDc, bmp);
-                BitBlt(memDc, 0, 0, w, h, dc, 0, 0, SRCCOPY);
+                BitBlt(memDc, 0, 0, w, h, dc, x, y, SRCCOPY);
 
                 var bitmap = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
                     bmp, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
@@ -130,7 +130,12 @@ public class RegionSelector : Window
     public RegionSelector()
     {
         WindowStyle = WindowStyle.None;
-        WindowState = WindowState.Maximized;
+        // 覆盖所有显示器（WindowState.Maximized 只覆盖当前显示器）
+        Left = SystemParameters.VirtualScreenLeft;
+        Top = SystemParameters.VirtualScreenTop;
+        Width = SystemParameters.VirtualScreenWidth;
+        Height = SystemParameters.VirtualScreenHeight;
+        WindowState = WindowState.Normal;
         AllowsTransparency = true;
         Background = new SolidColorBrush(Color.FromArgb(0x40, 0x00, 0x00, 0x00));
         Topmost = true;

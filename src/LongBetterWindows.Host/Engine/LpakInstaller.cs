@@ -67,7 +67,7 @@ namespace LongBetterWindows.Host.Engine
                 if (Directory.Exists(targetDir))
                 {
                     Log.Information("卸载旧版插件: {PluginId}", manifest.Id);
-                    UnloadPlugin(manifest.Id);
+                    await UnloadPluginAsync(manifest.Id);
                     Directory.Delete(targetDir, recursive: true);
                 }
 
@@ -119,7 +119,7 @@ namespace LongBetterWindows.Host.Engine
             return count;
         }
 
-        private void UnloadPlugin(string pluginId)
+        private async Task UnloadPluginAsync(string pluginId)
         {
             var registry = HostProvider.Instance.PluginStore;
             var entry = registry.Get(pluginId);
@@ -127,7 +127,17 @@ namespace LongBetterWindows.Host.Engine
 
             using (PluginAccessContext.Enter(pluginId))
             {
-                try { entry.Instance.StopAsync().Wait(1000); } catch { }
+                try
+                {
+                    var stopTask = entry.Instance.StopAsync();
+                    // 最多等待 1 秒，避免死锁
+                    if (await Task.WhenAny(stopTask, Task.Delay(1000)) != stopTask)
+                        Log.Warning("插件 {PluginId} 停止超时", pluginId);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "插件 {PluginId} 停止异常", pluginId);
+                }
             }
 
             registry.Unregister(pluginId);

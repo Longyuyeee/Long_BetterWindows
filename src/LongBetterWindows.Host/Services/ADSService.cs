@@ -80,6 +80,9 @@ namespace LongBetterWindows.Host.Services
             {
                 try
                 {
+                    // 先读取旧内容，供回滚时恢复
+                    var oldContent = TryReadExistingContent(filePath, streamName);
+
                     var adsPath = BuildAdsPath(filePath, streamName);
                     var handle = CreateFileW(
                         adsPath,
@@ -96,15 +99,17 @@ namespace LongBetterWindows.Host.Services
 
                         if (error == 1 || error == 50) // ERROR_INVALID_FUNCTION or ERROR_NOT_SUPPORTED
                         {
+                            var oldFallback = TryReadFallback(filePath);
                             WriteFallback(filePath, content);
                             Log.Information("非 NTFS 卷，使用回退文件: {Path}", filePath);
-                            RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName);
+                            RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName, oldFallback);
                             return HostApiResponse.Success();
                         }
 
                         Log.Warning("ADS 写入失败, Win32Error={Error}, 回退到文件方案", error);
+                        var oldFb = TryReadFallback(filePath);
                         WriteFallback(filePath, content);
-                        RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName);
+                        RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName, oldFb);
                         return HostApiResponse.Success();
                     }
 
@@ -126,7 +131,7 @@ namespace LongBetterWindows.Host.Services
                     Log.Debug("ADS 写入成功: {Path}:{Stream}, {Bytes} 字节",
                         filePath, streamName, content.Length);
 
-                    RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName);
+                    RecordAdsChange(ChangeAction.AdsWrite, filePath, streamName, oldContent);
                     return HostApiResponse.Success();
                 }
                 catch (Exception ex)
@@ -143,16 +148,20 @@ namespace LongBetterWindows.Host.Services
             {
                 try
                 {
+                    // 先读取现有内容，供回滚时恢复
+                    var oldContent = TryReadExistingContent(filePath, streamName);
+
                     var adsPath = BuildAdsPath(filePath, streamName);
 
-                    if (!DeleteFileNative(adsPath))
+                    if (!DeleteFileW(adsPath))
                     {
                         int error = Marshal.GetLastWin32Error();
 
                         if (error == 2 || error == 3)
                         {
+                            var oldFallback = TryReadFallback(filePath);
                             DeleteFallback(filePath);
-                            RecordAdsChange(ChangeAction.AdsDelete, filePath, streamName);
+                            RecordAdsChange(ChangeAction.AdsDelete, filePath, streamName, oldFallback);
                             return HostApiResponse.Success();
                         }
 
@@ -162,7 +171,7 @@ namespace LongBetterWindows.Host.Services
 
                     DeleteFallback(filePath);
                     Log.Debug("ADS 已删除: {Path}:{Stream}", filePath, streamName);
-                    RecordAdsChange(ChangeAction.AdsDelete, filePath, streamName);
+                    RecordAdsChange(ChangeAction.AdsDelete, filePath, streamName, oldContent);
                     return HostApiResponse.Success();
                 }
                 catch (Exception ex)
@@ -237,7 +246,7 @@ namespace LongBetterWindows.Host.Services
                     }
 
                     CloseHandle(handle);
-                    DeleteFileNative(adsPath);
+                    DeleteFileW(adsPath);
                     return HostApiResponse<bool>.Success(true);
                 }
                 catch
@@ -321,22 +330,48 @@ namespace LongBetterWindows.Host.Services
             return string.IsNullOrEmpty(ext);
         }
 
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern bool DeleteFileW(string lpFileName);
-
-        private static bool DeleteFileNative(string path)
-        {
-            return DeleteFileW(path);
-        }
-
-        private void RecordAdsChange(ChangeAction action, string filePath, string streamName)
+        private void RecordAdsChange(ChangeAction action, string filePath, string streamName, string? oldValue = null)
         {
             var pluginId = PluginAccessContext.CurrentPluginId ?? "builtin";
             _rollback.RecordChange(pluginId, new ChangeRecord
             {
                 Action = action,
                 Target = BuildAdsPath(filePath, streamName),
+                OldValue = oldValue,
             });
+        }
+
+        /// <summary>尝试读取现有 ADS 内容，失败返回 null（不抛异常）</summary>
+        private static string? TryReadExistingContent(string filePath, string streamName)
+        {
+            try
+            {
+                var adsPath = BuildAdsPath(filePath, streamName);
+                var handle = CreateFileW(
+                    adsPath,
+                    GENERIC_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    IntPtr.Zero,
+                    OPEN_EXISTING,
+                    IsDirectory(filePath) ? FILE_FLAG_BACKUP_SEMANTICS : FILE_ATTRIBUTE_NORMAL,
+                    IntPtr.Zero);
+
+                if (handle == (IntPtr)INVALID_HANDLE_VALUE || handle == IntPtr.Zero)
+                    return TryReadFallback(filePath);
+
+                try
+                {
+                    return ReadStreamContent(handle);
+                }
+                finally
+                {
+                    CloseHandle(handle);
+                }
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

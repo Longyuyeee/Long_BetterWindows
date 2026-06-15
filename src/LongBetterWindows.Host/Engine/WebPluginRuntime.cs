@@ -23,7 +23,7 @@ namespace LongBetterWindows.Host.Engine
     /// </summary>
     public class WebPluginRuntime
     {
-        private readonly WebView2 _webView;
+        private WebView2 _webView;
         private readonly string _pluginDir;
         private readonly PluginManifest _manifest;
 
@@ -33,39 +33,51 @@ namespace LongBetterWindows.Host.Engine
         {
             _manifest = manifest;
             _pluginDir = pluginDir;
-            _webView = new WebView2();
+            // WebView2 延迟到 UI 线程创建（InitializeAsync）
         }
 
         public async Task<bool> InitializeAsync()
         {
-            var env = await CoreWebView2Environment.CreateAsync();
-            await _webView.EnsureCoreWebView2Async(env);
-
-            var host = HostProvider.Instance;
-
-            // 注入 long.* JS API 桥接
-            _webView.CoreWebView2.WebMessageReceived += (s, e) =>
+            // WebView2 必须在 STA 线程（UI 线程）初始化和使用
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
             {
-                HandleJsMessage(e.WebMessageAsJson);
-            };
+                _webView = new WebView2();
 
-            // 在页面加载前注入初始化脚本（fire-and-forget，与导航并行）
-            _ = _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
-                BuildJsBridge(host, _manifest.Id));
+                var env = await CoreWebView2Environment.CreateAsync();
+                await _webView.EnsureCoreWebView2Async(env);
 
-            // 加载插件 HTML
-            var indexPath = Path.Combine(_pluginDir, _manifest.EntryPoint);
-            if (File.Exists(indexPath))
-            {
-                _webView.CoreWebView2.Navigate(
-                    new Uri(indexPath).AbsoluteUri);
-            }
-            else
-            {
-                // 默认空白页（纯 JS 插件无需 HTML）
-                _webView.CoreWebView2.NavigateToString(
-                    "<html><body><p>JS Plugin Ready</p></body></html>");
-            }
+                var host = HostProvider.Instance;
+
+                // 注入 long.* JS API 桥接
+                _webView.CoreWebView2.WebMessageReceived += (s, e) =>
+                {
+                    HandleJsMessage(e.WebMessageAsJson);
+                };
+
+                // 在页面加载前注入初始化脚本（与导航并行执行）
+                _ = _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                    BuildJsBridge(host, _manifest.Id))
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            Log.Error(t.Exception, "[Web:{Id}] JS Bridge 注入失败", _manifest.Id);
+                        else
+                            Log.Debug("[Web:{Id}] JS Bridge 注入完成", _manifest.Id);
+                    }, TaskScheduler.Default);
+
+                // 加载插件 HTML
+                var indexPath = Path.Combine(_pluginDir, _manifest.EntryPoint);
+                if (File.Exists(indexPath))
+                {
+                    _webView.CoreWebView2.Navigate(
+                        new Uri(indexPath).AbsoluteUri);
+                }
+                else
+                {
+                    _webView.CoreWebView2.NavigateToString(
+                        "<html><body><p>JS Plugin Ready</p></body></html>");
+                }
+            });
 
             Log.Information("WebPlugin {PluginId} 已初始化", _manifest.Id);
             return true;
@@ -118,44 +130,54 @@ namespace LongBetterWindows.Host.Engine
             return method switch
             {
                 // === long.app ===
-                "app.openUrl" => Task.FromResult<object?>(AppOpenUrl(Arg(args, 0))),
-                "app.openFolder" => Task.FromResult<object?>(AppOpenFolder(Arg(args, 0))),
-                "app.openWithDefault" => Task.FromResult<object?>(AppOpenWithDefault(Arg(args, 0))),
+                "app.openUrl" => Ok(h.ShellExecute.OpenUrlAsync(Arg(args, 0))),
+                "app.openFolder" => Ok(h.ShellExecute.OpenFolderAsync(Arg(args, 0))),
+                "app.openWithDefault" => Ok(h.ShellExecute.OpenWithDefaultAsync(Arg(args, 0))),
                 "app.showNotification" => Task.FromResult<object?>(UIToast(Arg(args, 0) + "\n" + Arg(args, 1))),
                 "app.getVersion" => Task.FromResult<object?>(new { version = "0.2.0" }),
 
                 // === long.clipboard ===
-                "clipboard.getText" => Ok(h.Clipboard!.GetTextAsync()),
-                "clipboard.setText" => Ok(h.Clipboard!.SetTextAsync(Arg(args, 0))),
-                "clipboard.clear" => Ok(h.Clipboard!.ClearAsync()),
+                "clipboard.getText" => Ok(h.Clipboard.GetTextAsync()),
+                "clipboard.setText" => Ok(h.Clipboard.SetTextAsync(Arg(args, 0))),
+                "clipboard.clear" => Ok(h.Clipboard.ClearAsync()),
 
                 // === long.shell ===
-                "shell.getActiveFolder" => Ok(h.ShellSelection!.GetActiveExplorerFolderPathAsync()),
-                "shell.getSelectedItems" => OkList(h.ShellSelection!.GetSelectedItemsAsync()),
-                "shell.getItemScreenRect" => Ok(h.ShellSelection!.GetSelectedItemScreenRectAsync()),
+                "shell.getActiveFolder" => Ok(h.ShellSelection.GetActiveExplorerFolderPathAsync()),
+                "shell.getSelectedItems" => OkList(h.ShellSelection.GetSelectedItemsAsync()),
+                "shell.getItemScreenRect" => Ok(h.ShellSelection.GetSelectedItemScreenRectAsync()),
+
+                // === long.shell execute ===
+                "shell.openUrl" => Ok(h.ShellExecute.OpenUrlAsync(Arg(args, 0))),
+                "shell.openFolder" => Ok(h.ShellExecute.OpenFolderAsync(Arg(args, 0))),
+                "shell.openWithDefault" => Ok(h.ShellExecute.OpenWithDefaultAsync(Arg(args, 0))),
+
+                // === long.http ===
+                "http.get" => Ok(h.Http.GetAsync(Arg(args, 0), ParseHeaders(args, 1))),
+                "http.post" => await HttpPost(args),
+                "http.download" => await HttpDownload(args),
 
                 // === long.fs.ads ===
-                "fs.ads.read" => Ok(h.ADS!.ReadAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
-                "fs.ads.write" => Ok(h.ADS!.WriteAsync(Arg(args, 0), Arg(args, 1, "long_note"), Arg(args, 2))),
-                "fs.ads.delete" => Ok(h.ADS!.DeleteAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
-                "fs.ads.exists" => Ok(h.ADS!.ExistsAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
-                "fs.ads.isNTFS" => Ok(h.ADS!.IsNTFSVolumeAsync(Arg(args, 0))),
+                "fs.ads.read" => Ok(h.ADS.ReadAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
+                "fs.ads.write" => Ok(h.ADS.WriteAsync(Arg(args, 0), Arg(args, 1, "long_note"), Arg(args, 2))),
+                "fs.ads.delete" => Ok(h.ADS.DeleteAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
+                "fs.ads.exists" => Ok(h.ADS.ExistsAsync(Arg(args, 0), Arg(args, 1, "long_note"))),
+                "fs.ads.isNTFS" => Ok(h.ADS.IsNTFSVolumeAsync(Arg(args, 0))),
 
                 // === long.hotkey ===
                 "hotkey.register" => await HotKeyRegister(args),
                 "hotkey.unregister" => await HotKeyUnregister(args),
-                "hotkey.isConflict" => Ok(h.HotKey!.IsConflictAsync(Arg(args, 0))),
+                "hotkey.isConflict" => Ok(h.HotKey.IsConflictAsync(Arg(args, 0))),
 
                 // === long.registry ===
-                "registry.read" => Ok(h.Registry!.ReadValueAsync(Arg(args, 0), Arg(args, 1))),
-                "registry.write" => Ok(h.Registry!.WriteValueAsync(Arg(args, 0), Arg(args, 1), Arg(args, 2))),
-                "registry.delete" => Ok(h.Registry!.DeleteValueAsync(Arg(args, 0), Arg(args, 1))),
+                "registry.read" => Ok(h.Registry.ReadValueAsync(Arg(args, 0), Arg(args, 1))),
+                "registry.write" => Ok(h.Registry.WriteValueAsync(Arg(args, 0), Arg(args, 1), Arg(args, 2))),
+                "registry.delete" => Ok(h.Registry.DeleteValueAsync(Arg(args, 0), Arg(args, 1))),
 
                 // === long.storage ===
-                "storage.get" => Ok(h.Storage!.GetAsync(Arg(args, 0))),
-                "storage.set" => Ok(h.Storage!.SetAsync(Arg(args, 0), Arg(args, 1))),
-                "storage.delete" => Ok(h.Storage!.DeleteAsync(Arg(args, 0))),
-                "storage.containsKey" => Ok(h.Storage!.ContainsKeyAsync(Arg(args, 0))),
+                "storage.get" => Ok(h.Storage.GetAsync(Arg(args, 0))),
+                "storage.set" => Ok(h.Storage.SetAsync(Arg(args, 0), Arg(args, 1))),
+                "storage.delete" => Ok(h.Storage.DeleteAsync(Arg(args, 0))),
+                "storage.containsKey" => Ok(h.Storage.ContainsKeyAsync(Arg(args, 0))),
 
                 // === long.shell file ops ===
                 "shell.listFiles" => Task.FromResult<object?>(ShellListFiles(Arg(args, 0))),
@@ -166,6 +188,10 @@ namespace LongBetterWindows.Host.Engine
 
                 // === long.ui ===
                 "ui.showToast" => Task.FromResult<object?>(UIToast(Arg(args, 0))),
+
+                // === long.screenshot ===
+                "screenshot.captureFull" => Ok(h.ScreenCapture.CaptureFullScreenAsync()),
+                "screenshot.captureRegion" => await CaptureRegionToFile(args),
 
                 _ => Task.FromResult<object?>(new { success = false, error = $"未知方法: {method}" }),
             };
@@ -182,6 +208,29 @@ namespace LongBetterWindows.Host.Engine
         private static async Task<object> OkList<T>(Task<HostApiResponse<List<T>>> t) { var r = await t; return new { r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
 
         private static object OkObj() => new { success = true };
+
+        private async Task<object> CaptureRegionToFile(object?[] args)
+        {
+            var x = int.Parse(Arg(args, 0, "0"));
+            var y = int.Parse(Arg(args, 1, "0"));
+            var w = int.Parse(Arg(args, 2, "0"));
+            var h = int.Parse(Arg(args, 3, "0"));
+            var result = await HostProvider.Instance.ScreenCapture.CaptureRegionAsync(x, y, w, h);
+            if (!result.IsSuccess || result.Data == null)
+                return new { success = false, error = result.ErrorMessage };
+
+            // 保存到临时文件并返回路径
+            var tempDir = System.IO.Path.GetTempPath();
+            var fileName = $"long_screenshot_{DateTime.Now:yyyyMMddHHmmss}.png";
+            var filePath = System.IO.Path.Combine(tempDir, fileName);
+            using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Create))
+            {
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(result.Data));
+                encoder.Save(stream);
+            }
+            return new { success = true, filePath = filePath.Replace("\\", "/") };
+        }
 
         private object ShellListFiles(string dir)
         {
@@ -206,7 +255,7 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task<object> WindowGetForeground()
         {
-            var result = await HostProvider.Instance.WindowInfo!.GetForegroundWindowInfoAsync();
+            var result = await HostProvider.Instance.WindowInfo.GetForegroundWindowInfoAsync();
             return result.IsSuccess ? result.Data! : new { success = false };
         }
 
@@ -217,33 +266,51 @@ namespace LongBetterWindows.Host.Engine
             return OkObj();
         }
 
-        private object AppOpenUrl(string url)
+        // === HTTP 辅助方法 ===
+
+        private static Dictionary<string, string>? ParseHeaders(object?[] args, int index)
         {
-            if (!string.IsNullOrEmpty(url))
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                { FileName = url, UseShellExecute = true });
-            return OkObj();
+            if (args.Length <= index || args[index] == null) return null;
+            try
+            {
+                var json = args[index]?.ToString();
+                if (string.IsNullOrEmpty(json)) return null;
+                return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json!);
+            }
+            catch { return null; }
         }
 
-        private object AppOpenFolder(string path)
+        private async Task<object> HttpPost(object?[] args)
         {
-            if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
-                System.Diagnostics.Process.Start("explorer.exe", path);
-            return OkObj();
+            var url = Arg(args, 0);
+            var body = Arg(args, 1);
+            var contentType = Arg(args, 2, "application/json");
+            var headers = ParseHeaders(args, 3);
+            var r = await HostProvider.Instance.Http.PostAsync(url, body, contentType, headers);
+            return new { r.IsSuccess, data = r.Data, error = r.ErrorMessage };
         }
 
-        private object AppOpenWithDefault(string path)
+        private async Task<object> HttpDownload(object?[] args)
         {
-            if (!string.IsNullOrEmpty(path) && File.Exists(path))
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                { FileName = path, UseShellExecute = true });
-            return OkObj();
+            var url = Arg(args, 0);
+            var r = await HostProvider.Instance.Http.DownloadAsync(url);
+            if (!r.IsSuccess || r.Data == null)
+                return new { success = false, error = r.ErrorMessage };
+
+            // 保存到临时文件
+            var tempDir = System.IO.Path.GetTempPath();
+            var fileName = $"long_download_{DateTime.Now:yyyyMMddHHmmss}_{System.IO.Path.GetFileName(new Uri(url).AbsolutePath)}";
+            if (string.IsNullOrEmpty(System.IO.Path.GetExtension(fileName)))
+                fileName += ".bin";
+            var filePath = System.IO.Path.Combine(tempDir, fileName);
+            await System.IO.File.WriteAllBytesAsync(filePath, r.Data);
+            return new { success = true, filePath = filePath.Replace("\\", "/"), size = r.Data.Length };
         }
 
         private async Task<object> HotKeyRegister(object?[] args)
         {
             var hotkey = Arg(args, 0);
-            var r = await HostProvider.Instance.HotKey!.RegisterAsync(hotkey, () =>
+            var r = await HostProvider.Instance.HotKey.RegisterAsync(hotkey, () =>
             {
                 _webView.CoreWebView2.PostWebMessageAsJson(
                     System.Text.Json.JsonSerializer.Serialize(new { type = "hotkey", hotkey }));
@@ -254,7 +321,7 @@ namespace LongBetterWindows.Host.Engine
         private async Task<object> HotKeyUnregister(object?[] args)
         {
             var hotkey = Arg(args, 0);
-            var r = await HostProvider.Instance.HotKey!.UnregisterAsync(hotkey);
+            var r = await HostProvider.Instance.HotKey.UnregisterAsync(hotkey);
             return new { r.IsSuccess, error = r.ErrorMessage };
         }
 
@@ -288,7 +355,10 @@ window.long = {
     getSelectedItems: function(){return call('shell.getSelectedItems',[]);},
     getItemScreenRect: function(){return call('shell.getItemScreenRect',[]);},
     listFiles: function(dir){return call('shell.listFiles',[dir]);},
-    renameFile: function(oldPath,newName){return call('shell.renameFile',[oldPath,newName]);}
+    renameFile: function(oldPath,newName){return call('shell.renameFile',[oldPath,newName]);},
+    openUrl: function(url){return call('shell.openUrl',[url]);},
+    openFolder: function(path){return call('shell.openFolder',[path]);},
+    openWithDefault: function(path){return call('shell.openWithDefault',[path]);}
   },
   fs: { ads: {
     read: function(p,s){return call('fs.ads.read',[p,s||'long_note']);},
@@ -315,6 +385,15 @@ window.long = {
   },
   ui: {
     showToast: function(m){return call('ui.showToast',[m]);}
+  },
+  screenshot: {
+    captureFull: function(){return call('screenshot.captureFull',[]);},
+    captureRegion: function(x,y,w,h){return call('screenshot.captureRegion',[x,y,w,h]);}
+  },
+  http: {
+    get: function(url,headers){return call('http.get',[url,headers]);},
+    post: function(url,body,contentType,headers){return call('http.post',[url,body,contentType||'application/json',headers]);},
+    download: function(url){return call('http.download',[url]);}
   },
   window: {
     getForeground: function(){return call('window.getForeground',[]);}

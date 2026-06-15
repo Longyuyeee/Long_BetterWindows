@@ -1,39 +1,32 @@
-<ui:FluentWindow x:Class="LongBetterWindows.Host.MainWindow"
+<Window x:Class="LongBetterWindows.Host.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         xmlns:views="clr-namespace:LongBetterWindows.Host.Views"
-        mc:Ignorable="d"
         Title="Long窗口·全能助手"
         MinWidth="420" MinHeight="360"
-        Width="500" Height="520"
-        WindowStartupLocation="CenterScreen"
-        ExtendsContentIntoTitleBar="True"
-        WindowBackdropType="None"
-        WindowCornerPreference="Round">
+        Width="500" Height="560"
+        WindowStartupLocation="CenterScreen">
 
-    <ui:FluentWindow.Background>
-        <SolidColorBrush Color="#F0F0F5" Opacity="0.95" />
-    </ui:FluentWindow.Background>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="36" GlassFrameThickness="0"
+                      CornerRadius="8" ResizeBorderThickness="4"
+                      UseAeroCaptionButtons="True" />
+    </WindowChrome.WindowChrome>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="36" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar
-            Title="Long窗口·全能助手"
-            Grid.Row="0">
-            <ui:TitleBar.Icon>
-                <ui:SymbolIcon Symbol="Window20" FontSize="18" />
-            </ui:TitleBar.Icon>
-        </ui:TitleBar>
-
-        <Grid Grid.Row="1" x:Name="RootGrid">
-            <views:ToolCenterControl />
+        <!-- 自定义标题栏 -->
+        <Grid Grid.Row="0" Background="#2D2D30">
+            <TextBlock Text="Long窗口·全能助手"
+                       Foreground="#CCCCCC" FontSize="12"
+                       VerticalAlignment="Center" Margin="12,0,0,0" />
         </Grid>
+
+        <!-- 内容 -->
+        <views:ToolCenterControl Grid.Row="1" />
     </Grid>
-</ui:FluentWindow>
+</Window>

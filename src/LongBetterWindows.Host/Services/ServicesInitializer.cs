@@ -20,6 +20,8 @@ namespace LongBetterWindows.Host.Services
         public static ScreenCaptureService ScreenCapture { get; private set; } = null!;
         public static InputService Input { get; private set; } = null!;
         public static ProcessService Process { get; private set; } = null!;
+        public static HttpService Http { get; private set; } = null!;
+        public static ShellExecuteService ShellExecute { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
 
         public static void Initialize()
@@ -67,6 +69,12 @@ namespace LongBetterWindows.Host.Services
 
             Process = new ProcessService();
             provider.RegisterService<IProcessService>(Process);
+
+            Http = new HttpService();
+            provider.RegisterService<IHttpService>(Http);
+
+            ShellExecute = new ShellExecuteService();
+            provider.RegisterService<IShellExecuteService>(ShellExecute);
 
             I18nService.Initialize();
 

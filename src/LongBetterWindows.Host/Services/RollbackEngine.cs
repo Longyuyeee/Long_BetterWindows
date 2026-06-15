@@ -1,7 +1,10 @@
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using LongBetterWindows.Host.Contracts;
 using Serilog;
+using static LongBetterWindows.Host.Services.NativeMethods;
 
 namespace LongBetterWindows.Host.Services
 {
@@ -166,14 +169,137 @@ namespace LongBetterWindows.Host.Services
             return true;
         }
 
-        private bool RollbackAdsWrite(ChangeRecord _)
+        private bool RollbackAdsWrite(ChangeRecord record)
         {
+            try
+            {
+                if (!string.IsNullOrEmpty(record.OldValue))
+                {
+                    // 存在旧内容 → 恢复旧内容
+                    return WriteAdsContent(record.Target, record.OldValue);
+                }
+                else
+                {
+                    // 无旧内容（新建的流）→ 删除该 ADS 流
+                    if (!DeleteFileW(record.Target))
+                    {
+                        int error = Marshal.GetLastWin32Error();
+                        if (error != 2 && error != 3) // 不是"文件不存在"
+                        {
+                            Log.Warning("ADS 回滚删除失败: {Target}, Win32Error={Error}", record.Target, error);
+                        }
+                    }
+
+                    // 同时清理回退文件
+                    DeleteAdsFallback(record.Target);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "ADS 回滚写操作失败: {Target}", record.Target);
+                return false;
+            }
+        }
+
+        private bool RollbackAdsDelete(ChangeRecord record)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(record.OldValue))
+                {
+                    // 恢复了被删除的内容
+                    return WriteAdsContent(record.Target, record.OldValue);
+                }
+                // 无旧内容（流原本就不存在），无需恢复
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "ADS 回滚删操作失败: {Target}", record.Target);
+                return false;
+            }
+        }
+
+        /// <summary>向 ADS 流写入内容，失败时回退到 fallback 文件</summary>
+        private static bool WriteAdsContent(string adsPath, string content)
+        {
+            // 判断是否为目录（ADS 路径格式: path:stream）
+            var basePath = GetBasePathFromAds(adsPath);
+            bool isDir = !string.IsNullOrEmpty(basePath) && Directory.Exists(basePath);
+
+            var handle = CreateFileW(
+                adsPath,
+                GENERIC_WRITE,
+                FILE_SHARE_READ,
+                IntPtr.Zero,
+                CREATE_ALWAYS,
+                isDir ? FILE_FLAG_BACKUP_SEMANTICS : FILE_ATTRIBUTE_NORMAL,
+                IntPtr.Zero);
+
+            if (handle == (IntPtr)INVALID_HANDLE_VALUE || handle == IntPtr.Zero)
+            {
+                // ADS 写入失败，写入 fallback 文件
+                WriteAdsFallback(adsPath, content);
+                return true;
+            }
+
+            try
+            {
+                var bytes = Encoding.UTF8.GetBytes(content);
+                if (!WriteFile(handle, bytes, (uint)bytes.Length, out _, IntPtr.Zero))
+                {
+                    WriteAdsFallback(adsPath, content);
+                }
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
+
             return true;
         }
 
-        private bool RollbackAdsDelete(ChangeRecord _)
+        /// <summary>从 ADS 路径提取基础文件路径（去掉 :stream 后缀）</summary>
+        private static string GetBasePathFromAds(string adsPath)
         {
-            return true;
+            var colonIdx = adsPath.LastIndexOf(':');
+            return colonIdx > 0 ? adsPath.Substring(0, colonIdx) : adsPath;
+        }
+
+        /// <summary>获取 ADS 对应的 fallback 文件路径</summary>
+        private static string GetAdsFallbackPath(string adsPath)
+        {
+            var basePath = GetBasePathFromAds(adsPath);
+            var dir = Directory.Exists(basePath) ? basePath : Path.GetDirectoryName(basePath);
+            return Path.Combine(dir ?? ".", "long_note.json");
+        }
+
+        private static void DeleteAdsFallback(string adsPath)
+        {
+            var fallbackPath = GetAdsFallbackPath(adsPath);
+            try
+            {
+                if (File.Exists(fallbackPath))
+                    File.Delete(fallbackPath);
+            }
+            catch { }
+        }
+
+        private static void WriteAdsFallback(string adsPath, string content)
+        {
+            var fallbackPath = GetAdsFallbackPath(adsPath);
+            try
+            {
+                var dir = Path.GetDirectoryName(fallbackPath);
+                if (dir != null && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                File.WriteAllText(fallbackPath, content, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "ADS fallback 写入失败: {Path}", fallbackPath);
+            }
         }
 
         private string GetLogPath(string pluginId)

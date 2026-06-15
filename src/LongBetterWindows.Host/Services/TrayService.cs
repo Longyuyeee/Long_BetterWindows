@@ -75,6 +75,9 @@ namespace LongBetterWindows.Host.Services
             };
 
             _visible = Shell_NotifyIcon(NIM_ADD, ref nid);
+
+            // 通知 NotificationService 托盘句柄，用于原生 Windows 气泡通知
+            NotificationService.SetTrayHandle(_hwndSource.Handle, 1);
         }
 
         private void RemoveTrayIcon()

@@ -30,20 +30,13 @@ namespace LongBetterWindows.Host.Engine
 
         public void ShowMainUI()
         {
+            var wv = _runtime.WebView;
             var w = new System.Windows.Window
             {
                 Title = Name,
                 Width = 480, Height = 520,
                 WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen,
-            };
-            var wv = new Microsoft.Web.WebView2.Wpf.WebView2();
-            w.Content = wv;
-            w.Loaded += async (_, _) =>
-            {
-                await wv.EnsureCoreWebView2Async();
-                var path = System.IO.Path.Combine(_pluginDir, _entryPoint);
-                if (System.IO.File.Exists(path))
-                    wv.CoreWebView2.Navigate(new Uri(path).AbsoluteUri);
+                Content = wv,
             };
             w.Show();
         }

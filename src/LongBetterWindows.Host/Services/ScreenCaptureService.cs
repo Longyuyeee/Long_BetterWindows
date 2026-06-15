@@ -27,16 +27,12 @@ namespace LongBetterWindows.Host.Services
                 {
                     Application.Current.Dispatcher.Invoke(() =>
                     {
-                        int w = (int)SystemParameters.PrimaryScreenWidth;
-                        int h = (int)SystemParameters.PrimaryScreenHeight;
-                        var dc = GetDC(IntPtr.Zero);
-                        var memDc = CreateCompatibleDC(dc);
-                        var bmp = CreateCompatibleBitmap(dc, w, h);
-                        SelectObject(memDc, bmp);
-                        BitBlt(memDc, 0, 0, w, h, dc, 0, 0, SRCCOPY);
-                        var bitmap = Imaging.CreateBitmapSourceFromHBitmap(bmp, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                        int x = (int)SystemParameters.VirtualScreenLeft;
+                        int y = (int)SystemParameters.VirtualScreenTop;
+                        int w = (int)SystemParameters.VirtualScreenWidth;
+                        int h = (int)SystemParameters.VirtualScreenHeight;
+                        var bitmap = CaptureRect(x, y, w, h);
                         Clipboard.SetImage(bitmap);
-                        DeleteObject(bmp); DeleteDC(memDc); ReleaseDC(IntPtr.Zero, dc);
                     });
                     return HostApiResponse.Success();
                 }
@@ -53,20 +49,52 @@ namespace LongBetterWindows.Host.Services
                     BitmapSource? result = null;
                     Application.Current.Dispatcher.Invoke(() =>
                     {
-                        int w = (int)SystemParameters.PrimaryScreenWidth;
-                        int h = (int)SystemParameters.PrimaryScreenHeight;
-                        var dc = GetDC(IntPtr.Zero);
-                        var memDc = CreateCompatibleDC(dc);
-                        var bmp = CreateCompatibleBitmap(dc, w, h);
-                        SelectObject(memDc, bmp);
-                        BitBlt(memDc, 0, 0, w, h, dc, 0, 0, SRCCOPY);
-                        result = Imaging.CreateBitmapSourceFromHBitmap(bmp, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                        DeleteObject(bmp); DeleteDC(memDc); ReleaseDC(IntPtr.Zero, dc);
+                        int x = (int)SystemParameters.VirtualScreenLeft;
+                        int y = (int)SystemParameters.VirtualScreenTop;
+                        int w = (int)SystemParameters.VirtualScreenWidth;
+                        int h = (int)SystemParameters.VirtualScreenHeight;
+                        result = CaptureRect(x, y, w, h);
                     });
                     return HostApiResponse<BitmapSource>.Success(result!);
                 }
                 catch (Exception ex) { return HostApiResponse<BitmapSource>.Failure(ApiErrorCode.Unknown, ex.Message); }
             });
+        }
+
+        public Task<HostApiResponse<BitmapSource>> CaptureRegionAsync(int x, int y, int width, int height)
+        {
+            return Task.Run(() =>
+            {
+                try
+                {
+                    if (width <= 0 || height <= 0)
+                        return HostApiResponse<BitmapSource>.Failure(ApiErrorCode.InvalidArgument, "区域宽高必须大于 0");
+
+                    BitmapSource? result = null;
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        result = CaptureRect(x, y, width, height);
+                    });
+                    return HostApiResponse<BitmapSource>.Success(result!);
+                }
+                catch (Exception ex) { return HostApiResponse<BitmapSource>.Failure(ApiErrorCode.Unknown, ex.Message); }
+            });
+        }
+
+        /// <summary>GDI 屏幕区域捕获，必须在 UI 线程调用</summary>
+        private static BitmapSource CaptureRect(int sx, int sy, int w, int h)
+        {
+            var dc = GetDC(IntPtr.Zero);
+            var memDc = CreateCompatibleDC(dc);
+            var bmp = CreateCompatibleBitmap(dc, w, h);
+            SelectObject(memDc, bmp);
+            BitBlt(memDc, 0, 0, w, h, dc, sx, sy, SRCCOPY);
+            var result = Imaging.CreateBitmapSourceFromHBitmap(
+                bmp, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            DeleteObject(bmp);
+            DeleteDC(memDc);
+            ReleaseDC(IntPtr.Zero, dc);
+            return result;
         }
     }
 }

@@ -13,7 +13,7 @@ public partial class MacroOverlay : Window
 
     public static MacroOverlay ShowOverlay()
     {
-        var area = SystemParameters.WorkArea;
+        var area = LongBetterWindows.Host.Services.MonitorHelper.GetCursorWorkArea();
         var window = new MacroOverlay
         {
             Left = area.Right - 120,

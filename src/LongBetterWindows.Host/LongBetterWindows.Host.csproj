@@ -20,23 +20,48 @@
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
   </ItemGroup>
 
-  <!-- 复制 Web 插件源码到 Plugins 输出目录 -->
-  <Target Name="CopyWebPlugins" AfterTargets="Build">
-    <!-- 自动复制所有 Web 插件目录到 Plugins/ -->
-    <ItemGroup>
-      <_WebPlugins Include="$(SolutionDir)src\ClipboardTool\**\*" />
-      <_WebPlugins Include="$(SolutionDir)src\QuickNotePlugin\**\*" />
-      <_WebPlugins Include="$(SolutionDir)src\TranslatePlugin\**\*" />
-      <_WebPlugins Include="$(SolutionDir)src\FileRenamerPlugin\**\*" />
-      <_WebPlugins Include="$(SolutionDir)src\JsonFormatterPlugin\**\*" />
-      <_WebPlugins Include="$(SolutionDir)src\Base64Tool\**\*" />
-      <_WebPlugins Include="$(SolutionDir)src\TextDiffPlugin\**\*" />
-      <_WebPlugins Include="$(SolutionDir)src\MarkdownPreview\**\*" />
-      <_WebPlugins Include="$(SolutionDir)src\PasswordGenerator\**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_WebPlugins)"
-          DestinationFiles="@(_WebPlugins->'$(SolutionDir)Plugins\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
+  <!-- 仓库根目录（兼容 SolutionDir 不存在的情况） -->
+  <PropertyGroup>
+    <RepoRoot Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)..\</RepoRoot>
+    <RepoRoot Condition="'$(SolutionDir)' != ''">$(SolutionDir)</RepoRoot>
+  </PropertyGroup>
+
+  <!-- 复制所有插件到输出目录 Plugins/ -->
+  <Target Name="CopyAllPlugins" AfterTargets="Build">
+    <Message Importance="high" Text="复制插件到 $(OutputPath)Plugins..." />
+
+    <!-- 复制所有插件到 output/Plugins/（robocopy 简单可靠） -->
+    <Exec Command="robocopy &quot;$(RepoRoot)src\SamplePlugin&quot; &quot;$(OutputPath)Plugins\SamplePlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Exec Command="if exist &quot;$(RepoRoot)src\SamplePlugin\bin\$(Configuration)\net8.0-windows\SamplePlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\SamplePlugin\bin\$(Configuration)\net8.0-windows\SamplePlugin.dll&quot; &quot;$(OutputPath)Plugins\SamplePlugin\&quot; &gt; nul" />
+
+    <Exec Command="robocopy &quot;$(RepoRoot)src\FolderNotePlugin&quot; &quot;$(OutputPath)Plugins\FolderNotePlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Exec Command="if exist &quot;$(RepoRoot)src\FolderNotePlugin\bin\$(Configuration)\net8.0-windows\FolderNotePlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\FolderNotePlugin\bin\$(Configuration)\net8.0-windows\FolderNotePlugin.dll&quot; &quot;$(OutputPath)Plugins\FolderNotePlugin\&quot; &gt; nul" />
+
+    <Exec Command="robocopy &quot;$(RepoRoot)src\QuickLaunchPlugin&quot; &quot;$(OutputPath)Plugins\QuickLaunchPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Exec Command="if exist &quot;$(RepoRoot)src\QuickLaunchPlugin\bin\$(Configuration)\net8.0-windows\QuickLaunchPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\QuickLaunchPlugin\bin\$(Configuration)\net8.0-windows\QuickLaunchPlugin.dll&quot; &quot;$(OutputPath)Plugins\QuickLaunchPlugin\&quot; &gt; nul" />
+
+    <Exec Command="robocopy &quot;$(RepoRoot)src\MacroPlugin&quot; &quot;$(OutputPath)Plugins\MacroPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Exec Command="if exist &quot;$(RepoRoot)src\MacroPlugin\bin\$(Configuration)\net8.0-windows\MacroPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\MacroPlugin\bin\$(Configuration)\net8.0-windows\MacroPlugin.dll&quot; &quot;$(OutputPath)Plugins\MacroPlugin\&quot; &gt; nul" />
+
+    <Exec Command="robocopy &quot;$(RepoRoot)src\ColorPickerPlugin&quot; &quot;$(OutputPath)Plugins\ColorPickerPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Exec Command="if exist &quot;$(RepoRoot)src\ColorPickerPlugin\bin\$(Configuration)\net8.0-windows\ColorPickerPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\ColorPickerPlugin\bin\$(Configuration)\net8.0-windows\ColorPickerPlugin.dll&quot; &quot;$(OutputPath)Plugins\ColorPickerPlugin\&quot; &gt; nul" />
+
+    <Exec Command="robocopy &quot;$(RepoRoot)src\ScreenshotPlugin&quot; &quot;$(OutputPath)Plugins\ScreenshotPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Exec Command="if exist &quot;$(RepoRoot)src\ScreenshotPlugin\bin\$(Configuration)\net8.0-windows\ScreenshotPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\ScreenshotPlugin\bin\$(Configuration)\net8.0-windows\ScreenshotPlugin.dll&quot; &quot;$(OutputPath)Plugins\ScreenshotPlugin\&quot; &gt; nul" />
+
+    <Exec Command="robocopy &quot;$(RepoRoot)src\WindowManagerPlugin&quot; &quot;$(OutputPath)Plugins\WindowManagerPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Exec Command="if exist &quot;$(RepoRoot)src\WindowManagerPlugin\bin\$(Configuration)\net8.0-windows\WindowManagerPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\WindowManagerPlugin\bin\$(Configuration)\net8.0-windows\WindowManagerPlugin.dll&quot; &quot;$(OutputPath)Plugins\WindowManagerPlugin\&quot; &gt; nul" />
+
+    <!-- Web 插件：robocopy 整个目录（排除 bin/obj） -->
+    <Exec Command="robocopy &quot;$(RepoRoot)src\ClipboardTool&quot; &quot;$(OutputPath)Plugins\ClipboardTool&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\QuickNotePlugin&quot; &quot;$(OutputPath)Plugins\QuickNotePlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\TranslatePlugin&quot; &quot;$(OutputPath)Plugins\TranslatePlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\FileRenamerPlugin&quot; &quot;$(OutputPath)Plugins\FileRenamerPlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\JsonFormatterPlugin&quot; &quot;$(OutputPath)Plugins\JsonFormatterPlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\Base64Tool&quot; &quot;$(OutputPath)Plugins\Base64Tool&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\TextDiffPlugin&quot; &quot;$(OutputPath)Plugins\TextDiffPlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\MarkdownPreview&quot; &quot;$(OutputPath)Plugins\MarkdownPreview&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\PasswordGenerator&quot; &quot;$(OutputPath)Plugins\PasswordGenerator&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
   </Target>
 
 </Project>

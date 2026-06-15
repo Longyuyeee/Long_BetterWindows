@@ -21,7 +21,7 @@ public partial class LaunchWindow : Window
 
     public static void Show(Action<string?> onSelect)
     {
-        var area = SystemParameters.WorkArea;
+        var area = LongBetterWindows.Host.Services.MonitorHelper.GetCursorWorkArea();
         var window = new LaunchWindow
         {
             _onSelect = onSelect,

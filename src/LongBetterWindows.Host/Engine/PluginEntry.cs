@@ -33,7 +33,20 @@ namespace LongBetterWindows.Host.Engine
         public string? GetSetting(string key)
         {
             if (_settings.TryGetValue(key, out var val))
-                return val is JsonElement je ? je.GetString() : val?.ToString();
+            {
+                if (val is JsonElement je)
+                {
+                    return je.ValueKind switch
+                    {
+                        JsonValueKind.String => je.GetString(),
+                        JsonValueKind.True => "true",
+                        JsonValueKind.False => "false",
+                        JsonValueKind.Number => je.GetRawText(),
+                        _ => null,
+                    };
+                }
+                return val?.ToString();
+            }
             return null;
         }
 

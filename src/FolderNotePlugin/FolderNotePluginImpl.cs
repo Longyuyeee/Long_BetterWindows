@@ -12,8 +12,8 @@ namespace FolderNotePlugin;
 
 public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
 {
-    private IHostApi? _host;
-    private IHotKeyService? _hotKey;
+    private IHostApi _host = null!;
+    private IHotKeyService _hotKey = null!;
 
     public string Id => "com.long.folder-note";
     public string Name => "文件夹备注助手";
@@ -23,14 +23,7 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
     public Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
-        _hotKey = host.HotKey;
-
-        if (_hotKey == null)
-        {
-            Log.Error("[FolderNotePlugin] 未获得热键能力授权");
-            State = PluginState.Error;
-            return Task.FromResult(false);
-        }
+        _hotKey = host.HotKey; // 若无 system.hotkey 能力会抛出 UnauthorizedAccessException
 
         Log.Information("[FolderNotePlugin] 初始化完成");
         return Task.FromResult(true);
@@ -38,8 +31,6 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
 
     public async Task<bool> StartAsync()
     {
-        if (_hotKey == null) return false;
-
         var result = await _hotKey.RegisterAsync("Alt+M", OnHotkeyTriggered);
 
         if (!result.IsSuccess)
@@ -56,8 +47,7 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
 
     public async Task<bool> StopAsync()
     {
-        if (_hotKey != null)
-            await _hotKey.UnregisterAsync("Alt+M");
+        await _hotKey.UnregisterAsync("Alt+M");
 
         State = PluginState.Disabled;
         Log.Information("[FolderNotePlugin] 已停止");
@@ -68,7 +58,7 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
 
     private async void OnHotkeyTriggered()
     {
-        if (_isActive || _host == null) return;
+        if (_isActive) return;
         _isActive = true;
 
         try
@@ -87,14 +77,8 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
 
     private async Task ShowNoteHudAsync()
     {
-        var shell = _host!.ShellSelection;
+        var shell = _host.ShellSelection;
         var ads = _host.ADS;
-
-        if (shell == null || ads == null)
-        {
-            FloatingHudWindow.ShowToast("所需能力未授权。");
-            return;
-        }
 
         var folderResult = await shell.GetActiveExplorerFolderPathAsync();
         if (!folderResult.IsSuccess || folderResult.Data == null)

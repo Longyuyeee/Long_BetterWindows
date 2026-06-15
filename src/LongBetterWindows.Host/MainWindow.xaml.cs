@@ -1,18 +1,15 @@
 using System.Windows;
 using System.Windows.Interop;
 using LongBetterWindows.Host.Services;
-using Wpf.Ui.Appearance;
-using Wpf.Ui.Controls;
 
 namespace LongBetterWindows.Host
 {
-    public partial class MainWindow : FluentWindow
+    public partial class MainWindow : Window
     {
         private TrayService? _tray;
 
         public MainWindow()
         {
-            SystemThemeWatcher.Watch(this);
             InitializeComponent();
             _tray = new TrayService(this);
         }

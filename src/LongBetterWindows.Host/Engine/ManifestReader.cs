@@ -18,18 +18,21 @@ namespace LongBetterWindows.Host.Engine
             "system.hotkey",
             "shell.context_menu",
             "shell.selection",
+            "shell.execute",
             "shell.ui.locator",
             "ui.floating_box",
             "fs.ads.access",
             "system.registry.read",
             "system.registry.write",
             "system.clipboard",
-            "file.ops",
-            "window.info",
+            "system.notification",
             "system.screenshot",
             "system.input",
             "system.process",
+            "file.ops",
+            "window.info",
             "storage.local",
+            "network.http",
         };
 
         public static async Task<ManifestResult> ReadAsync(string pluginDir)

@@ -13,6 +13,9 @@ namespace LongBetterWindows.Host.Services
         private static Dictionary<string, string> _strings = new();
         public static string CurrentLang { get; private set; } = "zh-CN";
 
+        /// <summary>支持的语言列表</summary>
+        public static readonly string[] SupportedLanguages = { "zh-CN", "en-US" };
+
         public static void Initialize(string? lang = null)
         {
             CurrentLang = lang ?? "zh-CN";
@@ -29,6 +32,14 @@ namespace LongBetterWindows.Host.Services
             CurrentLang = lang;
             Load(lang);
             Log.Information("语言切换为: {Lang}", lang);
+        }
+
+        /// <summary>在中英文之间切换</summary>
+        public static string ToggleLanguage()
+        {
+            var next = CurrentLang == "zh-CN" ? "en-US" : "zh-CN";
+            SetLanguage(next);
+            return next;
         }
 
         private static void Load(string lang)

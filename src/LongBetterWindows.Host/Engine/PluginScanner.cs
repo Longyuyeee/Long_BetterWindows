@@ -274,6 +274,10 @@ namespace LongBetterWindows.Host.Engine
                 loadContext = loadResult.Context;
             }
 
+            // ★ 先注册再初始化，以便 InitializeAsync 中权限检查能生效
+            registry.Register(manifest, plugin, loadContext, pluginDir);
+            _dirToPluginId[pluginDir] = manifest.Id;
+
             var hostApi = HostProvider.Instance;
 
             using (PluginAccessContext.Enter(manifest.Id))
@@ -282,14 +286,12 @@ namespace LongBetterWindows.Host.Engine
                 if (!initOk)
                 {
                     Log.Error("插件 {PluginId} 初始化失败", manifest.Id);
+                    registry.Unregister(manifest.Id);
                     if (loadContext != null) _loader.Unload(loadContext);
                     else _scriptLoader.Unload(manifest.Id);
                     return;
                 }
             }
-
-            registry.Register(manifest, plugin, loadContext, pluginDir);
-            _dirToPluginId[pluginDir] = manifest.Id;
 
             // 检查用户配置：仅 auto_start=true 时自动启动
             var entry = registry.Get(manifest.Id)!;

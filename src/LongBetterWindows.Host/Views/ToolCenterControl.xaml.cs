@@ -15,7 +15,15 @@ namespace LongBetterWindows.Host.Views
         private static readonly SolidColorBrush GreenBrush =
             new(Color.FromRgb(0x34, 0xC7, 0x59));
         private static readonly SolidColorBrush GrayBrush =
-            new(Color.FromRgb(0x80, 0x80, 0x80));
+            new(Color.FromRgb(0x99, 0x99, 0x99));
+        private static readonly SolidColorBrush LightTextBrush =
+            new(Color.FromRgb(0xE8, 0xE8, 0xE8));
+        private static readonly SolidColorBrush CardBgBrush =
+            new(Color.FromRgb(0x2D, 0x2D, 0x30));
+        private static readonly SolidColorBrush BlueBrush =
+            new(Color.FromRgb(0x00, 0x7A, 0xFF));
+        private static readonly SolidColorBrush RedBrush =
+            new(Color.FromRgb(0xFF, 0x3B, 0x30));
 
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
@@ -36,35 +44,31 @@ namespace LongBetterWindows.Host.Views
             PluginDevTools.Open(Window.GetWindow(this)!);
         }
 
+        private static bool _isLightMode;
         private void ThemeToggle_Click(object sender, RoutedEventArgs e)
         {
-            var app = Application.Current;
-            var isDark = app.Resources.MergedDictionaries
-                .OfType<ResourceDictionary>()
-                .Any(d => d.Source?.ToString().Contains("Dark") == true);
-
-            app.Resources.MergedDictionaries.Clear();
-            var theme = isDark ? "Light" : "Dark";
-            app.Resources.MergedDictionaries.Add(new ResourceDictionary
-            {
-                Source = new Uri($"pack://application:,,,/Wpf.Ui;component/Resources/Theme/{theme}.xaml",
-                    UriKind.Absolute)
-            });
+            _isLightMode = !_isLightMode;
+            var bg = _isLightMode ? "#F5F5F7" : "#1E1F22";
+            var window = Window.GetWindow(this);
+            if (window != null)
+                window.Background = new SolidColorBrush(
+                    (Color)ColorConverter.ConvertFromString(bg));
+            if (sender is Button btn)
+                btn.Content = _isLightMode ? "暗色" : "亮色";
         }
 
         private void RefreshDocLinks()
         {
             DocLinksPanel.Children.Clear();
 
-            // 查找 docs 目录
-            var docsDir = Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "docs");
+            // 查找 docs 目录：从 bin/Debug/net8.0-windows 向上 5 级到 repo 根
+            var docsDir = Path.GetFullPath(Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "docs"));
 
             if (!Directory.Exists(docsDir))
             {
-                // 尝试发布路径
-                docsDir = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "docs");
+                // 尝试直接在 BaseDirectory/docs
+                docsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "docs");
             }
 
             if (!Directory.Exists(docsDir))
@@ -269,7 +273,7 @@ namespace LongBetterWindows.Host.Views
 
                 var emptyCard = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(0x08, 0x00, 0x7A, 0xFF)),
+                    Background = CardBgBrush,
                     CornerRadius = new CornerRadius(10),
                     Padding = new Thickness(20, 20, 20, 20),
                     Child = new StackPanel
@@ -281,7 +285,7 @@ namespace LongBetterWindows.Host.Views
                                 Text = "暂无插件",
                                 FontSize = 14,
                                 FontWeight = FontWeights.Medium,
-                                Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                                Foreground = BlueBrush,
                             },
                             new TextBlock
                             {
@@ -295,14 +299,14 @@ namespace LongBetterWindows.Host.Views
                                 Text = ".\\new-plugin.ps1 -Name \"名称\" -Id \"com.example.id\"",
                                 FontSize = 11,
                                 FontFamily = new System.Windows.Media.FontFamily("Consolas"),
-                                Foreground = GrayBrush,
+                                Foreground = LightTextBrush,
                                 Margin = new Thickness(0, 2, 0, 0),
                             },
                             new TextBlock
                             {
                                 Text = "模板: empty / hotkey / full",
                                 FontSize = 10,
-                                Foreground = new SolidColorBrush(Color.FromRgb(0xA0, 0xA0, 0xA0)),
+                                Foreground = GrayBrush,
                                 Margin = new Thickness(0, 4, 0, 0),
                             },
                         },
@@ -348,6 +352,7 @@ namespace LongBetterWindows.Host.Views
                 Text = plugin.Manifest.Name,
                 FontSize = 13,
                 FontWeight = FontWeights.Medium,
+                Foreground = LightTextBrush,
                 VerticalAlignment = VerticalAlignment.Center,
             });
             infoStack.Children.Add(nameRow);
@@ -424,9 +429,7 @@ namespace LongBetterWindows.Host.Views
             }
 
             var btnText = isRunning ? "禁用" : "启用";
-            var btnBrush = isRunning
-                ? new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30))
-                : GreenBrush;
+            var btnBrush = isRunning ? RedBrush : GreenBrush;
 
             var toggleBtn = new Button
             {
@@ -453,7 +456,7 @@ namespace LongBetterWindows.Host.Views
 
             return new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(0x10, 0x00, 0x00, 0x00)),
+                Background = CardBgBrush,
                 CornerRadius = new CornerRadius(10),
                 Padding = new Thickness(14, 10, 14, 10),
                 Margin = new Thickness(0, 0, 0, 8),

@@ -15,7 +15,7 @@ namespace LongBetterWindows.Host.Views
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                var workArea = SystemParameters.WorkArea;
+                var workArea = Services.MonitorHelper.GetCursorWorkArea();
 
                 var window = new ToastWindow
                 {
