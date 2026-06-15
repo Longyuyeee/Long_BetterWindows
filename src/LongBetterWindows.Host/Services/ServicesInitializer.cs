@@ -19,6 +19,7 @@ namespace LongBetterWindows.Host.Services
         public static WindowInfoService WindowInfo { get; private set; } = null!;
         public static ScreenCaptureService ScreenCapture { get; private set; } = null!;
         public static InputService Input { get; private set; } = null!;
+        public static ProcessService Process { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
 
         public static void Initialize()
@@ -63,6 +64,9 @@ namespace LongBetterWindows.Host.Services
 
             Input = new InputService();
             provider.RegisterService<IInputService>(Input);
+
+            Process = new ProcessService();
+            provider.RegisterService<IProcessService>(Process);
 
             I18nService.Initialize();
 

@@ -28,6 +28,7 @@ namespace LongBetterWindows.Host.Engine
             "window.info",
             "system.screenshot",
             "system.input",
+            "system.process",
             "storage.local",
         };
 

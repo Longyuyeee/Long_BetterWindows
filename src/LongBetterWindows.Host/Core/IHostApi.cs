@@ -15,5 +15,6 @@ namespace LongBetterWindows.Host.Core
         IWindowInfoService? WindowInfo { get; }
         IScreenCaptureService? ScreenCapture { get; }
         IInputService? Input { get; }
+        IProcessService? Process { get; }
     }
 }

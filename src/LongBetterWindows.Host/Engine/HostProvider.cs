@@ -88,6 +88,8 @@ namespace LongBetterWindows.Host.Engine
                 return "system.screenshot";
             if (typeof(T) == typeof(IInputService))
                 return "system.input";
+            if (typeof(T) == typeof(IProcessService))
+                return "system.process";
             return null;
         }
 
@@ -102,5 +104,6 @@ namespace LongBetterWindows.Host.Engine
         public IWindowInfoService? WindowInfo => GetService<IWindowInfoService>();
         public IScreenCaptureService? ScreenCapture => GetService<IScreenCaptureService>();
         public IInputService? Input => GetService<IInputService>();
+        public IProcessService? Process => GetService<IProcessService>();
     }
 }
