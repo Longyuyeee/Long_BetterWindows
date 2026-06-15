@@ -16,6 +16,7 @@ namespace LongBetterWindows.Host.Services
         public static ClipboardService Clipboard { get; private set; } = null!;
         public static NotificationService Notification { get; private set; } = null!;
         public static FileOpsService FileOps { get; private set; } = null!;
+        public static WindowInfoService WindowInfo { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
 
         public static void Initialize()
@@ -51,6 +52,9 @@ namespace LongBetterWindows.Host.Services
 
             FileOps = new FileOpsService();
             provider.RegisterService<IFileOpsService>(FileOps);
+
+            WindowInfo = new WindowInfoService();
+            provider.RegisterService<IWindowInfoService>(WindowInfo);
 
             Startup = new StartupService();
         }

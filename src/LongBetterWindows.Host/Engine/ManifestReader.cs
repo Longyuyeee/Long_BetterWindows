@@ -25,6 +25,7 @@ namespace LongBetterWindows.Host.Engine
             "system.registry.write",
             "system.clipboard",
             "file.ops",
+            "window.info",
             "storage.local",
         };
 

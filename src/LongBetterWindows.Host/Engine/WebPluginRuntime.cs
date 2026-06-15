@@ -161,6 +161,9 @@ namespace LongBetterWindows.Host.Engine
                 "shell.listFiles" => Task.FromResult<object?>(ShellListFiles(Arg(args, 0))),
                 "shell.renameFile" => Task.FromResult<object?>(ShellRenameFile(Arg(args, 0), Arg(args, 1))),
 
+                // === long.window ===
+                "window.getForeground" => Task.FromResult<object?>(WindowGetForeground()),
+
                 // === long.ui ===
                 "ui.showToast" => Task.FromResult<object?>(UIToast(Arg(args, 0))),
 
@@ -199,6 +202,12 @@ namespace LongBetterWindows.Host.Engine
                 return new { success = true };
             }
             catch (Exception ex) { return new { success = false, error = ex.Message }; }
+        }
+
+        private async Task<object> WindowGetForeground()
+        {
+            var result = await HostProvider.Instance.WindowInfo!.GetForegroundWindowInfoAsync();
+            return result.IsSuccess ? result.Data! : new { success = false };
         }
 
         private object UIToast(string msg)
@@ -306,6 +315,9 @@ window.long = {
   },
   ui: {
     showToast: function(m){return call('ui.showToast',[m]);}
+  },
+  window: {
+    getForeground: function(){return call('window.getForeground',[]);}
   }
 };
 window.chrome.webview.addEventListener('message',function(e){

@@ -82,6 +82,8 @@ namespace LongBetterWindows.Host.Engine
                 return "system.notification";
             if (typeof(T) == typeof(IFileOpsService))
                 return "file.ops";
+            if (typeof(T) == typeof(IWindowInfoService))
+                return "window.info";
             return null;
         }
 
@@ -93,5 +95,6 @@ namespace LongBetterWindows.Host.Engine
         public IClipboardService? Clipboard => GetService<IClipboardService>();
         public INotificationService? Notification => GetService<INotificationService>();
         public IFileOpsService? FileOps => GetService<IFileOpsService>();
+        public IWindowInfoService? WindowInfo => GetService<IWindowInfoService>();
     }
 }
