@@ -180,4 +180,80 @@ public class ServiceTests
         }
         finally { if (Directory.Exists(dir)) try { Directory.Delete(dir, true); } catch { } }
     }
+
+    // ===== FileOpsService 测试 =====
+
+    [Fact]
+    public async Task FileOpsService_Copy_Works()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"test_fo_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var src = Path.Combine(dir, "src.txt");
+            var dst = Path.Combine(dir, "dst.txt");
+            File.WriteAllText(src, "test");
+
+            var svc = new FileOpsService();
+            var r = await svc.CopyAsync(src, dst);
+            Assert.True(r.IsSuccess);
+            Assert.True(File.Exists(dst));
+        }
+        finally { if (Directory.Exists(dir)) try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task FileOpsService_Move_Works()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"test_fo_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var src = Path.Combine(dir, "src.txt");
+            var dst = Path.Combine(dir, "moved.txt");
+            File.WriteAllText(src, "test");
+
+            var svc = new FileOpsService();
+            var r = await svc.MoveAsync(src, dst);
+            Assert.True(r.IsSuccess);
+            Assert.False(File.Exists(src));
+            Assert.True(File.Exists(dst));
+        }
+        finally { if (Directory.Exists(dir)) try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task FileOpsService_Delete_Works()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"test_fo_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var file = Path.Combine(dir, "del.txt");
+            File.WriteAllText(file, "test");
+
+            var svc = new FileOpsService();
+            var r = await svc.DeleteAsync(file);
+            Assert.True(r.IsSuccess);
+            Assert.False(File.Exists(file));
+        }
+        finally { if (Directory.Exists(dir)) try { Directory.Delete(dir, true); } catch { } }
+    }
+
+    [Fact]
+    public async Task FileOpsService_Exists_ReturnsTrue()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"test_fo_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var file = Path.Combine(dir, "exists.txt");
+            File.WriteAllText(file, "test");
+
+            var svc = new FileOpsService();
+            var r = await svc.ExistsAsync(file);
+            Assert.True(r.IsSuccess && r.Data);
+        }
+        finally { if (Directory.Exists(dir)) try { Directory.Delete(dir, true); } catch { } }
+    }
 }
