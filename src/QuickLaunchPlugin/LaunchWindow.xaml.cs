@@ -109,10 +109,20 @@ public partial class LaunchWindow : Window
             .ToList();
         results.AddRange(appResults);
 
-        // 4. 文件搜索（桌面/文档/下载）
-        if (query.Length >= 2)
+        // 4. 内容搜索 (grep: 以 > 开头)
+        if (query.StartsWith(">") && query.Length > 2)
         {
-            var fileResults = SearchFiles(query).Take(4).ToList();
+            var grepQuery = query.Substring(1).Trim();
+            if (grepQuery.Length >= 2)
+            {
+                var grepResults = SearchContent(grepQuery).Take(4).ToList();
+                results.AddRange(grepResults);
+            }
+        }
+        // 5. 文件搜索（桌面/文档/下载）
+        else if (query.Length >= 2)
+        {
+            var fileResults = SearchFiles(query).Take(3).ToList();
             results.AddRange(fileResults);
         }
 
@@ -179,6 +189,45 @@ public partial class LaunchWindow : Window
                 yield return new SmartEntry { Name = name, Path = f, Icon = icon, Category = "文件", Subtitle = dir };
             }
         }
+    }
+
+    private static List<SmartEntry> SearchContent(string query)
+    {
+        var results = new List<SmartEntry>();
+        var dirs = new[] { Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) };
+        var exts = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".txt", ".md", ".cs", ".json", ".xml", ".html", ".css", ".js", ".py", ".log", ".csv" };
+
+        foreach (var dir in dirs)
+        {
+            if (!Directory.Exists(dir)) continue;
+            string[] files;
+            try { files = Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories); }
+            catch { continue; }
+
+            foreach (var f in files.Take(200))
+            {
+                if (results.Count >= 4) return results;
+                if (!exts.Contains(Path.GetExtension(f))) continue;
+                try
+                {
+                    var content = File.ReadAllText(f);
+                    var idx = content.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0)
+                    {
+                        var start = Math.Max(0, idx - 20);
+                        var len = Math.Min(80, content.Length - start);
+                        var preview = content.Substring(start, len).Replace("\n", " ").Replace("\r", "");
+                        results.Add(new SmartEntry
+                        {
+                            Name = Path.GetFileName(f), Path = f, Icon = "🔍",
+                            Category = "内容匹配", Subtitle = "..." + preview + "...",
+                        });
+                    }
+                }
+                catch { }
+            }
+        }
+        return results;
     }
 
     private static bool IsUrl(string text)
