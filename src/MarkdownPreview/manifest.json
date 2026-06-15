@@ -1,0 +1,1 @@
+{"id":"com.long.markdown-preview","version":"1.0.0","name":"Markdown 预览","author":"Long","entry_point":"index.html","runtime":"webview","capabilities":["system.clipboard"],"default_settings":{"auto_start":true}}

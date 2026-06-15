@@ -31,6 +31,7 @@
       <_WebPlugins Include="$(SolutionDir)src\JsonFormatterPlugin\**\*" />
       <_WebPlugins Include="$(SolutionDir)src\Base64Tool\**\*" />
       <_WebPlugins Include="$(SolutionDir)src\TextDiffPlugin\**\*" />
+      <_WebPlugins Include="$(SolutionDir)src\MarkdownPreview\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(_WebPlugins)"
           DestinationFiles="@(_WebPlugins->'$(SolutionDir)Plugins\%(RecursiveDir)%(Filename)%(Extension)')"
