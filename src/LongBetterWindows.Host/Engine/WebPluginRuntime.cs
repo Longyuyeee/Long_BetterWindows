@@ -120,7 +120,9 @@ namespace LongBetterWindows.Host.Engine
                 // === long.app ===
                 "app.openUrl" => Task.FromResult<object?>(AppOpenUrl(Arg(args, 0))),
                 "app.openFolder" => Task.FromResult<object?>(AppOpenFolder(Arg(args, 0))),
+                "app.openWithDefault" => Task.FromResult<object?>(AppOpenWithDefault(Arg(args, 0))),
                 "app.showNotification" => Task.FromResult<object?>(UIToast(Arg(args, 0) + "\n" + Arg(args, 1))),
+                "app.getVersion" => Task.FromResult<object?>(new { version = "0.2.0" }),
 
                 // === long.clipboard ===
                 "clipboard.getText" => Ok(h.Clipboard!.GetTextAsync()),
@@ -221,6 +223,14 @@ namespace LongBetterWindows.Host.Engine
             return OkObj();
         }
 
+        private object AppOpenWithDefault(string path)
+        {
+            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                { FileName = path, UseShellExecute = true });
+            return OkObj();
+        }
+
         private async Task<object> HotKeyRegister(object?[] args)
         {
             var hotkey = Arg(args, 0);
@@ -255,7 +265,9 @@ window.long = {
   app: {
     openUrl: function(url){return call('app.openUrl',[url]);},
     openFolder: function(path){return call('app.openFolder',[path]);},
-    showNotification: function(title,body){return call('app.showNotification',[title,body]);}
+    openWithDefault: function(path){return call('app.openWithDefault',[path]);},
+    showNotification: function(title,body){return call('app.showNotification',[title,body]);},
+    getVersion: function(){return call('app.getVersion',[]);}
   },
   clipboard: {
     getText: function(){return call('clipboard.getText',[]);},
