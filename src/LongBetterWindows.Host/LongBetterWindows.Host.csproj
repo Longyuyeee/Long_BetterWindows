@@ -32,6 +32,7 @@
       <_WebPlugins Include="$(SolutionDir)src\Base64Tool\**\*" />
       <_WebPlugins Include="$(SolutionDir)src\TextDiffPlugin\**\*" />
       <_WebPlugins Include="$(SolutionDir)src\MarkdownPreview\**\*" />
+      <_WebPlugins Include="$(SolutionDir)src\PasswordGenerator\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(_WebPlugins)"
           DestinationFiles="@(_WebPlugins->'$(SolutionDir)Plugins\%(RecursiveDir)%(Filename)%(Extension)')"

@@ -1,0 +1,1 @@
+{"id":"com.long.password-gen","version":"1.0.0","name":"密码生成器","author":"Long","entry_point":"index.html","runtime":"webview","capabilities":["system.clipboard"],"default_settings":{"auto_start":true}}
