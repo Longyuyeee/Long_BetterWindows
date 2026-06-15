@@ -1,0 +1,40 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>文本对比</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,sans-serif;background:#f5f5f7;color:#1d1d1f;padding:20px}
+h2{font-size:15px;margin-bottom:8px;color:#007AFF}
+label{font-size:12px;color:#888;margin-bottom:4px;display:block}
+textarea{width:100%;height:100px;border:1px solid #e0e0e0;border-radius:8px;padding:10px;font-size:12px;font-family:monospace;line-height:1.5;resize:vertical;margin-bottom:10px}
+textarea:focus{outline:none;border-color:#007AFF}
+.btn-row{display:flex;gap:8px;margin-bottom:10px}
+button{padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer}
+.btn-primary{background:#007AFF;color:#fff}.btn-primary:hover{background:#0062CC}
+.btn-secondary{background:#f0f0f0;color:#333}.btn-secondary:hover{background:#e0e0e0}
+.result{font-size:12px;font-family:monospace;line-height:1.6;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px;max-height:200px;overflow:auto;white-space:pre-wrap}
+.add{background:#dcfce7;color:#166534}.del{background:#fecaca;color:#991b1b}.same{color:#888}
+</style></head><body>
+<h2>文本对比 (Diff)</h2>
+<label>原始文本</label><textarea id="textA" placeholder="原始文本..."></textarea>
+<label>修改后文本</label><textarea id="textB" placeholder="修改后文本..."></textarea>
+<div class="btn-row">
+  <button class="btn-primary" onclick="diff()">对比差异</button>
+  <button class="btn-secondary" onclick="pasteA()">粘贴原始</button>
+  <button class="btn-secondary" onclick="pasteB()">粘贴修改</button>
+</div>
+<div class="result" id="diffResult"></div>
+<script>
+function diff(){
+  var a=document.getElementById('textA').value.split('\n');
+  var b=document.getElementById('textB').value.split('\n');
+  var html='';var max=Math.max(a.length,b.length);
+  for(var i=0;i<max;i++){
+    var la=a[i]||'',lb=b[i]||'';
+    if(la===lb)html+='<span class="same">  '+esc(la)+'</span>\n';
+    else{html+='<span class="del">- '+esc(la)+'</span>\n<span class="add">+ '+esc(lb)+'</span>\n';}
+  }
+  document.getElementById('diffResult').innerHTML=html||'无差异';
+}
+async function pasteA(){var r=await long.clipboard.getText();if(r.success)document.getElementById('textA').value=r.data}
+async function pasteB(){var r=await long.clipboard.getText();if(r.success)document.getElementById('textB').value=r.data}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+</script></body></html>
