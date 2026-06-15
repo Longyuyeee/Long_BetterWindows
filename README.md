@@ -75,15 +75,22 @@ dotnet run --project src/LongBetterWindows.Host
 └─────────────────────────────────────────┘
 ```
 
-### 宿主能力 API
+### 宿主能力 API（12 项）
 
-| 接口 | 能力 | 说明 |
+| 接口 | 能力 ID | 说明 |
 |---|---|---|
-| `IHotKeyService` | `system.hotkey` | 全局热键注册、冲突检测 |
-| `IShellSelectionService` | `shell.selection` | Explorer 文件夹感知、选中项坐标 |
+| `IHotKeyService` | `system.hotkey` | 全局热键注册/冲突/所有权 |
+| `IClipboardService` | `system.clipboard` | 剪贴板读写 |
+| `IShellSelectionService` | `shell.selection` | Explorer 文件夹感知/选中项坐标 |
 | `IADSService` | `fs.ads.access` | NTFS 备用数据流读写 |
 | `IRegistryService` | `system.registry.*` | 安全注册表操作 + 回滚 |
 | `IStorageService` | `storage.local` | 本地 Key-Value 持久化存储 |
+| `INotificationService` | `system.notification` | Toast 通知 |
+| `IFileOpsService` | `file.ops` | 文件复制/移动/删除 |
+| `IWindowInfoService` | `window.info` | 前台窗口信息/可见窗口列表 |
+| `IScreenCaptureService` | `system.screenshot` | 全屏截图 |
+| `IInputService` | `system.input` | 模拟按键/鼠标点击 |
+| `IProcessService` | `system.process` | 进程启动/列表/终止 |
 
 ---
 
@@ -157,6 +164,35 @@ Long_BetterWindows/
 | Serilog | 结构化日志 |
 | Win32 P/Invoke | 系统级集成 (热键、ADS、全局钩子) |
 | COM Interop | Explorer Shell 感知 (IShellWindows) |
+
+---
+
+## 版本历史
+
+| 版本 | 日期 | 内容 |
+|---|---|---|
+| v0.1.0 | 2026-03 | 宿主框架 + 5 项能力 + 插件引擎 |
+| v0.2.0 | 2026-06 | 12 项能力 + 16 插件 + 3 运行时 + 内置 IDE + 30 测试 |
+
+## 路线图
+
+### 已完成
+- [x] 插件引擎（扫描/加载/热重载/权限沙盒）
+- [x] 三种运行时（DLL / .csx 脚本 / WebView2 HTML/JS）
+- [x] 12 项原子能力
+- [x] 16 个内置插件
+- [x] 内置插件开发 IDE
+- [x] 插件脚手架 + 5 种模板
+- [x] .lpak 打包分发
+- [x] 30 个单元测试
+- [x] 插件开发指南 + 内置文档浏览器
+
+### 进行中 / 预留
+- [ ] 插件市场（registry.json 已预留，待服务器部署）
+- [ ] Win11 Sparse Package 一级右键菜单（appxmanifest 已预留）
+- [ ] CI/CD（workflow 已就绪，待 Token 权限修复）
+- [ ] 国际化（zh-CN / en-US 已完成，待 UI 集成）
+- [ ] 主题切换（Dark / Light 已实现）
 
 ---
 
