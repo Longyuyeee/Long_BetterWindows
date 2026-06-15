@@ -36,6 +36,22 @@ namespace LongBetterWindows.Host.Views
             PluginDevTools.Open(Window.GetWindow(this)!);
         }
 
+        private void ThemeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            var app = Application.Current;
+            var isDark = app.Resources.MergedDictionaries
+                .OfType<ResourceDictionary>()
+                .Any(d => d.Source?.ToString().Contains("Dark") == true);
+
+            app.Resources.MergedDictionaries.Clear();
+            var theme = isDark ? "Light" : "Dark";
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri($"pack://application:,,,/Wpf.Ui;component/Resources/Theme/{theme}.xaml",
+                    UriKind.Absolute)
+            });
+        }
+
         private void RefreshDocLinks()
         {
             DocLinksPanel.Children.Clear();

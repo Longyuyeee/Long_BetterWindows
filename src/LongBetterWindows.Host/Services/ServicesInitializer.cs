@@ -56,6 +56,8 @@ namespace LongBetterWindows.Host.Services
             WindowInfo = new WindowInfoService();
             provider.RegisterService<IWindowInfoService>(WindowInfo);
 
+            I18nService.Initialize();
+
             Startup = new StartupService();
         }
     }

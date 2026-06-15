@@ -120,6 +120,26 @@
 
             <Border Background="#10000000" CornerRadius="12" Padding="20,16"
                     Margin="0,0,0,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="主题切换" FontSize="14" FontWeight="Medium" />
+                        <TextBlock Text="在暗色和亮色主题间切换" FontSize="12"
+                                   Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <Button Content="切换" Width="80" Height="32" FontSize="12"
+                                Click="ThemeToggle_Click" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Background="#10000000" CornerRadius="12" Padding="20,16"
+                    Margin="0,0,0,12">
                 <StackPanel>
                     <TextBlock Text="开发文档"
                                FontSize="14" FontWeight="Medium" />
