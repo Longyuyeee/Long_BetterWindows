@@ -1,0 +1,14 @@
+{
+  "id": "com.long.json-formatter",
+  "version": "1.0.0",
+  "name": "JSON 格式化",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": [
+    "system.clipboard"
+  ],
+  "default_settings": {
+    "auto_start": true
+  }
+}

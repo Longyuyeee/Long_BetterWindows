@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><title>JSON 格式化</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:20px;min-height:100vh}
+h2{font-size:15px;margin-bottom:12px;color:#89b4fa}
+textarea{width:100%;height:180px;background:#313244;color:#cdd6f4;border:1px solid #45475a;
+  border-radius:8px;padding:12px;font-size:13px;font-family:'Cascadia Code','Consolas',monospace;
+  line-height:1.6;resize:vertical}
+textarea:focus{outline:none;border-color:#89b4fa}
+.btn-row{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+button{padding:8px 16px;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer}
+.btn-primary{background:#89b4fa;color:#1e1e2e}.btn-primary:hover{background:#74c7ec}
+.btn-secondary{background:#45475a;color:#cdd6f4}.btn-secondary:hover{background:#585b70}
+.status{font-size:11px;margin-top:6px}.status.ok{color:#a6e3a1}.status.err{color:#f38ba8}
+.stat{font-size:11px;color:#6c7086;margin-left:8px}
+</style>
+</head>
+<body>
+<h2>JSON 格式化工具</h2>
+<textarea id="input" placeholder="粘贴 JSON 字符串..."></textarea>
+<div class="btn-row">
+  <button class="btn-primary" onclick="formatJson()">格式化</button>
+  <button class="btn-secondary" onclick="compressJson()">压缩</button>
+  <button class="btn-secondary" onclick="pasteFromClip()">从剪贴板粘贴</button>
+  <button class="btn-secondary" onclick="copyResult()">复制结果</button>
+  <span class="stat" id="statText"></span>
+</div>
+<div class="status" id="statusText"></div>
+<br/>
+<textarea id="output" placeholder="格式化结果..." readonly></textarea>
+
+<script>
+async function formatJson() {
+  try {
+    var obj = JSON.parse(document.getElementById('input').value);
+    var formatted = JSON.stringify(obj, null, 2);
+    document.getElementById('output').value = formatted;
+    showStatus('格式化成功', true);
+    document.getElementById('statText').textContent = (formatted.length)+' 字符';
+  } catch(e) { showStatus('JSON 解析失败: '+e.message, false); }
+}
+
+function compressJson() {
+  try {
+    var obj = JSON.parse(document.getElementById('input').value);
+    var compressed = JSON.stringify(obj);
+    document.getElementById('output').value = compressed;
+    showStatus('压缩成功', true);
+  } catch(e) { showStatus('JSON 解析失败: '+e.message, false); }
+}
+
+async function pasteFromClip() {
+  try { var r = await long.clipboard.getText();
+    if (r.success && r.data) { document.getElementById('input').value = r.data; formatJson(); }
+  } catch(e) {}
+}
+
+async function copyResult() {
+  var t = document.getElementById('output').value;
+  if (!t) return;
+  try { await long.clipboard.setText(t); showStatus('已复制', true); } catch(e) {}
+}
+
+function showStatus(msg, ok) {
+  var el = document.getElementById('statusText');
+  el.textContent = msg; el.className = 'status '+(ok?'ok':'err');
+}
+</script>
+</body>
+</html>
