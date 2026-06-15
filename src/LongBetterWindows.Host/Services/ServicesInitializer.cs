@@ -15,6 +15,7 @@ namespace LongBetterWindows.Host.Services
         public static ContextMenuService ContextMenu { get; private set; } = null!;
         public static ClipboardService Clipboard { get; private set; } = null!;
         public static NotificationService Notification { get; private set; } = null!;
+        public static FileOpsService FileOps { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
 
         public static void Initialize()
@@ -47,6 +48,9 @@ namespace LongBetterWindows.Host.Services
 
             Notification = new NotificationService();
             provider.RegisterService<INotificationService>(Notification);
+
+            FileOps = new FileOpsService();
+            provider.RegisterService<IFileOpsService>(FileOps);
 
             Startup = new StartupService();
         }

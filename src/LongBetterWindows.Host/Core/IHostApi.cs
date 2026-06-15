@@ -11,5 +11,6 @@ namespace LongBetterWindows.Host.Core
         IStorageService? Storage { get; }
         IClipboardService? Clipboard { get; }
         INotificationService? Notification { get; }
+        IFileOpsService? FileOps { get; }
     }
 }
