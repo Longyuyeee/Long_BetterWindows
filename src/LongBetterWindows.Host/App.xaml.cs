@@ -27,8 +27,12 @@ namespace LongBetterWindows.Host
             ServicesInitializer.Initialize();
             Log.Information("所有服务已初始化。");
 
-            // WPF-UI 主题必须在窗口创建前应用
-            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
+            // 跟随系统主题 (Windows 个性化设置)
+            var appsUseLight = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                "AppsUseLightTheme", 1);
+            var isSystemLight = appsUseLight is 1;
+            ApplicationThemeManager.Apply(isSystemLight ? ApplicationTheme.Light : ApplicationTheme.Dark);
 
             // 检查命令行 --note 参数（右键菜单触发）
             for (int i = 0; i < e.Args.Length; i++)
@@ -70,8 +74,17 @@ namespace LongBetterWindows.Host
                 }).ContinueWith(t =>
                 {
                     if (t.IsFaulted)
+                    {
                         Log.Error(t.Exception, "插件加载失败");
-                });
+                        Dispatcher.Invoke(async () =>
+                            await ServicesInitializer.Notification.ShowAsync("插件加载出错", "部分插件未能正确加载，请查看日志。"));
+                    }
+                    else
+                    {
+                        var count = scanner.LoadedPlugins.Count;
+                        Log.Information("插件加载完成，共 {Count} 个", count);
+                    }
+                }, TaskScheduler.Default);
             }
         }
 

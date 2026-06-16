@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Interop;
+using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host
@@ -12,6 +13,11 @@ namespace LongBetterWindows.Host
         {
             InitializeComponent();
             _tray = new TrayService(this);
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            AnimationHelper.FadeIn(this, durationMs: 350);
         }
 
         protected override void OnSourceInitialized(EventArgs e)

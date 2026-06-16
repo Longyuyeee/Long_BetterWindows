@@ -1,170 +1,666 @@
-<!DOCTYPE html><html><head><meta charset='UTF-8'>
-<title>Plugin DevTools</title>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>插件开发工具</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,system-ui,sans-serif;display:flex;height:100vh;background:#1e1e1e;color:#d4d4d4}
-#sidebar{width:220px;background:#252526;border-right:1px solid #3e3e3e;overflow-y:auto;padding:8px}
-#sidebar h4{font-size:11px;text-transform:uppercase;color:#888;margin:12px 0 4px 8px}
-.plugin-item,.file-item{padding:6px 8px;cursor:pointer;font-size:12px;border-radius:4px;display:flex;align-items:center}
-.plugin-item:hover,.file-item:hover{background:#2a2d2e}
-.plugin-item.active,.file-item.active{background:#37373d}
-.plugin-item .icon{width:16px;text-align:center;margin-right:6px;font-size:11px}
-#main{flex:1;display:flex;flex-direction:column}
-#toolbar{display:flex;gap:4px;padding:8px 12px;background:#323233;border-bottom:1px solid #3e3e3e;align-items:center}
-#toolbar button{padding:5px 12px;border:none;border-radius:4px;font-size:11px;cursor:pointer;background:#0e639c;color:#fff}
-#toolbar button.secondary{background:#3e3e3e}
-#toolbar select{padding:4px 8px;border:1px solid #3e3e3e;border-radius:4px;font-size:11px;background:#3c3c3c;color:#ddd}
-#toolbar input{padding:4px 8px;border:1px solid #3e3e3e;border-radius:4px;font-size:11px;background:#3c3c3c;color:#ddd;width:100px}
-#tabs{display:flex;background:#2d2d2d;border-bottom:1px solid #3e3e3e;overflow-x:auto}
-.tab{padding:6px 16px;font-size:11px;cursor:pointer;border-right:1px solid #3e3e3e;white-space:nowrap;display:flex;align-items:center}
-.tab.active{background:#1e1e1e;border-bottom:2px solid #007acc}
-.tab .close{margin-left:8px;color:#888;font-size:14px;cursor:pointer}
-.tab .close:hover{color:#fff}
-#editor{flex:1;position:relative}
-textarea{position:absolute;top:0;left:0;width:100%;height:100%;background:transparent;color:#d4d4d4;
-  border:none;padding:12px;font-family:'Consolas','Monaco','Courier New',monospace;font-size:13px;
-  line-height:1.6;resize:none;outline:none;tab-size:4;white-space:pre;overflow:auto}
-#status{font-size:11px;padding:4px 12px;background:#007acc;color:#fff;display:none}
-#status.show{display:block}
-#empty{flex:1;display:flex;align-items:center;justify-content:center;color:#666;font-size:13px;flex-direction:column}
-#empty h3{color:#888;margin-bottom:8px}
-#empty p{color:#555}
-.dialog-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100}
-.dialog{background:#2d2d2d;padding:24px;border-radius:8px;min-width:360px}
-.dialog h3{margin-bottom:16px;color:#ddd}
-.dialog label{display:block;font-size:11px;color:#888;margin-bottom:4px}
-.dialog input,.dialog select{width:100%;padding:6px 8px;margin-bottom:12px;border:1px solid #3e3e3e;border-radius:4px;background:#3c3c3c;color:#ddd;font-size:12px}
-.dialog button{padding:6px 16px;border:none;border-radius:4px;font-size:12px;cursor:pointer;margin-right:8px}
-.dialog .btn-primary{background:#0e639c;color:#fff}
-.dialog .btn-secondary{background:#3e3e3e;color:#ddd}
-</style></head><body>
+/* ══════════════════════════════════════════ */
+/* 色彩: 对齐 Long窗口 Apple 设计系统       */
+/* ══════════════════════════════════════════ */
+:root {
+  --bg:        #1E1F22;
+  --sidebar:   #252528;
+  --card:      #2D2D30;
+  --accent:    #007AFF;
+  --accent-h:  #0062CC;
+  --green:     #34C759;
+  --red:       #FF3B30;
+  --text:      #E8E8E8;
+  --text2:     #999999;
+  --text3:     #888888;
+  --divider:   #3A3A3D;
+  --input-bg:  #333338;
+}
 
-<div id='sidebar'>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  display: flex; height: 100vh;
+  background: var(--bg); color: var(--text);
+  user-select: none;
+}
+
+/* ═══ 侧栏 ═══ */
+#sidebar {
+  width: 220px; min-width: 180px;
+  background: var(--sidebar);
+  border-right: 1px solid var(--divider);
+  overflow-y: auto; padding: 8px;
+}
+#sidebar h4 {
+  font-size: 10px; text-transform: uppercase;
+  color: var(--text3); margin: 12px 0 4px 8px;
+  letter-spacing: 0.5px;
+}
+.plugin-item, .file-item {
+  padding: 6px 8px; cursor: pointer; font-size: 12px;
+  border-radius: 6px; display: flex; align-items: center;
+  transition: background 0.12s;
+}
+.plugin-item:hover, .file-item:hover { background: rgba(255,255,255,0.06); }
+.plugin-item.active, .file-item.active { background: rgba(0,122,255,0.15); color: var(--accent); }
+.plugin-item .icon { width: 16px; text-align: center; margin-right: 6px; font-size: 11px; }
+.file-item  .icon { width: 14px; text-align: center; margin-right: 6px; font-size: 10px; color: var(--text3); }
+
+/* 文件树层级缩进 */
+.file-item[data-depth="1"] { padding-left: 20px; }
+.file-item[data-depth="2"] { padding-left: 32px; }
+.file-item[data-depth="3"] { padding-left: 44px; }
+
+/* ═══ 主区域 ═══ */
+#main { flex: 1; display: flex; flex-direction: column; }
+
+/* 工具栏 */
+#toolbar {
+  display: flex; gap: 6px; padding: 8px 12px;
+  background: var(--card); border-bottom: 1px solid var(--divider);
+  align-items: center; flex-wrap: wrap;
+}
+#toolbar button {
+  padding: 5px 12px; border: none; border-radius: 6px;
+  font-size: 11px; cursor: pointer; font-weight: 500;
+  transition: background 0.15s, transform 0.1s;
+}
+#toolbar button:active { transform: scale(0.97); }
+#toolbar .btn-primary { background: var(--accent); color: #fff; }
+#toolbar .btn-primary:hover { background: var(--accent-h); }
+#toolbar .btn-secondary { background: var(--divider); color: #ccc; }
+#toolbar .btn-secondary:hover { background: #4A4A4D; }
+#toolbar .btn-green { background: var(--green); color: #fff; }
+#toolbar .btn-green:hover { background: #2DAF4A; }
+#toolbar input {
+  padding: 4px 8px; border: 1px solid var(--divider);
+  border-radius: 6px; font-size: 11px; background: var(--input-bg);
+  color: #ddd; width: 120px; outline: none;
+}
+#toolbar input:focus { border-color: var(--accent); }
+#toolbar .sep { width: 1px; height: 18px; background: var(--divider); margin: 0 4px; }
+
+/* 标签栏 */
+#tabs {
+  display: flex; background: var(--sidebar); border-bottom: 1px solid var(--divider);
+  overflow-x: auto;
+}
+.tab {
+  padding: 7px 14px; font-size: 11px; cursor: pointer;
+  border-right: 1px solid var(--divider); white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+  transition: background 0.12s;
+}
+.tab:hover { background: rgba(255,255,255,0.04); }
+.tab.active { background: var(--bg); border-bottom: 2px solid var(--accent); }
+.tab .dot { color: var(--accent); font-size: 8px; display: none; }
+.tab .dot.show { display: inline; }
+.tab .close { color: var(--text3); font-size: 13px; cursor: pointer; padding: 0 2px; }
+.tab .close:hover { color: var(--red); }
+
+/* 编辑器 */
+#editor { flex: 1; display: flex; overflow: hidden; position: relative; }
+#editorWrap { flex: 1; display: flex; position: relative; }
+#lineNumbers {
+  width: 40px; min-width: 40px;
+  background: var(--bg); color: var(--text3);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px; line-height: 1.6;
+  padding: 12px 0; overflow: hidden; text-align: right;
+  border-right: 1px solid var(--divider); user-select: none;
+}
+#lineNumbers span {
+  display: block; padding: 0 8px 0 4px;
+  counter-increment: line;
+}
+textarea#codeEditor {
+  flex: 1;
+  background: transparent; color: var(--text);
+  border: none; padding: 12px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px; line-height: 1.6; resize: none; outline: none;
+  tab-size: 4; white-space: pre; overflow: auto;
+}
+textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
+
+/* 搜索栏 */
+#searchBar {
+  display: none; position: absolute; top: 0; right: 8px; z-index: 10;
+  background: var(--card); border: 1px solid var(--divider);
+  border-radius: 0 0 6px 6px; padding: 6px 10px;
+  align-items: center; gap: 4px;
+}
+#searchBar.show { display: flex; }
+#searchBar input {
+  width: 160px; padding: 4px 6px; border: 1px solid var(--divider);
+  border-radius: 4px; font-size: 12px; background: var(--input-bg); color: #ddd;
+  font-family: 'Consolas', monospace;
+}
+#searchBar span { font-size: 11px; color: var(--text3); min-width: 30px; text-align: center; }
+#searchBar button {
+  padding: 2px 6px; border: 1px solid var(--divider); border-radius: 4px;
+  background: var(--card); color: var(--text2); cursor: pointer; font-size: 11px;
+}
+#searchBar button:hover { background: var(--divider); }
+
+/* 空状态 */
+#empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  color: var(--text3); font-size: 13px; flex-direction: column; gap: 8px;
+}
+#empty h3 { color: var(--text2); font-weight: 600; }
+#empty p { color: var(--text3); font-size: 12px; }
+
+/* 状态栏 */
+#status {
+  font-size: 11px; padding: 5px 12px;
+  background: var(--accent); color: #fff;
+  display: none; align-items: center; justify-content: space-between;
+  transition: background 0.2s;
+}
+#status.show { display: flex; }
+#status.saved { background: var(--green); }
+
+/* 对话框 */
+.overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5); display: none;
+  align-items: center; justify-content: center; z-index: 100;
+}
+.overlay.show { display: flex; }
+.dialog {
+  background: var(--card); padding: 24px; border-radius: 10px;
+  min-width: 400px; max-width: 480px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.dialog h3 { margin-bottom: 16px; color: var(--text); font-size: 15px; }
+.dialog label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 4px; font-weight: 500; }
+.dialog input, .dialog select {
+  width: 100%; padding: 6px 10px; margin-bottom: 12px;
+  border: 1px solid var(--divider); border-radius: 6px;
+  background: var(--input-bg); color: var(--text); font-size: 12px;
+  outline: none;
+}
+.dialog input:focus, .dialog select:focus { border-color: var(--accent); }
+.dialog button {
+  padding: 6px 18px; border: none; border-radius: 6px;
+  font-size: 12px; cursor: pointer; margin-right: 8px; font-weight: 500;
+  transition: background 0.15s;
+}
+.dialog .btn-primary { background: var(--accent); color: #fff; }
+.dialog .btn-primary:hover { background: var(--accent-h); }
+.dialog .btn-secondary { background: var(--divider); color: #ddd; }
+.dialog .btn-secondary:hover { background: #4A4A4D; }
+
+/* 能力勾选区域 */
+.caps-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  margin-bottom: 12px; max-height: 180px; overflow-y: auto;
+  padding: 8px; background: var(--bg); border-radius: 6px;
+}
+.caps-grid label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text2); cursor: pointer;
+  padding: 2px 0;
+}
+.caps-grid input[type="checkbox"] { accent-color: var(--accent); width: auto; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- ══════════ 侧栏 ══════════ -->
+<div id="sidebar">
   <h4>插件</h4>
-  <div id='pluginList'></div>
-  <div id='fileTree'></div>
+  <div id="pluginList"></div>
+  <div id="fileTree"></div>
 </div>
 
-<div id='main'>
-  <div id='toolbar'>
-    <button onclick='showNewDialog()'>+ 新建插件</button>
-    <button class='secondary' onclick='saveCurrent()'>保存 (Ctrl+S)</button>
-    <button class='secondary' onclick='previewCurrent()'>预览</button>
-    <button class='secondary' onclick='location.reload()'>刷新</button>
-    <span style='color:#888;font-size:11px;margin-left:12px' id='fileInfo'></span>
+<!-- ══════════ 主区域 ══════════ -->
+<div id="main">
+  <!-- 工具栏 -->
+  <div id="toolbar">
+    <button class="btn-primary" onclick="showNewDialog()">+ 新建</button>
+    <span class="sep"></span>
+    <button class="btn-secondary" onclick="saveCurrent()" title="Ctrl+S">保存</button>
+    <button class="btn-secondary" onclick="previewCurrent()">预览</button>
+    <span class="sep"></span>
+    <button class="btn-secondary" onclick="showSearch()" title="Ctrl+F">搜索</button>
+    <span class="sep"></span>
+    <span id="fileInfo" style="color:var(--text3);font-size:11px;margin-left:4px"></span>
+    <span style="flex:1"></span>
+    <button class="btn-secondary" onclick="location.reload()">刷新</button>
   </div>
-  <div id='tabs'></div>
-  <div id='editor'>
-    <div id='empty'><h3>插件开发工具</h3><p>选择左侧插件开始编辑，或点击「+ 新建插件」创建</p></div>
-    <textarea id='codeEditor' style='display:none' onkeydown='handleKeydown(event)' spellcheck='false'></textarea>
+
+  <!-- 标签栏 -->
+  <div id="tabs"></div>
+
+  <!-- 编辑器 -->
+  <div id="editor">
+    <div id="empty">
+      <h3>插件开发工具</h3>
+      <p>选择左侧插件打开文件，或点击「+ 新建」创建插件</p>
+    </div>
+    <div id="editorWrap" style="display:none">
+      <div id="lineNumbers"></div>
+      <div style="flex:1;position:relative">
+        <textarea id="codeEditor" spellcheck="false"
+          onkeydown="handleKeydown(event)"
+          oninput="onEditorInput()"
+          onscroll="syncScroll()"></textarea>
+        <!-- 搜索栏 -->
+        <div id="searchBar">
+          <input id="searchInput" placeholder="查找..." oninput="doSearch()" onkeydown="handleSearchKey(event)">
+          <span id="searchCount">0/0</span>
+          <button onclick="searchPrev()">▲</button>
+          <button onclick="searchNext()">▼</button>
+          <button onclick="closeSearch()">✕</button>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id='status'></div>
+
+  <!-- 状态栏 -->
+  <div id="status"></div>
 </div>
 
-<div id='newDialog' class='dialog-overlay' style='display:none'>
-  <div class='dialog'>
+<!-- ══════════ 新建对话框 ══════════ -->
+<div id="newDialog" class="overlay">
+  <div class="dialog">
     <h3>新建插件</h3>
     <label>类型</label>
-    <select id='newType'><option value='web'>HTML/JS (WebView2)</option><option value='script'>C# 脚本 (.csx)</option></select>
-    <label>名称</label><input id='newName' placeholder='我的插件' />
-    <label>ID (反向域名)</label><input id='newId' placeholder='com.example.myplugin' />
-    <br/>
-    <button class='btn-primary' onclick='createPlugin()'>创建</button>
-    <button class='btn-secondary' onclick='document.getElementById(&quot;newDialog&quot;).style.display=&quot;none&quot;'>取消</button>
+    <select id="newType" onchange="onTypeChange()">
+      <option value="web">HTML/JS (WebView2)</option>
+      <option value="script">C# 脚本 (.csx)</option>
+      <option value="dll">DLL 插件 (.NET)</option>
+    </select>
+    <label>名称</label>
+    <input id="newName" placeholder="我的插件">
+    <label>ID (反向域名)</label>
+    <input id="newId" placeholder="com.example.myplugin">
+    <label>能力 (Capabilities)</label>
+    <div class="caps-grid" id="capsGrid"></div>
+    <br>
+    <button class="btn-primary" onclick="createPlugin()">创建</button>
+    <button class="btn-secondary" onclick="closeNewDialog()">取消</button>
   </div>
 </div>
 
 <script>
-var tabs=[],currentTab=-1,currentPlugin='',fileCache={};
-function api(action,data){
-  window.chrome.webview.postMessage(JSON.stringify({Action:action,Path:data?data.path:undefined,Content:data?data.content:undefined,Template:data?data.template:undefined,Name:data?data.name:undefined,Id:data?data.id:undefined}));
+// ══════════════════════════════════════════════
+// 状态
+// ══════════════════════════════════════════════
+var tabs = [], currentTab = -1, currentPlugin = '', fileCache = {};
+var searchResults = [], searchIdx = -1;
+
+// ══════════════════════════════════════════════
+// JS → C# Bridge
+// ══════════════════════════════════════════════
+function api(action, data) {
+  data = data || {};
+  window.chrome.webview.postMessage(JSON.stringify({
+    Action: action,
+    Path: data.path,
+    Content: data.content,
+    Template: data.template,
+    Name: data.name,
+    Id: data.id,
+    Capabilities: data.capabilities
+  }));
 }
+
 api('listPlugins');
 
-function handleMessage(msg){
-  try{var m=JSON.parse(msg);}catch(e){return}
-  if(m.type==='pluginsListed')renderPlugins(m.data);
-  else if(m.type==='filesListed')renderFileTree(m.data);
-  else if(m.type==='fileOpened')openInTab(m.data.path,m.data.content);
-  else if(m.type==='fileSaved')showStatus(m.data.success?'已保存':'保存失败');
-  else if(m.type==='pluginCreated'){showStatus('插件已创建');api('listPlugins');}
-}
-
-function renderPlugins(plugins){
-  var h='';
-  plugins.forEach(function(p){h+='<div class=plugin-item onclick=selectPlugin(&quot;'+p.path+'&quot;)><span class=icon>'+(p.hasManifest?'O':'+')+'</span>'+esc(p.name)+'</div>'});
-  document.getElementById('pluginList').innerHTML=h||'<span style=color:#666;font-size:11px>无</span>';
-}
-function selectPlugin(dir){
-  currentPlugin=dir;
-  document.querySelectorAll('.plugin-item').forEach(function(el){el.classList.toggle('active',el.textContent.includes(dir.split('/').pop()))});
-  document.getElementById('fileTree').innerHTML='<h4>文件</h4>';
-  api('listFiles',{path:dir});
-}
-function renderFileTree(data){
-  var h='<h4>文件</h4>';
-  data.files.forEach(function(f){
-    h+='<div class=file-item onclick=openFile(&quot;'+f.path+'&quot;)>'+esc(f.name)+'</div>';});
-  document.getElementById('fileTree').innerHTML+=h;
-}
-function openFile(path){
-  if(fileCache[path]){openInTab(path,fileCache[path]);return}
-  api('openFile',{path:path});
-}
-function openInTab(path,content){
-  fileCache[path]=content;
-  var name=path.split('/').pop();
-  var idx=tabs.findIndex(function(t){return t.path===path});
-  if(idx>=0){currentTab=idx}else{tabs.push({path:path,name:name,content:content});currentTab=tabs.length-1}
-  renderTabs();showEditor();
-}
-function renderTabs(){
-  var h='';
-  tabs.forEach(function(t,i){
-    h+='<div class=tab'+(i===currentTab?' active':'')+' onclick=switchTab('+i+')>'+esc(t.name)+'<span class=close onclick=&quot;event.stopPropagation();closeTab('+i+')&quot;>x</span></div>';});
-  document.getElementById('tabs').innerHTML=h;
-}
-function switchTab(i){currentTab=i;renderTabs();showEditor()}
-function closeTab(i){
-  if(fileCache[tabs[i].path]) delete fileCache[tabs[i].path];
-  tabs.splice(i,1);if(currentTab>=tabs.length)currentTab=tabs.length-1;renderTabs();
-  if(tabs.length===0){document.getElementById('codeEditor').style.display='none';document.getElementById('empty').style.display='flex'}
-  else showEditor();
-}
-function showEditor(){
-  if(currentTab<0)return;
-  document.getElementById('empty').style.display='none';
-  var ed=document.getElementById('codeEditor');ed.style.display='block';ed.value=tabs[currentTab]?tabs[currentTab].content:'';ed.focus();
-}
-function saveCurrent(){
-  if(currentTab<0||!tabs[currentTab])return;
-  tabs[currentTab].content=document.getElementById('codeEditor').value;
-  fileCache[tabs[currentTab].path]=tabs[currentTab].content;
-  api('saveFile',{path:tabs[currentTab].path,content:tabs[currentTab].content});
-}
-function handleKeydown(e){
-  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveCurrent()}
-  if(e.key==='Tab'){e.preventDefault();var s=document.getElementById('codeEditor').selectionStart;var v=document.getElementById('codeEditor').value;document.getElementById('codeEditor').value=v.substring(0,s)+'  '+v.substring(s);document.getElementById('codeEditor').selectionStart=document.getElementById('codeEditor').selectionEnd=s+2}
-}
-function showNewDialog(){document.getElementById('newDialog').style.display='flex'}
-function createPlugin(){
-  var t=document.getElementById('newType').value;
-  var n=document.getElementById('newName').value||'my-plugin';
-  var id=document.getElementById('newId').value||'com.example.plugin';
-  api('newPlugin',{template:t,name:n,id:id});
-  document.getElementById('newDialog').style.display='none';
-}
-function previewCurrent(){
-  if(currentTab<0||!tabs[currentTab])return;
-  saveCurrent();
-  api('preview',{path:tabs[currentTab].path});
-  showStatus('预览中...');
-}
-function showStatus(msg){var s=document.getElementById('status');s.textContent=msg;s.classList.add('show');setTimeout(function(){s.classList.remove('show')},3000)}
-function updateFileInfo(){
-  if(currentTab>=0&&tabs[currentTab]){
-    document.getElementById('fileInfo').textContent=tabs[currentTab].path.split('/').slice(-2).join('/');
+function handleMessage(raw) {
+  try { var m = JSON.parse(raw); } catch(e) { return; }
+  switch(m.type) {
+    case 'pluginsListed':    renderPlugins(m.data); break;
+    case 'filesListed':      renderFileTree(m.data); break;
+    case 'fileOpened':       openInTab(m.data.path, m.data.content, m.data.readOnly); break;
+    case 'fileSaved':        onFileSaved(m.data); break;
+    case 'pluginCreated':    onPluginCreated(); break;
+    case 'capabilitiesListed': renderCaps(m.data); break;
+    case 'error':            showStatus(m.data.msg, false); break;
   }
 }
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-</script></body></html>
+
+// ══════════════════════════════════════════════
+// 插件列表
+// ══════════════════════════════════════════════
+function renderPlugins(plugins) {
+  var h = '';
+  (plugins||[]).forEach(function(p) {
+    var icon = p.hasManifest ? '\u25C9' : '\u25CB';
+    var color = p.hasManifest ? 'color:var(--green)' : 'color:var(--text3)';
+    h += '<div class="plugin-item" onclick="selectPlugin(\'' + escAttr(p.path) + '\')">' +
+         '<span class="icon" style="' + color + '">' + icon + '</span>' + esc(p.name) + '</div>';
+  });
+  document.getElementById('pluginList').innerHTML = h ||
+    '<span style="color:var(--text3);font-size:11px">无插件</span>';
+}
+
+function selectPlugin(dir) {
+  currentPlugin = dir;
+  document.querySelectorAll('.plugin-item').forEach(function(el) {
+    el.classList.toggle('active', el.textContent.includes(dir.split('\\').pop().split('/').pop()));
+  });
+  document.getElementById('fileTree').innerHTML = '';
+  api('listFiles', { path: dir });
+}
+
+// ══════════════════════════════════════════════
+// 文件树 (层级结构)
+// ══════════════════════════════════════════════
+function renderFileTree(data) {
+  var files = (data.files||[]).sort(function(a,b) { return a.name.localeCompare(b.name); });
+
+  // 构建目录树
+  var tree = { _files: [] };
+  files.forEach(function(f) {
+    var parts = f.name.split('/');
+    var node = tree;
+    for (var i = 0; i < parts.length - 1; i++) {
+      if (!node[parts[i]]) node[parts[i]] = { _files: [] };
+      node = node[parts[i]];
+    }
+    node._files.push({ name: parts[parts.length-1], path: f.path, depth: parts.length - 1 });
+  });
+
+  var h = '<h4>文件</h4>';
+  h += renderTree(tree, 0, data.dir);
+  document.getElementById('fileTree').innerHTML += h;
+}
+
+function renderTree(node, depth, basePath) {
+  var h = '';
+  // 文件
+  (node._files||[]).forEach(function(f) {
+    var icon = getFileIcon(f.name);
+    h += '<div class="file-item" data-depth="' + depth + '" onclick="openFile(\'' + escAttr(f.path) + '\')">' +
+         '<span class="icon">' + icon + '</span>' + esc(f.name) + '</div>';
+  });
+  // 子目录
+  Object.keys(node).forEach(function(key) {
+    if (key === '_files') return;
+    h += '<div class="file-item" data-depth="' + depth + '" style="color:var(--accent);font-weight:500">' +
+         '<span class="icon">\u25B6</span>' + key + '</div>';
+    h += renderTree(node[key], depth + 1, basePath);
+  });
+  return h;
+}
+
+function getFileIcon(name) {
+  if (name.endsWith('.json')) return '{}';
+  if (name.endsWith('.html') || name.endsWith('.htm')) return '&lt;&gt;';
+  if (name.endsWith('.cs') || name.endsWith('.csx')) return 'C#';
+  if (name.endsWith('.csproj')) return '\u2699';
+  if (name.endsWith('.md')) return 'MD';
+  return '\u25A1';
+}
+
+// ══════════════════════════════════════════════
+// 标签页 & 编辑器
+// ══════════════════════════════════════════════
+function openFile(path) {
+  if (fileCache[path]) { openInTab(path, fileCache[path]); return; }
+  api('openFile', { path: path });
+}
+
+function openInTab(path, content, readOnly) {
+  fileCache[path] = content;
+  var name = path.split('\\').pop().split('/').pop();
+  var idx = tabs.findIndex(function(t) { return t.path === path; });
+  if (idx >= 0) {
+    currentTab = idx;
+  } else {
+    tabs.push({ path: path, name: name, content: content, dirty: false, readOnly: !!readOnly });
+    currentTab = tabs.length - 1;
+  }
+  renderTabs(); showEditor(); updateFileInfo();
+}
+
+function renderTabs() {
+  var h = '';
+  tabs.forEach(function(t, i) {
+    var cls = 'tab' + (i === currentTab ? ' active' : '');
+    var dot = t.dirty ? ' show' : '';
+    var ro = t.readOnly ? ' [只读]' : '';
+    h += '<div class="' + cls + '" onclick="switchTab(' + i + ')">' +
+         '<span class="dot' + dot + '">\u25CF</span>' +
+         esc(t.name) + ro +
+         '<span class="close" onclick="event.stopPropagation();closeTab(' + i + ')">\u00D7</span></div>';
+  });
+  document.getElementById('tabs').innerHTML = h;
+}
+
+function switchTab(i) {
+  currentTab = i; renderTabs(); showEditor(); updateFileInfo();
+}
+
+function closeTab(i) {
+  if (tabs[i].dirty && !confirm('文件未保存，确定关闭？')) return;
+  if (fileCache[tabs[i].path]) delete fileCache[tabs[i].path];
+  tabs.splice(i, 1);
+  if (currentTab >= tabs.length) currentTab = tabs.length - 1;
+  renderTabs();
+  if (tabs.length === 0) {
+    document.getElementById('editorWrap').style.display = 'none';
+    document.getElementById('empty').style.display = 'flex';
+  } else {
+    showEditor();
+  }
+  updateFileInfo();
+}
+
+function showEditor() {
+  if (currentTab < 0) return;
+  document.getElementById('empty').style.display = 'none';
+  document.getElementById('editorWrap').style.display = 'flex';
+  var ed = document.getElementById('codeEditor');
+  ed.value = tabs[currentTab].content;
+  ed.readOnly = !!tabs[currentTab].readOnly;
+  ed.classList.toggle('readonly', !!tabs[currentTab].readOnly);
+  ed.focus();
+  updateLineNumbers();
+}
+
+function onEditorInput() {
+  if (currentTab < 0) return;
+  tabs[currentTab].content = document.getElementById('codeEditor').value;
+  if (!tabs[currentTab].dirty) {
+    tabs[currentTab].dirty = true;
+    renderTabs();
+  }
+  updateLineNumbers();
+}
+
+function updateFileInfo() {
+  var el = document.getElementById('fileInfo');
+  if (currentTab >= 0 && tabs[currentTab]) {
+    var p = tabs[currentTab].path;
+    var parts = p.replace(/\\/g, '/').split('/');
+    el.textContent = parts.slice(-2).join('/');
+  } else {
+    el.textContent = '';
+  }
+}
+
+// ══════════════════════════════════════════════
+// 行号
+// ══════════════════════════════════════════════
+function updateLineNumbers() {
+  var ed = document.getElementById('codeEditor');
+  var lines = ed.value.split('\n').length;
+  var ln = document.getElementById('lineNumbers');
+  var h = '';
+  for (var i = 1; i <= lines; i++) h += '<span>' + i + '</span>';
+  ln.innerHTML = h;
+}
+
+function syncScroll() {
+  document.getElementById('lineNumbers').scrollTop = document.getElementById('codeEditor').scrollTop;
+}
+
+// ══════════════════════════════════════════════
+// 保存
+// ══════════════════════════════════════════════
+function saveCurrent() {
+  if (currentTab < 0 || !tabs[currentTab] || tabs[currentTab].readOnly) return;
+  var t = tabs[currentTab];
+  t.content = document.getElementById('codeEditor').value;
+  fileCache[t.path] = t.content;
+  api('saveFile', { path: t.path, content: t.content });
+}
+
+function onFileSaved(data) {
+  if (data.success) {
+    if (currentTab >= 0 && tabs[currentTab]) {
+      tabs[currentTab].dirty = false;
+      renderTabs();
+    }
+    showStatus('已保存 \u2713', true);
+  } else {
+    showStatus('保存失败: ' + (data.error||'未知'), false);
+  }
+}
+
+// ══════════════════════════════════════════════
+// 搜索 (Ctrl+F)
+// ══════════════════════════════════════════════
+function showSearch() {
+  document.getElementById('searchBar').classList.add('show');
+  document.getElementById('searchInput').focus();
+  document.getElementById('searchInput').select();
+}
+function closeSearch() {
+  document.getElementById('searchBar').classList.remove('show');
+  searchResults = []; searchIdx = -1;
+  document.getElementById('searchCount').textContent = '0/0';
+}
+function doSearch() {
+  var q = document.getElementById('searchInput').value;
+  var ed = document.getElementById('codeEditor');
+  searchResults = [];
+  if (!q) { document.getElementById('searchCount').textContent = '0/0'; return; }
+  var text = ed.value;
+  var idx = text.indexOf(q);
+  while (idx >= 0) { searchResults.push(idx); idx = text.indexOf(q, idx + 1); }
+  searchIdx = searchResults.length > 0 ? 0 : -1;
+  document.getElementById('searchCount').textContent = (searchIdx+1) + '/' + searchResults.length;
+  if (searchIdx >= 0) ed.setSelectionRange(searchResults[searchIdx], searchResults[searchIdx] + q.length);
+}
+function searchNext() { navigateSearch(1); }
+function searchPrev() { navigateSearch(-1); }
+function navigateSearch(dir) {
+  if (searchResults.length === 0) return;
+  searchIdx = (searchIdx + dir + searchResults.length) % searchResults.length;
+  var q = document.getElementById('searchInput').value;
+  var ed = document.getElementById('codeEditor');
+  ed.setSelectionRange(searchResults[searchIdx], searchResults[searchIdx] + q.length);
+  ed.focus();
+  document.getElementById('searchCount').textContent = (searchIdx+1) + '/' + searchResults.length;
+}
+function handleSearchKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? searchPrev() : searchNext(); }
+  if (e.key === 'Escape') closeSearch();
+}
+
+// ══════════════════════════════════════════════
+// 键盘快捷键
+// ══════════════════════════════════════════════
+function handleKeydown(e) {
+  // Ctrl+S: 保存
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveCurrent(); }
+  // Ctrl+F: 搜索
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); showSearch(); }
+  // Tab: 缩进
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    var ed = document.getElementById('codeEditor');
+    var s = ed.selectionStart;
+    ed.value = ed.value.substring(0, s) + '  ' + ed.value.substring(s);
+    ed.selectionStart = ed.selectionEnd = s + 2;
+    onEditorInput();
+  }
+}
+
+// ══════════════════════════════════════════════
+// 新建插件对话框
+// ══════════════════════════════════════════════
+function showNewDialog() {
+  document.getElementById('newDialog').classList.add('show');
+  api('listCapabilities');
+}
+function closeNewDialog() {
+  document.getElementById('newDialog').classList.remove('show');
+}
+function onTypeChange() {
+  api('listCapabilities');
+}
+function renderCaps(caps) {
+  var type = document.getElementById('newType').value;
+  var h = '';
+  (caps||[]).forEach(function(c) {
+    var checked = '';
+    h += '<label><input type="checkbox" value="' + c.id + '" ' + checked + '>' + c.id + '</label>';
+  });
+  document.getElementById('capsGrid').innerHTML = h ||
+    '<span style="color:var(--text3);font-size:11px">无可用能力</span>';
+}
+
+function createPlugin() {
+  var t = document.getElementById('newType').value;
+  var n = document.getElementById('newName').value.trim() || 'my-plugin';
+  var id = document.getElementById('newId').value.trim() || 'com.example.plugin';
+  var caps = [];
+  document.querySelectorAll('#capsGrid input:checked').forEach(function(cb) {
+    caps.push(cb.value);
+  });
+  api('newPlugin', { template: t, name: n, id: id, capabilities: caps });
+  closeNewDialog();
+}
+
+function onPluginCreated() {
+  showStatus('插件创建成功 \u2713', true);
+  api('listPlugins');
+}
+
+// ══════════════════════════════════════════════
+// 预览
+// ══════════════════════════════════════════════
+function previewCurrent() {
+  if (currentTab < 0 || !tabs[currentTab]) return;
+  saveCurrent();
+  api('preview', { path: tabs[currentTab].path });
+  showStatus('预览中...', false);
+}
+
+// ══════════════════════════════════════════════
+// 状态栏
+// ══════════════════════════════════════════════
+var _statusTimer;
+function showStatus(msg, isSuccess) {
+  var s = document.getElementById('status');
+  s.textContent = msg;
+  s.classList.add('show');
+  s.classList.toggle('saved', !!isSuccess);
+  clearTimeout(_statusTimer);
+  _statusTimer = setTimeout(function() { s.classList.remove('show', 'saved'); }, 2000);
+}
+
+// ══════════════════════════════════════════════
+// 工具函数
+// ══════════════════════════════════════════════
+function esc(s) {
+  return (s||'').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escAttr(s) {
+  return (s||'').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+</script>
+</body>
+</html>

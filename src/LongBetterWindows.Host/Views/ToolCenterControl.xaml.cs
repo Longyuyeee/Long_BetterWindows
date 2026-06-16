@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
@@ -12,19 +13,6 @@ namespace LongBetterWindows.Host.Views
 {
     public partial class ToolCenterControl : UserControl
     {
-        private static readonly SolidColorBrush GreenBrush =
-            new(Color.FromRgb(0x34, 0xC7, 0x59));
-        private static readonly SolidColorBrush GrayBrush =
-            new(Color.FromRgb(0x99, 0x99, 0x99));
-        private static readonly SolidColorBrush LightTextBrush =
-            new(Color.FromRgb(0xE8, 0xE8, 0xE8));
-        private static readonly SolidColorBrush CardBgBrush =
-            new(Color.FromRgb(0x2D, 0x2D, 0x30));
-        private static readonly SolidColorBrush BlueBrush =
-            new(Color.FromRgb(0x00, 0x7A, 0xFF));
-        private static readonly SolidColorBrush RedBrush =
-            new(Color.FromRgb(0xFF, 0x3B, 0x30));
-
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
         private bool _startupEnabled;
@@ -37,7 +25,79 @@ namespace LongBetterWindows.Host.Views
             RefreshStartupStatus();
             RefreshDocLinks();
             RefreshPluginList();
+
+            // 默认激活「系统」标签
+            ActivateTab(TabSystem);
+
+            // 动态更新关于信息
+            UpdateAboutInfo();
+
+            // 订阅插件变化事件，自动刷新列表
+            HostProvider.Instance.PluginStore.PluginsChanged += () =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    RefreshPluginList();
+                    UpdateAboutInfo();
+                });
+            };
         }
+
+        private void UpdateAboutInfo()
+        {
+            var plugins = HostProvider.Instance.PluginStore.GetAll();
+            var capCount = Engine.ManifestReader.KnownCapabilities.Count;
+            AboutStats.Text = $"{capCount} 项原子能力 · {plugins.Count} 个插件 · 3 种运行时";
+        }
+
+        #region Tab Navigation
+
+        private Button? _activeTab;
+
+        private void Tab_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button tab || tab == _activeTab) return;
+
+            // 停用旧标签
+            if (_activeTab != null) DeactivateTab(_activeTab);
+
+            // 激活新标签
+            ActivateTab(tab);
+
+            // 切换面板
+            PanelSystem.Visibility = tab == TabSystem ? Visibility.Visible : Visibility.Collapsed;
+            PanelPlugins.Visibility = tab == TabPlugins ? Visibility.Visible : Visibility.Collapsed;
+            PanelDev.Visibility = tab == TabDev ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void ActivateTab(Button tab)
+        {
+            _activeTab = tab;
+            tab.Background = BlueBrush;
+            tab.Foreground = WhiteBrush;
+            tab.FontWeight = FontWeights.SemiBold;
+        }
+
+        private void DeactivateTab(Button tab)
+        {
+            tab.Background = Brushes.Transparent;
+            tab.Foreground = GrayBrush;
+            tab.FontWeight = FontWeights.Normal;
+        }
+
+        #endregion
+
+        #region Shared Brush helpers (from Colors.xaml)
+
+        private Brush GreenBrush => (Brush)FindResource("SuccessGreenBrush");
+        private Brush GrayBrush => (Brush)FindResource("TextSecondaryBrush");
+        private Brush LightTextBrush => (Brush)FindResource("TextPrimaryBrush");
+        private Brush CardBgBrush => (Brush)FindResource("CardBackgroundBrush");
+        private Brush BlueBrush => (Brush)FindResource("AccentBlueBrush");
+        private Brush RedBrush => (Brush)FindResource("DangerRedBrush");
+        private Brush WhiteBrush => (Brush)FindResource("WhiteBrush");
+
+        #endregion
 
         private void DevTools_Click(object sender, RoutedEventArgs e)
         {
@@ -48,11 +108,22 @@ namespace LongBetterWindows.Host.Views
         private void ThemeToggle_Click(object sender, RoutedEventArgs e)
         {
             _isLightMode = !_isLightMode;
-            var bg = _isLightMode ? "#F5F5F7" : "#1E1F22";
+
+            // 使用 WPF-UI 主题管理器切换整个 Application
+            var theme = _isLightMode
+                ? Wpf.Ui.Appearance.ApplicationTheme.Light
+                : Wpf.Ui.Appearance.ApplicationTheme.Dark;
+            Wpf.Ui.Appearance.ApplicationThemeManager.Apply(theme);
+
+            // 同步窗口背景色
             var window = Window.GetWindow(this);
             if (window != null)
-                window.Background = new SolidColorBrush(
-                    (Color)ColorConverter.ConvertFromString(bg));
+            {
+                window.Background = _isLightMode
+                    ? (Brush)FindResource("LightSurfaceBrush")
+                    : (Brush)FindResource("SurfaceBackgroundBrush");
+            }
+
             if (sender is Button btn)
                 btn.Content = _isLightMode ? "暗色" : "亮色";
         }
@@ -61,15 +132,11 @@ namespace LongBetterWindows.Host.Views
         {
             DocLinksPanel.Children.Clear();
 
-            // 查找 docs 目录：从 bin/Debug/net8.0-windows 向上 5 级到 repo 根
             var docsDir = Path.GetFullPath(Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "docs"));
 
             if (!Directory.Exists(docsDir))
-            {
-                // 尝试直接在 BaseDirectory/docs
                 docsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "docs");
-            }
 
             if (!Directory.Exists(docsDir))
             {
@@ -100,7 +167,7 @@ namespace LongBetterWindows.Host.Views
                 {
                     Text = name,
                     FontSize = 12,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                    Foreground = BlueBrush,
                     Cursor = Cursors.Hand,
                     Margin = new Thickness(0, 2, 0, 2),
                     Tag = file,
@@ -148,31 +215,39 @@ namespace LongBetterWindows.Host.Views
             ColumnButton.IsEnabled = false;
             ColumnStatusText.Text = "处理中...";
 
-            if (_columnEnabled)
+            try
             {
-                var result = await ServicesInitializer.ColumnInjection
-                    .DisableCommentColumnAsync();
-                if (result.IsSuccess)
+                if (_columnEnabled)
                 {
-                    _columnEnabled = false;
-                    ColumnStatusText.Text = "备注列已移除";
-                    ColumnStatusText.Foreground = GrayBrush;
+                    var result = await ServicesInitializer.ColumnInjection
+                        .DisableCommentColumnAsync();
+                    if (result.IsSuccess)
+                    {
+                        _columnEnabled = false;
+                        ColumnStatusText.Text = "备注列已移除";
+                        ColumnStatusText.Foreground = GrayBrush;
+                    }
+                    else
+                        ColumnStatusText.Text = "移除失败: " + (result.ErrorMessage ?? "未知错误");
                 }
                 else
-                    ColumnStatusText.Text = "移除失败";
+                {
+                    var result = await ServicesInitializer.ColumnInjection
+                        .EnableCommentColumnAsync();
+                    if (result.IsSuccess)
+                    {
+                        _columnEnabled = true;
+                        ColumnStatusText.Text = "备注列已启用 · Explorer 已刷新";
+                        ColumnStatusText.Foreground = GreenBrush;
+                    }
+                    else
+                        ColumnStatusText.Text = "注入失败: " + (result.ErrorMessage ?? "未知错误");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                var result = await ServicesInitializer.ColumnInjection
-                    .EnableCommentColumnAsync();
-                if (result.IsSuccess)
-                {
-                    _columnEnabled = true;
-                    ColumnStatusText.Text = "备注列已启用 · Explorer 已刷新";
-                    ColumnStatusText.Foreground = GreenBrush;
-                }
-                else
-                    ColumnStatusText.Text = "注入失败";
+                ColumnStatusText.Text = "操作异常: " + ex.Message;
+                ColumnStatusText.Foreground = RedBrush;
             }
 
             ColumnButton.Content = _columnEnabled ? "移除" : "一键开启";
@@ -184,29 +259,37 @@ namespace LongBetterWindows.Host.Views
             ContextMenuButton.IsEnabled = false;
             ContextMenuStatusText.Text = "处理中...";
 
-            if (_contextMenuRegistered)
+            try
             {
-                var result = await ServicesInitializer.ContextMenu.UnregisterAsync();
-                if (result.IsSuccess)
+                if (_contextMenuRegistered)
                 {
-                    _contextMenuRegistered = false;
-                    ContextMenuStatusText.Text = "已移除";
-                    ContextMenuStatusText.Foreground = GrayBrush;
+                    var result = await ServicesInitializer.ContextMenu.UnregisterAsync();
+                    if (result.IsSuccess)
+                    {
+                        _contextMenuRegistered = false;
+                        ContextMenuStatusText.Text = "已移除";
+                        ContextMenuStatusText.Foreground = GrayBrush;
+                    }
+                    else
+                        ContextMenuStatusText.Text = "移除失败: " + (result.ErrorMessage ?? "未知错误");
                 }
                 else
-                    ContextMenuStatusText.Text = "移除失败";
+                {
+                    var result = await ServicesInitializer.ContextMenu.RegisterAsync();
+                    if (result.IsSuccess)
+                    {
+                        _contextMenuRegistered = true;
+                        ContextMenuStatusText.Text = "已注册 · 右键文件夹即可使用";
+                        ContextMenuStatusText.Foreground = GreenBrush;
+                    }
+                    else
+                        ContextMenuStatusText.Text = "注册失败: " + (result.ErrorMessage ?? "未知错误");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                var result = await ServicesInitializer.ContextMenu.RegisterAsync();
-                if (result.IsSuccess)
-                {
-                    _contextMenuRegistered = true;
-                    ContextMenuStatusText.Text = "已注册 · 右键文件夹即可使用";
-                    ContextMenuStatusText.Foreground = GreenBrush;
-                }
-                else
-                    ContextMenuStatusText.Text = "注册失败";
+                ContextMenuStatusText.Text = "操作异常: " + ex.Message;
+                ContextMenuStatusText.Foreground = RedBrush;
             }
 
             ContextMenuButton.Content = _contextMenuRegistered ? "移除" : "注册";
@@ -247,7 +330,14 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
+        #region Plugin List
+
         private int _pluginCardVersion;
+
+        private void RefreshPlugins_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshPluginList();
+        }
 
         private void RefreshPluginList()
         {
@@ -256,16 +346,6 @@ namespace LongBetterWindows.Host.Views
 
             PluginsPanel.Children.Clear();
             var plugins = HostProvider.Instance.PluginStore.GetAll();
-
-            var header = new TextBlock
-            {
-                Text = "插件",
-                FontWeight = FontWeights.SemiBold,
-                FontSize = 13,
-                Foreground = GrayBrush,
-                Margin = new Thickness(0, 4, 0, 12),
-            };
-            PluginsPanel.Children.Add(header);
 
             if (plugins.Count == 0)
             {
@@ -298,14 +378,14 @@ namespace LongBetterWindows.Host.Views
                             {
                                 Text = ".\\new-plugin.ps1 -Name \"名称\" -Id \"com.example.id\"",
                                 FontSize = 11,
-                                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                                FontFamily = new FontFamily("Consolas"),
                                 Foreground = LightTextBrush,
                                 Margin = new Thickness(0, 2, 0, 0),
                             },
                             new TextBlock
                             {
                                 Text = "模板: empty / hotkey / full",
-                                FontSize = 10,
+                                FontSize = 11,
                                 Foreground = GrayBrush,
                                 Margin = new Thickness(0, 4, 0, 0),
                             },
@@ -332,8 +412,6 @@ namespace LongBetterWindows.Host.Views
             var stateText = isRunning ? "运行中" : "已停止";
 
             var hotkey = PluginRegistry.GetPluginHotkey(plugin);
-            var capText = plugin.Manifest.Capabilities.Count > 0
-                ? string.Join(", ", plugin.Manifest.Capabilities) : "无";
 
             // 左侧信息区
             var infoStack = new StackPanel();
@@ -371,8 +449,8 @@ namespace LongBetterWindows.Host.Views
                     Child = new TextBlock
                     {
                         Text = hotkey,
-                        FontSize = 10,
-                        Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                        FontSize = 11,
+                        Foreground = BlueBrush,
                     },
                 };
                 metaRow.Children.Add(hotkeyBadge);
@@ -398,8 +476,8 @@ namespace LongBetterWindows.Host.Views
                     Content = "打开",
                     Width = 48, Height = 24,
                     FontSize = 11,
-                    Foreground = Brushes.White,
-                    Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                    Foreground = WhiteBrush,
+                    Background = BlueBrush,
                     BorderThickness = new Thickness(0),
                     Cursor = Cursors.Hand,
                     Margin = new Thickness(0, 0, 6, 0),
@@ -436,7 +514,7 @@ namespace LongBetterWindows.Host.Views
                 Content = btnText,
                 Width = 56, Height = 28,
                 FontSize = 11,
-                Foreground = Brushes.White,
+                Foreground = WhiteBrush,
                 Background = btnBrush,
                 BorderThickness = new Thickness(0),
                 Cursor = Cursors.Hand,
@@ -454,14 +532,47 @@ namespace LongBetterWindows.Host.Views
             grid.Children.Add(infoStack);
             grid.Children.Add(btnPanel);
 
-            return new Border
+            var card = new Border
             {
                 Background = CardBgBrush,
                 CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(14, 10, 14, 10),
-                Margin = new Thickness(0, 0, 0, 8),
+                Padding = new Thickness(18, 14, 18, 14),
+                Margin = new Thickness(0, 0, 0, 10),
                 Child = grid,
+                RenderTransformOrigin = new Point(0.5, 0.5),
+                RenderTransform = new TranslateTransform(0, 0),
+                Cursor = Cursors.Hand,
             };
+
+            // ♥ 卡片 hover 微动效 — 轻微上浮 + 背景变亮
+            card.MouseEnter += (_, _) =>
+            {
+                var upAnim = new DoubleAnimation(0, -2, TimeSpan.FromMilliseconds(150))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                var bgAnim = new ColorAnimation(
+                    ((SolidColorBrush)CardBgBrush).Color,
+                    Color.FromRgb(0x35, 0x35, 0x38),
+                    TimeSpan.FromMilliseconds(150));
+                ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.YProperty, upAnim);
+                card.Background.BeginAnimation(SolidColorBrush.ColorProperty, bgAnim);
+            };
+            card.MouseLeave += (_, _) =>
+            {
+                var downAnim = new DoubleAnimation(-2, 0, TimeSpan.FromMilliseconds(200))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                var bgAnim = new ColorAnimation(
+                    Color.FromRgb(0x35, 0x35, 0x38),
+                    ((SolidColorBrush)CardBgBrush).Color,
+                    TimeSpan.FromMilliseconds(200));
+                ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.YProperty, downAnim);
+                card.Background.BeginAnimation(SolidColorBrush.ColorProperty, bgAnim);
+            };
+
+            return card;
         }
 
         private async void PluginToggle_Click(object sender, RoutedEventArgs e)
@@ -469,22 +580,29 @@ namespace LongBetterWindows.Host.Views
             if (sender is not Button btn || btn.Tag is not ToggleState state) return;
             btn.IsEnabled = false;
 
-            var registry = HostProvider.Instance.PluginStore;
-            var entry = registry.Get(state.PluginId);
+            try
+            {
+                var registry = HostProvider.Instance.PluginStore;
+                var entry = registry.Get(state.PluginId);
 
-            if (entry == null)
-            {
-                btn.IsEnabled = true;
-                return;
-            }
+                if (entry == null)
+                {
+                    btn.IsEnabled = true;
+                    return;
+                }
 
-            if (entry.State == Core.PluginState.Running)
-            {
-                await registry.StopPluginAsync(state.PluginId);
+                if (entry.State == Core.PluginState.Running)
+                {
+                    await registry.StopPluginAsync(state.PluginId);
+                }
+                else
+                {
+                    await registry.StartPluginAsync(state.PluginId);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                await registry.StartPluginAsync(state.PluginId);
+                System.Diagnostics.Debug.WriteLine($"Plugin toggle error: {ex.Message}");
             }
 
             btn.IsEnabled = true;
@@ -520,5 +638,7 @@ namespace LongBetterWindows.Host.Views
             public string PluginId { get; init; } = string.Empty;
             public int Version { get; init; }
         }
+
+        #endregion
     }
 }

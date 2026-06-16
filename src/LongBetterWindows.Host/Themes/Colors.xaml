@@ -1,0 +1,85 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================ -->
+    <!-- 色彩系统 — Apple HIG-inspired semantic colors -->
+    <!-- ============================================ -->
+
+    <!-- ▸ 强调色 -->
+    <Color x:Key="AccentBlueColor">#007AFF</Color>
+    <SolidColorBrush x:Key="AccentBlueBrush" Color="#007AFF" />
+    <Color x:Key="AccentBlueHoverColor">#0062CC</Color>
+    <SolidColorBrush x:Key="AccentBlueHoverBrush" Color="#0062CC" />
+    <Color x:Key="AccentBluePressedColor">#0055AA</Color>
+    <SolidColorBrush x:Key="AccentBluePressedBrush" Color="#0055AA" />
+
+    <!-- ▸ 语义色 -->
+    <Color x:Key="SuccessGreenColor">#34C759</Color>
+    <SolidColorBrush x:Key="SuccessGreenBrush" Color="#34C759" />
+    <Color x:Key="SuccessGreenHoverColor">#2DAF4A</Color>
+    <SolidColorBrush x:Key="SuccessGreenHoverBrush" Color="#2DAF4A" />
+
+    <Color x:Key="DangerRedColor">#FF3B30</Color>
+    <SolidColorBrush x:Key="DangerRedBrush" Color="#FF3B30" />
+    <Color x:Key="DangerRedHoverColor">#E0352B</Color>
+    <SolidColorBrush x:Key="DangerRedHoverBrush" Color="#E0352B" />
+
+    <!-- ▸ 表面色 (暗色主题) -->
+    <Color x:Key="SurfaceBackgroundColor">#1E1F22</Color>
+    <SolidColorBrush x:Key="SurfaceBackgroundBrush" Color="#1E1F22" />
+
+    <Color x:Key="CardBackgroundColor">#2D2D30</Color>
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2D2D30" />
+    <Color x:Key="CardHoverColor">#353538</Color>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#353538" />
+
+    <Color x:Key="TitleBarColor">#2D2D30</Color>
+    <SolidColorBrush x:Key="TitleBarBrush" Color="#2D2D30" />
+
+    <!-- ▸ 按钮色 -->
+    <Color x:Key="SecondaryButtonColor">#3A3A3D</Color>
+    <SolidColorBrush x:Key="SecondaryButtonBrush" Color="#3A3A3D" />
+    <Color x:Key="SecondaryButtonHoverColor">#4A4A4D</Color>
+    <SolidColorBrush x:Key="SecondaryButtonHoverBrush" Color="#4A4A4D" />
+
+    <!-- ▸ 文字色 (暗色主题) -->
+    <Color x:Key="TextPrimaryColor">#E8E8E8</Color>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E8E8E8" />
+
+    <Color x:Key="TextSecondaryColor">#999999</Color>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#999999" />
+
+    <Color x:Key="TextMutedColor">#888888</Color>
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#888888" />
+
+    <Color x:Key="TextDimColor">#777777</Color>
+    <SolidColorBrush x:Key="TextDimBrush" Color="#777777" />
+
+    <Color x:Key="WhiteColor">#FFFFFF</Color>
+    <SolidColorBrush x:Key="WhiteBrush" Color="#FFFFFF" />
+
+    <!-- ▸ 分隔线 / 边框 -->
+    <Color x:Key="DividerColor">#3A3A3D</Color>
+    <SolidColorBrush x:Key="DividerBrush" Color="#3A3A3D" />
+
+    <!-- ▸ 滚动条 -->
+    <Color x:Key="ScrollThumbColor">#555555</Color>
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#555555" />
+    <Color x:Key="ScrollThumbHoverColor">#777777</Color>
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#777777" />
+
+    <!-- ▸ 半透覆盖层 -->
+    <Color x:Key="OverlayDarkColor">#80000000</Color>
+    <SolidColorBrush x:Key="OverlayDarkBrush" Color="#80000000" />
+
+    <!-- ▸ 亮色主题备用色 (ThemeToggle 切换时使用) -->
+    <Color x:Key="LightSurfaceColor">#F5F5F7</Color>
+    <SolidColorBrush x:Key="LightSurfaceBrush" Color="#F5F5F7" />
+    <Color x:Key="LightCardColor">#FFFFFF</Color>
+    <SolidColorBrush x:Key="LightCardBrush" Color="#FFFFFF" />
+    <Color x:Key="LightTextPrimaryColor">#1D1D1F</Color>
+    <SolidColorBrush x:Key="LightTextPrimaryBrush" Color="#1D1D1F" />
+    <Color x:Key="LightTextSecondaryColor">#86868B</Color>
+    <SolidColorBrush x:Key="LightTextSecondaryBrush" Color="#86868B" />
+
+</ResourceDictionary>

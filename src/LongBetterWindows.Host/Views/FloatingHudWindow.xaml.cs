@@ -11,6 +11,7 @@ namespace LongBetterWindows.Host.Views
         private Action<string>? _onSave;
         private bool _dirty;
         private bool _isClosing;
+        private System.Threading.CancellationTokenSource? _closeCts;
 
         public FloatingHudWindow()
         {
@@ -83,9 +84,23 @@ namespace LongBetterWindows.Host.Views
             scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
         }
 
-        private void Window_LostFocus(object sender, RoutedEventArgs e)
+        private void Window_Deactivated(object sender, EventArgs e)
         {
-            SaveAndClose();
+            // 失去焦点后 3 秒自动保存关闭，给用户时间切换回来
+            _closeCts?.Cancel();
+            _closeCts = new System.Threading.CancellationTokenSource();
+            var token = _closeCts.Token;
+            Task.Delay(3000, token).ContinueWith(_ =>
+            {
+                if (!token.IsCancellationRequested)
+                    Dispatcher.Invoke(() => SaveAndClose());
+            });
+        }
+
+        private void Window_Activated(object sender, EventArgs e)
+        {
+            // 用户切回来了，取消自动关闭
+            _closeCts?.Cancel();
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -97,13 +112,10 @@ namespace LongBetterWindows.Host.Views
                     Close();
                     break;
                 case Key.Enter when Keyboard.Modifiers == ModifierKeys.Control:
+                    _closeCts?.Cancel();
                     SaveAndClose();
                     break;
             }
-        }
-
-        private void NoteTextBox_LostFocus(object sender, RoutedEventArgs e)
-        {
         }
 
         private void NoteTextBox_TextChanged(

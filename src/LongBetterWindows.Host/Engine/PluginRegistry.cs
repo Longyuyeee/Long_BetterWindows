@@ -10,6 +10,9 @@ namespace LongBetterWindows.Host.Engine
         private readonly Dictionary<string, PluginEntry> _entries = new();
         private readonly object _lock = new();
 
+        /// <summary>插件注册/注销/状态变化时触发（在 UI 线程订阅后需自行 Dispatch）</summary>
+        public event Action? PluginsChanged;
+
         public int Count
         {
             get { lock (_lock) return _entries.Count; }
@@ -49,6 +52,7 @@ namespace LongBetterWindows.Host.Engine
 
                 _entries[manifest.Id] = entry;
                 Log.Information("插件 {PluginId} (v{Version}) 已注册", manifest.Id, manifest.Version);
+                NotifyChanged();
                 return true;
             }
         }
@@ -63,6 +67,7 @@ namespace LongBetterWindows.Host.Engine
                 entry.State = PluginState.Disabled;
                 _entries.Remove(pluginId);
                 Log.Information("插件 {PluginId} 已注销", pluginId);
+                NotifyChanged();
                 return true;
             }
         }
@@ -75,6 +80,7 @@ namespace LongBetterWindows.Host.Engine
                     return false;
 
                 entry.State = state;
+                NotifyChanged();
                 return true;
             }
         }
@@ -83,6 +89,11 @@ namespace LongBetterWindows.Host.Engine
         {
             var entry = Get(pluginId);
             return entry != null && entry.HasCapability(capability);
+        }
+
+        private void NotifyChanged()
+        {
+            PluginsChanged?.Invoke();
         }
 
         public IReadOnlyList<string> GetPluginCapabilities(string pluginId)

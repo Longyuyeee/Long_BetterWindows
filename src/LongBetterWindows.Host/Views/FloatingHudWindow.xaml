@@ -8,7 +8,8 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
-        FocusManager.LostFocus="Window_LostFocus"
+        Deactivated="Window_Deactivated"
+        Activated="Window_Activated"
         KeyDown="Window_KeyDown"
         Loaded="Window_Loaded">
 
@@ -24,7 +25,7 @@
                        Foreground="#FF007AFF" Margin="0,0,0,4"
                        TextTrimming="CharacterEllipsis" />
             <TextBlock x:Name="FolderLabel" Text=""
-                       FontSize="10"
+                       FontSize="11"
                        Foreground="#80000000" Margin="0,0,0,10"
                        TextTrimming="CharacterEllipsis" />
 
@@ -38,8 +39,7 @@
                      MinHeight="60"
                      MaxHeight="200"
                      VerticalScrollBarVisibility="Auto"
-                     TextChanged="NoteTextBox_TextChanged"
-                     LostFocus="NoteTextBox_LostFocus" />
+                     TextChanged="NoteTextBox_TextChanged" />
 
             <TextBlock x:Name="HintText" Text="输入备注内容..."
                        FontSize="11" Foreground="#60000000"

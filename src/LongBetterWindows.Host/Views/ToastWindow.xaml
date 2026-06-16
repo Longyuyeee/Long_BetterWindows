@@ -9,10 +9,13 @@
         SizeToContent="WidthAndHeight">
 
     <Border x:Name="ToastBorder"
-            Background="#E0323232" CornerRadius="10"
+            Background="{DynamicResource CardBackgroundBrush}" CornerRadius="10"
             Padding="16,10" MaxWidth="340">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.3" />
+        </Border.Effect>
         <TextBlock x:Name="MessageText"
-                   Foreground="White" FontSize="13"
+                   Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13"
                    TextWrapping="Wrap" />
     </Border>
 </Window>

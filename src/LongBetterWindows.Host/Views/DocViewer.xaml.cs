@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Windows;
+using LongBetterWindows.Host.Helpers;
 using Microsoft.Web.WebView2.Wpf;
 
 namespace LongBetterWindows.Host.Views
@@ -34,9 +35,11 @@ namespace LongBetterWindows.Host.Views
             {
                 Title = title,
                 Owner = owner,
+                Opacity = 0,
             };
 
             viewer.Show();
+            AnimationHelper.FadeIn(viewer, durationMs: 200);
             viewer.RenderMarkdown(markdown);
         }
 
@@ -73,9 +76,15 @@ namespace LongBetterWindows.Host.Views
             sb.AppendLine("strong{color:#1d1d1f;}");
             sb.AppendLine("</style></head><body>");
 
-            // Simple JS markdown renderer
+            // Markdown content (must be before renderer script so it exists in DOM when JS runs)
+            sb.AppendLine($"<script type='text/markdown' id='content'>{escaped}</script>");
+
+            // Simple JS markdown renderer (runs after content element is parsed)
             sb.AppendLine("<script>");
-            sb.AppendLine("var md = document.getElementById('content').textContent;");
+            sb.AppendLine("(function(){");
+            sb.AppendLine("var el = document.getElementById('content');");
+            sb.AppendLine("if (!el) return;");
+            sb.AppendLine("var md = el.textContent;");
             sb.AppendLine("var html = md");
             sb.AppendLine("  .replace(/^### (.+)$/gm, '<h3>$1</h3>')");
             sb.AppendLine("  .replace(/^## (.+)$/gm, '<h2>$1</h2>')");
@@ -84,7 +93,7 @@ namespace LongBetterWindows.Host.Views
             sb.AppendLine("  .replace(/\\*(.+?)\\*/g, '<em>$1</em>')");
             sb.AppendLine("  .replace(/`([^`]+)`/g, '<code>$1</code>')");
             sb.AppendLine("  .replace(/```(\\w*)\\n?([\\s\\S]*?)```/g, '<pre><code>$2</code></pre>')");
-            sb.AppendLine("  .replace(/^\\- (.+)$/gm, '<li>$1</li>')");
+            sb.AppendLine("  .replace(/^- (.+)$/gm, '<li>$1</li>')");
             sb.AppendLine("  .replace(/(<li>.*<\\/li>)/s, '<ul>$1</ul>')");
             sb.AppendLine("  .replace(/^>(.+)$/gm, '<blockquote>$1</blockquote>')");
             sb.AppendLine("  .replace(/^\\|(.+)\\|$/gm, function(m){");
@@ -98,9 +107,9 @@ namespace LongBetterWindows.Host.Views
             sb.AppendLine("  .replace(/\\n\\n/g, '</p><p>')");
             sb.AppendLine("  .replace(/^(.+)$/gm, '<p>$1</p>');");
             sb.AppendLine("document.body.innerHTML = html;");
+            sb.AppendLine("})();");
             sb.AppendLine("</script>");
 
-            sb.AppendLine($"<script type='text/markdown' id='content'>{escaped}</script>");
             sb.AppendLine("</body></html>");
 
             return sb.ToString();
