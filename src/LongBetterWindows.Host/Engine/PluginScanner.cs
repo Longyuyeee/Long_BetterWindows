@@ -146,7 +146,11 @@ namespace LongBetterWindows.Host.Engine
 
                         using (PluginAccessContext.Enter(oldId))
                         {
-                            entry.Instance.StopAsync().ContinueWith(_ => { });
+                            entry.Instance.StopAsync().ContinueWith(t =>
+                            {
+                                if (t.IsFaulted)
+                                    Log.Error(t.Exception, "插件 {PluginId} 停止时出错", oldId);
+                            });
                         }
 
                         registry.Unregister(oldId);

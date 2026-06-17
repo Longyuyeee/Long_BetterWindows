@@ -180,7 +180,7 @@ namespace LongBetterWindows.Host
                         return prop.GetString();
                 }
             }
-            catch { /* ignore corrupt config */ }
+            catch (Exception ex) { Log.Warning(ex, "读取主题配置失败"); }
             return null;
         }
 

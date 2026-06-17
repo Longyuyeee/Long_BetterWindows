@@ -83,7 +83,7 @@ namespace LongBetterWindows.Host.Views
                 Margin = new Thickness(0, 4, 0, 0),
             };
 
-            applyBtn.Click += (_, _) =>
+            applyBtn.Click += async (_, _) =>
             {
                 var newHotkey = hotkeyBox.Text.Trim();
                 if (string.IsNullOrEmpty(newHotkey) || newHotkey == _currentHotkey)
@@ -94,7 +94,7 @@ namespace LongBetterWindows.Host.Views
                 }
 
                 // 检查冲突
-                var conflictResult = _hotKey.IsConflictAsync(newHotkey).Result;
+                var conflictResult = await _hotKey.IsConflictAsync(newHotkey);
                 if (conflictResult.IsSuccess && conflictResult.Data)
                 {
                     var owner = _hotKey.GetOwner(newHotkey);
@@ -107,8 +107,8 @@ namespace LongBetterWindows.Host.Views
                 }
 
                 // 更换热键
-                var changeResult = _hotKey.ChangeHotkeyAsync(
-                    _currentHotkey, newHotkey, _pluginId, () => { }).Result;
+                var changeResult = await _hotKey.ChangeHotkeyAsync(
+                    _currentHotkey, newHotkey, _pluginId, () => { });
 
                 if (changeResult.IsSuccess)
                 {

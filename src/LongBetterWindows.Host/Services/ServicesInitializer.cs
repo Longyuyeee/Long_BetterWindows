@@ -76,7 +76,8 @@ namespace LongBetterWindows.Host.Services
             ShellExecute = new ShellExecuteService();
             provider.RegisterService<IShellExecuteService>(ShellExecute);
 
-            I18nService.Initialize();
+            // I18nService 预留，待国际化时启用
+            // I18nService.Initialize();
 
             Startup = new StartupService();
         }

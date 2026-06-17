@@ -31,6 +31,11 @@ namespace LongBetterWindows.Host.Engine
         public void ShowMainUI()
         {
             var wv = _runtime.WebView;
+            if (wv == null)
+            {
+                Log.Warning("[Web:{Id}] WebView 尚未初始化，无法打开 UI", Id);
+                return;
+            }
             var w = new System.Windows.Window
             {
                 Title = Name,
@@ -73,7 +78,7 @@ namespace LongBetterWindows.Host.Engine
 
         public void Dispose()
         {
-            _runtime.WebView.Dispose();
+            _runtime.WebView?.Dispose();
         }
     }
 }
