@@ -12,6 +12,12 @@ namespace LongBetterWindows.Host.Views
     /// </summary>
     public partial class HotkeySettingsControl : UserControl
     {
+        private static readonly SolidColorBrush GrayBrush = new(Color.FromRgb(0x80, 0x80, 0x80));
+        private static readonly SolidColorBrush BlueBrush = new(Color.FromRgb(0x00, 0x7A, 0xFF));
+
+        private static Brush? TryFindBrush(string key)
+            => Application.Current.TryFindResource(key) as Brush;
+
         private readonly IHotKeyService _hotKey;
         private readonly string _pluginId;
         private readonly string _pluginName;
@@ -45,7 +51,7 @@ namespace LongBetterWindows.Host.Views
             {
                 Text = "当前快捷键",
                 FontSize = 12,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),
+                Foreground = TryFindBrush("TextSecondaryBrush") ?? GrayBrush,
             };
             panel.Children.Add(label);
 
@@ -72,7 +78,7 @@ namespace LongBetterWindows.Host.Views
                 Height = 30,
                 Margin = new Thickness(8, 0, 0, 0),
                 FontSize = 12,
-                Background = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF)),
+                Background = TryFindBrush("AccentBlueBrush") ?? BlueBrush,
                 Foreground = Brushes.White,
                 BorderThickness = new Thickness(0),
             };
@@ -133,7 +139,7 @@ namespace LongBetterWindows.Host.Views
             {
                 Text = "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6",
                 FontSize = 11,
-                Foreground = new SolidColorBrush(Color.FromRgb(0xA0, 0xA0, 0xA0)),
+                Foreground = TryFindBrush("TextDimBrush") ?? GrayBrush,
                 Margin = new Thickness(0, 8, 0, 0),
                 TextWrapping = TextWrapping.Wrap,
             };

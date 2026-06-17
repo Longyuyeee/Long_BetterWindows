@@ -515,6 +515,41 @@ namespace LongBetterWindows.Host.Views
             });
             infoStack.Children.Add(metaRow);
 
+            // 第三行: 能力标签
+            var caps = plugin.Manifest.Capabilities;
+            if (caps.Count > 0)
+            {
+                var capsRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
+                var showCaps = caps.Take(3).ToList();
+                foreach (var cap in showCaps)
+                {
+                    capsRow.Children.Add(new Border
+                    {
+                        Background = new SolidColorBrush(Color.FromArgb(0x10, 0x99, 0x99, 0x99)),
+                        CornerRadius = new CornerRadius(3),
+                        Padding = new Thickness(4, 1, 4, 1),
+                        Margin = new Thickness(0, 0, 4, 0),
+                        Child = new TextBlock
+                        {
+                            Text = cap,
+                            FontSize = 10,
+                            Foreground = GrayBrush,
+                        },
+                    });
+                }
+                if (caps.Count > 3)
+                {
+                    capsRow.Children.Add(new TextBlock
+                    {
+                        Text = $"+{caps.Count - 3}",
+                        FontSize = 10,
+                        Foreground = GrayBrush,
+                        VerticalAlignment = VerticalAlignment.Center,
+                    });
+                }
+                infoStack.Children.Add(capsRow);
+            }
+
             // 右侧按钮区域
             var btnPanel = new StackPanel { Orientation = Orientation.Horizontal };
 
