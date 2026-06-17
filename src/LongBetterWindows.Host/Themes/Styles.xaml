@@ -183,8 +183,14 @@
         <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="18,14" />
-        <Setter Property="Margin" Value="0,0,0,10" />
+        <Setter Property="Margin" Value="0,0,10,10" />
+        <Setter Property="MinWidth" Value="200" />
         <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+    </Style>
+
+    <!-- 响应式卡片容器：窄屏1列，宽屏2列 -->
+    <Style x:Key="ResponsiveCardPanel" TargetType="WrapPanel">
+        <Setter Property="ItemWidth" Value="230" />
     </Style>
 
     <!-- ═══════════════════════════════════════════ -->

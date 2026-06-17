@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:LongBetterWindows.Host.Views"
         Title="Long窗口·全能助手"
-        MinWidth="420" MinHeight="360"
+        MinWidth="440" MinHeight="360"
         Width="500" Height="560"
         WindowStartupLocation="CenterScreen"
         Opacity="0"

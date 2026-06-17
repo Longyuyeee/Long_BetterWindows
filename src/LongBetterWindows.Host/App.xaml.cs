@@ -182,6 +182,22 @@ namespace LongBetterWindows.Host
             return null;
         }
 
+        public static bool IsFirstRun()
+        {
+            return ReadThemeSetting() == null; // 无配置 = 首次运行
+        }
+
+        public static void MarkOnboarded()
+        {
+            try
+            {
+                if (!Directory.Exists(ThemeConfigDir))
+                    Directory.CreateDirectory(ThemeConfigDir);
+                File.WriteAllText(ThemeConfigPath, "{}");
+            }
+            catch { }
+        }
+
         public static void SaveThemeSetting(bool isLight)
         {
             try

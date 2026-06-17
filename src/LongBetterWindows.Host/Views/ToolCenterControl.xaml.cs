@@ -29,6 +29,10 @@ namespace LongBetterWindows.Host.Views
             // 默认激活「系统」标签
             ActivateTab(TabSystem);
 
+            // 首次运行显示欢迎横幅
+            if (App.IsFirstRun())
+                WelcomeBanner.Visibility = Visibility.Visible;
+
             // 动态更新关于信息
             UpdateAboutInfo();
 
@@ -103,6 +107,27 @@ namespace LongBetterWindows.Host.Views
             tab.Background = Brushes.Transparent;
             tab.Foreground = GrayBrush;
             tab.FontWeight = FontWeights.Normal;
+        }
+
+        private void WelcomeDismiss_Click(object sender, RoutedEventArgs e)
+        {
+            WelcomeBanner.Visibility = Visibility.Collapsed;
+            App.MarkOnboarded();
+        }
+
+        private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Tab)
+            {
+                e.Handled = true;
+                // 循环切换面板
+                if (_activeTab == TabSystem)
+                    Tab_Click(TabPlugins, new RoutedEventArgs());
+                else if (_activeTab == TabPlugins)
+                    Tab_Click(TabDev, new RoutedEventArgs());
+                else
+                    Tab_Click(TabSystem, new RoutedEventArgs());
+            }
         }
 
         #endregion
