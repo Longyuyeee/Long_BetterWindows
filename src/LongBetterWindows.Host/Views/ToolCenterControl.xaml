@@ -203,7 +203,7 @@
                 <Border Style="{StaticResource CardBorderStyle}">
                     <StackPanel>
                         <TextBlock Text="关于 Long窗口" Style="{StaticResource CardTitleStyle}" />
-                        <TextBlock x:Name="AboutVersion" Text="v0.3.0 · .NET 8.0 · WPF"
+                        <TextBlock x:Name="AboutVersion" Text="v0.4.0 · .NET 8.0 · WPF"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    FontSize="11" Margin="0,2,0,0" />
                         <TextBlock x:Name="AboutStats"
