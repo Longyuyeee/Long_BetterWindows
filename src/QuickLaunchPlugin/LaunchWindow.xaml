@@ -11,7 +11,7 @@
         Loaded="Window_Loaded"
         Deactivated="Window_Deactivated">
 
-    <Border Background="#F5F5F7" CornerRadius="14" Padding="16"
+    <Border x:Name="MainBorder" CornerRadius="14" Padding="16"
             BorderBrush="#20000000" BorderThickness="0.5"
             Width="440">
         <Border.Effect>
@@ -23,7 +23,6 @@
                      FontSize="18"
                      BorderThickness="0"
                      Background="Transparent"
-                     Foreground="#1D1D1F"
                      CaretBrush="#007AFF"
                      PreviewKeyDown="SearchBox_PreviewKeyDown"
                      TextChanged="SearchBox_TextChanged" />
@@ -42,8 +41,8 @@
                                        Width="24" VerticalAlignment="Center" />
                             <StackPanel>
                                 <TextBlock Text="{Binding Name}" FontSize="13" />
-                                <TextBlock Text="{Binding Subtitle}" FontSize="10"
-                                           Foreground="#80000000" />
+                                <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
                             </StackPanel>
                         </StackPanel>
                     </DataTemplate>
@@ -51,7 +50,7 @@
             </ListBox>
 
             <TextBlock x:Name="HintText" Text="搜索应用..."
-                       FontSize="11" Foreground="#80000000"
+                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
                        Margin="0,8,0,0" />
         </StackPanel>
     </Border>

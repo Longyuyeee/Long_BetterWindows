@@ -4,7 +4,9 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
+using Wpf.Ui.Appearance;
 
 namespace QuickLaunchPlugin;
 
@@ -32,8 +34,16 @@ public partial class LaunchWindow : Window
         window.SearchBox.Focus();
     }
 
+    private static List<SmartEntry>? _cachedApps;
+
     private void LoadApps()
     {
+        if (_cachedApps != null)
+        {
+            _apps.AddRange(_cachedApps);
+            return;
+        }
+
         var paths = new[]
         {
             Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
@@ -60,6 +70,7 @@ public partial class LaunchWindow : Window
         }
 
         _apps.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        _cachedApps = new List<SmartEntry>(_apps);
     }
 
     private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
@@ -285,6 +296,16 @@ public partial class LaunchWindow : Window
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        // 根据主题适配颜色
+        var isDark = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme()
+            == Wpf.Ui.Appearance.ApplicationTheme.Dark;
+        MainBorder.Background = isDark
+            ? new SolidColorBrush(Color.FromRgb(0x1E, 0x1F, 0x22))
+            : new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF7));
+        SearchBox.Foreground = isDark
+            ? new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8))
+            : new SolidColorBrush(Color.FromRgb(0x1D, 0x1D, 0x1F));
+
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }

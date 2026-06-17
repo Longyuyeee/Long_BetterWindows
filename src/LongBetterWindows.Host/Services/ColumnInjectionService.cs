@@ -29,13 +29,14 @@ namespace LongBetterWindows.Host.Services
             {
                 try
                 {
-                    var key = FolderTypeKeys.FirstOrDefault();
-                    if (key == null) return false;
-
-                    var fullPath = $@"HKEY_CURRENT_USER\{key}";
-                    var columns = Registry.GetValue(fullPath, "ColumnList", null) as string;
-
-                    return columns != null && columns.Contains(CommentProperty);
+                    foreach (var key in FolderTypeKeys)
+                    {
+                        var fullPath = $@"HKEY_CURRENT_USER\{key}";
+                        var columns = Registry.GetValue(fullPath, "ColumnList", null) as string;
+                        if (columns != null && columns.Contains(CommentProperty))
+                            return true;
+                    }
+                    return false;
                 }
                 catch
                 {

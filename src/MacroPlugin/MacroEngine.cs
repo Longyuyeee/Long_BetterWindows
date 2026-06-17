@@ -178,11 +178,13 @@ public class MacroEngine : IDisposable
     [DllImport("user32.dll")] static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
     [DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string? lpModuleName);
 
+    // 缓存进程模块句柄，避免每次 SetHook 都调用 GetCurrentProcess()
+    private static readonly IntPtr _cachedModuleHandle = GetModuleHandle(
+        System.Diagnostics.Process.GetCurrentProcess().MainModule?.ModuleName);
+
     static IntPtr SetHook(int type, HookProc proc)
     {
-        using var p = System.Diagnostics.Process.GetCurrentProcess();
-        using var m = p.MainModule;
-        return m != null ? SetWindowsHookEx(type, proc, GetModuleHandle(m.ModuleName), 0) : IntPtr.Zero;
+        return SetWindowsHookEx(type, proc, _cachedModuleHandle, 0);
     }
 
     const uint INPUT_MOUSE = 0, MOUSEEVENTF_MOVE = 0x0001, MOUSEEVENTF_LEFTDOWN = 0x0002, MOUSEEVENTF_LEFTUP = 0x0004;

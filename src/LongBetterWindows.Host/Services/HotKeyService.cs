@@ -34,6 +34,12 @@ namespace LongBetterWindows.Host.Services
             ["Escape"] = 0x1B, ["Back"] = 0x08, ["Delete"] = 0x2E,
             ["Up"] = 0x26, ["Down"] = 0x28, ["Left"] = 0x25, ["Right"] = 0x27,
             ["Home"] = 0x24, ["End"] = 0x23, ["PageUp"] = 0x21, ["PageDown"] = 0x22,
+            ["OemPeriod"] = 0xBE, [","] = 0xBC, ["."] = 0xBE, ["Oemcomma"] = 0xBC,
+            ["OemSemicolon"] = 0xBA, [";"] = 0xBA,
+            ["OemOpenBrackets"] = 0xDB, ["["] = 0xDB, ["OemCloseBrackets"] = 0xDD, ["]"] = 0xDD,
+            ["OemQuestion"] = 0xBF, ["/"] = 0xBF, ["OemPipe"] = 0xDC, ["\\"] = 0xDC,
+            ["OemMinus"] = 0xBD, ["-"] = 0xBD, ["Oemplus"] = 0xBB, ["="] = 0xBB,
+            ["Oemtilde"] = 0xC0, ["`"] = 0xC0,
         };
 
         public HotKeyService()

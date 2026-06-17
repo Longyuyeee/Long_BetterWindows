@@ -23,12 +23,19 @@ namespace LongBetterWindows.Host.Views
 
             Loaded += async (_, _) =>
             {
-                await _webView.EnsureCoreWebView2Async();
-                _webView.CoreWebView2.WebMessageReceived += OnJsMessage;
+                try
+                {
+                    await _webView.EnsureCoreWebView2Async();
+                    _webView.CoreWebView2.WebMessageReceived += OnJsMessage;
 
-                var htmlPath = FindHtmlPath();
-                if (htmlPath != null && File.Exists(htmlPath))
-                    _webView.CoreWebView2.Navigate(new Uri(htmlPath).AbsoluteUri);
+                    var htmlPath = FindHtmlPath();
+                    if (htmlPath != null && File.Exists(htmlPath))
+                        _webView.CoreWebView2.Navigate(new Uri(htmlPath).AbsoluteUri);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"PluginDevTools init error: {ex.Message}");
+                }
             };
 
             Closed += (_, _) =>
