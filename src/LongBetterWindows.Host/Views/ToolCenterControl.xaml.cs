@@ -64,10 +64,30 @@ namespace LongBetterWindows.Host.Views
             // 激活新标签
             ActivateTab(tab);
 
-            // 切换面板
-            PanelSystem.Visibility = tab == TabSystem ? Visibility.Visible : Visibility.Collapsed;
-            PanelPlugins.Visibility = tab == TabPlugins ? Visibility.Visible : Visibility.Collapsed;
-            PanelDev.Visibility = tab == TabDev ? Visibility.Visible : Visibility.Collapsed;
+            // 切换面板（带淡入过渡）
+            SwitchPanel(tab);
+        }
+
+        private void SwitchPanel(Button tab)
+        {
+            var panels = new[] {
+                (TabSystem, PanelSystem),
+                (TabPlugins, PanelPlugins),
+                (TabDev, PanelDev)
+            };
+
+            foreach (var (tabBtn, panel) in panels)
+            {
+                if (tabBtn == tab)
+                {
+                    panel.Visibility = Visibility.Visible;
+                    Helpers.AnimationHelper.FadeInElement(panel, durationMs: 180);
+                }
+                else
+                {
+                    panel.Visibility = Visibility.Collapsed;
+                }
+            }
         }
 
         private void ActivateTab(Button tab)
@@ -114,6 +134,7 @@ namespace LongBetterWindows.Host.Views
                 ? Wpf.Ui.Appearance.ApplicationTheme.Light
                 : Wpf.Ui.Appearance.ApplicationTheme.Dark;
             Wpf.Ui.Appearance.ApplicationThemeManager.Apply(theme);
+            App.SaveThemeSetting(_isLightMode);
 
             // 同步窗口背景色
             var window = Window.GetWindow(this);
@@ -344,6 +365,7 @@ namespace LongBetterWindows.Host.Views
             _pluginCardVersion++;
             var version = _pluginCardVersion;
 
+            PluginsLoading.Visibility = Visibility.Collapsed;
             PluginsPanel.Children.Clear();
             var plugins = HostProvider.Instance.PluginStore.GetAll();
 

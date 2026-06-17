@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -70,7 +71,7 @@ namespace LongBetterWindows.Host.Services
                 uID = 1,
                 uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP,
                 uCallbackMessage = WM_TRAYICON,
-                hIcon = LoadIcon(IntPtr.Zero, IDI_APPLICATION),
+                hIcon = LoadAppIcon(),
                 szTip = "Long窗口·全能助手",
             };
 
@@ -163,16 +164,30 @@ namespace LongBetterWindows.Host.Services
             public string szTip;
         }
 
-        private static readonly IntPtr IDI_APPLICATION = new(32512);
-
         [DllImport("shell32.dll", SetLastError = true)]
         private static extern bool Shell_NotifyIcon(uint dwMessage, ref NOTIFYICONDATA lpData);
 
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern uint RegisterWindowMessage(string lpString);
 
-        [DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr LoadIcon(IntPtr hInstance, IntPtr lpIconName);
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern IntPtr LoadImage(IntPtr hInst, string name, uint type, int cx, int cy, uint fuLoad);
+
+        private const uint IMAGE_ICON = 1;
+        private const uint LR_LOADFROMFILE = 0x0010;
+
+        private static IntPtr LoadAppIcon()
+        {
+            // 尝试从输出目录加载应用专属图标
+            var path = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+            if (File.Exists(path))
+            {
+                var hIcon = LoadImage(IntPtr.Zero, path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE);
+                if (hIcon != IntPtr.Zero) return hIcon;
+            }
+            // 回退：加载系统默认应用图标
+            return LoadImage(IntPtr.Zero, "#32512", IMAGE_ICON, 32, 32, 0x8000); // LR_SHARED
+        }
 
         #endregion
     }

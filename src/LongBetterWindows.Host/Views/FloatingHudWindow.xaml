@@ -22,16 +22,16 @@
         <StackPanel Width="320">
             <TextBlock x:Name="TitleLabel" Text="备注"
                        FontSize="11" FontWeight="Medium"
-                       Foreground="#FF007AFF" Margin="0,0,0,4"
+                       Foreground="{DynamicResource AccentBlueBrush}" Margin="0,0,0,4"
                        TextTrimming="CharacterEllipsis" />
             <TextBlock x:Name="FolderLabel" Text=""
                        FontSize="11"
-                       Foreground="#80000000" Margin="0,0,0,10"
+                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,10"
                        TextTrimming="CharacterEllipsis" />
 
             <TextBox x:Name="NoteTextBox"
                      FontSize="14"
-                     CaretBrush="#FF007AFF"
+                     CaretBrush="{DynamicResource AccentBlueBrush}"
                      BorderThickness="0"
                      Background="Transparent"
                      TextWrapping="Wrap"
@@ -42,7 +42,7 @@
                      TextChanged="NoteTextBox_TextChanged" />
 
             <TextBlock x:Name="HintText" Text="输入备注内容..."
-                       FontSize="11" Foreground="#60000000"
+                       FontSize="11" Foreground="{DynamicResource TextDimBrush}"
                        Margin="0,8,0,0" TextAlignment="Right" />
         </StackPanel>
     </Border>

@@ -27,12 +27,21 @@ namespace LongBetterWindows.Host
             ServicesInitializer.Initialize();
             Log.Information("所有服务已初始化。");
 
-            // 跟随系统主题 (Windows 个性化设置)
-            var appsUseLight = Microsoft.Win32.Registry.GetValue(
-                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
-                "AppsUseLightTheme", 1);
-            var isSystemLight = appsUseLight is 1;
-            ApplicationThemeManager.Apply(isSystemLight ? ApplicationTheme.Light : ApplicationTheme.Dark);
+            // 优先使用用户保存的主题偏好，否则跟随系统
+            var themeSetting = ReadThemeSetting();
+            bool isLight;
+            if (themeSetting == "light")
+                isLight = true;
+            else if (themeSetting == "dark")
+                isLight = false;
+            else
+            {
+                var appsUseLight = Microsoft.Win32.Registry.GetValue(
+                    @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                    "AppsUseLightTheme", 1);
+                isLight = appsUseLight is 1;
+            }
+            ApplicationThemeManager.Apply(isLight ? ApplicationTheme.Light : ApplicationTheme.Dark);
 
             // 检查命令行 --note 参数（右键菜单触发）
             for (int i = 0; i < e.Args.Length; i++)
@@ -149,5 +158,43 @@ namespace LongBetterWindows.Host
             Log.CloseAndFlush();
             base.OnExit(e);
         }
+
+        #region Theme Persistence
+
+        private static readonly string ThemeConfigDir =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LongBetterWindows");
+        private static readonly string ThemeConfigPath =
+            Path.Combine(ThemeConfigDir, "theme.json");
+
+        private static string? ReadThemeSetting()
+        {
+            try
+            {
+                if (File.Exists(ThemeConfigPath))
+                {
+                    var json = File.ReadAllText(ThemeConfigPath);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("theme", out var prop))
+                        return prop.GetString();
+                }
+            }
+            catch { /* ignore corrupt config */ }
+            return null;
+        }
+
+        public static void SaveThemeSetting(bool isLight)
+        {
+            try
+            {
+                if (!Directory.Exists(ThemeConfigDir))
+                    Directory.CreateDirectory(ThemeConfigDir);
+                var json = System.Text.Json.JsonSerializer.Serialize(
+                    new { theme = isLight ? "light" : "dark" });
+                File.WriteAllText(ThemeConfigPath, json);
+            }
+            catch { /* best effort */ }
+        }
+
+        #endregion
     }
 }

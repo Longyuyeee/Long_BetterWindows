@@ -55,33 +55,9 @@ namespace LongBetterWindows.Host.Views
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(350))
-            {
-                EasingFunction = new ElasticEase
-                {
-                    EasingMode = EasingMode.EaseOut,
-                    Oscillations = 2,
-                    Springiness = 4,
-                },
-            };
-            BeginAnimation(OpacityProperty, fadeIn);
-
-            var scaleTransform = new ScaleTransform(0.85, 0.85);
-            RenderTransform = scaleTransform;
-            RenderTransformOrigin = new Point(0.5, 0.5);
-
-            var scaleAnim = new DoubleAnimation(0.85, 1, TimeSpan.FromMilliseconds(400))
-            {
-                EasingFunction = new ElasticEase
-                {
-                    EasingMode = EasingMode.EaseOut,
-                    Oscillations = 2,
-                    Springiness = 5,
-                },
-            };
-
-            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
-            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
+            // 淡入 + 弹性缩放 (复用 AnimationHelper)
+            Helpers.AnimationHelper.FadeIn(this, durationMs: 350);
+            Helpers.AnimationHelper.ScaleBounce(this, from: 0.85, to: 1.0, durationMs: 400);
         }
 
         private void Window_Deactivated(object sender, EventArgs e)

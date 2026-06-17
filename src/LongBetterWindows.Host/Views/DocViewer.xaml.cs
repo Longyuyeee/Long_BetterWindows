@@ -86,26 +86,40 @@ namespace LongBetterWindows.Host.Views
             sb.AppendLine("if (!el) return;");
             sb.AppendLine("var md = el.textContent;");
             sb.AppendLine("var html = md");
+            // Code blocks first (before other regexes touch backticks)
+            sb.AppendLine("  .replace(/```(\\w*)\\n?([\\s\\S]*?)```/g, '<pre><code>$2</code></pre>')");
+            // Headers
             sb.AppendLine("  .replace(/^### (.+)$/gm, '<h3>$1</h3>')");
             sb.AppendLine("  .replace(/^## (.+)$/gm, '<h2>$1</h2>')");
             sb.AppendLine("  .replace(/^# (.+)$/gm, '<h1>$1</h1>')");
+            // Bold / italic / inline code
             sb.AppendLine("  .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>')");
             sb.AppendLine("  .replace(/\\*(.+?)\\*/g, '<em>$1</em>')");
             sb.AppendLine("  .replace(/`([^`]+)`/g, '<code>$1</code>')");
-            sb.AppendLine("  .replace(/```(\\w*)\\n?([\\s\\S]*?)```/g, '<pre><code>$2</code></pre>')");
-            sb.AppendLine("  .replace(/^- (.+)$/gm, '<li>$1</li>')");
-            sb.AppendLine("  .replace(/(<li>.*<\\/li>)/s, '<ul>$1</ul>')");
+            // Horizontal rule
+            sb.AppendLine("  .replace(/^---+$/gm, '<hr>')");
+            // Blockquotes
             sb.AppendLine("  .replace(/^>(.+)$/gm, '<blockquote>$1</blockquote>')");
+            // Links
+            sb.AppendLine("  .replace(/\\[(.+?)\\]\\((.+?)\\)/g, '<a href=\"$2\">$1</a>')");
+            // Tables
             sb.AppendLine("  .replace(/^\\|(.+)\\|$/gm, function(m){");
             sb.AppendLine("    var cells = m.split('|').filter(function(c){return c.trim();});");
-            sb.AppendLine("    var tag = m.match(/^\\|[-:\\s|]+\\|$/) ? 'td' : 'th';");
+            sb.AppendLine("    var tag = /^\\|[-:\\s|]+\\|$/.test(m) ? 'td' : 'th';");
             sb.AppendLine("    return '<tr>'+cells.map(function(c){return '<'+tag+'>'+c.trim()+'</'+tag+'>'}).join('')+'</tr>';");
             sb.AppendLine("  })");
             sb.AppendLine("  .replace(/((?:<tr>.*<\\/tr>\\n?)+)/g, '<table>$1</table>')");
-            sb.AppendLine("  .replace(/\\[(.+?)\\]\\((.+?)\\)/g, '<a href=\"$2\">$1</a>')");
-            sb.AppendLine("  .replace(/^---+$/gm, '<hr>')");
-            sb.AppendLine("  .replace(/\\n\\n/g, '</p><p>')");
-            sb.AppendLine("  .replace(/^(.+)$/gm, '<p>$1</p>');");
+            // Lists: group consecutive li items into ul blocks
+            sb.AppendLine("  .replace(/((?:^- .+\\n?)+)/gm, function(block){");
+            sb.AppendLine("    return '<ul>' + block.replace(/^- (.+)$/gm, '<li>$1</li>') + '</ul>';");
+            sb.AppendLine("  })");
+            // Paragraphs: process block by block, skip pre-rendered HTML blocks
+            sb.AppendLine("  .replace(/(?:^|\\n\\n)((?!<(?:h[1-3]|ul|ol|pre|table|blockquote|hr))[\\s\\S]+?)(?=\\n\\n|$)/gm,");
+            sb.AppendLine("    function(_, text){ var t = text.trim();");
+            sb.AppendLine("      return t ? '<p>' + t.replace(/\\n/g, '<br>') + '</p>' : ''; })");
+            sb.AppendLine("  .replace(/\\n\\n/g, '');");
+            // Trim trailing newlines
+            sb.AppendLine("  html = html.trim();");
             sb.AppendLine("document.body.innerHTML = html;");
             sb.AppendLine("})();");
             sb.AppendLine("</script>");

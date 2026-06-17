@@ -131,6 +131,11 @@
                             Click="RefreshPlugins_Click" />
                 </StackPanel>
 
+                <!-- 插件加载中提示 -->
+                <TextBlock x:Name="PluginsLoading" Text="正在扫描插件..."
+                           FontSize="12" Foreground="{StaticResource TextMutedBrush}"
+                           Margin="0,4,0,0" />
+
                 <!-- 插件卡片容器 (动态填充) -->
                 <StackPanel x:Name="PluginsPanel" />
 

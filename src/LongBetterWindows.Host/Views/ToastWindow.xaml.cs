@@ -19,13 +19,24 @@ namespace LongBetterWindows.Host.Views
 
                 var window = new ToastWindow
                 {
+                    Opacity = 0,
                     Left = workArea.Right - 360,
                     Top = workArea.Bottom - 80,
                 };
                 window.MessageText.Text = message;
                 window.Show();
 
-                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200));
+                // 自适应位置：根据实际宽度调整到右下角
+                window.Loaded += (_, _) =>
+                {
+                    window.Left = workArea.Right - window.ActualWidth - 20;
+                    window.Top = workArea.Bottom - window.ActualHeight - 20;
+                };
+
+                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(250))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
                 window.BeginAnimation(OpacityProperty, fadeIn);
 
                 var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
