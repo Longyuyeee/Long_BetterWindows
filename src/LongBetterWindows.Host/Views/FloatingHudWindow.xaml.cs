@@ -112,12 +112,7 @@ namespace LongBetterWindows.Host.Views
                 _onSave(text);
             }
 
-            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
-            };
-            fadeOut.Completed += (_, _) => Close();
-            BeginAnimation(OpacityProperty, fadeOut);
+            Helpers.AnimationHelper.FadeOut(this, durationMs: 150);
         }
     }
 }
