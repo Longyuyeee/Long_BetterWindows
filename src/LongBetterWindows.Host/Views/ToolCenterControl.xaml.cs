@@ -475,7 +475,7 @@ namespace LongBetterWindows.Host.Views
                     Padding = new Thickness(18, 14, 18, 14),
                     Child = new TextBlock
                     {
-                        Text = $"没有找到匹配 "{filter}" 的插件",
+                        Text = $"没有找到匹配 [{filter}] 的插件",
                         FontSize = 13,
                         Foreground = GrayBrush,
                     },
