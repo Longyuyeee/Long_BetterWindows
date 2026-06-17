@@ -132,7 +132,7 @@ namespace LongBetterWindows.Host.Views
             var hint = new TextBlock
             {
                 Text = "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6",
-                FontSize = 10,
+                FontSize = 11,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xA0, 0xA0, 0xA0)),
                 Margin = new Thickness(0, 8, 0, 0),
                 TextWrapping = TextWrapping.Wrap,

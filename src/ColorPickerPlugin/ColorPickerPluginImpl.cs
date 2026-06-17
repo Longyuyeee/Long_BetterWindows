@@ -123,6 +123,8 @@ public class ColorPickerWindow : Window
         _capturing = true;
         while (_capturing)
         {
+            try
+            {
             GetCursorPos(out var pt);
             Left = pt.X + 16; Top = pt.Y + 16;
 
@@ -140,6 +142,11 @@ public class ColorPickerWindow : Window
             _rgbText.Text = $"rgb({r},{g},{b})";
 
             await Task.Delay(50);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ColorPicker capture error: {ex.Message}");
+            }
         }
     }
 

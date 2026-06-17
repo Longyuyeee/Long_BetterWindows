@@ -663,23 +663,30 @@ namespace LongBetterWindows.Host.Views
             if (sender is not Button btn || btn.Tag is not PluginEntry entry) return;
             if (entry.Instance is not IHasSettingsUI hasUI) return;
 
-            var settingsUI = hasUI.CreateSettingsUI();
-            if (settingsUI == null) return;
-
-            var popup = new Window
+            try
             {
-                Title = $"{entry.Manifest.Name} - 设置",
-                Content = settingsUI,
-                Width = 420,
-                Height = 320,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Owner = Window.GetWindow(this),
-                ResizeMode = ResizeMode.NoResize,
-                WindowStyle = WindowStyle.ToolWindow,
-                ShowInTaskbar = false,
-            };
+                var settingsUI = hasUI.CreateSettingsUI();
+                if (settingsUI == null) return;
 
-            popup.ShowDialog();
+                var popup = new Window
+                {
+                    Title = $"{entry.Manifest.Name} - 设置",
+                    Content = settingsUI,
+                    Width = 420,
+                    Height = 320,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = Window.GetWindow(this),
+                    ResizeMode = ResizeMode.NoResize,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    ShowInTaskbar = false,
+                };
+
+                popup.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Settings UI error: {ex.Message}");
+            }
         }
 
         private class ToggleState
