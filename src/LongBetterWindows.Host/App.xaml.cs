@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
@@ -214,6 +215,44 @@ namespace LongBetterWindows.Host
                 File.WriteAllText(ThemeConfigPath, json);
             }
             catch { /* best effort */ }
+        }
+
+        /// <summary>动态更新自定义主题资源，使 DynamicResource 绑定响应主题切换</summary>
+        public static void UpdateThemeResources(bool isLight)
+        {
+            var r = Current.Resources;
+            var c = (Color c) => new SolidColorBrush(c);
+
+            if (isLight)
+            {
+                r["SurfaceBackgroundBrush"] = r["LightSurfaceBrush"];
+                r["CardBackgroundBrush"] = r["LightCardBrush"];
+                r["TextPrimaryBrush"] = r["LightTextPrimaryBrush"];
+                r["TextSecondaryBrush"] = r["LightTextSecondaryBrush"];
+                r["TextMutedBrush"] = r["LightTextSecondaryBrush"];
+                r["TextDimBrush"] = c(Color.FromRgb(0x99, 0x99, 0x99));
+                r["SecondaryButtonBrush"] = c(Color.FromRgb(0xE8, 0xE8, 0xEB));
+                r["SecondaryButtonHoverBrush"] = c(Color.FromRgb(0xD8, 0xD8, 0xDB));
+                r["DividerBrush"] = c(Color.FromRgb(0xDD, 0xDD, 0xDD));
+                r["TitleBarBrush"] = c(Color.FromRgb(0xF0, 0xF0, 0xF2));
+                r["ScrollThumbBrush"] = c(Color.FromRgb(0xBB, 0xBB, 0xBB));
+                r["ScrollThumbHoverBrush"] = c(Color.FromRgb(0x99, 0x99, 0x99));
+            }
+            else
+            {
+                r["SurfaceBackgroundBrush"] = c(Color.FromRgb(0x1E, 0x1F, 0x22));
+                r["CardBackgroundBrush"] = c(Color.FromRgb(0x2D, 0x2D, 0x30));
+                r["TextPrimaryBrush"] = c(Color.FromRgb(0xE8, 0xE8, 0xE8));
+                r["TextSecondaryBrush"] = c(Color.FromRgb(0x99, 0x99, 0x99));
+                r["TextMutedBrush"] = c(Color.FromRgb(0x88, 0x88, 0x88));
+                r["TextDimBrush"] = c(Color.FromRgb(0x77, 0x77, 0x77));
+                r["SecondaryButtonBrush"] = c(Color.FromRgb(0x3A, 0x3A, 0x3D));
+                r["SecondaryButtonHoverBrush"] = c(Color.FromRgb(0x4A, 0x4A, 0x4D));
+                r["DividerBrush"] = c(Color.FromRgb(0x3A, 0x3A, 0x3D));
+                r["TitleBarBrush"] = c(Color.FromRgb(0x2D, 0x2D, 0x30));
+                r["ScrollThumbBrush"] = c(Color.FromRgb(0x55, 0x55, 0x55));
+                r["ScrollThumbHoverBrush"] = c(Color.FromRgb(0x77, 0x77, 0x77));
+            }
         }
 
         #endregion

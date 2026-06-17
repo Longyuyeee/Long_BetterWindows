@@ -162,6 +162,7 @@ namespace LongBetterWindows.Host.Views
                 : Wpf.Ui.Appearance.ApplicationTheme.Dark;
             Wpf.Ui.Appearance.ApplicationThemeManager.Apply(theme);
             App.SaveThemeSetting(_isLightMode);
+            App.UpdateThemeResources(_isLightMode);
 
             // 同步窗口背景色
             var window = Window.GetWindow(this);

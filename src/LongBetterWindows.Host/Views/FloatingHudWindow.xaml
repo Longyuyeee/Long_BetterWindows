@@ -13,7 +13,7 @@
         KeyDown="Window_KeyDown"
         Loaded="Window_Loaded">
 
-    <Border Background="#E8F0F8F5" CornerRadius="16" Padding="16,12"
+    <Border x:Name="HudBorder" CornerRadius="16" Padding="16,12"
             BorderBrush="#20000000" BorderThickness="0.5">
         <Border.Effect>
             <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.15" />
@@ -34,6 +34,7 @@
                      CaretBrush="{DynamicResource AccentBlueBrush}"
                      BorderThickness="0"
                      Background="Transparent"
+                     Foreground="{DynamicResource TextPrimaryBrush}"
                      TextWrapping="Wrap"
                      AcceptsReturn="True"
                      MinHeight="60"

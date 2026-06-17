@@ -105,8 +105,8 @@
 
     <!-- Primary (蓝色主按钮) -->
     <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource AccentBlueBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource WhiteBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AccentBlueBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource WhiteBrush}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Width" Value="72" />
@@ -123,8 +123,8 @@
 
     <!-- Secondary (灰色次要按钮) -->
     <Style x:Key="SecondaryButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource SecondaryButtonBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SecondaryButtonBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Width" Value="72" />
@@ -141,8 +141,8 @@
 
     <!-- Success (绿色成功按钮) -->
     <Style x:Key="SuccessButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource SuccessGreenBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource WhiteBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource WhiteBrush}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Width" Value="72" />
@@ -159,8 +159,8 @@
 
     <!-- Danger (红色危险按钮) -->
     <Style x:Key="DangerButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource DangerRedBrush}" />
-        <Setter Property="Foreground" Value="{StaticResource WhiteBrush}" />
+        <Setter Property="Background" Value="{DynamicResource DangerRedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource WhiteBrush}" />
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Width" Value="72" />
@@ -180,7 +180,7 @@
     <!-- ═══════════════════════════════════════════ -->
 
     <Style x:Key="CardBorderStyle" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="18,14" />
         <Setter Property="Margin" Value="0,0,10,10" />
@@ -200,26 +200,26 @@
     <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="11" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
         <Setter Property="Margin" Value="0,0,0,8" />
     </Style>
 
     <Style x:Key="CardTitleStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     </Style>
 
     <Style x:Key="CardDescStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="11" />
-        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
         <Setter Property="Margin" Value="0,3,0,0" />
     </Style>
 
     <Style x:Key="DocLinkStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="12" />
-        <Setter Property="Foreground" Value="{StaticResource AccentBlueBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AccentBlueBrush}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Margin" Value="0,2,0,2" />
     </Style>
@@ -229,7 +229,7 @@
     <!-- ═══════════════════════════════════════════ -->
 
     <Style x:Key="DarkScrollViewerStyle" TargetType="ScrollViewer">
-        <Setter Property="Background" Value="{StaticResource SurfaceBackgroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ScrollViewer">
@@ -319,7 +319,7 @@
 
     <Style x:Key="SegmentedTabStyle" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="Height" Value="30" />
@@ -352,7 +352,7 @@
 
     <!-- 分段控件容器 (3 个标签的 pill 背景) -->
     <Style x:Key="SegmentedBarStyle" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource CardBackgroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="3" />
     </Style>
