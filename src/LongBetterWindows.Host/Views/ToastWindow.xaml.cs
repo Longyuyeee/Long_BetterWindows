@@ -12,6 +12,15 @@ namespace LongBetterWindows.Host.Views
         }
 
         public static void Show(string message)
+            => ShowInternal(message, null);
+
+        public static void ShowSuccess(string message)
+            => ShowInternal(message, "SuccessGreenBrush");
+
+        public static void ShowError(string message)
+            => ShowInternal(message, "DangerRedBrush");
+
+        private static void ShowInternal(string message, string? accentKey)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -23,10 +32,17 @@ namespace LongBetterWindows.Host.Views
                     Left = workArea.Right - 360,
                     Top = workArea.Bottom - 80,
                 };
+
+                // 根据类型设置背景色
+                if (accentKey != null)
+                {
+                    var brush = Application.Current.TryFindResource(accentKey) as System.Windows.Media.Brush;
+                    if (brush != null) window.ToastBorder.Background = brush;
+                }
+
                 window.MessageText.Text = message;
                 window.Show();
 
-                // 自适应位置：根据实际宽度调整到右下角
                 window.Loaded += (_, _) =>
                 {
                     window.Left = workArea.Right - window.ActualWidth - 20;

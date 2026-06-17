@@ -483,6 +483,35 @@ namespace LongBetterWindows.Host.Views
                 Foreground = LightTextBrush,
                 VerticalAlignment = VerticalAlignment.Center,
             });
+            // 运行时类型徽章
+            var runtimeLabel = plugin.Manifest.Runtime switch
+            {
+                "dotnet" => "DLL",
+                "webview" => "Web",
+                "csharp-script" => "Script",
+                _ => plugin.Manifest.Runtime
+            };
+            var runtimeColor = plugin.Manifest.Runtime switch
+            {
+                "dotnet" => BlueBrush,
+                "webview" => GreenBrush,
+                _ => GrayBrush
+            };
+            nameRow.Children.Add(new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(0x15, 0x99, 0x99, 0x99)),
+                CornerRadius = new CornerRadius(3),
+                Padding = new Thickness(5, 1, 5, 1),
+                Margin = new Thickness(6, 0, 0, 0),
+                Child = new TextBlock
+                {
+                    Text = runtimeLabel,
+                    FontSize = 9,
+                    Foreground = runtimeColor,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+                VerticalAlignment = VerticalAlignment.Center,
+            });
             infoStack.Children.Add(nameRow);
 
             // 第二行: 快捷键 + 状态
@@ -532,7 +561,7 @@ namespace LongBetterWindows.Host.Views
                         Child = new TextBlock
                         {
                             Text = cap,
-                            FontSize = 10,
+                            FontSize = 11,
                             Foreground = GrayBrush,
                         },
                     });
