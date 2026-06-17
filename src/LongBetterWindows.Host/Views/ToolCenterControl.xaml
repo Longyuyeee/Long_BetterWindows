@@ -145,10 +145,11 @@
 
                 <!-- 插件列表 header + 刷新 -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <TextBlock Text="已安装插件" FontWeight="SemiBold" FontSize="13"
+                    <TextBlock x:Name="PluginsHeader" Text="已安装插件" FontWeight="SemiBold" FontSize="13"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                VerticalAlignment="Center" />
                     <Button Content="刷新" Width="48" Height="22"
+                            ToolTip="重新扫描插件目录"
                             FontSize="11" Foreground="#CCCCCC"
                             Background="#3A3A3D" BorderThickness="0"
                             Cursor="Hand" Margin="12,0,0,0"

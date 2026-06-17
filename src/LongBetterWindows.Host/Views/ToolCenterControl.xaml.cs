@@ -29,6 +29,10 @@ namespace LongBetterWindows.Host.Views
             // 默认激活「系统」标签
             ActivateTab(TabSystem);
 
+            // 同步主题按钮状态
+            var currentTheme = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme();
+            _isLightMode = currentTheme == Wpf.Ui.Appearance.ApplicationTheme.Light;
+
             // 首次运行显示欢迎横幅
             if (App.IsFirstRun())
                 WelcomeBanner.Visibility = Visibility.Visible;
@@ -54,6 +58,7 @@ namespace LongBetterWindows.Host.Views
             var ver = typeof(App).Assembly.GetName().Version;
             AboutVersion.Text = $"v{ver?.Major ?? 0}.{ver?.Minor ?? 0}.{ver?.Build ?? 0} · .NET 8.0 · WPF";
             AboutStats.Text = $"{capCount} 项原子能力 · {plugins.Count} 个插件 · 3 种运行时";
+            PluginsHeader.Text = $"已安装插件 ({plugins.Count})";
         }
 
         #region Tab Navigation
