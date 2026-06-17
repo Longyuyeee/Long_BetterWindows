@@ -67,30 +67,6 @@ namespace LongBetterWindows.Host.Services
 
         // === 多显示器支持 ===
 
-        [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT lpPoint);
-        [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFO lpmi);
-
-        const uint MONITOR_DEFAULTTONEAREST = 2;
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct POINT { public int X, Y; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RECT { public int Left, Top, Right, Bottom; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct MONITORINFO { public uint cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
-
-        /// <summary>获取鼠标光标所在显示器的工作区域（支持多屏）</summary>
-        public static RECT GetCursorMonitorWorkArea()
-        {
-            GetCursorPos(out var pt);
-            var hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-            var mi = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
-            GetMonitorInfoW(hMonitor, ref mi);
-            return mi.rcWork;
-        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

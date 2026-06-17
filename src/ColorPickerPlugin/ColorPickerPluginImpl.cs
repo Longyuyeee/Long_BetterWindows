@@ -21,7 +21,7 @@ public class ColorPickerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
     public Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
-        if (host.HotKey == null)
+        if (!host.HasCapability("system.hotkey"))
         { State = PluginState.Error; return Task.FromResult(false); }
         return Task.FromResult(true);
     }

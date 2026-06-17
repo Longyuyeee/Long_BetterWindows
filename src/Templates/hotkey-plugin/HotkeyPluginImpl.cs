@@ -23,7 +23,7 @@ public class HotkeyPluginImpl : ILongPlugin
         _host = host;
 
         // 检查能力是否已授权（必须在 manifest.capabilities 中声明）
-        if (host.HotKey == null)
+        if (!host.HasCapability("system.hotkey"))
         {
             Log.Error("[HotkeyPlugin] 未获得 system.hotkey 能力授权");
             State = PluginState.Error;

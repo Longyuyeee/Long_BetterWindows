@@ -21,7 +21,7 @@ public class QuickLaunchPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
     {
         _host = host;
 
-        if (host.HotKey == null)
+        if (!host.HasCapability("system.hotkey"))
         {
             Log.Error("[QuickLaunch] 未获得热键能力授权");
             State = PluginState.Error;

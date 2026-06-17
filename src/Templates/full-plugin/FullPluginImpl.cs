@@ -31,11 +31,11 @@ public class FullPluginImpl : ILongPlugin, IHasSettingsUI
         _host = host;
 
         // 验证所有需要的能力
-        if (host.HotKey == null)
+        if (!host.HasCapability("system.hotkey"))
             Log.Warning("[FullPlugin] system.hotkey 未授权");
-        if (host.ShellSelection == null)
+        if (!host.HasCapability("shell.selection"))
             Log.Warning("[FullPlugin] shell.selection 未授权");
-        if (host.Storage == null)
+        if (!host.HasCapability("storage.local"))
             Log.Warning("[FullPlugin] storage.local 未授权");
 
         // 从持久化配置读取热键设置
