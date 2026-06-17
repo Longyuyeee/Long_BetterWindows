@@ -51,6 +51,8 @@ namespace LongBetterWindows.Host.Views
         {
             var plugins = HostProvider.Instance.PluginStore.GetAll();
             var capCount = Engine.ManifestReader.KnownCapabilities.Count;
+            var ver = typeof(App).Assembly.GetName().Version;
+            AboutVersion.Text = $"v{ver?.Major ?? 0}.{ver?.Minor ?? 0}.{ver?.Build ?? 0} · .NET 8.0 · WPF";
             AboutStats.Text = $"{capCount} 项原子能力 · {plugins.Count} 个插件 · 3 种运行时";
         }
 

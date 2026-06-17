@@ -30,6 +30,11 @@ namespace LongBetterWindows.Host.Views
                 if (htmlPath != null && File.Exists(htmlPath))
                     _webView.CoreWebView2.Navigate(new Uri(htmlPath).AbsoluteUri);
             };
+
+            Closed += (_, _) =>
+            {
+                _webView.Dispose();
+            };
         }
 
         public static void Open(Window owner)

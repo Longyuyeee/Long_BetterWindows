@@ -80,5 +80,12 @@ namespace LongBetterWindows.Host.Services
 
             Startup = new StartupService();
         }
+
+        public static void DisposeAll()
+        {
+            (HotKey as IDisposable)?.Dispose();
+            (Http as IDisposable)?.Dispose();
+            (Storage as IDisposable)?.Dispose();
+        }
     }
 }

@@ -134,7 +134,7 @@ namespace LongBetterWindows.Host.Engine
                 "app.openFolder" => Ok(h.ShellExecute.OpenFolderAsync(Arg(args, 0))),
                 "app.openWithDefault" => Ok(h.ShellExecute.OpenWithDefaultAsync(Arg(args, 0))),
                 "app.showNotification" => Task.FromResult<object?>(UIToast(Arg(args, 0) + "\n" + Arg(args, 1))),
-                "app.getVersion" => Task.FromResult<object?>(new { version = "0.2.0" }),
+                "app.getVersion" => Task.FromResult<object?>(new { version = typeof(WebPluginRuntime).Assembly.GetName().Version?.ToString() ?? "0.4.0" }),
 
                 // === long.clipboard ===
                 "clipboard.getText" => Ok(h.Clipboard.GetTextAsync()),

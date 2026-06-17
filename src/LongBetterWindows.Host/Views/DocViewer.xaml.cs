@@ -27,6 +27,11 @@ namespace LongBetterWindows.Host.Views
             {
                 await _webView.EnsureCoreWebView2Async();
             };
+
+            Closed += (_, _) =>
+            {
+                _webView.Dispose();
+            };
         }
 
         public static void ShowDoc(Window owner, string title, string markdown)
@@ -45,10 +50,16 @@ namespace LongBetterWindows.Host.Views
 
         private async void RenderMarkdown(string markdown)
         {
-            await _webView.EnsureCoreWebView2Async();
-
-            var html = BuildHtml(title: Title, markdown: markdown);
-            _webView.CoreWebView2.NavigateToString(html);
+            try
+            {
+                await _webView.EnsureCoreWebView2Async();
+                var html = BuildHtml(title: Title, markdown: markdown);
+                _webView.CoreWebView2.NavigateToString(html);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"DocViewer render error: {ex.Message}");
+            }
         }
 
         private static string BuildHtml(string title, string markdown)

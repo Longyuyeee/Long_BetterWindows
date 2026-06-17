@@ -154,6 +154,8 @@ namespace LongBetterWindows.Host
 
         protected override void OnExit(ExitEventArgs e)
         {
+            // 清理服务资源
+            ServicesInitializer.DisposeAll();
             Log.Information("Long窗口·全能助手 已退出。");
             Log.CloseAndFlush();
             base.OnExit(e);
@@ -193,7 +195,10 @@ namespace LongBetterWindows.Host
             {
                 if (!Directory.Exists(ThemeConfigDir))
                     Directory.CreateDirectory(ThemeConfigDir);
-                File.WriteAllText(ThemeConfigPath, "{}");
+                // 写一个有效配置，让 IsFirstRun 返回 false
+                var json = System.Text.Json.JsonSerializer.Serialize(
+                    new { theme = "system", onboarded = "true" });
+                File.WriteAllText(ThemeConfigPath, json);
             }
             catch { }
         }
