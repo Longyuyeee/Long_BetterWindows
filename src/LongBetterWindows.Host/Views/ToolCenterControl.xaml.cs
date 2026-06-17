@@ -388,8 +388,14 @@ namespace LongBetterWindows.Host.Views
 
         private int _pluginCardVersion;
 
+        private void PluginSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            RefreshPluginList(); // 重新过滤渲染
+        }
+
         private void RefreshPlugins_Click(object sender, RoutedEventArgs e)
         {
+            PluginSearchBox.Text = "";
             RefreshPluginList();
         }
 
@@ -454,7 +460,30 @@ namespace LongBetterWindows.Host.Views
 
             PluginsPanel.Visibility = Visibility.Visible;
 
-            foreach (var plugin in plugins)
+            // 搜索过滤
+            var filter = PluginSearchBox?.Text.Trim().ToLowerInvariant() ?? "";
+            var filtered = string.IsNullOrEmpty(filter)
+                ? plugins
+                : plugins.Where(p => p.Manifest.Name.ToLowerInvariant().Contains(filter)).ToList();
+
+            if (filtered.Count == 0 && !string.IsNullOrEmpty(filter))
+            {
+                PluginsPanel.Children.Add(new Border
+                {
+                    Background = CardBgBrush,
+                    CornerRadius = new CornerRadius(10),
+                    Padding = new Thickness(18, 14, 18, 14),
+                    Child = new TextBlock
+                    {
+                        Text = $"没有找到匹配 "{filter}" 的插件",
+                        FontSize = 13,
+                        Foreground = GrayBrush,
+                    },
+                });
+                return;
+            }
+
+            foreach (var plugin in filtered)
             {
                 PluginsPanel.Children.Add(CreatePluginCard(plugin, version));
             }

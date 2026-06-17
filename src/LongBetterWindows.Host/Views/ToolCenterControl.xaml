@@ -143,11 +143,22 @@
             <!-- ═══════════════════════════════════════ -->
             <StackPanel x:Name="PanelPlugins" Visibility="Collapsed">
 
-                <!-- 插件列表 header + 刷新 -->
+                <!-- 插件列表 header + 搜索 + 刷新 -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                     <TextBlock x:Name="PluginsHeader" Text="已安装插件" FontWeight="SemiBold" FontSize="13"
                                Foreground="{StaticResource TextSecondaryBrush}"
                                VerticalAlignment="Center" />
+                    <TextBox x:Name="PluginSearchBox" Width="120" Height="22"
+                             FontSize="11" Margin="12,0,0,0"
+                             VerticalContentAlignment="Center"
+                             Style="{x:Null}"
+                             Background="{StaticResource CardBackgroundBrush}"
+                             Foreground="{StaticResource TextPrimaryBrush}"
+                             BorderBrush="{StaticResource DividerBrush}"
+                             BorderThickness="1"
+                             CaretBrush="{StaticResource AccentBlueBrush}"
+                             TextChanged="PluginSearch_TextChanged"
+                             ToolTip="搜索插件..." />
                     <Button Content="刷新" Width="48" Height="22"
                             ToolTip="重新扫描插件目录"
                             FontSize="11" Foreground="#CCCCCC"
