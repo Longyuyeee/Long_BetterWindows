@@ -134,6 +134,12 @@ namespace LongBetterWindows.Host.Engine
                 return new { success = false, error = $"插件未声明权限: {requiredCapability}" };
             }
 
+            // ✅ 记录 API 调用
+            if (requiredCapability != null)
+            {
+                Services.CapabilityUsageTracker.Instance.RecordApiCall(_manifest.Id, requiredCapability, method);
+            }
+
             var h = HostProvider.Instance;
 
             // ✅ 设置插件上下文以支持回滚追踪

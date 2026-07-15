@@ -843,6 +843,26 @@ namespace LongBetterWindows.Host.Views
             RefreshPluginList();
         }
 
+        private void PluginCapabilities_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not PluginEntry plugin) return;
+
+            var dialog = new Window
+            {
+                Title = $"{plugin.Manifest.Name} - 权限详情",
+                Width = 500,
+                Height = 600,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1F, 0x22)),
+                Content = new CapabilityDetailPanel(),
+            };
+
+            var panel = (CapabilityDetailPanel)dialog.Content;
+            panel.LoadCapabilities(plugin.Id, plugin.Manifest.Capabilities);
+
+            dialog.ShowDialog();
+        }
+
         private void PluginSettings_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button btn || btn.Tag is not PluginEntry entry) return;

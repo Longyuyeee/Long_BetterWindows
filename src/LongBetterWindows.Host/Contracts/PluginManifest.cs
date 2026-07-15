@@ -30,5 +30,17 @@ namespace LongBetterWindows.Host.Contracts
 
         [JsonPropertyName("default_settings")]
         public Dictionary<string, object>? DefaultSettings { get; init; }
+
+        [JsonPropertyName("dependencies")]
+        public List<PluginDependency> Dependencies { get; init; } = new();
+    }
+
+    public class PluginDependency
+    {
+        [JsonPropertyName("plugin_id")]
+        public string PluginId { get; set; } = string.Empty;
+
+        [JsonPropertyName("min_version")]
+        public string MinVersion { get; set; } = string.Empty;
     }
 }
