@@ -23,7 +23,7 @@ namespace LongBetterWindows.Host.Engine
     /// </summary>
     public class WebPluginRuntime
     {
-        private WebView2 _webView;
+        private WebView2 _webView = null!;
         private readonly string _pluginDir;
         private readonly PluginManifest _manifest;
 
@@ -125,8 +125,26 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task<object?> DispatchJsCall(string method, object?[] args)
         {
+            // ✅ 权限检查：验证插件是否声明了所需的 capability
+            var requiredCapability = GetRequiredCapability(method);
+            if (requiredCapability != null && !_manifest.Capabilities.Contains(requiredCapability))
+            {
+                Log.Warning("[Web:{Id}] 权限拒绝: {Method} 需要 {Capability}",
+                    _manifest.Id, method, requiredCapability);
+                return new { success = false, error = $"插件未声明权限: {requiredCapability}" };
+            }
+
             var h = HostProvider.Instance;
 
+            // ✅ 设置插件上下文以支持回滚追踪
+            using (PluginAccessContext.Enter(_manifest.Id))
+            {
+                return await DispatchJsCallInternal(method, args, h);
+            }
+        }
+
+        private async Task<object?> DispatchJsCallInternal(string method, object?[] args, IHostApi h)
+        {
             return method switch
             {
                 // === long.app ===
@@ -188,6 +206,9 @@ namespace LongBetterWindows.Host.Engine
 
                 // === long.ui ===
                 "ui.showToast" => Task.FromResult<object?>(UIToast(Arg(args, 0))),
+                "ui.createWindow" => await UICreateWindow(args),
+                "ui.closeWindow" => Ok(h.UI.CloseWindowAsync(Arg(args, 0))),
+                "ui.sendMessage" => Ok(h.UI.SendMessageToWindowAsync(Arg(args, 0), Arg(args, 1))),
 
                 // === long.screenshot ===
                 "screenshot.captureFull" => Ok(h.ScreenCapture.CaptureFullScreenAsync()),
@@ -196,6 +217,72 @@ namespace LongBetterWindows.Host.Engine
                 _ => Task.FromResult<object?>(new { success = false, error = $"未知方法: {method}" }),
             };
         }
+
+        /// <summary>
+        /// 获取调用指定方法所需的 capability
+        /// </summary>
+        private static string? GetRequiredCapability(string method) => method switch
+        {
+            // 文件系统 ADS
+            "fs.ads.read" or "fs.ads.write" or "fs.ads.delete" or "fs.ads.exists" or "fs.ads.isNTFS"
+                => "fs.ads.access",
+
+            // 注册表
+            "registry.read" or "registry.write" or "registry.delete"
+                => "system.registry.write",
+
+            // 热键
+            "hotkey.register" or "hotkey.unregister" or "hotkey.isConflict"
+                => "system.hotkey",
+
+            // 剪贴板
+            "clipboard.getText" or "clipboard.setText" or "clipboard.clear"
+                => "system.clipboard",
+
+            // Shell 选择
+            "shell.getActiveFolder" or "shell.getSelectedItems" or "shell.getItemScreenRect"
+                => "shell.selection",
+
+            // 网络 HTTP
+            "http.get" or "http.post" or "http.download"
+                => "network.http",
+
+            // 本地存储（无需声明，所有插件都可用）
+            "storage.get" or "storage.set" or "storage.delete" or "storage.containsKey"
+                => null,
+
+            // 通知
+            "app.showNotification" or "ui.showToast"
+                => "system.notification",
+
+            // 截图
+            "screenshot.captureFull" or "screenshot.captureRegion"
+                => "system.screenshot",
+
+            // Shell 执行
+            "app.openUrl" or "shell.openUrl"
+                => "shell.execute.url",
+            "app.openFolder" or "shell.openFolder" or "app.openWithDefault" or "shell.openWithDefault"
+                => "shell.execute",
+
+            // 文件操作
+            "shell.listFiles" or "shell.renameFile"
+                => "file.ops",
+
+            // 窗口信息
+            "window.getForeground"
+                => "window.info",
+
+            // UI 窗口
+            "ui.createWindow" or "ui.closeWindow" or "ui.sendMessage"
+                => "ui.window",
+
+            // 应用信息（无需权限）
+            "app.getVersion"
+                => null,
+
+            _ => null
+        };
 
         // 辅助方法
         private static string Arg(object?[] args, int i, string def = "") =>
@@ -325,6 +412,18 @@ namespace LongBetterWindows.Host.Engine
             return new { r.IsSuccess, error = r.ErrorMessage };
         }
 
+        private async Task<object> UICreateWindow(object?[] args)
+        {
+            var title = Arg(args, 0);
+            var htmlContent = Arg(args, 1);
+            var width = args.Length > 2 ? int.Parse(Arg(args, 2, "600")) : 600;
+            var height = args.Length > 3 ? int.Parse(Arg(args, 3, "400")) : 400;
+            var resizable = args.Length > 4 ? bool.Parse(Arg(args, 4, "true")) : true;
+
+            var r = await HostProvider.Instance.UI.CreateWindowAsync(title, htmlContent, width, height, resizable);
+            return new { r.IsSuccess, data = r.Data, error = r.ErrorMessage };
+        }
+
         private static string BuildJsBridge(IHostApi host, string pluginId)
         {
             var js = @"
@@ -384,7 +483,10 @@ window.long = {
     containsKey: function(k){return call('storage.containsKey',[k]);}
   },
   ui: {
-    showToast: function(m){return call('ui.showToast',[m]);}
+    showToast: function(m){return call('ui.showToast',[m]);},
+    createWindow: function(title,htmlContent,width,height,resizable){return call('ui.createWindow',[title,htmlContent,width,height,resizable]);},
+    closeWindow: function(windowId){return call('ui.closeWindow',[windowId]);},
+    sendMessage: function(windowId,message){return call('ui.sendMessage',[windowId,message]);}
   },
   screenshot: {
     captureFull: function(){return call('screenshot.captureFull',[]);},

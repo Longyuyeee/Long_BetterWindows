@@ -110,6 +110,8 @@ namespace LongBetterWindows.Host.Engine
                 return "network.http";
             if (typeof(T) == typeof(IShellExecuteService))
                 return "shell.execute";
+            if (typeof(T) == typeof(IUICapability))
+                return "ui.window";
             return null;
         }
 
@@ -127,5 +129,6 @@ namespace LongBetterWindows.Host.Engine
         public IProcessService Process => GetService<IProcessService>();
         public IHttpService Http => GetService<IHttpService>();
         public IShellExecuteService ShellExecute => GetService<IShellExecuteService>();
+        public IUICapability UI => GetService<IUICapability>();
     }
 }

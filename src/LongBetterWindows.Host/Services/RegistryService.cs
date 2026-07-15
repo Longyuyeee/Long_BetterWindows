@@ -135,11 +135,39 @@ namespace LongBetterWindows.Host.Services
             return _rollback.RollbackAsync(pluginId);
         }
 
+        /// <summary>
+        /// 解析并验证注册表键路径，防止路径遍历攻击
+        /// </summary>
         private static string ResolveKeyPath(string key)
         {
-            return string.IsNullOrEmpty(key)
-                ? RootKeyPath
-                : $@"{RootKeyPath}\{key.Trim('\\')}";
+            if (string.IsNullOrEmpty(key))
+                return RootKeyPath;
+
+            var trimmedKey = key.Trim('\\');
+
+            // ✅ 防止路径遍历
+            if (trimmedKey.Contains(".."))
+            {
+                Log.Warning("检测到注册表路径遍历尝试: {Key}", key);
+                throw new ArgumentException("注册表键路径不能包含 '..'");
+            }
+
+            // ✅ 防止绝对路径
+            if (System.IO.Path.IsPathRooted(trimmedKey) ||
+                trimmedKey.StartsWith("HKEY_", StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Warning("检测到绝对注册表路径尝试: {Key}", key);
+                throw new ArgumentException("注册表键路径必须是相对路径");
+            }
+
+            // ✅ 验证字符合法性（只允许字母、数字、下划线、连字符、反斜杠）
+            if (!System.Text.RegularExpressions.Regex.IsMatch(trimmedKey, @"^[a-zA-Z0-9_\-\\]+$"))
+            {
+                Log.Warning("检测到非法字符的注册表路径: {Key}", key);
+                throw new ArgumentException("注册表键路径包含非法字符");
+            }
+
+            return $@"{RootKeyPath}\{trimmedKey}";
         }
     }
 }

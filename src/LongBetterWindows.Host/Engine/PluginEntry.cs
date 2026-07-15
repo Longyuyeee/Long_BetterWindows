@@ -15,11 +15,11 @@ namespace LongBetterWindows.Host.Engine
 
         public string Id => Manifest.Id;
         public PluginManifest Manifest { get; }
-        public ILongPlugin Instance { get; }
+        public object Instance { get; }
         public PluginState State { get; set; } = PluginState.Loaded;
         public string Directory { get; }
 
-        public PluginEntry(PluginManifest manifest, ILongPlugin instance, string directory)
+        public PluginEntry(PluginManifest manifest, object instance, string directory)
         {
             Manifest = manifest;
             Instance = instance;

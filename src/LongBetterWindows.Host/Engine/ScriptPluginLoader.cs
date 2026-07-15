@@ -32,18 +32,21 @@ namespace LongBetterWindows.Host.Engine
                 var code = await File.ReadAllTextAsync(scriptPath);
                 var host = HostProvider.Instance;
 
-                // 创建脚本选项，引用宿主程序集以访问类型
+                // ✅ 创建受限的脚本选项
+                // 只引用宿主程序集，不允许加载其他程序集
                 var options = ScriptOptions.Default
                     .WithReferences(
                         typeof(IHostApi).Assembly,
                         typeof(PluginState).Assembly)
                     .WithImports(
-                        "System",
+                        // 只导入安全的命名空间，避免导入危险类型
                         "System.Threading.Tasks",
                         "LongBetterWindows.Host.Core",
                         "LongBetterWindows.Host.Capabilities",
-                        "LongBetterWindows.Host.Contracts",
-                        "Serilog");
+                        "LongBetterWindows.Host.Contracts")
+                    // 注意：不导入 System.IO, System.Diagnostics, System.Net, System.Reflection
+                    // 脚本必须通过 Host API 访问系统功能
+                    .WithMetadataResolver(new RestrictedMetadataReferenceResolver());
 
                 var script = CSharpScript.Create(code, options,
                     globalsType: typeof(ScriptGlobals));

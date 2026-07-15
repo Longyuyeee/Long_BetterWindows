@@ -35,7 +35,7 @@ namespace LongBetterWindows.Host.Engine
             }
         }
 
-        public bool Register(PluginManifest manifest, ILongPlugin instance, PluginLoadContext? context, string directory)
+        public bool Register(PluginManifest manifest, object instance, PluginLoadContext? context, string directory)
         {
             lock (_lock)
             {
@@ -117,14 +117,25 @@ namespace LongBetterWindows.Host.Engine
             {
                 using (PluginAccessContext.Enter(pluginId))
                 {
-                    var ok = await entry.Instance.StartAsync();
-                    if (ok)
+                    if (entry.Instance is ILongPlugin plugin)
                     {
+                        var ok = await plugin.StartAsync();
+                        if (ok)
+                        {
+                            SetState(pluginId, PluginState.Running);
+                            entry.SetSetting("auto_start", "true");
+                            Log.Information("插件 {PluginId} 已启用", pluginId);
+                        }
+                        return ok;
+                    }
+                    else
+                    {
+                        // WebPluginRuntime 等非 ILongPlugin 类型，默认已运行
                         SetState(pluginId, PluginState.Running);
                         entry.SetSetting("auto_start", "true");
                         Log.Information("插件 {PluginId} 已启用", pluginId);
+                        return true;
                     }
-                    return ok;
                 }
             }
             catch (Exception ex)
@@ -149,7 +160,10 @@ namespace LongBetterWindows.Host.Engine
             {
                 using (PluginAccessContext.Enter(pluginId))
                 {
-                    await entry.Instance.StopAsync();
+                    if (entry.Instance is ILongPlugin plugin)
+                    {
+                        await plugin.StopAsync();
+                    }
                 }
                 SetState(pluginId, PluginState.Disabled);
                 entry.SetSetting("auto_start", "false");

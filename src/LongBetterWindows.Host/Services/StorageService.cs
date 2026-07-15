@@ -1,7 +1,9 @@
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
+using Serilog;
 
 namespace LongBetterWindows.Host.Services
 {
@@ -131,11 +133,40 @@ namespace LongBetterWindows.Host.Services
             return new Dictionary<string, string>();
         }
 
+        /// <summary>
+        /// 保存数据到文件，使用原子写入防止数据损坏
+        /// </summary>
         private void Save()
         {
-            var json = JsonSerializer.Serialize(_data,
-                new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_filePath, json);
+            // ✅ 在锁外进行 JSON 序列化，减少锁持有时间
+            string json;
+            _lock.EnterReadLock();
+            try
+            {
+                json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+
+            // ✅ 使用原子写入：先写临时文件，再替换
+            var tempFile = _filePath + ".tmp";
+            try
+            {
+                File.WriteAllText(tempFile, json, Encoding.UTF8);
+                File.Move(tempFile, _filePath, overwrite: true);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "保存存储数据失败: {FilePath}", _filePath);
+                // 清理临时文件
+                if (File.Exists(tempFile))
+                {
+                    try { File.Delete(tempFile); } catch { }
+                }
+                throw;
+            }
         }
 
         public void Dispose()

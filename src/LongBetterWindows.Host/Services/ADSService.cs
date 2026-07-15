@@ -256,9 +256,28 @@ namespace LongBetterWindows.Host.Services
             });
         }
 
+        /// <summary>
+        /// 构建 ADS 路径，验证流名称安全性
+        /// </summary>
         private static string BuildAdsPath(string filePath, string streamName)
         {
             var name = string.IsNullOrEmpty(streamName) ? DefaultStreamName : streamName;
+
+            // ✅ 验证流名称安全性
+            if (name.Contains(':') || name.Contains('\\') || name.Contains('/') ||
+                name.Contains("..") || name.Contains('<') || name.Contains('>') ||
+                name.Contains('|') || name.Contains('*') || name.Contains('?'))
+            {
+                Log.Warning("检测到非法的 ADS 流名称: {StreamName}", streamName);
+                throw new ArgumentException("ADS 流名称包含非法字符");
+            }
+
+            // ✅ 限制流名称长度
+            if (name.Length > 255)
+            {
+                throw new ArgumentException("ADS 流名称过长（最大 255 字符）");
+            }
+
             return $"{filePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)}:{name}";
         }
 

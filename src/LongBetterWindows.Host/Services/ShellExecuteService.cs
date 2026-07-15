@@ -17,6 +17,19 @@ namespace LongBetterWindows.Host.Services
                     if (string.IsNullOrWhiteSpace(url))
                         return HostApiResponse.Failure(ApiErrorCode.InvalidArgument, "URL 不能为空");
 
+                    // ✅ 安全验证：只允许安全的 URL 协议
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                        return HostApiResponse.Failure(ApiErrorCode.InvalidArgument, "无效的 URL 格式");
+
+                    var allowedSchemes = new[] { "http", "https", "mailto" };
+                    if (!allowedSchemes.Contains(uri.Scheme.ToLowerInvariant()))
+                    {
+                        Log.Warning("拒绝打开不安全的 URL 协议: {Scheme} ({Url})", uri.Scheme, url);
+                        return HostApiResponse.Failure(
+                            ApiErrorCode.InvalidArgument,
+                            $"不支持的协议: {uri.Scheme}。仅允许 http、https、mailto");
+                    }
+
                     Process.Start(new ProcessStartInfo
                     {
                         FileName = url,

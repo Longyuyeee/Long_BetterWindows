@@ -24,5 +24,6 @@ namespace LongBetterWindows.Host.Core
         IProcessService Process { get; }
         IHttpService Http { get; }
         IShellExecuteService ShellExecute { get; }
+        IUICapability UI { get; }
     }
 }

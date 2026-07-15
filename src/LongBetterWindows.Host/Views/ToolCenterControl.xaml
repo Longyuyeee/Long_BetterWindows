@@ -143,6 +143,33 @@
             <!-- ═══════════════════════════════════════ -->
             <StackPanel x:Name="PanelPlugins" Visibility="Collapsed">
 
+                <!-- 拖放区域（热插拔安装） -->
+                <Border x:Name="DropZone"
+                        Background="#1A1A1D"
+                        BorderBrush="#3A3A3D"
+                        BorderThickness="2"
+                        CornerRadius="8"
+                        Padding="20,16"
+                        Margin="0,0,0,16"
+                        AllowDrop="True"
+                        Drop="DropZone_Drop"
+                        DragEnter="DropZone_DragEnter"
+                        DragLeave="DropZone_DragLeave"
+                        DragOver="DropZone_DragOver">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="📦" FontSize="20" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="拖放 .csx / .js / .ts 或 .lpak 文件到这里"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="单文件脚本即刻生效 · 支持 C# / JavaScript / TypeScript"
+                                       FontSize="10"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       Margin="0,2,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <!-- 插件列表 header + 搜索 + 刷新 -->
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                     <TextBlock x:Name="PluginsHeader" Text="已安装插件" FontWeight="SemiBold" FontSize="13"
@@ -183,6 +210,24 @@
             <StackPanel x:Name="PanelDev" Visibility="Collapsed">
 
                 <WrapPanel ItemWidth="215">
+                <!-- 快速创建脚本 -->
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="✨ 新建脚本" Style="{StaticResource CardTitleStyle}" />
+                            <TextBlock Text="快速创建 C# / JS / TS 脚本插件"
+                                       Style="{StaticResource CardDescStyle}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="创建"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Click="CreateScript_Click" />
+                    </Grid>
+                </Border>
+
                 <!-- 插件开发工具 -->
                 <Border Style="{StaticResource CardBorderStyle}">
                     <Grid>

@@ -87,17 +87,45 @@ namespace LongBetterWindows.Host.Views
                 (TabDev, PanelDev)
             };
 
+            // ✅ 找到当前显示的面板，先淡出
+            StackPanel? oldPanel = null;
+            StackPanel? newPanel = null;
+
             foreach (var (tabBtn, panel) in panels)
             {
+                if (panel.Visibility == Visibility.Visible && tabBtn != tab)
+                    oldPanel = panel;
                 if (tabBtn == tab)
+                    newPanel = panel;
+            }
+
+            if (newPanel == null) return;
+
+            // 如果有旧面板，先淡出再切换
+            if (oldPanel != null)
+            {
+                var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(150))
                 {
-                    panel.Visibility = Visibility.Visible;
-                    Helpers.AnimationHelper.FadeInElement(panel, durationMs: 180);
-                }
-                else
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+                };
+
+                fadeOut.Completed += (s, e) =>
                 {
-                    panel.Visibility = Visibility.Collapsed;
-                }
+                    oldPanel.Visibility = Visibility.Collapsed;
+                    oldPanel.Opacity = 1; // 恢复透明度
+
+                    // 显示新面板并淡入
+                    newPanel.Visibility = Visibility.Visible;
+                    Helpers.AnimationHelper.FadeInElement(newPanel, durationMs: 200);
+                };
+
+                oldPanel.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            }
+            else
+            {
+                // 没有旧面板，直接显示
+                newPanel.Visibility = Visibility.Visible;
+                Helpers.AnimationHelper.FadeInElement(newPanel, durationMs: 200);
             }
         }
 
@@ -489,7 +517,7 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
-        private Border CreatePluginCard(PluginEntry plugin, int version)
+        private UIElement CreatePluginCard(PluginEntry plugin, int version)
         {
             var isRunning = plugin.State == Core.PluginState.Running;
             var stateColor = isRunning ? GreenBrush : GrayBrush;
@@ -680,47 +708,105 @@ namespace LongBetterWindows.Host.Views
             grid.Children.Add(infoStack);
             grid.Children.Add(btnPanel);
 
+            // 创建主卡片容器（包含状态条）
+            var cardContainer = new Grid
+            {
+                Margin = new Thickness(0, 0, 0, 10),
+            };
+
+            // 顶部彩色状态条
+            var statusBar = new Border
+            {
+                Height = 3,
+                VerticalAlignment = VerticalAlignment.Top,
+                CornerRadius = new CornerRadius(10, 10, 0, 0),
+            };
+
+            // 根据运行状态设置渐变颜色
+            if (isRunning)
+            {
+                var gradient = new LinearGradientBrush
+                {
+                    StartPoint = new Point(0, 0),
+                    EndPoint = new Point(1, 0),
+                };
+                gradient.GradientStops.Add(new GradientStop(Color.FromRgb(0x10, 0xB9, 0x81), 0));
+                gradient.GradientStops.Add(new GradientStop(Color.FromRgb(0x34, 0xD3, 0x99), 1));
+                statusBar.Background = gradient;
+            }
+            else
+            {
+                statusBar.Background = new SolidColorBrush(Color.FromRgb(0x4B, 0x55, 0x63));
+            }
+
+            // 主卡片
             var card = new Border
             {
                 Background = CardBgBrush,
                 CornerRadius = new CornerRadius(10),
                 Padding = new Thickness(18, 14, 18, 14),
-                Margin = new Thickness(0, 0, 0, 10),
                 Child = grid,
                 RenderTransformOrigin = new Point(0.5, 0.5),
                 RenderTransform = new TranslateTransform(0, 0),
                 Cursor = Cursors.Hand,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Colors.Black,
+                    BlurRadius = 16,
+                    ShadowDepth = 2,
+                    Opacity = 0.25,
+                    Direction = 270,
+                },
             };
 
-            // ♥ 卡片 hover 微动效 — 轻微上浮 + 背景变亮
+            cardContainer.Children.Add(card);
+            cardContainer.Children.Add(statusBar);
+
+            // ♥ 卡片 hover 微动效 — 轻微上浮 + 背景变亮 + 阴影增强
             card.MouseEnter += (_, _) =>
             {
-                var upAnim = new DoubleAnimation(0, -2, TimeSpan.FromMilliseconds(150))
+                var upAnim = new DoubleAnimation(0, -3, TimeSpan.FromMilliseconds(200))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 };
                 var bgAnim = new ColorAnimation(
                     ((SolidColorBrush)CardBgBrush).Color,
-                    Color.FromRgb(0x35, 0x35, 0x38),
-                    TimeSpan.FromMilliseconds(150));
+                    Color.FromRgb(0x38, 0x38, 0x3C),
+                    TimeSpan.FromMilliseconds(200));
+
+                // 增强阴影效果
+                if (card.Effect is System.Windows.Media.Effects.DropShadowEffect shadow)
+                {
+                    var shadowAnim = new DoubleAnimation(0.25, 0.4, TimeSpan.FromMilliseconds(200));
+                    shadow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, shadowAnim);
+                }
+
                 ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.YProperty, upAnim);
                 card.Background.BeginAnimation(SolidColorBrush.ColorProperty, bgAnim);
             };
             card.MouseLeave += (_, _) =>
             {
-                var downAnim = new DoubleAnimation(-2, 0, TimeSpan.FromMilliseconds(200))
+                var downAnim = new DoubleAnimation(-3, 0, TimeSpan.FromMilliseconds(250))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 };
                 var bgAnim = new ColorAnimation(
-                    Color.FromRgb(0x35, 0x35, 0x38),
+                    Color.FromRgb(0x38, 0x38, 0x3C),
                     ((SolidColorBrush)CardBgBrush).Color,
-                    TimeSpan.FromMilliseconds(200));
+                    TimeSpan.FromMilliseconds(250));
+
+                // 恢复阴影效果
+                if (card.Effect is System.Windows.Media.Effects.DropShadowEffect shadow)
+                {
+                    var shadowAnim = new DoubleAnimation(0.4, 0.25, TimeSpan.FromMilliseconds(250));
+                    shadow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, shadowAnim);
+                }
+
                 ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.YProperty, downAnim);
                 card.Background.BeginAnimation(SolidColorBrush.ColorProperty, bgAnim);
             };
 
-            return card;
+            return cardContainer;
         }
 
         private async void PluginToggle_Click(object sender, RoutedEventArgs e)
@@ -787,6 +873,220 @@ namespace LongBetterWindows.Host.Views
                 System.Diagnostics.Debug.WriteLine($"Settings UI error: {ex.Message}");
             }
         }
+
+        #region Drag & Drop Installation
+
+        private void DropZone_DragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+                DropZone.BorderBrush = (Brush)FindResource("AccentBlueBrush");
+                DropZone.Background = new SolidColorBrush(Color.FromArgb(30, 102, 126, 234));
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+        }
+
+        private void DropZone_DragLeave(object sender, DragEventArgs e)
+        {
+            DropZone.BorderBrush = new SolidColorBrush(Color.FromArgb(255, 58, 58, 61));
+            DropZone.Background = new SolidColorBrush(Color.FromArgb(255, 26, 26, 29));
+        }
+
+        private void DropZone_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+            e.Handled = true;
+        }
+
+        private void DropZone_Drop(object sender, DragEventArgs e)
+        {
+            DropZone_DragLeave(sender, e);
+
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+                return;
+
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files == null || files.Length == 0)
+                return;
+
+            foreach (var file in files)
+            {
+                var ext = Path.GetExtension(file).ToLowerInvariant();
+
+                if (ext == ".csx" || ext == ".js" || ext == ".ts")
+                {
+                    try
+                    {
+                        var pluginsDir = Path.Combine(AppContext.BaseDirectory, "Plugins");
+                        if (!Directory.Exists(pluginsDir))
+                            Directory.CreateDirectory(pluginsDir);
+
+                        var destPath = Path.Combine(pluginsDir, Path.GetFileName(file));
+                        File.Copy(file, destPath, overwrite: true);
+
+                        FloatingHudWindow.ShowToast($"✅ {Path.GetFileName(file)} 已添加\n稍后自动加载...");
+                    }
+                    catch (Exception ex)
+                    {
+                        FloatingHudWindow.ShowToast($"❌ 复制失败: {ex.Message}");
+                    }
+                }
+                else if (ext == ".lpak")
+                {
+                    _ = InstallLpakAsync(file);
+                }
+                else
+                {
+                    FloatingHudWindow.ShowToast($"⚠️ 不支持的文件类型: {ext}");
+                }
+            }
+        }
+
+        private void CreateScript_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ScriptCreationDialog();
+            if (dialog.ShowDialog() == true)
+            {
+                var scriptPath = dialog.ScriptPath;
+                var template = dialog.SelectedTemplate;
+                var language = dialog.SelectedLanguage;
+
+                try
+                {
+                    var pluginsDir = Path.Combine(AppContext.BaseDirectory, "Plugins");
+                    if (!Directory.Exists(pluginsDir))
+                        Directory.CreateDirectory(pluginsDir);
+
+                    var content = GetScriptTemplate(template, language);
+                    var ext = language switch
+                    {
+                        "C#" => ".csx",
+                        "JavaScript" => ".js",
+                        "TypeScript" => ".ts",
+                        _ => ".js"
+                    };
+
+                    var fileName = $"{scriptPath}{ext}";
+                    var fullPath = Path.Combine(pluginsDir, fileName);
+
+                    File.WriteAllText(fullPath, content);
+
+                    FloatingHudWindow.ShowToast($"✅ {fileName} 已创建\n稍后自动加载...");
+
+                    // 打开编辑器（如果需要）
+                    if (dialog.OpenInEditor)
+                    {
+                        DevTools_Click(sender, e);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FloatingHudWindow.ShowToast($"❌ 创建失败: {ex.Message}");
+                }
+            }
+        }
+
+        private string GetScriptTemplate(string template, string language)
+        {
+            if (language == "C#")
+            {
+                return template switch
+                {
+                    "热键插件" => @"// 热键插件示例
+await Host.HotKey.RegisterAsync(""Ctrl+Shift+T"", async () => {
+    var time = DateTime.Now.ToString(""HH:mm:ss"");
+    await Host.Clipboard.SetTextAsync(time);
+    await Host.Notification.ShowAsync(""时间: "" + time, ""success"");
+});",
+                    "笔记插件" => @"// 笔记插件 - 为选中的文件添加备注
+await Host.HotKey.RegisterAsync(""Ctrl+Shift+N"", async () => {
+    var items = await Host.ShellSelection.GetSelectedItemsAsync();
+    if (items.IsSuccess && items.Data.Count > 0)
+    {
+        var filePath = items.Data[0];
+        // TODO: 打开笔记编辑界面
+        await Host.Notification.ShowAsync(""笔记功能开发中"", ""info"");
+    }
+});",
+                    _ => @"// 空白脚本
+await Host.Notification.ShowAsync(""Hello from C# script!"", ""success"");
+"
+                };
+            }
+            else // JavaScript/TypeScript
+            {
+                return template switch
+                {
+                    "热键插件" => @"// 热键插件示例
+long.hotkey.register('Ctrl+Shift+T', async () => {
+    const time = new Date().toLocaleString('zh-CN');
+    await long.clipboard.setText(time);
+    await long.notification.show(`⏰ ${time}`, 'success');
+});
+console.log('⏰ 时间插件已加载');",
+                    "笔记插件" => @"// 笔记插件 - 为选中的文件添加备注
+long.hotkey.register('Ctrl+Shift+N', async () => {
+    const items = await long.shell.getSelectedItems();
+    if (items.success && items.data.length > 0) {
+        const filePath = items.data[0];
+        // TODO: 打开笔记编辑界面
+        await long.notification.show('笔记功能开发中', 'info');
+    }
+});
+console.log('📝 笔记插件已加载');",
+                    _ => @"// 空白脚本
+long.notification.show('Hello from JavaScript!', 'success');
+console.log('插件已加载');
+"
+                };
+            }
+        }
+
+        private async Task InstallLpakAsync(string lpakFilePath)
+        {
+            try
+            {
+                var pluginsDir = Path.Combine(AppContext.BaseDirectory, "Plugins");
+                if (!Directory.Exists(pluginsDir))
+                    Directory.CreateDirectory(pluginsDir);
+
+                var installer = new Services.LpakInstallerService(pluginsDir);
+
+                FloatingHudWindow.ShowToast($"📦 正在安装 {Path.GetFileName(lpakFilePath)}...");
+
+                var result = await installer.InstallAsync(lpakFilePath);
+
+                if (result.IsSuccess && result.Manifest != null)
+                {
+                    FloatingHudWindow.ShowToast(
+                        $"✅ {result.Manifest.Name} 安装成功\n" +
+                        $"版本: {result.Manifest.Version}\n" +
+                        $"稍后自动加载...");
+                }
+                else
+                {
+                    FloatingHudWindow.ShowToast($"❌ 安装失败\n{result.ErrorMessage}");
+                }
+            }
+            catch (Exception ex)
+            {
+                FloatingHudWindow.ShowToast($"❌ 安装失败: {ex.Message}");
+                Serilog.Log.Error(ex, "安装 .lpak 失败");
+            }
+        }
+
+        #endregion
 
         private class ToggleState
         {

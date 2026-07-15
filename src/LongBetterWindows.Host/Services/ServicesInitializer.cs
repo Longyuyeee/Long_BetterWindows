@@ -22,6 +22,7 @@ namespace LongBetterWindows.Host.Services
         public static ProcessService Process { get; private set; } = null!;
         public static HttpService Http { get; private set; } = null!;
         public static ShellExecuteService ShellExecute { get; private set; } = null!;
+        public static UIService UI { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
 
         public static void Initialize()
@@ -75,6 +76,9 @@ namespace LongBetterWindows.Host.Services
 
             ShellExecute = new ShellExecuteService();
             provider.RegisterService<IShellExecuteService>(ShellExecute);
+
+            UI = new UIService();
+            provider.RegisterService<IUICapability>(UI);
 
             // I18nService 预留，待国际化时启用
             // I18nService.Initialize();

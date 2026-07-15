@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Compression;
+using LongBetterWindows.Host.Core;
 using Serilog;
 
 namespace LongBetterWindows.Host.Engine
@@ -129,10 +130,13 @@ namespace LongBetterWindows.Host.Engine
             {
                 try
                 {
-                    var stopTask = entry.Instance.StopAsync();
-                    // 最多等待 1 秒，避免死锁
-                    if (await Task.WhenAny(stopTask, Task.Delay(1000)) != stopTask)
-                        Log.Warning("插件 {PluginId} 停止超时", pluginId);
+                    if (entry.Instance is ILongPlugin plugin)
+                    {
+                        var stopTask = plugin.StopAsync();
+                        // 最多等待 1 秒，避免死锁
+                        if (await Task.WhenAny(stopTask, Task.Delay(1000)) != stopTask)
+                            Log.Warning("插件 {PluginId} 停止超时", pluginId);
+                    }
                 }
                 catch (Exception ex)
                 {
