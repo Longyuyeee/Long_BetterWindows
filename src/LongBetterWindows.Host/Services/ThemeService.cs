@@ -79,14 +79,14 @@ public class ThemeService
 
     private void LoadThemePreference()
     {
-        var storage = StorageService.Instance;
+        var storage = new StorageService();
         _isLightTheme = storage.Get("theme.isLight", false);
         ApplyTheme(_isLightTheme);
     }
 
     private void SaveThemePreference()
     {
-        var storage = StorageService.Instance;
+        var storage = new StorageService();
         storage.Set("theme.isLight", _isLightTheme);
     }
 
