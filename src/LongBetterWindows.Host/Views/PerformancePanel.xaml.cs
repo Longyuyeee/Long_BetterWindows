@@ -95,8 +95,11 @@ namespace LongBetterWindows.Host.Views
             if (width <= 0 || height <= 0)
                 return;
 
-            var maxValue = Math.Max(cpuHistory.Max(), 10); // 至少显示 10%
+            var maxValue = Math.Max(cpuHistory.Max(), 10);
             var stepX = width / (cpuHistory.Count - 1);
+
+            // 绘制网格线
+            DrawGridLines(width, height);
 
             // 绘制折线
             var polyline = new Polyline
@@ -115,16 +118,41 @@ namespace LongBetterWindows.Host.Views
 
             CpuChartCanvas.Children.Add(polyline);
 
-            // 绘制区域填充
+            // 绘制渐变填充
             var polygon = new Polygon
             {
-                Fill = new SolidColorBrush(Color.FromArgb(30, 59, 130, 246)),
+                Fill = new LinearGradientBrush(
+                    Color.FromArgb(80, 59, 130, 246),
+                    Color.FromArgb(10, 59, 130, 246),
+                    new Point(0, 0),
+                    new Point(0, 1)),
                 Points = new PointCollection(polyline.Points)
             };
             polygon.Points.Add(new Point(width, height));
             polygon.Points.Add(new Point(0, height));
 
             CpuChartCanvas.Children.Insert(0, polygon);
+        }
+
+        private void DrawGridLines(double width, double height)
+        {
+            var gridBrush = new SolidColorBrush(Color.FromArgb(30, 148, 163, 184));
+
+            // 横线（每 20%）
+            for (int i = 1; i <= 4; i++)
+            {
+                var y = height * i / 5.0;
+                var line = new Line
+                {
+                    X1 = 0,
+                    Y1 = y,
+                    X2 = width,
+                    Y2 = y,
+                    Stroke = gridBrush,
+                    StrokeThickness = 1
+                };
+                CpuChartCanvas.Children.Add(line);
+            }
         }
 
         private void RefreshPluginPerformance()
