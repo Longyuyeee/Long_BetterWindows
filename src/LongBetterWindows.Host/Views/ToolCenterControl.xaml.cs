@@ -49,6 +49,238 @@ namespace LongBetterWindows.Host.Views
                     UpdateAboutInfo();
                 });
             };
+
+            // 启动时检查插件更新
+            CheckPluginUpdatesAsync();
+        }
+
+        private async void CheckPluginUpdatesAsync()
+        {
+            try
+            {
+                var updates = await PluginUpdateService.CheckUpdatesAsync();
+                if (updates.Count > 0)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        // 显示更新提示横幅
+                        ShowUpdateBanner(updates.Count);
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "检查插件更新失败");
+            }
+        }
+
+        private void ShowUpdateBanner(int updateCount)
+        {
+            // 创建更新提示横幅（在插件列表顶部）
+            if (PluginsPanel.Children.Count > 0 &&
+                PluginsPanel.Children[0] is Border banner &&
+                banner.Tag?.ToString() == "UpdateBanner")
+            {
+                return; // 已存在，不重复显示
+            }
+
+            var updateBanner = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(59, 130, 246)),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(16, 12, 16, 12),
+                Margin = new Thickness(0, 0, 0, 16),
+                Tag = "UpdateBanner"
+            };
+
+            var stack = new StackPanel { Orientation = Orientation.Horizontal };
+
+            var icon = new TextBlock
+            {
+                Text = "🔄",
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+
+            var text = new TextBlock
+            {
+                Text = $"发现 {updateCount} 个插件更新可用",
+                Foreground = Brushes.White,
+                FontSize = 14,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 16, 0)
+            };
+
+            var updateBtn = new Button
+            {
+                Content = "查看更新",
+                Background = new SolidColorBrush(Color.FromRgb(37, 99, 235)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(12, 4, 12, 4),
+                Cursor = Cursors.Hand,
+                FontSize = 13
+            };
+            updateBtn.Click += ShowUpdateDialog_Click;
+
+            var closeBtn = new Button
+            {
+                Content = "✕",
+                Background = Brushes.Transparent,
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(8, 4, 8, 4),
+                Cursor = Cursors.Hand,
+                FontSize = 14,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            closeBtn.Click += (s, e) => PluginsPanel.Children.Remove(updateBanner);
+
+            stack.Children.Add(icon);
+            stack.Children.Add(text);
+            stack.Children.Add(updateBtn);
+            stack.Children.Add(closeBtn);
+
+            updateBanner.Child = stack;
+            PluginsPanel.Children.Insert(0, updateBanner);
+        }
+
+        private async void ShowUpdateDialog_Click(object sender, RoutedEventArgs e)
+        {
+            var updates = await PluginUpdateService.CheckUpdatesAsync();
+
+            var dialog = new Window
+            {
+                Title = "插件更新",
+                Width = 500,
+                Height = 400,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Window.GetWindow(this),
+                Background = new SolidColorBrush(Color.FromRgb(15, 23, 42))
+            };
+
+            var mainStack = new StackPanel { Margin = new Thickness(20) };
+
+            var header = new TextBlock
+            {
+                Text = $"发现 {updates.Count} 个插件更新",
+                FontSize = 18,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+            mainStack.Children.Add(header);
+
+            var scrollViewer = new ScrollViewer
+            {
+                Height = 250,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            };
+
+            var updateStack = new StackPanel();
+            foreach (var update in updates)
+            {
+                var itemBorder = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromRgb(30, 41, 59)),
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12),
+                    Margin = new Thickness(0, 0, 0, 8)
+                };
+
+                var itemStack = new StackPanel();
+
+                var nameText = new TextBlock
+                {
+                    Text = update.PluginName,
+                    FontSize = 14,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = Brushes.White
+                };
+
+                var versionText = new TextBlock
+                {
+                    Text = $"{update.CurrentVersion} → {update.NewVersion}",
+                    FontSize = 12,
+                    Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                    Margin = new Thickness(0, 4, 0, 0)
+                };
+
+                itemStack.Children.Add(nameText);
+                itemStack.Children.Add(versionText);
+                itemBorder.Child = itemStack;
+                updateStack.Children.Add(itemBorder);
+            }
+
+            scrollViewer.Content = updateStack;
+            mainStack.Children.Add(scrollViewer);
+
+            var buttonStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 16, 0, 0)
+            };
+
+            var updateAllBtn = new Button
+            {
+                Content = "全部更新",
+                Width = 100,
+                Height = 32,
+                Background = new SolidColorBrush(Color.FromRgb(59, 130, 246)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            updateAllBtn.Click += async (s, ev) =>
+            {
+                dialog.Close();
+                await UpdateAllPluginsAsync(updates);
+            };
+
+            var cancelBtn = new Button
+            {
+                Content = "稍后再说",
+                Width = 100,
+                Height = 32,
+                Background = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand
+            };
+            cancelBtn.Click += (s, ev) => dialog.Close();
+
+            buttonStack.Children.Add(updateAllBtn);
+            buttonStack.Children.Add(cancelBtn);
+            mainStack.Children.Add(buttonStack);
+
+            dialog.Content = mainStack;
+            dialog.ShowDialog();
+        }
+
+        private async Task UpdateAllPluginsAsync(List<PluginUpdateInfo> updates)
+        {
+            foreach (var update in updates)
+            {
+                try
+                {
+                    if (update.MarketPlugin != null)
+                    {
+                        await PluginInstallService.UpdatePluginAsync(
+                            update.PluginId,
+                            update.MarketPlugin);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Error(ex, "更新插件失败: {PluginId}", update.PluginId);
+                }
+            }
+
+            System.Windows.MessageBox.Show("所有插件更新完成", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
+            RefreshPluginList();
         }
 
         private void UpdateAboutInfo()
