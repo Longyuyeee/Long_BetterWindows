@@ -1,0 +1,53 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================ -->
+    <!-- 浅色主题配色方案 -->
+    <!-- ============================================ -->
+
+    <!-- ▸ 表面色 (浅色主题) -->
+    <Color x:Key="LightSurfaceBackgroundColor">#F8FAFC</Color>
+    <SolidColorBrush x:Key="LightSurfaceBackgroundBrush" Color="#F8FAFC" />
+
+    <Color x:Key="LightCardBackgroundColor">#FFFFFF</Color>
+    <SolidColorBrush x:Key="LightCardBackgroundBrush" Color="#FFFFFF" />
+    <Color x:Key="LightCardHoverColor">#F1F5F9</Color>
+    <SolidColorBrush x:Key="LightCardHoverBrush" Color="#F1F5F9" />
+
+    <Color x:Key="LightTitleBarColor">#FFFFFF</Color>
+    <SolidColorBrush x:Key="LightTitleBarBrush" Color="#FFFFFF" />
+
+    <!-- ▸ 按钮色 (浅色主题) -->
+    <Color x:Key="LightSecondaryButtonColor">#F1F5F9</Color>
+    <SolidColorBrush x:Key="LightSecondaryButtonBrush" Color="#F1F5F9" />
+    <Color x:Key="LightSecondaryButtonHoverColor">#E2E8F0</Color>
+    <SolidColorBrush x:Key="LightSecondaryButtonHoverBrush" Color="#E2E8F0" />
+
+    <!-- ▸ 文字色 (浅色主题) -->
+    <Color x:Key="LightTextPrimaryColor">#0F172A</Color>
+    <SolidColorBrush x:Key="LightTextPrimaryBrush" Color="#0F172A" />
+
+    <Color x:Key="LightTextSecondaryColor">#64748B</Color>
+    <SolidColorBrush x:Key="LightTextSecondaryBrush" Color="#64748B" />
+
+    <Color x:Key="LightTextMutedColor">#94A3B8</Color>
+    <SolidColorBrush x:Key="LightTextMutedBrush" Color="#94A3B8" />
+
+    <Color x:Key="LightTextDimColor">#CBD5E1</Color>
+    <SolidColorBrush x:Key="LightTextDimBrush" Color="#CBD5E1" />
+
+    <!-- ▸ 分隔线 / 边框 (浅色主题) -->
+    <Color x:Key="LightDividerColor">#E2E8F0</Color>
+    <SolidColorBrush x:Key="LightDividerBrush" Color="#E2E8F0" />
+
+    <!-- ▸ 滚动条 (浅色主题) -->
+    <Color x:Key="LightScrollThumbColor">#CBD5E1</Color>
+    <SolidColorBrush x:Key="LightScrollThumbBrush" Color="#CBD5E1" />
+    <Color x:Key="LightScrollThumbHoverColor">#94A3B8</Color>
+    <SolidColorBrush x:Key="LightScrollThumbHoverBrush" Color="#94A3B8" />
+
+    <!-- ▸ 半透覆盖层 (浅色主题) -->
+    <Color x:Key="LightOverlayColor">#80FFFFFF</Color>
+    <SolidColorBrush x:Key="LightOverlayBrush" Color="#80FFFFFF" />
+
+</ResourceDictionary>
