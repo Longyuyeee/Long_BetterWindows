@@ -81,9 +81,12 @@ public class ThemeService
     {
         var storage = new StorageService();
         var result = storage.GetAsync("theme.isLight").Result;
-        if (result.Success && result.Data != null && bool.TryParse(result.Data, out var isLight))
+        if (result.Success && result.Data != null)
         {
-            _isLightTheme = isLight;
+            if (bool.TryParse(result.Data, out var isLight))
+            {
+                _isLightTheme = isLight;
+            }
         }
         ApplyTheme(_isLightTheme);
     }
