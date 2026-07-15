@@ -80,14 +80,18 @@ public class ThemeService
     private void LoadThemePreference()
     {
         var storage = new StorageService();
-        _isLightTheme = storage.Get("theme.isLight", false);
+        var result = storage.GetAsync("theme.isLight").Result;
+        if (result.Success && result.Data != null && bool.TryParse(result.Data, out var isLight))
+        {
+            _isLightTheme = isLight;
+        }
         ApplyTheme(_isLightTheme);
     }
 
     private void SaveThemePreference()
     {
         var storage = new StorageService();
-        storage.Set("theme.isLight", _isLightTheme);
+        storage.SetAsync("theme.isLight", _isLightTheme.ToString()).Wait();
     }
 
     /// <summary>
