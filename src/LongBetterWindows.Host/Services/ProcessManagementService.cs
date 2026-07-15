@@ -12,7 +12,7 @@ public class ProcessManagementService : IProcessService
 {
     private readonly ILogger _logger = Log.ForContext<ProcessManagementService>();
 
-    public Task<HostApiResponse<int>> StartAsync(string path, string? args = null)
+    public Task<HostApiResponse> StartAsync(string path, string? args = null)
     {
         return Task.Run(() =>
         {
@@ -28,61 +28,37 @@ public class ProcessManagementService : IProcessService
                 var process = Process.Start(startInfo);
                 if (process == null)
                 {
-                    return HostApiResponse<int>.Failure(
+                    return HostApiResponse.Failure(
                         ApiErrorCode.Unknown, "无法启动进程");
                 }
 
                 _logger.Information("已启动进程: {Path} (PID: {Pid})", path, process.Id);
-                return HostApiResponse<int>.Success(process.Id);
+                return HostApiResponse.Success();
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "启动进程失败: {Path}", path);
-                return HostApiResponse<int>.Failure(
-                    ApiErrorCode.Unknown, ex.Message);
-            }
-        });
-    }
-
-    public Task<HostApiResponse> KillAsync(int pid)
-    {
-        return Task.Run(() =>
-        {
-            try
-            {
-                var process = Process.GetProcessById(pid);
-                process.Kill();
-                _logger.Information("已结束进程: PID {Pid}", pid);
-                return HostApiResponse.Success();
-            }
-            catch (ArgumentException)
-            {
-                return HostApiResponse.Failure(
-                    ApiErrorCode.InvalidArgument, "进程不存在");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "结束进程失败: PID {Pid}", pid);
                 return HostApiResponse.Failure(
                     ApiErrorCode.Unknown, ex.Message);
             }
         });
     }
 
-    public Task<HostApiResponse<List<ProcessInfo>>> GetListAsync()
+    public Task<HostApiResponse<List<ProcessInfo>>> GetRunningProcessesAsync(string? nameFilter = null)
     {
         return Task.Run(() =>
         {
             try
             {
                 var processes = Process.GetProcesses()
+                    .Where(p => string.IsNullOrEmpty(nameFilter) ||
+                               p.ProcessName.Contains(nameFilter, StringComparison.OrdinalIgnoreCase))
                     .Select(p => new ProcessInfo
                     {
-                        Pid = p.Id,
+                        Id = p.Id,
                         Name = p.ProcessName,
-                        MemoryMB = p.WorkingSet64 / 1024 / 1024
+                        MainWindowTitle = p.MainWindowTitle
                     })
-                    .OrderByDescending(p => p.MemoryMB)
                     .Take(50)
                     .ToList();
 
@@ -97,26 +73,26 @@ public class ProcessManagementService : IProcessService
         });
     }
 
-    public Task<HostApiResponse<bool>> IsRunningAsync(string processName)
+    public Task<HostApiResponse> KillAsync(int processId)
     {
         return Task.Run(() =>
         {
             try
             {
-                var processes = Process.GetProcessesByName(processName);
-                var isRunning = processes.Length > 0;
-
-                foreach (var p in processes)
-                {
-                    p.Dispose();
-                }
-
-                return HostApiResponse<bool>.Success(isRunning);
+                var process = Process.GetProcessById(processId);
+                process.Kill();
+                _logger.Information("已结束进程: PID {Pid}", processId);
+                return HostApiResponse.Success();
+            }
+            catch (ArgumentException)
+            {
+                return HostApiResponse.Failure(
+                    ApiErrorCode.InvalidArgument, "进程不存在");
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "检查进程状态失败: {ProcessName}", processName);
-                return HostApiResponse<bool>.Failure(
+                _logger.Error(ex, "结束进程失败: PID {Pid}", processId);
+                return HostApiResponse.Failure(
                     ApiErrorCode.Unknown, ex.Message);
             }
         });
