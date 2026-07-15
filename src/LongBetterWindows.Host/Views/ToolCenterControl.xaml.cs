@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using LongBetterWindows.Host.Controls;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
@@ -664,7 +665,25 @@ namespace LongBetterWindows.Host.Views
             _pluginCardVersion++;
             var version = _pluginCardVersion;
 
+            // 显示骨架屏
+            PluginsPanel.Children.Clear();
+            PluginsPanel.Visibility = Visibility.Visible;
             PluginsLoading.Visibility = Visibility.Collapsed;
+
+            for (int i = 0; i < 3; i++)
+            {
+                PluginsPanel.Children.Add(new SkeletonCard());
+            }
+
+            // 延迟加载实际内容
+            Task.Delay(300).ContinueWith(_ =>
+            {
+                Dispatcher.Invoke(() => LoadPluginContent(version));
+            });
+        }
+
+        private void LoadPluginContent(int version)
+        {
             PluginsPanel.Children.Clear();
             var plugins = HostProvider.Instance.PluginStore.GetAll();
 

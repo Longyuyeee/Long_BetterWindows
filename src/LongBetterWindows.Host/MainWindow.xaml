@@ -15,7 +15,11 @@
                       UseAeroCaptionButtons="True" />
     </WindowChrome.WindowChrome>
 
-    <Border CornerRadius="8" Background="{StaticResource SurfaceBackgroundBrush}">
+    <Border CornerRadius="8">
+        <!-- Acrylic 毛玻璃效果 -->
+        <Border.Background>
+            <SolidColorBrush Color="#CC0F172A" Opacity="0.95" />
+        </Border.Background>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="36" />

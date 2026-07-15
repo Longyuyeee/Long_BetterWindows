@@ -1,0 +1,67 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================ -->
+    <!-- 渐变系统 — 为 UI 元素添加细腻渐变 -->
+    <!-- ============================================ -->
+
+    <!-- ▸ 成功状态渐变 (绿色 → 青色) -->
+    <LinearGradientBrush x:Key="SuccessGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#10B981" Offset="0" />
+        <GradientStop Color="#34D399" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ▸ 警告状态渐变 (黄色 → 橙色) -->
+    <LinearGradientBrush x:Key="WarningGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#F59E0B" Offset="0" />
+        <GradientStop Color="#FBBF24" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ▸ 危险状态渐变 (红色 → 橙色) -->
+    <LinearGradientBrush x:Key="DangerGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#EF4444" Offset="0" />
+        <GradientStop Color="#F97316" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ▸ 主色调渐变 (蓝色 → 紫色) -->
+    <LinearGradientBrush x:Key="PrimaryGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#3B82F6" Offset="0" />
+        <GradientStop Color="#8B5CF6" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ▸ 信息状态渐变 (青色 → 蓝色) -->
+    <LinearGradientBrush x:Key="InfoGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#06B6D4" Offset="0" />
+        <GradientStop Color="#3B82F6" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ▸ 卡片顶部装饰渐变 (微妙的垂直渐变) -->
+    <LinearGradientBrush x:Key="CardAccentGradientBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#3B82F6" Offset="0" />
+        <GradientStop Color="#2563EB" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ▸ 背景微妙径向渐变 -->
+    <RadialGradientBrush x:Key="BackgroundRadialGradientBrush"
+                         Center="0.5,0.5"
+                         RadiusX="1"
+                         RadiusY="1">
+        <GradientStop Color="#1E293B" Offset="0" />
+        <GradientStop Color="#0F172A" Offset="1" />
+    </RadialGradientBrush>
+
+    <!-- ▸ 分隔线渐变 (从透明到半透明) -->
+    <LinearGradientBrush x:Key="DividerGradientBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#00334155" Offset="0" />
+        <GradientStop Color="#334155" Offset="0.5" />
+        <GradientStop Color="#00334155" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- ▸ 骨架屏高光扫过渐变 -->
+    <LinearGradientBrush x:Key="SkeletonShimmerBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#001E293B" Offset="0" />
+        <GradientStop Color="#334155" Offset="0.5" />
+        <GradientStop Color="#001E293B" Offset="1" />
+    </LinearGradientBrush>
+
+</ResourceDictionary>

@@ -18,6 +18,9 @@ namespace LongBetterWindows.Host
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             AnimationHelper.FadeIn(this, durationMs: 350);
+
+            // 启用 Acrylic 毛玻璃效果
+            AcrylicHelper.EnableAcrylic(this, 0xCC1E1F22);
         }
 
         protected override void OnSourceInitialized(EventArgs e)
