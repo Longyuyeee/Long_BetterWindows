@@ -1,109 +1,120 @@
-using System;
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Animation;
+using System.Globalization;
+using Microsoft.Win32;
+using LongBetterWindows.Host.Capabilities;
+using LongBetterWindows.Host.Contracts;
 
-namespace LongBetterWindows.Host.Services;
-
-/// <summary>
-/// 主题管理服务
-/// </summary>
-public class ThemeService
+namespace LongBetterWindows.Host.Services
 {
-    private static ThemeService? _instance;
-    public static ThemeService Instance => _instance ??= new ThemeService();
-
-    private bool _isLightTheme = false;
-
-    public bool IsLightTheme => _isLightTheme;
-
-    private ThemeService()
+    public class ThemeService : IThemeService
     {
-        // 从配置加载主题偏好
-        LoadThemePreference();
-    }
+        private const string ThemeRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+        private const string AppsUseLightTheme = "AppsUseLightTheme";
+        private const string SystemUsesLightTheme = "SystemUsesLightTheme";
 
-    /// <summary>
-    /// 切换主题
-    /// </summary>
-    public void ToggleTheme()
-    {
-        _isLightTheme = !_isLightTheme;
-        ApplyTheme(_isLightTheme);
-        SaveThemePreference();
-    }
-
-    /// <summary>
-    /// 应用主题
-    /// </summary>
-    public void ApplyTheme(bool isLight)
-    {
-        _isLightTheme = isLight;
-
-        var resources = Application.Current.Resources;
-
-        // 平滑过渡所有颜色
-        AnimateColorTransition(resources, "SurfaceBackgroundBrush",
-            isLight ? Color.FromRgb(248, 250, 252) : Color.FromRgb(30, 31, 34));
-
-        AnimateColorTransition(resources, "CardBackgroundBrush",
-            isLight ? Color.FromRgb(255, 255, 255) : Color.FromRgb(45, 45, 48));
-
-        AnimateColorTransition(resources, "TextPrimaryBrush",
-            isLight ? Color.FromRgb(15, 23, 42) : Color.FromRgb(232, 232, 232));
-
-        AnimateColorTransition(resources, "TextSecondaryBrush",
-            isLight ? Color.FromRgb(100, 116, 139) : Color.FromRgb(153, 153, 153));
-
-        AnimateColorTransition(resources, "TitleBarBrush",
-            isLight ? Color.FromRgb(255, 255, 255) : Color.FromRgb(45, 45, 48));
-
-        AnimateColorTransition(resources, "DividerBrush",
-            isLight ? Color.FromRgb(226, 232, 240) : Color.FromRgb(58, 58, 61));
-    }
-
-    private void AnimateColorTransition(ResourceDictionary resources, string brushKey, Color targetColor)
-    {
-        if (resources[brushKey] is SolidColorBrush brush)
+        public Task<HostApiResponse<SystemTheme>> GetSystemThemeAsync()
         {
-            var animation = new ColorAnimation
+            return Task.Run(() =>
             {
-                To = targetColor,
-                Duration = TimeSpan.FromMilliseconds(500),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
-            };
+                try
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(ThemeRegistryPath);
+                    if (key == null)
+                        return HostApiResponse<SystemTheme>.Failure(ApiErrorCode.NotFound, "无法访问主题注册表");
 
-            brush.BeginAnimation(SolidColorBrush.ColorProperty, animation);
+                    var appsLight = (int?)key.GetValue(AppsUseLightTheme) ?? 1;
+                    var theme = appsLight == 1 ? SystemTheme.Light : SystemTheme.Dark;
+
+                    return HostApiResponse<SystemTheme>.Success(theme);
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse<SystemTheme>.Failure(ApiErrorCode.Unknown, ex.Message);
+                }
+            });
         }
-    }
 
-    private void LoadThemePreference()
-    {
-        var storage = new StorageService();
-        var result = storage.GetAsync("theme.isLight").Result;
-        if (result.IsSuccess && result.Data != null)
+        public Task<HostApiResponse> SetSystemThemeAsync(SystemTheme theme)
         {
-            if (bool.TryParse(result.Data, out var isLight))
+            return Task.Run(() =>
             {
-                _isLightTheme = isLight;
-            }
+                try
+                {
+                    if (theme == SystemTheme.Auto)
+                        return HostApiResponse.Failure(ApiErrorCode.InvalidArgument, "暂不支持自动主题");
+
+                    using var key = Registry.CurrentUser.OpenSubKey(ThemeRegistryPath, true);
+                    if (key == null)
+                        return HostApiResponse.Failure(ApiErrorCode.NotFound, "无法访问主题注册表");
+
+                    int value = theme == SystemTheme.Light ? 1 : 0;
+                    key.SetValue(AppsUseLightTheme, value, RegistryValueKind.DWord);
+                    key.SetValue(SystemUsesLightTheme, value, RegistryValueKind.DWord);
+
+                    return HostApiResponse.Success();
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message);
+                }
+            });
         }
-        ApplyTheme(_isLightTheme);
-    }
 
-    private void SaveThemePreference()
-    {
-        var storage = new StorageService();
-        storage.SetAsync("theme.isLight", _isLightTheme.ToString()).Wait();
-    }
+        public async Task<HostApiResponse> ToggleThemeAsync()
+        {
+            var currentResult = await GetSystemThemeAsync();
+            if (!currentResult.IsSuccess)
+                return HostApiResponse.Failure(currentResult.ErrorCode, currentResult.ErrorMessage);
 
-    /// <summary>
-    /// 根据系统主题自动切换
-    /// </summary>
-    public void ApplySystemTheme()
-    {
-        // TODO: 检测 Windows 系统主题
-        // 当前简单实现：默认深色
-        ApplyTheme(false);
+            var newTheme = currentResult.Data == SystemTheme.Light ? SystemTheme.Dark : SystemTheme.Light;
+            return await SetSystemThemeAsync(newTheme);
+        }
+
+        public Task<HostApiResponse<string>> GetAccentColorAsync()
+        {
+            return Task.Run(() =>
+            {
+                try
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM");
+                    if (key == null)
+                        return HostApiResponse<string>.Failure(ApiErrorCode.NotFound, "无法访问DWM注册表");
+
+                    var colorValue = (int?)key.GetValue("ColorizationColor") ?? 0;
+                    var color = $"#{colorValue:X8}";
+
+                    return HostApiResponse<string>.Success(color);
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse<string>.Failure(ApiErrorCode.Unknown, ex.Message);
+                }
+            });
+        }
+
+        public Task<HostApiResponse> SetAccentColorAsync(string color)
+        {
+            return Task.Run(() =>
+            {
+                try
+                {
+                    if (!color.StartsWith("#"))
+                        return HostApiResponse.Failure(ApiErrorCode.InvalidArgument, "颜色格式无效");
+
+                    var colorValue = int.Parse(color.TrimStart('#'), NumberStyles.HexNumber);
+
+                    using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM", true);
+                    if (key == null)
+                        return HostApiResponse.Failure(ApiErrorCode.NotFound, "无法访问DWM注册表");
+
+                    key.SetValue("ColorizationColor", colorValue, RegistryValueKind.DWord);
+
+                    return HostApiResponse.Success();
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message);
+                }
+            });
+        }
     }
 }

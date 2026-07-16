@@ -126,6 +126,10 @@ namespace LongBetterWindows.Host.Engine
                 return "system.schedule";
             if (typeof(T) == typeof(IAudioService))
                 return "system.audio";
+            if (typeof(T) == typeof(IPowerService))
+                return "system.power";
+            if (typeof(T) == typeof(IThemeService))
+                return "system.theme";
             return null;
         }
 
@@ -151,5 +155,7 @@ namespace LongBetterWindows.Host.Engine
         public ICacheService Cache => GetService<ICacheService>();
         public IScheduleService Schedule => GetService<IScheduleService>();
         public IAudioService Audio => GetService<IAudioService>();
+        public IPowerService Power => GetService<IPowerService>();
+        public IThemeService Theme => GetService<IThemeService>();
     }
 }

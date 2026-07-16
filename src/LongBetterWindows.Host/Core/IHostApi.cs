@@ -32,5 +32,7 @@ namespace LongBetterWindows.Host.Core
         ICacheService Cache { get; }
         IScheduleService Schedule { get; }
         IAudioService Audio { get; }
+        IPowerService Power { get; }
+        IThemeService Theme { get; }
     }
 }

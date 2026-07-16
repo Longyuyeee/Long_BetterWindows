@@ -31,6 +31,8 @@ namespace LongBetterWindows.Host.Services
         public static CacheService Cache { get; private set; } = null!;
         public static ScheduleService Schedule { get; private set; } = null!;
         public static AudioService Audio { get; private set; } = null!;
+        public static PowerService Power { get; private set; } = null!;
+        public static ThemeService Theme { get; private set; } = null!;
 
         public static void Initialize()
         {
@@ -107,6 +109,12 @@ namespace LongBetterWindows.Host.Services
 
             Audio = new AudioService();
             provider.RegisterService<IAudioService>(Audio);
+
+            Power = new PowerService();
+            provider.RegisterService<IPowerService>(Power);
+
+            Theme = new ThemeService();
+            provider.RegisterService<IThemeService>(Theme);
 
             // I18nService 预留，待国际化时启用
             // I18nService.Initialize();
