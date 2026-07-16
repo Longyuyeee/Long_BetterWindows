@@ -33,6 +33,9 @@ namespace LongBetterWindows.Host.Services
         public static AudioService Audio { get; private set; } = null!;
         public static PowerService Power { get; private set; } = null!;
         public static ThemeService Theme { get; private set; } = null!;
+        public static WallpaperService Wallpaper { get; private set; } = null!;
+        public static BrightnessService Brightness { get; private set; } = null!;
+        public static NetworkMonitorService NetworkMonitor { get; private set; } = null!;
 
         public static void Initialize()
         {
@@ -115,6 +118,15 @@ namespace LongBetterWindows.Host.Services
 
             Theme = new ThemeService();
             provider.RegisterService<IThemeService>(Theme);
+
+            Wallpaper = new WallpaperService();
+            provider.RegisterService<IWallpaperService>(Wallpaper);
+
+            Brightness = new BrightnessService();
+            provider.RegisterService<IBrightnessService>(Brightness);
+
+            NetworkMonitor = new NetworkMonitorService();
+            provider.RegisterService<INetworkMonitorService>(NetworkMonitor);
 
             // I18nService 预留，待国际化时启用
             // I18nService.Initialize();

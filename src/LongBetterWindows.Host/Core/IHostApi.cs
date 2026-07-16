@@ -34,5 +34,8 @@ namespace LongBetterWindows.Host.Core
         IAudioService Audio { get; }
         IPowerService Power { get; }
         IThemeService Theme { get; }
+        IWallpaperService Wallpaper { get; }
+        IBrightnessService Brightness { get; }
+        INetworkMonitorService NetworkMonitor { get; }
     }
 }

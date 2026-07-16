@@ -130,6 +130,12 @@ namespace LongBetterWindows.Host.Engine
                 return "system.power";
             if (typeof(T) == typeof(IThemeService))
                 return "system.theme";
+            if (typeof(T) == typeof(IWallpaperService))
+                return "system.wallpaper";
+            if (typeof(T) == typeof(IBrightnessService))
+                return "display.brightness";
+            if (typeof(T) == typeof(INetworkMonitorService))
+                return "network.monitor";
             return null;
         }
 
@@ -157,5 +163,8 @@ namespace LongBetterWindows.Host.Engine
         public IAudioService Audio => GetService<IAudioService>();
         public IPowerService Power => GetService<IPowerService>();
         public IThemeService Theme => GetService<IThemeService>();
+        public IWallpaperService Wallpaper => GetService<IWallpaperService>();
+        public IBrightnessService Brightness => GetService<IBrightnessService>();
+        public INetworkMonitorService NetworkMonitor => GetService<INetworkMonitorService>();
     }
 }
