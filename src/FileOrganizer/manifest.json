@@ -1,0 +1,18 @@
+{
+  "id": "com.long.fileorganizer",
+  "version": "1.0.0",
+  "name": "文件整理器",
+  "author": "Long",
+  "description": "自动整理指定文件夹，支持按类型/日期分类、查找大文件、删除重复文件、批量重命名",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": [
+    "filesystem.advanced",
+    "shell.selection",
+    "storage.local"
+  ],
+  "default_settings": {
+    "large_file_threshold": 104857600,
+    "auto_backup": true
+  }
+}

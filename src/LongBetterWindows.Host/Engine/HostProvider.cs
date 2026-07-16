@@ -112,6 +112,20 @@ namespace LongBetterWindows.Host.Engine
                 return "shell.execute";
             if (typeof(T) == typeof(IUICapability))
                 return "ui.window";
+            if (typeof(T) == typeof(INetworkPortService))
+                return "network.ports";
+            if (typeof(T) == typeof(IPerformanceService))
+                return "system.performance";
+            if (typeof(T) == typeof(IFileSystemService))
+                return "filesystem.advanced";
+            if (typeof(T) == typeof(IPinyinService))
+                return "text.pinyin";
+            if (typeof(T) == typeof(ICacheService))
+                return "system.cache";
+            if (typeof(T) == typeof(IScheduleService))
+                return "system.schedule";
+            if (typeof(T) == typeof(IAudioService))
+                return "system.audio";
             return null;
         }
 
@@ -130,5 +144,12 @@ namespace LongBetterWindows.Host.Engine
         public IHttpService Http => GetService<IHttpService>();
         public IShellExecuteService ShellExecute => GetService<IShellExecuteService>();
         public IUICapability UI => GetService<IUICapability>();
+        public INetworkPortService NetworkPort => GetService<INetworkPortService>();
+        public IPerformanceService Performance => GetService<IPerformanceService>();
+        public IFileSystemService FileSystem => GetService<IFileSystemService>();
+        public IPinyinService Pinyin => GetService<IPinyinService>();
+        public ICacheService Cache => GetService<ICacheService>();
+        public IScheduleService Schedule => GetService<IScheduleService>();
+        public IAudioService Audio => GetService<IAudioService>();
     }
 }

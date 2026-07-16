@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>硬件监控</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, sans-serif;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 16px 20px;
+      background: #252526;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .refresh-info {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #252526;
+      border: 1px solid #3c3c3c;
+      border-radius: 8px;
+      padding: 20px;
+      transition: all 0.2s;
+    }
+
+    .card:hover {
+      border-color: #C4612F;
+      transform: translateY(-2px);
+    }
+
+    .card-title {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card-value {
+      font-size: 32px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .card-value.warning {
+      color: #f48771;
+    }
+
+    .card-label {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .progress-bar {
+      height: 6px;
+      background: #3c3c3c;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #C4612F;
+      transition: width 0.3s ease;
+    }
+
+    .progress-fill.warning {
+      background: #f48771;
+    }
+
+    .system-info {
+      background: #252526;
+      border: 1px solid #3c3c3c;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #2d2d30;
+      font-size: 13px;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .info-label {
+      color: #888;
+    }
+
+    .info-value {
+      color: #d4d4d4;
+      font-family: 'Consolas', monospace;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    .disk-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .disk-item {
+      background: #252526;
+      border: 1px solid #3c3c3c;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .disk-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .disk-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+    }
+
+    .disk-usage {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .process-table {
+      background: #252526;
+      border: 1px solid #3c3c3c;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      padding: 12px 16px;
+      background: #2d2d30;
+      font-size: 12px;
+      color: #888;
+      font-weight: 500;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      padding: 12px 16px;
+      border-top: 1px solid #2d2d30;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+
+    .table-row:hover {
+      background: #2d2d30;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #3c3c3c;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>硬件监控</h1>
+    <div class="refresh-info">每 <span id="refreshInterval">2</span> 秒自动刷新</div>
+  </div>
+
+  <div class="content">
+    <!-- 实时监控卡片 -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-title">CPU 使用率</div>
+        <div class="card-value" id="cpuValue">0%</div>
+        <div class="card-label">处理器负载</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="cpuBar" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">内存使用率</div>
+        <div class="card-value" id="memValue">0%</div>
+        <div class="card-label" id="memLabel">0 GB / 0 GB</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="memBar" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">系统运行时间</div>
+        <div class="card-value" id="uptimeValue">0h</div>
+        <div class="card-label">自上次启动</div>
+      </div>
+    </div>
+
+    <!-- 系统信息 -->
+    <div class="system-info">
+      <div class="section-title">系统信息</div>
+      <div class="info-row">
+        <span class="info-label">操作系统</span>
+        <span class="info-value" id="osName">加载中...</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">计算机名</span>
+        <span class="info-value" id="machineName">加载中...</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">处理器</span>
+        <span class="info-value" id="processorName">加载中...</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">逻辑处理器</span>
+        <span class="info-value" id="processorCount">0 核心</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">总内存</span>
+        <span class="info-value" id="totalRam">0 GB</span>
+      </div>
+    </div>
+
+    <!-- 磁盘信息 -->
+    <div class="section-title">磁盘使用情况</div>
+    <div class="disk-list" id="diskList">
+      <div style="text-align: center; padding: 40px; color: #888;">加载中...</div>
+    </div>
+
+    <!-- 进程资源占用 Top 10 -->
+    <div class="section-title" style="margin-top: 24px;">资源占用 Top 10</div>
+    <div class="process-table">
+      <div class="table-header">
+        <div>进程名称</div>
+        <div>PID</div>
+        <div>内存 (MB)</div>
+        <div>线程数</div>
+      </div>
+      <div id="processList"></div>
+    </div>
+  </div>
+
+  <script>
+    let refreshInterval = 2000;
+    let cpuWarningThreshold = 80;
+    let memWarningThreshold = 85;
+
+    // 初始化
+    async function init() {
+      await loadSystemInfo();
+      await updateMetrics();
+      setInterval(updateMetrics, refreshInterval);
+    }
+
+    // 加载系统信息（只加载一次）
+    async function loadSystemInfo() {
+      try {
+        // 模拟数据（实际应调用 long.performance.getSystemInfo()）
+        const sysInfo = {
+          osName: 'Windows 11 Home China',
+          machineName: 'DESKTOP-ABC123',
+          processorName: 'Intel Core i7-12700H',
+          processorCount: 20,
+          totalRam: 17042284544,
+          uptime: { hours: 5, minutes: 23 }
+        };
+
+        document.getElementById('osName').textContent = sysInfo.osName;
+        document.getElementById('machineName').textContent = sysInfo.machineName;
+        document.getElementById('processorName').textContent = sysInfo.processorName;
+        document.getElementById('processorCount').textContent = sysInfo.processorCount + ' 核心';
+        document.getElementById('totalRam').textContent = formatBytes(sysInfo.totalRam);
+      } catch (e) {
+        console.error('加载系统信息失败:', e);
+      }
+    }
+
+    // 更新实时监控数据
+    async function updateMetrics() {
+      try {
+        // 模拟 CPU 数据
+        const cpuUsage = Math.random() * 60 + 10; // 10-70%
+        updateCpu(cpuUsage);
+
+        // 模拟内存数据
+        const memInfo = {
+          totalPhysicalMemory: 17042284544,
+          usedPhysicalMemory: 10737418240,
+          usagePercentage: 63
+        };
+        updateMemory(memInfo);
+
+        // 模拟运行时间
+        const uptime = { hours: 5, minutes: 23 };
+        document.getElementById('uptimeValue').textContent = `${uptime.hours}h ${uptime.minutes}m`;
+
+        // 模拟磁盘数据
+        const disks = [
+          { name: 'C:\\', totalSize: 256060514304, usedSpace: 198765432100, usagePercentage: 77.6 },
+          { name: 'D:\\', totalSize: 1000204886016, usedSpace: 523456789012, usagePercentage: 52.3 }
+        ];
+        updateDisks(disks);
+
+        // 模拟进程数据
+        const processes = [
+          { processName: 'chrome', processId: 12345, memoryUsage: 524288000, threadCount: 48 },
+          { processName: 'Code', processId: 23456, memoryUsage: 314572800, threadCount: 32 },
+          { processName: 'LongBetterWindows.Host', processId: 34567, memoryUsage: 104857600, threadCount: 16 },
+        ];
+        updateProcesses(processes);
+
+      } catch (e) {
+        console.error('更新监控数据失败:', e);
+      }
+    }
+
+    // 更新 CPU
+    function updateCpu(usage) {
+      const valueEl = document.getElementById('cpuValue');
+      const barEl = document.getElementById('cpuBar');
+
+      valueEl.textContent = Math.round(usage) + '%';
+      barEl.style.width = usage + '%';
+
+      if (usage >= cpuWarningThreshold) {
+        valueEl.classList.add('warning');
+        barEl.classList.add('warning');
+      } else {
+        valueEl.classList.remove('warning');
+        barEl.classList.remove('warning');
+      }
+    }
+
+    // 更新内存
+    function updateMemory(info) {
+      const valueEl = document.getElementById('memValue');
+      const barEl = document.getElementById('memBar');
+      const labelEl = document.getElementById('memLabel');
+
+      valueEl.textContent = Math.round(info.usagePercentage) + '%';
+      barEl.style.width = info.usagePercentage + '%';
+      labelEl.textContent = `${formatBytes(info.usedPhysicalMemory)} / ${formatBytes(info.totalPhysicalMemory)}`;
+
+      if (info.usagePercentage >= memWarningThreshold) {
+        valueEl.classList.add('warning');
+        barEl.classList.add('warning');
+      } else {
+        valueEl.classList.remove('warning');
+        barEl.classList.remove('warning');
+      }
+    }
+
+    // 更新磁盘列表
+    function updateDisks(disks) {
+      const listEl = document.getElementById('diskList');
+      listEl.innerHTML = disks.map(disk => `
+        <div class="disk-item">
+          <div class="disk-header">
+            <span class="disk-name">${disk.name}</span>
+            <span class="disk-usage">${Math.round(disk.usagePercentage)}% 已用</span>
+          </div>
+          <div class="disk-label" style="font-size: 12px; color: #888; margin-bottom: 8px;">
+            ${formatBytes(disk.usedSpace)} / ${formatBytes(disk.totalSize)}
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill ${disk.usagePercentage > 90 ? 'warning' : ''}" style="width: ${disk.usagePercentage}%"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 更新进程列表
+    function updateProcesses(processes) {
+      const listEl = document.getElementById('processList');
+      listEl.innerHTML = processes.map(p => `
+        <div class="table-row">
+          <div>${p.processName}</div>
+          <div>${p.processId}</div>
+          <div>${Math.round(p.memoryUsage / 1024 / 1024)} MB</div>
+          <div>${p.threadCount}</div>
+        </div>
+      `).join('');
+    }
+
+    // 格式化字节
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    // 启动
+    init();
+  </script>
+</body>
+</html>

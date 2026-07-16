@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>开发者工具箱</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, sans-serif;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #888;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #333;
+      padding-bottom: 2px;
+    }
+
+    .tab {
+      padding: 8px 16px;
+      background: transparent;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab:hover {
+      color: #d4d4d4;
+    }
+
+    .tab.active {
+      color: #fff;
+      border-bottom-color: #C4612F;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .tool-section {
+      background: #252526;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .tool-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    textarea, input[type="text"], select {
+      width: 100%;
+      background: #1e1e1e;
+      border: 1px solid #3c3c3c;
+      border-radius: 4px;
+      color: #d4d4d4;
+      padding: 10px;
+      font-family: 'Consolas', monospace;
+      font-size: 13px;
+      resize: vertical;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus, input:focus, select:focus {
+      outline: none;
+      border-color: #C4612F;
+    }
+
+    textarea {
+      min-height: 100px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 8px 16px;
+      background: #C4612F;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: #A94E22;
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: #3c3c3c;
+    }
+
+    button.secondary:hover {
+      background: #4c4c4c;
+    }
+
+    .result {
+      background: #1e1e1e;
+      border: 1px solid #3c3c3c;
+      border-radius: 4px;
+      padding: 12px;
+      font-family: 'Consolas', monospace;
+      font-size: 13px;
+      color: #4ec9b0;
+      word-break: break-all;
+      min-height: 60px;
+      margin-top: 12px;
+    }
+
+    .info {
+      background: #264f78;
+      border-left: 3px solid #007acc;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-top: 12px;
+      color: #d4d4d4;
+    }
+
+    .quick-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .quick-btn {
+      padding: 12px;
+      background: #2d2d30;
+      border: 1px solid #3c3c3c;
+      border-radius: 6px;
+      color: #d4d4d4;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+    }
+
+    .quick-btn:hover {
+      background: #3c3c3c;
+      border-color: #C4612F;
+      transform: translateY(-2px);
+    }
+
+    .quick-btn-title {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .quick-btn-desc {
+      font-size: 11px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>开发者工具箱</h1>
+    <p class="subtitle">编码、解码、转换与识别 · 输入即识别</p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="encode">编码/解码</button>
+      <button class="tab" data-tab="hash">哈希/UUID</button>
+      <button class="tab" data-tab="time">时间戳</button>
+      <button class="tab" data-tab="convert">进制转换</button>
+      <button class="tab" data-tab="url">URL/Unicode</button>
+    </div>
+
+    <!-- Tab: 编码/解码 -->
+    <div class="tab-content active" data-content="encode">
+      <div class="tool-section">
+        <div class="tool-title">Base64 编码/解码</div>
+        <div class="input-group">
+          <label>输入文本</label>
+          <textarea id="base64Input" placeholder="输入要编码或解码的文本..."></textarea>
+        </div>
+        <div class="button-row">
+          <button onclick="base64Encode()">编码</button>
+          <button onclick="base64Decode()">解码</button>
+          <button class="secondary" onclick="copyFromClipboard('base64Input')">从剪贴板粘贴</button>
+          <button class="secondary" onclick="copyResult('base64Result')">复制结果</button>
+        </div>
+        <div class="result" id="base64Result">结果将显示在这里...</div>
+      </div>
+    </div>
+
+    <!-- Tab: 哈希/UUID -->
+    <div class="tab-content" data-content="hash">
+      <div class="tool-section">
+        <div class="tool-title">文本哈希</div>
+        <div class="input-group">
+          <label>输入文本</label>
+          <textarea id="hashInput" placeholder="输入要计算哈希的文本..."></textarea>
+        </div>
+        <div class="button-row">
+          <button onclick="hashMD5()">MD5</button>
+          <button onclick="hashSHA1()">SHA-1</button>
+          <button onclick="hashSHA256()">SHA-256</button>
+          <button class="secondary" onclick="copyFromClipboard('hashInput')">从剪贴板粘贴</button>
+        </div>
+        <div class="result" id="hashResult">结果将显示在这里...</div>
+      </div>
+
+      <div class="tool-section">
+        <div class="tool-title">UUID 生成器</div>
+        <div class="quick-buttons">
+          <div class="quick-btn" onclick="generateUUID('v4')">
+            <div class="quick-btn-title">UUID v4</div>
+            <div class="quick-btn-desc">随机生成</div>
+          </div>
+          <div class="quick-btn" onclick="generateUUID('short')">
+            <div class="quick-btn-title">短 UUID</div>
+            <div class="quick-btn-desc">16位字母数字</div>
+          </div>
+          <div class="quick-btn" onclick="generateUUID('timestamp')">
+            <div class="quick-btn-title">时间戳 ID</div>
+            <div class="quick-btn-desc">基于当前时间</div>
+          </div>
+        </div>
+        <div class="result" id="uuidResult">点击上方按钮生成 UUID</div>
+      </div>
+    </div>
+
+    <!-- Tab: 时间戳 -->
+    <div class="tab-content" data-content="time">
+      <div class="tool-section">
+        <div class="tool-title">时间戳转换</div>
+        <div class="input-group">
+          <label>时间戳（秒或毫秒）</label>
+          <input type="text" id="timestampInput" placeholder="输入时间戳，如 1234567890">
+        </div>
+        <div class="button-row">
+          <button onclick="timestampToDate()">转为日期</button>
+          <button onclick="getCurrentTimestamp()">获取当前时间戳</button>
+          <button class="secondary" onclick="copyFromClipboard('timestampInput')">从剪贴板粘贴</button>
+        </div>
+        <div class="result" id="timestampResult">结果将显示在这里...</div>
+      </div>
+
+      <div class="tool-section">
+        <div class="tool-title">日期转时间戳</div>
+        <div class="input-group">
+          <label>日期时间</label>
+          <input type="text" id="dateInput" placeholder="格式: 2024-01-15 08:30:00">
+        </div>
+        <div class="button-row">
+          <button onclick="dateToTimestamp()">转为时间戳</button>
+        </div>
+        <div class="result" id="dateResult">结果将显示在这里...</div>
+        <div class="info">支持格式: YYYY-MM-DD HH:mm:ss 或 YYYY-MM-DD</div>
+      </div>
+    </div>
+
+    <!-- Tab: 进制转换 -->
+    <div class="tab-content" data-content="convert">
+      <div class="tool-section">
+        <div class="tool-title">进制转换</div>
+        <div class="input-group">
+          <label>输入数值</label>
+          <input type="text" id="numberInput" placeholder="输入数字...">
+        </div>
+        <div class="input-group">
+          <label>输入进制</label>
+          <select id="fromBase">
+            <option value="10">十进制 (DEC)</option>
+            <option value="16">十六进制 (HEX)</option>
+            <option value="8">八进制 (OCT)</option>
+            <option value="2">二进制 (BIN)</option>
+          </select>
+        </div>
+        <div class="button-row">
+          <button onclick="convertBase()">转换全部</button>
+          <button class="secondary" onclick="copyFromClipboard('numberInput')">从剪贴板粘贴</button>
+        </div>
+        <div class="result" id="convertResult">结果将显示在这里...</div>
+      </div>
+    </div>
+
+    <!-- Tab: URL/Unicode -->
+    <div class="tab-content" data-content="url">
+      <div class="tool-section">
+        <div class="tool-title">URL 编码/解码</div>
+        <div class="input-group">
+          <label>输入 URL 或文本</label>
+          <textarea id="urlInput" placeholder="输入要编码或解码的 URL..."></textarea>
+        </div>
+        <div class="button-row">
+          <button onclick="urlEncode()">URL 编码</button>
+          <button onclick="urlDecode()">URL 解码</button>
+          <button class="secondary" onclick="copyFromClipboard('urlInput')">从剪贴板粘贴</button>
+          <button class="secondary" onclick="copyResult('urlResult')">复制结果</button>
+        </div>
+        <div class="result" id="urlResult">结果将显示在这里...</div>
+      </div>
+
+      <div class="tool-section">
+        <div class="tool-title">Unicode 转换</div>
+        <div class="input-group">
+          <label>输入文本或 Unicode</label>
+          <textarea id="unicodeInput" placeholder="输入文本或 中文 格式..."></textarea>
+        </div>
+        <div class="button-row">
+          <button onclick="toUnicode()">转为 Unicode</button>
+          <button onclick="fromUnicode()">Unicode 解码</button>
+          <button class="secondary" onclick="copyFromClipboard('unicodeInput')">从剪贴板粘贴</button>
+          <button class="secondary" onclick="copyResult('unicodeResult')">复制结果</button>
+        </div>
+        <div class="result" id="unicodeResult">结果将显示在这里...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab 切换
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelector(`[data-content="${target}"]`).classList.add('active');
+      });
+    });
+
+    // Base64
+    function base64Encode() {
+      const input = document.getElementById('base64Input').value;
+      try {
+        const result = btoa(unescape(encodeURIComponent(input)));
+        document.getElementById('base64Result').textContent = result;
+        autoCopy(result);
+      } catch (e) {
+        document.getElementById('base64Result').textContent = '编码失败: ' + e.message;
+      }
+    }
+
+    function base64Decode() {
+      const input = document.getElementById('base64Input').value;
+      try {
+        const result = decodeURIComponent(escape(atob(input)));
+        document.getElementById('base64Result').textContent = result;
+        autoCopy(result);
+      } catch (e) {
+        document.getElementById('base64Result').textContent = '解码失败: ' + e.message;
+      }
+    }
+
+    // 哈希函数（简化实现，生产环境应使用 crypto API）
+    async function hashMD5() {
+      const input = document.getElementById('hashInput').value;
+      const result = await simpleHash(input, 'MD5');
+      document.getElementById('hashResult').textContent = result;
+      autoCopy(result);
+    }
+
+    async function hashSHA1() {
+      const input = document.getElementById('hashInput').value;
+      const result = await simpleHash(input, 'SHA-1');
+      document.getElementById('hashResult').textContent = result;
+      autoCopy(result);
+    }
+
+    async function hashSHA256() {
+      const input = document.getElementById('hashInput').value;
+      const result = await simpleHash(input, 'SHA-256');
+      document.getElementById('hashResult').textContent = result;
+      autoCopy(result);
+    }
+
+    async function simpleHash(str, algorithm) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(str);
+      const hashBuffer = await crypto.subtle.digest(algorithm, data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // UUID
+    function generateUUID(type) {
+      let result;
+      if (type === 'v4') {
+        result = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      } else if (type === 'short') {
+        result = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        result = result.substring(0, 16).toUpperCase();
+      } else if (type === 'timestamp') {
+        result = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+        result = result.toUpperCase();
+      }
+      document.getElementById('uuidResult').textContent = result;
+      autoCopy(result);
+    }
+
+    // 时间戳
+    function timestampToDate() {
+      const input = document.getElementById('timestampInput').value;
+      try {
+        let ts = parseInt(input);
+        if (ts.toString().length === 10) ts *= 1000;
+        const date = new Date(ts);
+        const result = date.toLocaleString('zh-CN', {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        });
+        document.getElementById('timestampResult').textContent = result;
+      } catch (e) {
+        document.getElementById('timestampResult').textContent = '转换失败: ' + e.message;
+      }
+    }
+
+    function getCurrentTimestamp() {
+      const now = Date.now();
+      const nowSec = Math.floor(now / 1000);
+      const result = `毫秒: ${now}\n秒: ${nowSec}`;
+      document.getElementById('timestampResult').textContent = result;
+      autoCopy(now.toString());
+    }
+
+    function dateToTimestamp() {
+      const input = document.getElementById('dateInput').value;
+      try {
+        const date = new Date(input);
+        const ts = date.getTime();
+        const tsSec = Math.floor(ts / 1000);
+        const result = `毫秒: ${ts}\n秒: ${tsSec}`;
+        document.getElementById('dateResult').textContent = result;
+        autoCopy(ts.toString());
+      } catch (e) {
+        document.getElementById('dateResult').textContent = '转换失败: ' + e.message;
+      }
+    }
+
+    // 进制转换
+    function convertBase() {
+      const input = document.getElementById('numberInput').value.trim();
+      const fromBase = parseInt(document.getElementById('fromBase').value);
+      try {
+        const decimal = parseInt(input, fromBase);
+        const result = `十进制 (DEC): ${decimal}\n` +
+                      `十六进制 (HEX): ${decimal.toString(16).toUpperCase()}\n` +
+                      `八进制 (OCT): ${decimal.toString(8)}\n` +
+                      `二进制 (BIN): ${decimal.toString(2)}`;
+        document.getElementById('convertResult').textContent = result;
+      } catch (e) {
+        document.getElementById('convertResult').textContent = '转换失败: ' + e.message;
+      }
+    }
+
+    // URL
+    function urlEncode() {
+      const input = document.getElementById('urlInput').value;
+      const result = encodeURIComponent(input);
+      document.getElementById('urlResult').textContent = result;
+      autoCopy(result);
+    }
+
+    function urlDecode() {
+      const input = document.getElementById('urlInput').value;
+      try {
+        const result = decodeURIComponent(input);
+        document.getElementById('urlResult').textContent = result;
+        autoCopy(result);
+      } catch (e) {
+        document.getElementById('urlResult').textContent = '解码失败: ' + e.message;
+      }
+    }
+
+    // Unicode
+    function toUnicode() {
+      const input = document.getElementById('unicodeInput').value;
+      const result = Array.from(input).map(char => {
+        const code = char.charCodeAt(0);
+        return code > 127 ? '\\u' + code.toString(16).padStart(4, '0') : char;
+      }).join('');
+      document.getElementById('unicodeResult').textContent = result;
+      autoCopy(result);
+    }
+
+    function fromUnicode() {
+      const input = document.getElementById('unicodeInput').value;
+      try {
+        const result = input.replace(/\\u[\dA-Fa-f]{4}/g, match => {
+          return String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16));
+        });
+        document.getElementById('unicodeResult').textContent = result;
+        autoCopy(result);
+      } catch (e) {
+        document.getElementById('unicodeResult').textContent = '解码失败: ' + e.message;
+      }
+    }
+
+    // 剪贴板工具函数
+    async function copyFromClipboard(targetId) {
+      try {
+        const result = await long.clipboard.getText();
+        if (result.success && result.data) {
+          document.getElementById(targetId).value = result.data;
+          long.ui.showToast('已从剪贴板粘贴');
+        }
+      } catch (e) {
+        console.error('粘贴失败:', e);
+      }
+    }
+
+    async function copyResult(resultId) {
+      const text = document.getElementById(resultId).textContent;
+      try {
+        await long.clipboard.setText(text);
+        long.ui.showToast('已复制到剪贴板');
+      } catch (e) {
+        console.error('复制失败:', e);
+      }
+    }
+
+    async function autoCopy(text) {
+      try {
+        await long.clipboard.setText(text);
+      } catch (e) {
+        console.log('自动复制失败:', e);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "id": "com.long.clipboardhistory",
+  "version": "1.0.0",
+  "name": "剪贴板历史",
+  "author": "Long",
+  "description": "自动记录剪贴板历史，支持按关键词、时间、类型搜索，并可重新放回剪贴板",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": [
+    "system.clipboard",
+    "system.clipboard.monitor",
+    "storage.local",
+    "system.hotkey"
+  ],
+  "default_settings": {
+    "hotkey": "Ctrl+Shift+V",
+    "max_items": 500,
+    "auto_start": true
+  }
+}

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>剪贴板历史</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, sans-serif;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 16px 20px;
+      background: #252526;
+      border-bottom: 1px solid #333;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .search-box {
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 40px 10px 36px;
+      background: #1e1e1e;
+      border: 1px solid #3c3c3c;
+      border-radius: 6px;
+      color: #d4d4d4;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: #C4612F;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #888;
+      font-size: 16px;
+    }
+
+    .filter-bar {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      gap: 6px;
+    }
+
+    .filter-btn {
+      padding: 4px 10px;
+      background: #3c3c3c;
+      border: 1px solid #3c3c3c;
+      border-radius: 4px;
+      color: #888;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-btn.active {
+      background: #C4612F;
+      border-color: #C4612F;
+      color: #fff;
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .history-item {
+      background: #252526;
+      border: 1px solid #3c3c3c;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .history-item:hover {
+      border-color: #C4612F;
+      transform: translateX(4px);
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .item-type {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #3c3c3c;
+      border-radius: 3px;
+      font-size: 11px;
+      color: #888;
+    }
+
+    .item-type.text { background: #264f78; color: #9cdcfe; }
+    .item-type.image { background: #2d4f2f; color: #4ec9b0; }
+
+    .item-time {
+      font-size: 11px;
+      color: #888;
+    }
+
+    .item-content {
+      font-family: 'Consolas', monospace;
+      font-size: 13px;
+      color: #d4d4d4;
+      line-height: 1.5;
+      max-height: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .item-actions {
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      opacity: 0;
+      display: flex;
+      gap: 6px;
+      transition: opacity 0.2s;
+    }
+
+    .history-item:hover .item-actions {
+      opacity: 1;
+    }
+
+    .action-btn {
+      padding: 4px 8px;
+      background: #C4612F;
+      border: none;
+      border-radius: 3px;
+      color: #fff;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .action-btn:hover {
+      background: #A94E22;
+    }
+
+    .action-btn.delete {
+      background: #c42f2f;
+    }
+
+    .action-btn.delete:hover {
+      background: #a92222;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #888;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 20px;
+      padding: 12px 20px;
+      background: #252526;
+      border-top: 1px solid #333;
+      font-size: 12px;
+      color: #888;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-value {
+      color: #C4612F;
+      font-weight: 600;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #3c3c3c;
+      border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4c4c4c;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>剪贴板历史</h1>
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="搜索历史记录...">
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">全部</button>
+        <button class="filter-btn" data-filter="text">文本</button>
+        <button class="filter-btn" data-filter="image">图片</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <p>暂无历史记录</p>
+      <p style="font-size: 11px; margin-top: 8px;">复制内容后会自动记录在这里</p>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-item">
+      <span>总记录:</span>
+      <span class="stat-value" id="totalCount">0</span>
+    </div>
+    <div class="stat-item">
+      <span>文本:</span>
+      <span class="stat-value" id="textCount">0</span>
+    </div>
+    <div class="stat-item">
+      <span>监听状态:</span>
+      <span class="stat-value" id="monitorStatus">启动中...</span>
+    </div>
+  </div>
+
+  <script>
+    let history = [];
+    let currentFilter = 'all';
+    let currentSearch = '';
+
+    // 初始化
+    async function init() {
+      await loadHistory();
+      await startMonitoring();
+      setupEventListeners();
+      renderHistory();
+    }
+
+    // 加载历史记录
+    async function loadHistory() {
+      try {
+        const result = await long.storage.get('clipboard_history');
+        if (result.success && result.data) {
+          history = JSON.parse(result.data);
+        }
+      } catch (e) {
+        console.error('加载历史失败:', e);
+      }
+    }
+
+    // 保存历史记录
+    async function saveHistory() {
+      try {
+        await long.storage.set('clipboard_history', JSON.stringify(history));
+      } catch (e) {
+        console.error('保存历史失败:', e);
+      }
+    }
+
+    // 开始监听剪贴板
+    async function startMonitoring() {
+      try {
+        // 注册热键
+        await long.hotkey.register('Ctrl+Shift+V');
+
+        // 监听剪贴板变化（通过轮询实现）
+        setInterval(async () => {
+          const result = await long.clipboard.getText();
+          if (result.success && result.data) {
+            const text = result.data;
+            // 检查是否是新内容
+            if (history.length === 0 || history[0].content !== text) {
+              addToHistory(text, 'text');
+            }
+          }
+        }, 1000);
+
+        document.getElementById('monitorStatus').textContent = '运行中';
+      } catch (e) {
+        console.error('启动监听失败:', e);
+        document.getElementById('monitorStatus').textContent = '失败';
+      }
+    }
+
+    // 添加到历史
+    function addToHistory(content, type) {
+      const item = {
+        id: Date.now(),
+        content: content,
+        type: type,
+        timestamp: new Date().toISOString()
+      };
+
+      history.unshift(item);
+
+      // 限制历史记录数量
+      if (history.length > 500) {
+        history = history.slice(0, 500);
+      }
+
+      saveHistory();
+      renderHistory();
+    }
+
+    // 渲染历史记录
+    function renderHistory() {
+      const content = document.getElementById('content');
+
+      // 过滤
+      let filtered = history;
+      if (currentFilter !== 'all') {
+        filtered = history.filter(item => item.type === currentFilter);
+      }
+      if (currentSearch) {
+        filtered = filtered.filter(item =>
+          item.content.toLowerCase().includes(currentSearch.toLowerCase())
+        );
+      }
+
+      // 更新统计
+      document.getElementById('totalCount').textContent = history.length;
+      document.getElementById('textCount').textContent =
+        history.filter(item => item.type === 'text').length;
+
+      if (filtered.length === 0) {
+        content.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <p>${currentSearch || currentFilter !== 'all' ? '没有找到匹配的记录' : '暂无历史记录'}</p>
+          </div>
+        `;
+        return;
+      }
+
+      content.innerHTML = filtered.map(item => `
+        <div class="history-item" data-id="${item.id}">
+          <div class="item-header">
+            <span class="item-type ${item.type}">${item.type === 'text' ? '文本' : '图片'}</span>
+            <span class="item-time">${formatTime(item.timestamp)}</span>
+          </div>
+          <div class="item-content">${escapeHtml(item.content)}</div>
+          <div class="item-actions">
+            <button class="action-btn" onclick="copyItem(${item.id})">复制</button>
+            <button class="action-btn delete" onclick="deleteItem(${item.id})">删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 复制到剪贴板
+    async function copyItem(id) {
+      const item = history.find(i => i.id === id);
+      if (item) {
+        await long.clipboard.setText(item.content);
+        long.ui.showToast('已复制到剪贴板');
+      }
+    }
+
+    // 删除记录
+    function deleteItem(id) {
+      history = history.filter(i => i.id !== id);
+      saveHistory();
+      renderHistory();
+      long.ui.showToast('已删除');
+    }
+
+    // 设置事件监听
+    function setupEventListeners() {
+      // 搜索
+      document.getElementById('searchInput').addEventListener('input', (e) => {
+        currentSearch = e.target.value;
+        renderHistory();
+      });
+
+      // 过滤按钮
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          currentFilter = e.target.dataset.filter;
+          renderHistory();
+        });
+      });
+
+      // 热键消息
+      window.addEventListener('message', (e) => {
+        if (e.data.type === 'hotkey' && e.data.hotkey === 'Ctrl+Shift+V') {
+          // 热键触发时显示窗口
+          long.ui.showToast('剪贴板历史');
+        }
+      });
+    }
+
+    // 格式化时间
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+
+      if (diff < 60000) return '刚刚';
+      if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+
+      return date.toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    // HTML 转义
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 启动
+    init();
+  </script>
+</body>
+</html>

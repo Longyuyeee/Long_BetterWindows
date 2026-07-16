@@ -24,6 +24,13 @@ namespace LongBetterWindows.Host.Services
         public static ShellExecuteService ShellExecute { get; private set; } = null!;
         public static UIService UI { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
+        public static NetworkPortService NetworkPort { get; private set; } = null!;
+        public static PerformanceService Performance { get; private set; } = null!;
+        public static FileSystemService FileSystem { get; private set; } = null!;
+        public static PinyinService Pinyin { get; private set; } = null!;
+        public static CacheService Cache { get; private set; } = null!;
+        public static ScheduleService Schedule { get; private set; } = null!;
+        public static AudioService Audio { get; private set; } = null!;
 
         public static void Initialize()
         {
@@ -79,6 +86,27 @@ namespace LongBetterWindows.Host.Services
 
             UI = new UIService();
             provider.RegisterService<IUICapability>(UI);
+
+            NetworkPort = new NetworkPortService();
+            provider.RegisterService<INetworkPortService>(NetworkPort);
+
+            Performance = new PerformanceService();
+            provider.RegisterService<IPerformanceService>(Performance);
+
+            FileSystem = new FileSystemService();
+            provider.RegisterService<IFileSystemService>(FileSystem);
+
+            Pinyin = new PinyinService();
+            provider.RegisterService<IPinyinService>(Pinyin);
+
+            Cache = new CacheService();
+            provider.RegisterService<ICacheService>(Cache);
+
+            Schedule = new ScheduleService();
+            provider.RegisterService<IScheduleService>(Schedule);
+
+            Audio = new AudioService();
+            provider.RegisterService<IAudioService>(Audio);
 
             // I18nService 预留，待国际化时启用
             // I18nService.Initialize();

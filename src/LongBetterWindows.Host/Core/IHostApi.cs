@@ -25,5 +25,12 @@ namespace LongBetterWindows.Host.Core
         IHttpService Http { get; }
         IShellExecuteService ShellExecute { get; }
         IUICapability UI { get; }
+        INetworkPortService NetworkPort { get; }
+        IPerformanceService Performance { get; }
+        IFileSystemService FileSystem { get; }
+        IPinyinService Pinyin { get; }
+        ICacheService Cache { get; }
+        IScheduleService Schedule { get; }
+        IAudioService Audio { get; }
     }
 }

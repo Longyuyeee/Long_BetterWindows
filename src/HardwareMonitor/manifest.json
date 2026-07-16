@@ -1,0 +1,18 @@
+{
+  "id": "com.long.hardwaremonitor",
+  "version": "1.0.0",
+  "name": "硬件监控",
+  "author": "Long",
+  "description": "实时监控 CPU/内存/磁盘状态，查看系统信息和进程资源占用，异常提醒与问题排查",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": [
+    "system.performance",
+    "system.process"
+  ],
+  "default_settings": {
+    "refresh_interval": 2000,
+    "cpu_warning_threshold": 80,
+    "memory_warning_threshold": 85
+  }
+}
