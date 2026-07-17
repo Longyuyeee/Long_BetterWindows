@@ -1,65 +1,32 @@
 @echo off
 chcp 65001 >nul
-title Longçª—å£ - ä¸€é”®å¯åŠ¨
+title Long´°¿Ú - Ò»¼üÆô¶¯
 
 echo ====================================
-echo   Longçª—å£ v1.6 - ä¸€é”®å¯åŠ¨è„šæœ¬
+echo   Long´°¿Ú v1.8 - Ò»¼üÆô¶¯
 echo ====================================
 echo.
 
-:: æ£€æŸ¥æ˜¯å¦åœ¨é¡¹ç›®æ ¹ç›®å½•
 if not exist "src\LongBetterWindows.Host\LongBetterWindows.Host.csproj" (
-    echo [é”™è¯¯] è¯·åœ¨é¡¹ç›®æ ¹ç›®å½•è¿è¡Œæ­¤è„šæœ¬ï¼
+    echo [´íÎó] ÇëÔÚÏîÄ¿¸ùÄ¿Â¼Ö´ÐÐ
     pause
     exit /b 1
 )
 
-:: æ­¥éª¤1: æž„å»ºé¡¹ç›®
-echo [1/3] æ­£åœ¨æž„å»ºé¡¹ç›®...
+echo [1/2] ¹¹½¨ÏîÄ¿...
 dotnet build -c Release --nologo -v quiet
 if %ERRORLEVEL% neq 0 (
-    echo [é”™è¯¯] æž„å»ºå¤±è´¥ï¼
+    echo [´íÎó] ¹¹½¨Ê§°Ü
     pause
     exit /b 1
 )
-echo [âˆš] æž„å»ºæˆåŠŸ
+echo [OK] ¹¹½¨³É¹¦
 echo.
 
-:: æ­¥éª¤2: å¤åˆ¶æ’ä»¶
-echo [2/3] æ­£åœ¨å¤åˆ¶ WebView æ’ä»¶...
-set "BUILD_DIR=src\LongBetterWindows.Host\bin\Release\net8.0-windows"
-set "PLUGIN_DIR=%BUILD_DIR%\Plugins"
-
-:: åˆ›å»ºæ’ä»¶ç›®å½•
-if not exist "%PLUGIN_DIR%" mkdir "%PLUGIN_DIR%"
-
-:: å¤åˆ¶æ‰€æœ‰ WebView æ’ä»¶
-for /d %%D in (src\*) do (
-    if exist "%%D\manifest.json" (
-        if not exist "%%D\%%~nD.csproj" (
-            echo   - å¤åˆ¶ %%~nD
-            xcopy /Y /Q "%%D\*" "%PLUGIN_DIR%\%%~nD\" >nul 2>&1
-            if not exist "%PLUGIN_DIR%\%%~nD" mkdir "%PLUGIN_DIR%\%%~nD"
-            copy /Y "%%D\manifest.json" "%PLUGIN_DIR%\%%~nD\" >nul 2>&1
-            if exist "%%D\index.html" copy /Y "%%D\index.html" "%PLUGIN_DIR%\%%~nD\" >nul 2>&1
-            if exist "%%D\*.js" copy /Y "%%D\*.js" "%PLUGIN_DIR%\%%~nD\" >nul 2>&1
-            if exist "%%D\*.css" copy /Y "%%D\*.css" "%PLUGIN_DIR%\%%~nD\" >nul 2>&1
-        )
-    )
-)
-echo [âˆš] æ’ä»¶å¤åˆ¶å®Œæˆ
-echo.
-
-:: æ­¥éª¤3: å¯åŠ¨åº”ç”¨
-echo [3/3] æ­£åœ¨å¯åŠ¨ Longçª—å£...
-echo.
-echo ====================================
-echo   åº”ç”¨å·²å¯åŠ¨ï¼
-echo ====================================
-echo.
-
-cd "%BUILD_DIR%"
+echo [2/2] Æô¶¯Ó¦ÓÃ...
+cd src\LongBetterWindows.Host\bin\Release\net8.0-windows
 start "" "LongBetterWindows.Host.exe"
-
+echo.
+echo Ó¦ÓÃÒÑÆô¶¯£¡
 timeout /t 2 >nul
 exit
