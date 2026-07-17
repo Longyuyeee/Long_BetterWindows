@@ -8,19 +8,20 @@ namespace LongBetterWindows.Host.Services
 {
     public class PerformanceService : IPerformanceService
     {
-        private readonly PerformanceCounter? _cpuCounter;
+        private readonly Lazy<PerformanceCounter?> _cpuCounter = new(CreateCpuCounter);
         private readonly Dictionary<int, (double lastCpu, DateTime lastTime)> _processCache = new();
 
-        public PerformanceService()
+        private static PerformanceCounter? CreateCpuCounter()
         {
             try
             {
-                _cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-                _cpuCounter.NextValue(); // 初始化
+                var counter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+                counter.NextValue();
+                return counter;
             }
             catch
             {
-                _cpuCounter = null;
+                return null;
             }
         }
 
@@ -30,10 +31,11 @@ namespace LongBetterWindows.Host.Services
             {
                 try
                 {
-                    if (_cpuCounter == null)
+                    var cpuCounter = _cpuCounter.Value;
+                    if (cpuCounter == null)
                         return HostApiResponse<double>.Failure(ApiErrorCode.Unknown, "无法访问 CPU 性能计数器");
 
-                    var usage = _cpuCounter.NextValue();
+                    var usage = cpuCounter.NextValue();
                     return HostApiResponse<double>.Success(Math.Round(usage, 2));
                 }
                 catch (Exception ex)

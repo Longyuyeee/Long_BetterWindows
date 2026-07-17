@@ -2,6 +2,10 @@
 
   <ItemGroup>
     <Content Include="..\..\Assets\app.ico" Link="Assets\app.ico" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <Content Include="Views\PluginDevTools.html" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\typescript.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\typescript.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\CodeMirror\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

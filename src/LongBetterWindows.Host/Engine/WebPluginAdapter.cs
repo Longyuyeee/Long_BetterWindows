@@ -36,6 +36,7 @@ namespace LongBetterWindows.Host.Engine
                 Log.Warning("[Web:{Id}] WebView 尚未初始化，无法打开 UI", Id);
                 return;
             }
+            _runtime.DetachFromRuntimeHost();
             var w = new System.Windows.Window
             {
                 Title = Name,
@@ -50,7 +51,12 @@ namespace LongBetterWindows.Host.Engine
         {
             try
             {
-                await _runtime.InitializeAsync();
+                var initialized = await _runtime.InitializeAsync();
+                if (!initialized)
+                {
+                    State = PluginState.Error;
+                    return false;
+                }
                 Log.Debug("[Web:{Id}] WebView2 初始化完成", Id);
             }
             catch (Exception ex)

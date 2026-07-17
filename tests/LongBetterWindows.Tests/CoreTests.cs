@@ -86,6 +86,98 @@ public class CoreTests
         Assert.Contains("未知能力", result.Error);
     }
 
+    [Theory]
+    [InlineData("network.ports")]
+    [InlineData("system.performance")]
+    [InlineData("filesystem.advanced")]
+    [InlineData("system.power")]
+    [InlineData("system.wallpaper")]
+    [InlineData("display.brightness")]
+    [InlineData("system.input")]
+    [InlineData("system.cache")]
+    [InlineData("system.schedule")]
+    [InlineData("ui.window")]
+    [InlineData("text.pinyin")]
+    [InlineData("window.info")]
+    public async Task ManifestReader_CurrentHostCapability_ReturnsSuccess(string capability)
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.capability",
+            version = "1.0.0",
+            name = "Capability Test",
+            entry_point = "index.html",
+            capabilities = new[] { capability }
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.True(result.IsSuccess, result.Error);
+    }
+
+    [Fact]
+    public void StandaloneScriptCapabilities_ValidDirectives_AreExtracted()
+    {
+        var source = """
+            // @capabilities system.hotkey, system.notification
+            // @capability network.http
+            // @capability unknown.capability
+            console.log('ready');
+            """;
+
+        var capabilities = PluginScanner.ExtractStandaloneCapabilities(source);
+
+        Assert.Equal(
+            new[] { "network.http", "system.hotkey", "system.notification" },
+            capabilities);
+    }
+
+    [Fact]
+    public void CapabilityMetadata_AllManifestCapabilitiesHaveDescriptions()
+    {
+        var missing = ManifestReader.KnownCapabilities
+            .Where(capability => CapabilityMetadata.GetInfo(capability).Level == SecurityLevel.Unknown)
+            .ToList();
+
+        Assert.Empty(missing);
+    }
+
+    [Theory]
+    [InlineData("process.start", "system.process")]
+    [InlineData("performance.getCpuUsage", "system.performance")]
+    [InlineData("networkPort.getTcpListeners", "network.ports")]
+    [InlineData("audio.setVolume", "system.audio")]
+    [InlineData("power.shutdown", "system.power")]
+    [InlineData("wallpaper.set", "system.wallpaper")]
+    [InlineData("brightness.set", "display.brightness")]
+    [InlineData("fileSystem.enumerate", "filesystem.advanced")]
+    [InlineData("cache.cleanTemp", "system.cache")]
+    [InlineData("schedule.create", "system.schedule")]
+    [InlineData("input.keyPress", "system.input")]
+    [InlineData("ui.confirm", "ui.window")]
+    public void WebBridgeMethod_RequiresExpectedCapability(string method, string capability)
+    {
+        Assert.Equal(capability, WebPluginRuntime.GetRequiredCapability(method));
+    }
+
+    [Fact]
+    public void WebBridgeScript_ContainsPlatformApisAndPromiseResolution()
+    {
+        var script = WebPluginRuntime.BuildJsBridge("com.test.bridge");
+
+        Assert.Contains("process:", script);
+        Assert.Contains("performance:", script);
+        Assert.Contains("networkPort:", script);
+        Assert.Contains("audio:", script);
+        Assert.Contains("power:", script);
+        Assert.Contains("fileSystem:", script);
+        Assert.Contains("cache:", script);
+        Assert.Contains("schedule:", script);
+        Assert.Contains("input:", script);
+        Assert.Contains("confirm: function", script);
+        Assert.Contains("_pending[m.id].resolve", script);
+    }
+
     [Fact]
     public void PluginRegistry_Register_AddsPlugin()
     {

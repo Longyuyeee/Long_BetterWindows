@@ -180,12 +180,19 @@
     <!-- ═══════════════════════════════════════════ -->
 
     <Style x:Key="CardBorderStyle" TargetType="Border">
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
-        <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Padding" Value="18,14" />
-        <Setter Property="Margin" Value="0,0,10,10" />
+        <Setter Property="Background" Value="#CC20283A" />
+        <Setter Property="BorderBrush" Value="#20FFFFFF" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="18,16" />
+        <Setter Property="Margin" Value="0,0,12,12" />
         <Setter Property="MinWidth" Value="200" />
         <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect Color="#000000" BlurRadius="18" ShadowDepth="3" Opacity="0.18" />
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- 响应式卡片容器：窄屏1列，宽屏2列 -->
@@ -254,7 +261,7 @@
                                    ViewportSize="{TemplateBinding ViewportHeight}"
                                    Maximum="{TemplateBinding ScrollableHeight}"
                                    Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
-                                   Style="{StaticResource DarkScrollBarStyle}" />
+                                   Style="{DynamicResource DarkScrollBarStyle}" />
                         <ScrollBar x:Name="PART_HorizontalScrollBar"
                                    Grid.Column="0" Grid.Row="1"
                                    Orientation="Horizontal"

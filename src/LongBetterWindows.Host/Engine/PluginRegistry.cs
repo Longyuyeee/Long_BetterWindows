@@ -52,9 +52,10 @@ namespace LongBetterWindows.Host.Engine
 
                 _entries[manifest.Id] = entry;
                 Log.Information("插件 {PluginId} (v{Version}) 已注册", manifest.Id, manifest.Version);
-                NotifyChanged();
-                return true;
             }
+
+            NotifyChanged();
+            return true;
         }
 
         public bool Unregister(string pluginId)
@@ -67,9 +68,10 @@ namespace LongBetterWindows.Host.Engine
                 entry.State = PluginState.Disabled;
                 _entries.Remove(pluginId);
                 Log.Information("插件 {PluginId} 已注销", pluginId);
-                NotifyChanged();
-                return true;
             }
+
+            NotifyChanged();
+            return true;
         }
 
         public bool SetState(string pluginId, PluginState state)
@@ -80,9 +82,10 @@ namespace LongBetterWindows.Host.Engine
                     return false;
 
                 entry.State = state;
-                NotifyChanged();
-                return true;
             }
+
+            NotifyChanged();
+            return true;
         }
 
         public bool HasCapability(string pluginId, string capability)

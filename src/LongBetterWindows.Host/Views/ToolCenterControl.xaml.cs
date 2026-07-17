@@ -347,9 +347,9 @@ namespace LongBetterWindows.Host.Views
                     oldPanel.Visibility = Visibility.Collapsed;
                     oldPanel.Opacity = 1; // 恢复透明度
 
-                    // 显示新面板并淡入
+                    // 显示新面板，并用位移强化页面层级变化。
                     newPanel.Visibility = Visibility.Visible;
-                    Helpers.AnimationHelper.FadeInElement(newPanel, durationMs: 200);
+                    Helpers.AnimationHelperEnhanced.SlideInFromBottom(newPanel, durationMs: 280);
                 };
 
                 oldPanel.BeginAnimation(UIElement.OpacityProperty, fadeOut);
@@ -358,7 +358,7 @@ namespace LongBetterWindows.Host.Views
             {
                 // 没有旧面板，直接显示
                 newPanel.Visibility = Visibility.Visible;
-                Helpers.AnimationHelper.FadeInElement(newPanel, durationMs: 200);
+                Helpers.AnimationHelperEnhanced.SlideInFromBottom(newPanel, durationMs: 280);
             }
         }
 
@@ -1274,13 +1274,15 @@ namespace LongBetterWindows.Host.Views
             {
                 return template switch
                 {
-                    "热键插件" => @"// 热键插件示例
+                    "热键插件" => @"// @capabilities system.hotkey, system.clipboard, system.notification
+// 热键插件示例
 await Host.HotKey.RegisterAsync(""Ctrl+Shift+T"", async () => {
     var time = DateTime.Now.ToString(""HH:mm:ss"");
     await Host.Clipboard.SetTextAsync(time);
     await Host.Notification.ShowAsync(""时间: "" + time, ""success"");
 });",
-                    "笔记插件" => @"// 笔记插件 - 为选中的文件添加备注
+                    "笔记插件" => @"// @capabilities system.hotkey, shell.selection, system.notification
+// 笔记插件 - 为选中的文件添加备注
 await Host.HotKey.RegisterAsync(""Ctrl+Shift+N"", async () => {
     var items = await Host.ShellSelection.GetSelectedItemsAsync();
     if (items.IsSuccess && items.Data.Count > 0)
@@ -1290,7 +1292,8 @@ await Host.HotKey.RegisterAsync(""Ctrl+Shift+N"", async () => {
         await Host.Notification.ShowAsync(""笔记功能开发中"", ""info"");
     }
 });",
-                    _ => @"// 空白脚本
+                    _ => @"// @capabilities system.notification
+// 空白脚本
 await Host.Notification.ShowAsync(""Hello from C# script!"", ""success"");
 "
                 };
@@ -1299,14 +1302,16 @@ await Host.Notification.ShowAsync(""Hello from C# script!"", ""success"");
             {
                 return template switch
                 {
-                    "热键插件" => @"// 热键插件示例
+                    "热键插件" => @"// @capabilities system.hotkey, system.clipboard, system.notification
+// 热键插件示例
 long.hotkey.register('Ctrl+Shift+T', async () => {
     const time = new Date().toLocaleString('zh-CN');
     await long.clipboard.setText(time);
     await long.notification.show(`⏰ ${time}`, 'success');
 });
 console.log('⏰ 时间插件已加载');",
-                    "笔记插件" => @"// 笔记插件 - 为选中的文件添加备注
+                    "笔记插件" => @"// @capabilities system.hotkey, shell.selection, system.notification
+// 笔记插件 - 为选中的文件添加备注
 long.hotkey.register('Ctrl+Shift+N', async () => {
     const items = await long.shell.getSelectedItems();
     if (items.success && items.data.length > 0) {
@@ -1316,7 +1321,8 @@ long.hotkey.register('Ctrl+Shift+N', async () => {
     }
 });
 console.log('📝 笔记插件已加载');",
-                    _ => @"// 空白脚本
+                    _ => @"// @capabilities system.notification
+// 空白脚本
 long.notification.show('Hello from JavaScript!', 'success');
 console.log('插件已加载');
 "

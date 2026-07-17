@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>插件开发工具</title>
+<link rel="stylesheet" href="../Assets/CodeMirror/lib/codemirror.min.css">
+<link rel="stylesheet" href="../Assets/CodeMirror/theme/material-darker.min.css">
+<link rel="stylesheet" href="../Assets/CodeMirror/addon/hint/show-hint.min.css">
 <style>
 /* ══════════════════════════════════════════ */
 /* 色彩: 对齐 Long窗口 Apple 设计系统       */
@@ -39,6 +42,19 @@ body {
   border-right: 1px solid var(--divider);
   overflow-y: auto; padding: 8px;
 }
+.sidebar-search {
+  width: 100%; padding: 6px 8px; margin: 4px 0 6px;
+  border: 1px solid var(--divider); border-radius: 6px;
+  background: var(--input-bg); color: var(--text); font-size: 10px; outline: none;
+}
+.api-list { max-height: 230px; overflow-y: auto; }
+.api-item {
+  padding: 6px 7px; border-radius: 6px; cursor: pointer; margin-bottom: 3px;
+  background: rgba(255,255,255,.025); border: 1px solid transparent;
+}
+.api-item:hover { background: rgba(0,122,255,.1); border-color: rgba(0,122,255,.3); }
+.api-item code { color: #8ab4ff; font-size: 9px; word-break: break-all; }
+.api-item span { display: block; color: var(--text3); font-size: 9px; margin-top: 2px; }
 #sidebar h4 {
   font-size: 10px; text-transform: uppercase;
   color: var(--text3); margin: 12px 0 4px 8px;
@@ -109,6 +125,7 @@ body {
 /* 编辑器 */
 #editor { flex: 1; display: flex; overflow: hidden; position: relative; }
 #editorWrap { flex: 1; display: flex; position: relative; }
+#editorHost { flex: 1; position: relative; min-width: 0; }
 #lineNumbers {
   width: 40px; min-width: 40px;
   background: var(--bg); color: var(--text3);
@@ -129,6 +146,38 @@ textarea#codeEditor {
   tab-size: 4; white-space: pre; overflow: auto;
 }
 textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
+.CodeMirror {
+  height: 100%; background: var(--bg); color: var(--text);
+  font-family: 'Cascadia Code', 'Consolas', 'Monaco', monospace;
+  font-size: 13px; line-height: 1.65;
+}
+.CodeMirror-gutters { background: #191a1d; border-right: 1px solid var(--divider); }
+.CodeMirror-linenumber { color: #666b78; padding: 0 8px 0 4px; }
+.CodeMirror-cursor { border-left-color: #8ab4ff; }
+.CodeMirror-selected { background: rgba(0,122,255,0.28) !important; }
+.CodeMirror-matchingbracket { color: #7ee787 !important; border-bottom: 1px solid #7ee787; }
+.CodeMirror-hints {
+  background: #252832; border: 1px solid #465067; color: #dbe6ff;
+  border-radius: 9px; box-shadow: 0 12px 32px rgba(0,0,0,.4); padding: 5px;
+}
+.CodeMirror-hint { border-radius: 5px; padding: 5px 9px; }
+li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
+
+/* 运行日志 */
+#consolePanel {
+  display: none; height: 180px; min-height: 120px; flex-direction: column;
+  border-top: 1px solid var(--divider); background: #15171c;
+}
+#consolePanel.show { display: flex; }
+.console-head {
+  height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+  background: #20232b; color: var(--text2); font-size: 10px;
+}
+.console-head button { border: 0; border-radius: 5px; padding: 3px 8px; cursor: pointer; background: #343947; color: #d5d9e2; }
+#consoleOutput {
+  flex: 1; overflow: auto; padding: 9px 12px; white-space: pre-wrap;
+  font: 10px/1.55 'Cascadia Code','Consolas',monospace; color: #aeb8c8;
+}
 
 /* 搜索栏 */
 #searchBar {
@@ -200,15 +249,22 @@ textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
 
 /* 能力勾选区域 */
 .caps-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
-  margin-bottom: 12px; max-height: 180px; overflow-y: auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  margin-bottom: 12px; max-height: 240px; overflow-y: auto;
   padding: 8px; background: var(--bg); border-radius: 6px;
 }
 .caps-grid label {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: var(--text2); cursor: pointer;
-  padding: 2px 0;
+  display: grid; grid-template-columns: auto 20px 1fr; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text2); cursor: pointer; padding: 7px;
+  border: 1px solid transparent; border-radius: 7px; background: rgba(255,255,255,0.025);
 }
+.caps-grid label:hover { border-color: rgba(0,122,255,0.45); background: rgba(0,122,255,0.08); }
+.cap-icon { font-size: 14px; text-align: center; }
+.cap-name { color: var(--text); font-weight: 600; }
+.cap-id { display: block; color: var(--text3); font-size: 9px; margin-top: 1px; }
+.cap-desc { display: block; color: var(--text2); font-size: 9px; margin-top: 2px; line-height: 1.3; }
+.cap-risk-high .cap-name { color: #ff8b84; }
+.cap-risk-medium .cap-name { color: #ffd166; }
 .caps-grid input[type="checkbox"] { accent-color: var(--accent); width: auto; margin: 0; }
 </style>
 </head>
@@ -219,6 +275,9 @@ textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
   <h4>插件</h4>
   <div id="pluginList"></div>
   <div id="fileTree"></div>
+  <h4>LONG API</h4>
+  <input id="apiFilter" class="sidebar-search" placeholder="搜索 API 或能力..." oninput="renderApiExplorer()">
+  <div id="apiList" class="api-list"></div>
 </div>
 
 <!-- ══════════ 主区域 ══════════ -->
@@ -231,6 +290,8 @@ textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
     <button class="btn-secondary" onclick="previewCurrent()">预览</button>
     <span class="sep"></span>
     <button class="btn-secondary" onclick="showSearch()" title="Ctrl+F">搜索</button>
+    <button class="btn-secondary" onclick="showLongHints()" title="Ctrl+Space">API 提示</button>
+    <button class="btn-secondary" onclick="toggleConsole()" title="查看当前插件日志">运行日志</button>
     <span class="sep"></span>
     <span id="fileInfo" style="color:var(--text3);font-size:11px;margin-left:4px"></span>
     <span style="flex:1"></span>
@@ -247,8 +308,7 @@ textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
       <p>选择左侧插件打开文件，或点击「+ 新建」创建插件</p>
     </div>
     <div id="editorWrap" style="display:none">
-      <div id="lineNumbers"></div>
-      <div style="flex:1;position:relative">
+      <div id="editorHost">
         <textarea id="codeEditor" spellcheck="false"
           onkeydown="handleKeydown(event)"
           oninput="onEditorInput()"
@@ -265,6 +325,18 @@ textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
     </div>
   </div>
 
+  <div id="consolePanel">
+    <div class="console-head">
+      <strong>运行日志</strong>
+      <span id="consolePlugin">选择插件后查看日志</span>
+      <span style="flex:1"></span>
+      <button onclick="refreshPluginLogs()">刷新</button>
+      <button onclick="clearConsole()">清空</button>
+      <button onclick="toggleConsole(false)">关闭</button>
+    </div>
+    <div id="consoleOutput">暂无日志</div>
+  </div>
+
   <!-- 状态栏 -->
   <div id="status"></div>
 </div>
@@ -277,7 +349,6 @@ textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
     <select id="newType" onchange="onTypeChange()">
       <option value="web">HTML/JS (WebView2)</option>
       <option value="script">C# 脚本 (.csx)</option>
-      <option value="dll">DLL 插件 (.NET)</option>
     </select>
     <label>名称</label>
     <input id="newName" placeholder="我的插件">
@@ -291,19 +362,138 @@ textarea#codeEditor.readonly { opacity: 0.7; cursor: default; }
   </div>
 </div>
 
+<script src="../Assets/CodeMirror/lib/codemirror.min.js"></script>
+<script src="../Assets/CodeMirror/mode/javascript/javascript.min.js"></script>
+<script src="../Assets/CodeMirror/mode/xml/xml.min.js"></script>
+<script src="../Assets/CodeMirror/mode/css/css.min.js"></script>
+<script src="../Assets/CodeMirror/mode/htmlmixed/htmlmixed.min.js"></script>
+<script src="../Assets/CodeMirror/mode/clike/clike.min.js"></script>
+<script src="../Assets/CodeMirror/addon/edit/closebrackets.min.js"></script>
+<script src="../Assets/CodeMirror/addon/edit/matchbrackets.min.js"></script>
+<script src="../Assets/CodeMirror/addon/hint/show-hint.min.js"></script>
 <script>
 // ══════════════════════════════════════════════
 // 状态
 // ══════════════════════════════════════════════
-var tabs = [], currentTab = -1, currentPlugin = '', fileCache = {};
+var tabs = [], currentTab = -1, currentPlugin = '', currentPluginId = '', fileCache = {};
 var searchResults = [], searchIdx = -1;
+var suppressEditorChange = false;
+var longApiCatalog = [
+  ['long.app.getVersion()', '读取宿主版本', ''],
+  ['long.app.log()', '写入插件运行日志', ''],
+  ['long.clipboard.getText()', '读取剪贴板', 'system.clipboard'],
+  ['long.clipboard.setText()', '写入剪贴板', 'system.clipboard'],
+  ['long.hotkey.register()', '注册全局热键', 'system.hotkey'],
+  ['long.shell.getSelectedItems()', '获取资源管理器选中项', 'shell.selection'],
+  ['long.process.start()', '启动进程', 'system.process'],
+  ['long.process.getList()', '获取进程列表', 'system.process'],
+  ['long.process.kill()', '结束进程', 'system.process'],
+  ['long.fileOps.copy()', '复制文件', 'file.ops'],
+  ['long.fileOps.move()', '移动文件', 'file.ops'],
+  ['long.fileOps.delete()', '删除文件', 'file.ops'],
+  ['long.fileSystem.enumerate()', '遍历目录', 'filesystem.advanced'],
+  ['long.fileSystem.hash()', '计算文件哈希', 'filesystem.advanced'],
+  ['long.fileSystem.findDuplicates()', '查找重复文件', 'filesystem.advanced'],
+  ['long.fileSystem.searchContent()', '搜索文件内容', 'filesystem.advanced'],
+  ['long.performance.getCpuUsage()', '读取 CPU 使用率', 'system.performance'],
+  ['long.performance.getMemoryInfo()', '读取内存信息', 'system.performance'],
+  ['long.performance.getSystemInfo()', '读取系统信息', 'system.performance'],
+  ['long.networkPort.getTcpListeners()', '获取 TCP 监听端口', 'network.ports'],
+  ['long.networkPort.findPortOwner()', '查找端口占用进程', 'network.ports'],
+  ['long.network.getSpeed()', '读取实时网速', 'network.monitor'],
+  ['long.audio.getVolume()', '读取音量', 'system.audio'],
+  ['long.audio.setVolume()', '设置音量', 'system.audio'],
+  ['long.power.getStatus()', '读取电源状态', 'system.power'],
+  ['long.power.lock()', '锁定屏幕', 'system.power'],
+  ['long.theme.get()', '读取系统主题', 'system.theme'],
+  ['long.theme.set()', '设置系统主题', 'system.theme'],
+  ['long.wallpaper.set()', '设置桌面壁纸', 'system.wallpaper'],
+  ['long.brightness.set()', '设置屏幕亮度', 'display.brightness'],
+  ['long.pinyin.get()', '获取完整拼音', 'text.pinyin'],
+  ['long.pinyin.match()', '拼音模糊匹配', 'text.pinyin'],
+  ['long.input.keyPress()', '模拟按键', 'system.input'],
+  ['long.input.mouseClick()', '模拟鼠标点击', 'system.input'],
+  ['long.cache.getStatistics()', '读取缓存统计', 'system.cache'],
+  ['long.cache.cleanTemp()', '清理临时文件', 'system.cache'],
+  ['long.schedule.create()', '创建计划任务', 'system.schedule'],
+  ['long.schedule.getAll()', '读取计划任务', 'system.schedule'],
+  ['long.ui.showToast()', '显示轻提示', 'system.notification'],
+  ['long.ui.confirm()', '显示确认对话框', 'ui.window'],
+  ['long.ui.prompt()', '显示输入对话框', 'ui.window'],
+  ['long.ui.createWindow()', '创建插件窗口', 'ui.window']
+];
+
+var codeMirrorEditor = CodeMirror.fromTextArea(document.getElementById('codeEditor'), {
+  theme: 'material-darker',
+  mode: 'javascript',
+  lineNumbers: true,
+  indentUnit: 2,
+  tabSize: 2,
+  lineWrapping: false,
+  matchBrackets: true,
+  autoCloseBrackets: true,
+  styleActiveLine: true,
+  extraKeys: {
+    'Ctrl-S': function() { saveCurrent(); },
+    'Cmd-S': function() { saveCurrent(); },
+    'Ctrl-F': function() { showSearch(); },
+    'Cmd-F': function() { showSearch(); },
+    'Ctrl-Space': function() { showLongHints(); },
+    'Tab': function(cm) { cm.replaceSelection('  ', 'end'); }
+  }
+});
+
+codeMirrorEditor.on('change', function(cm, change) {
+  if (suppressEditorChange) return;
+  onEditorInput();
+  if (change.origin === '+input' && change.text && change.text.join('').endsWith('.')) {
+    setTimeout(showLongHints, 0);
+  }
+});
+
+function editorModeForPath(path) {
+  var ext = (path.split('.').pop() || '').toLowerCase();
+  if (ext === 'ts') return { name: 'javascript', typescript: true };
+  if (ext === 'json') return { name: 'javascript', json: true };
+  if (ext === 'html' || ext === 'htm') return 'htmlmixed';
+  if (ext === 'css') return 'css';
+  if (ext === 'cs' || ext === 'csx') return 'text/x-csharp';
+  return 'javascript';
+}
+
+function showLongHints() {
+  if (!codeMirrorEditor || currentTab < 0) return;
+  var cursor = codeMirrorEditor.getCursor();
+  var token = codeMirrorEditor.getTokenAt(cursor);
+  var raw = token.string || '';
+  var start = token.start;
+  var lineBefore = codeMirrorEditor.getRange({line: cursor.line, ch: 0}, cursor);
+  var match = lineBefore.match(/[A-Za-z0-9_.]+$/);
+  var query = match ? match[0] : raw;
+  if (match) start = cursor.ch - query.length;
+  var normalized = query.toLowerCase();
+  var list = longApiCatalog
+    .filter(function(item) { return !normalized || item[0].toLowerCase().indexOf(normalized) >= 0; })
+    .map(function(item) {
+      return {
+        text: item[0],
+        displayText: item[0] + '  —  ' + item[1] + (item[2] ? '  [' + item[2] + ']' : '')
+      };
+    });
+  codeMirrorEditor.showHint({
+    hint: function() {
+      return { list: list, from: CodeMirror.Pos(cursor.line, start), to: cursor };
+    },
+    completeSingle: false
+  });
+}
 
 // ══════════════════════════════════════════════
 // JS → C# Bridge
 // ══════════════════════════════════════════════
 function api(action, data) {
   data = data || {};
-  window.chrome.webview.postMessage(JSON.stringify({
+  window.chrome.webview.postMessage({
     Action: action,
     Path: data.path,
     Content: data.content,
@@ -311,13 +501,13 @@ function api(action, data) {
     Name: data.name,
     Id: data.id,
     Capabilities: data.capabilities
-  }));
+  });
 }
 
 api('listPlugins');
 
 function handleMessage(raw) {
-  try { var m = JSON.parse(raw); } catch(e) { return; }
+  try { var m = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
   switch(m.type) {
     case 'pluginsListed':    renderPlugins(m.data); break;
     case 'filesListed':      renderFileTree(m.data); break;
@@ -325,6 +515,7 @@ function handleMessage(raw) {
     case 'fileSaved':        onFileSaved(m.data); break;
     case 'pluginCreated':    onPluginCreated(); break;
     case 'capabilitiesListed': renderCaps(m.data); break;
+    case 'pluginLogs':       renderPluginLogs(m.data); break;
     case 'error':            showStatus(m.data.msg, false); break;
   }
 }
@@ -337,20 +528,67 @@ function renderPlugins(plugins) {
   (plugins||[]).forEach(function(p) {
     var icon = p.hasManifest ? '\u25C9' : '\u25CB';
     var color = p.hasManifest ? 'color:var(--green)' : 'color:var(--text3)';
-    h += '<div class="plugin-item" onclick="selectPlugin(\'' + escAttr(p.path) + '\')">' +
+    h += '<div class="plugin-item" data-path="' + escAttr(p.path) + '" data-id="' + escAttr(p.id || '') + '" ' +
+         'onclick="selectPlugin(this.dataset.path,this.dataset.id)">' +
          '<span class="icon" style="' + color + '">' + icon + '</span>' + esc(p.name) + '</div>';
   });
   document.getElementById('pluginList').innerHTML = h ||
     '<span style="color:var(--text3);font-size:11px">无插件</span>';
 }
 
-function selectPlugin(dir) {
+function selectPlugin(dir, pluginId) {
   currentPlugin = dir;
+  currentPluginId = pluginId || '';
+  document.getElementById('consolePlugin').textContent = currentPluginId || dir.split('/').pop();
   document.querySelectorAll('.plugin-item').forEach(function(el) {
-    el.classList.toggle('active', el.textContent.includes(dir.split('\\').pop().split('/').pop()));
+    el.classList.toggle('active', el.dataset.path === dir);
   });
   document.getElementById('fileTree').innerHTML = '';
   api('listFiles', { path: dir });
+}
+
+function renderApiExplorer() {
+  var query = (document.getElementById('apiFilter')?.value || '').trim().toLowerCase();
+  var items = longApiCatalog.filter(function(item) {
+    return !query || item.join(' ').toLowerCase().indexOf(query) >= 0;
+  }).slice(0, 60);
+  document.getElementById('apiList').innerHTML = items.map(function(item) {
+    return '<div class="api-item" data-api="' + escAttr(item[0]) + '" onclick="insertApi(this.dataset.api)">' +
+      '<code>' + esc(item[0]) + '</code><span>' + esc(item[1]) +
+      (item[2] ? ' · ' + esc(item[2]) : '') + '</span></div>';
+  }).join('');
+}
+
+function insertApi(apiText) {
+  if (currentTab < 0) return;
+  codeMirrorEditor.replaceSelection(apiText, 'end');
+  codeMirrorEditor.focus();
+}
+
+function toggleConsole(force) {
+  var panel = document.getElementById('consolePanel');
+  var show = typeof force === 'boolean' ? force : !panel.classList.contains('show');
+  panel.classList.toggle('show', show);
+  setTimeout(function() { codeMirrorEditor.refresh(); }, 0);
+  if (show) refreshPluginLogs();
+}
+
+function refreshPluginLogs() {
+  if (!currentPluginId) {
+    document.getElementById('consoleOutput').textContent = '请先在左侧选择插件。';
+    return;
+  }
+  document.getElementById('consoleOutput').textContent = '正在读取日志...';
+  api('getLogs', { id: currentPluginId });
+}
+
+function renderPluginLogs(data) {
+  var lines = data && data.lines ? data.lines : [];
+  document.getElementById('consoleOutput').textContent = lines.length ? lines.join('\n') : '当前插件暂无日志。';
+}
+
+function clearConsole() {
+  document.getElementById('consoleOutput').textContent = '日志显示已清空（不会删除磁盘日志）。';
 }
 
 // ══════════════════════════════════════════════
@@ -461,22 +699,25 @@ function showEditor() {
   if (currentTab < 0) return;
   document.getElementById('empty').style.display = 'none';
   document.getElementById('editorWrap').style.display = 'flex';
-  var ed = document.getElementById('codeEditor');
-  ed.value = tabs[currentTab].content;
-  ed.readOnly = !!tabs[currentTab].readOnly;
-  ed.classList.toggle('readonly', !!tabs[currentTab].readOnly);
-  ed.focus();
-  updateLineNumbers();
+  suppressEditorChange = true;
+  codeMirrorEditor.setOption('mode', editorModeForPath(tabs[currentTab].path));
+  codeMirrorEditor.setOption('readOnly', !!tabs[currentTab].readOnly);
+  codeMirrorEditor.setValue(tabs[currentTab].content || '');
+  suppressEditorChange = false;
+  setTimeout(function() {
+    codeMirrorEditor.refresh();
+    codeMirrorEditor.focus();
+    codeMirrorEditor.setCursor({ line: 0, ch: 0 });
+  }, 0);
 }
 
 function onEditorInput() {
   if (currentTab < 0) return;
-  tabs[currentTab].content = document.getElementById('codeEditor').value;
+  tabs[currentTab].content = codeMirrorEditor.getValue();
   if (!tabs[currentTab].dirty) {
     tabs[currentTab].dirty = true;
     renderTabs();
   }
-  updateLineNumbers();
 }
 
 function updateFileInfo() {
@@ -494,16 +735,11 @@ function updateFileInfo() {
 // 行号
 // ══════════════════════════════════════════════
 function updateLineNumbers() {
-  var ed = document.getElementById('codeEditor');
-  var lines = ed.value.split('\n').length;
-  var ln = document.getElementById('lineNumbers');
-  var h = '';
-  for (var i = 1; i <= lines; i++) h += '<span>' + i + '</span>';
-  ln.innerHTML = h;
+  // CodeMirror manages line numbers.
 }
 
 function syncScroll() {
-  document.getElementById('lineNumbers').scrollTop = document.getElementById('codeEditor').scrollTop;
+  // CodeMirror keeps gutters synchronized with editor scrolling.
 }
 
 // ══════════════════════════════════════════════
@@ -512,18 +748,19 @@ function syncScroll() {
 function saveCurrent() {
   if (currentTab < 0 || !tabs[currentTab] || tabs[currentTab].readOnly) return;
   var t = tabs[currentTab];
-  t.content = document.getElementById('codeEditor').value;
+  t.content = codeMirrorEditor.getValue();
   fileCache[t.path] = t.content;
   api('saveFile', { path: t.path, content: t.content });
 }
 
 function onFileSaved(data) {
   if (data.success) {
-    if (currentTab >= 0 && tabs[currentTab]) {
-      tabs[currentTab].dirty = false;
+    var savedTab = tabs.find(function(tab) { return tab.path === data.path; });
+    if (savedTab) {
+      savedTab.dirty = false;
       renderTabs();
     }
-    showStatus('已保存 \u2713', true);
+    showStatus('已保存 · 插件将在 1 秒内热重载 \u2713', true);
   } else {
     showStatus('保存失败: ' + (data.error||'未知'), false);
   }
@@ -544,15 +781,14 @@ function closeSearch() {
 }
 function doSearch() {
   var q = document.getElementById('searchInput').value;
-  var ed = document.getElementById('codeEditor');
   searchResults = [];
   if (!q) { document.getElementById('searchCount').textContent = '0/0'; return; }
-  var text = ed.value;
+  var text = codeMirrorEditor.getValue();
   var idx = text.indexOf(q);
   while (idx >= 0) { searchResults.push(idx); idx = text.indexOf(q, idx + 1); }
   searchIdx = searchResults.length > 0 ? 0 : -1;
   document.getElementById('searchCount').textContent = (searchIdx+1) + '/' + searchResults.length;
-  if (searchIdx >= 0) ed.setSelectionRange(searchResults[searchIdx], searchResults[searchIdx] + q.length);
+  if (searchIdx >= 0) selectSearchResult(q);
 }
 function searchNext() { navigateSearch(1); }
 function searchPrev() { navigateSearch(-1); }
@@ -560,10 +796,15 @@ function navigateSearch(dir) {
   if (searchResults.length === 0) return;
   searchIdx = (searchIdx + dir + searchResults.length) % searchResults.length;
   var q = document.getElementById('searchInput').value;
-  var ed = document.getElementById('codeEditor');
-  ed.setSelectionRange(searchResults[searchIdx], searchResults[searchIdx] + q.length);
-  ed.focus();
+  selectSearchResult(q);
   document.getElementById('searchCount').textContent = (searchIdx+1) + '/' + searchResults.length;
+}
+function selectSearchResult(q) {
+  var start = codeMirrorEditor.posFromIndex(searchResults[searchIdx]);
+  var end = codeMirrorEditor.posFromIndex(searchResults[searchIdx] + q.length);
+  codeMirrorEditor.setSelection(start, end);
+  codeMirrorEditor.scrollIntoView({from:start, to:end}, 80);
+  codeMirrorEditor.focus();
 }
 function handleSearchKey(e) {
   if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? searchPrev() : searchNext(); }
@@ -581,11 +822,7 @@ function handleKeydown(e) {
   // Tab: 缩进
   if (e.key === 'Tab') {
     e.preventDefault();
-    var ed = document.getElementById('codeEditor');
-    var s = ed.selectionStart;
-    ed.value = ed.value.substring(0, s) + '  ' + ed.value.substring(s);
-    ed.selectionStart = ed.selectionEnd = s + 2;
-    onEditorInput();
+    codeMirrorEditor.replaceSelection('  ', 'end');
   }
 }
 
@@ -606,8 +843,13 @@ function renderCaps(caps) {
   var type = document.getElementById('newType').value;
   var h = '';
   (caps||[]).forEach(function(c) {
-    var checked = '';
-    h += '<label><input type="checkbox" value="' + c.id + '" ' + checked + '>' + c.id + '</label>';
+    var checked = type === 'web' && c.id === 'system.notification' ? 'checked' : '';
+    h += '<label class="cap-risk-' + escAttr(c.level || 'unknown') + '" title="' + escAttr(c.description || '') + '">' +
+      '<input type="checkbox" value="' + escAttr(c.id) + '" ' + checked + '>' +
+      '<span class="cap-icon">' + esc(c.icon || '•') + '</span>' +
+      '<span><span class="cap-name">' + esc(c.name || c.id) + '</span>' +
+      '<span class="cap-id">' + esc(c.id) + '</span>' +
+      '<span class="cap-desc">' + esc(c.description || '') + '</span></span></label>';
   });
   document.getElementById('capsGrid').innerHTML = h ||
     '<span style="color:var(--text3);font-size:11px">无可用能力</span>';
@@ -662,6 +904,7 @@ function esc(s) {
 function escAttr(s) {
   return (s||'').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+renderApiExplorer();
 </script>
 </body>
 </html>

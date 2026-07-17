@@ -13,6 +13,9 @@ namespace LongBetterWindows.Host
     {
         public static bool IsExiting { get; set; }
         private string? _directNotePath;
+        private bool _isDirectNoteMode;
+        private int _pluginRuntimeStarted;
+        private PluginScanner? _scanner;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -50,6 +53,7 @@ namespace LongBetterWindows.Host
                 if (e.Args[i] == "--note" && i + 1 < e.Args.Length)
                 {
                     _directNotePath = e.Args[i + 1];
+                    _isDirectNoteMode = true;
                     break;
                 }
             }
@@ -65,37 +69,40 @@ namespace LongBetterWindows.Host
                 args.Handled = true;
             };
 
-            // 非 --note 模式：正常启动，安装 .lpak → 扫描插件
-            if (_directNotePath == null)
+        }
+
+        internal void StartPluginRuntime()
+        {
+            if (_isDirectNoteMode || Interlocked.Exchange(ref _pluginRuntimeStarted, 1) != 0)
+                return;
+
+            _scanner = new PluginScanner();
+            var scanner = _scanner;
+            var installer = new LpakInstaller(scanner);
+
+            _ = Task.Run(async () =>
             {
-                var scanner = new PluginScanner();
-                var installer = new LpakInstaller(scanner);
+                // 先安装 .lpak 包
+                var installed = await installer.InstallAllFromDirectoryAsync();
+                if (installed > 0)
+                    Log.Information("安装了 {Count} 个 .lpak 插件", installed);
 
-                _ = Task.Run(async () =>
+                // 主窗口句柄与热键服务就绪后再扫描和启动插件。
+                await scanner.ScanAsync();
+                Log.Information("插件加载完成，共 {Count} 个", scanner.LoadedPlugins.Count);
+            }).ContinueWith(t =>
+            {
+                if (t.IsFaulted)
                 {
-                    // 先安装 .lpak 包
-                    var installed = await installer.InstallAllFromDirectoryAsync();
-                    if (installed > 0)
-                        Log.Information("安装了 {Count} 个 .lpak 插件", installed);
-
-                    // 再扫描已解压的插件
-                    await scanner.ScanAsync();
+                    Log.Error(t.Exception, "插件加载失败");
+                    Dispatcher.Invoke(async () =>
+                        await ServicesInitializer.Notification.ShowAsync("插件加载出错", "部分插件未能正确加载，请查看日志。"));
+                }
+                else
+                {
                     Log.Information("插件加载完成，共 {Count} 个", scanner.LoadedPlugins.Count);
-                }).ContinueWith(t =>
-                {
-                    if (t.IsFaulted)
-                    {
-                        Log.Error(t.Exception, "插件加载失败");
-                        Dispatcher.Invoke(async () =>
-                            await ServicesInitializer.Notification.ShowAsync("插件加载出错", "部分插件未能正确加载，请查看日志。"));
-                    }
-                    else
-                    {
-                        var count = scanner.LoadedPlugins.Count;
-                        Log.Information("插件加载完成，共 {Count} 个", count);
-                    }
-                }, TaskScheduler.Default);
-            }
+                }
+            }, TaskScheduler.Default);
         }
 
         protected override async void OnActivated(EventArgs e)
@@ -156,6 +163,7 @@ namespace LongBetterWindows.Host
         protected override void OnExit(ExitEventArgs e)
         {
             // 清理服务资源
+            _scanner?.Dispose();
             ServicesInitializer.DisposeAll();
             Log.Information("Long窗口·全能助手 已退出。");
             Log.CloseAndFlush();

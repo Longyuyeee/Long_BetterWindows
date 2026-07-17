@@ -25,6 +25,7 @@ namespace LongBetterWindows.Host.Engine
             "system.registry.read",
             "system.registry.write",
             "system.clipboard",
+            "system.clipboard.monitor",
             "system.notification",
             "system.screenshot",
             "system.input",
@@ -33,6 +34,19 @@ namespace LongBetterWindows.Host.Engine
             "window.info",
             "storage.local",
             "network.http",
+            "network.ports",
+            "network.monitor",
+            "system.performance",
+            "filesystem.advanced",
+            "text.pinyin",
+            "system.cache",
+            "system.schedule",
+            "system.audio",
+            "system.power",
+            "system.theme",
+            "system.wallpaper",
+            "display.brightness",
+            "ui.window",
         };
 
         public static async Task<ManifestResult> ReadAsync(string pluginDir)

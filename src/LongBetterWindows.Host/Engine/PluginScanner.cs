@@ -1,4 +1,7 @@
 using System.IO;
+using System.Net;
+using System.Text;
+using System.Text.RegularExpressions;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using Serilog;
@@ -48,6 +51,8 @@ namespace LongBetterWindows.Host.Engine
 
                 foreach (var dir in Directory.GetDirectories(scanDir))
                 {
+                    if (Path.GetFileName(dir).StartsWith(".long_temp_", StringComparison.OrdinalIgnoreCase))
+                        continue;
                     allDirs.Add(dir);
                 }
 
@@ -117,6 +122,9 @@ namespace LongBetterWindows.Host.Engine
 
         private static bool IsPluginFile(string path)
         {
+            if (path.Contains($"{Path.DirectorySeparatorChar}.long_temp_", StringComparison.OrdinalIgnoreCase))
+                return false;
+
             var ext = Path.GetExtension(path).ToLowerInvariant();
             var name = Path.GetFileName(path).ToLowerInvariant();
             return ext == ".dll" || ext == ".csx" || ext == ".js" || ext == ".ts" || name == "manifest.json";
@@ -142,6 +150,12 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task ReloadPluginByFileAsync(string filePath)
         {
+            if (IsStandaloneScript(filePath))
+            {
+                await ReloadStandaloneScriptAsync(Path.GetFullPath(filePath));
+                return;
+            }
+
             var pluginDir = FindPluginRootDir(filePath);
             if (pluginDir == null) return;
 
@@ -182,6 +196,45 @@ namespace LongBetterWindows.Host.Engine
 
             // 加载新版本
             await TryLoadPluginAsync(pluginDir);
+        }
+
+        private bool IsStandaloneScript(string filePath)
+        {
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+            if (extension is not (".csx" or ".js" or ".ts")) return false;
+
+            var parent = Path.GetDirectoryName(Path.GetFullPath(filePath));
+            return _scanDirs.Any(dir => string.Equals(
+                Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar),
+                parent?.TrimEnd(Path.DirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase));
+        }
+
+        private async Task ReloadStandaloneScriptAsync(string scriptPath)
+        {
+            if (_dirToPluginId.TryGetValue(scriptPath, out var pluginId))
+            {
+                var registry = HostProvider.Instance.PluginStore;
+                var entry = registry.Get(pluginId);
+                if (entry?.Instance is ILongPlugin plugin)
+                {
+                    using (PluginAccessContext.Enter(pluginId))
+                        await plugin.StopAsync();
+                }
+
+                registry.Unregister(pluginId);
+                _scriptLoader.Unload(pluginId);
+                LoadedPlugins.RemoveAll(p => p.Id == pluginId);
+                DiscoveredManifests.RemoveAll(m => m.Id == pluginId);
+                _dirToPluginId.Remove(scriptPath);
+            }
+
+            if (!File.Exists(scriptPath)) return;
+
+            if (Path.GetExtension(scriptPath).Equals(".csx", StringComparison.OrdinalIgnoreCase))
+                await TryLoadStandaloneScriptAsync(scriptPath);
+            else
+                await TryLoadStandaloneJsScriptAsync(scriptPath);
         }
 
         private static string? FindPluginRootDir(string filePath)
@@ -327,8 +380,18 @@ namespace LongBetterWindows.Host.Engine
                     if (!startOk)
                     {
                         Log.Error("插件 {PluginId} 启动失败", manifest.Id);
-                        if (loadContext != null) _loader.Unload(loadContext);
-                        else _scriptLoader.Unload(manifest.Id);
+                        try
+                        {
+                            await plugin.StopAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "插件 {PluginId} 启动失败后的清理未完全完成", manifest.Id);
+                        }
+
+                        // 保留插件实例，用户可解决热键冲突后从管理界面重新启用。
+                        registry.SetState(manifest.Id, PluginState.Error);
+                        LoadedPlugins.Add(entry);
                         return;
                     }
                 }
@@ -356,6 +419,8 @@ namespace LongBetterWindows.Host.Engine
             if (string.IsNullOrEmpty(scriptDir))
                 return;
 
+            var scriptContent = await File.ReadAllTextAsync(scriptPath);
+
             // 自动生成虚拟 manifest
             var manifest = new PluginManifest
             {
@@ -364,7 +429,7 @@ namespace LongBetterWindows.Host.Engine
                 Version = "1.0.0",
                 Runtime = "csharp-script",
                 EntryPoint = Path.GetFileName(scriptPath),
-                Capabilities = new List<string>(), // 单文件脚本默认无权限限制
+                Capabilities = ExtractStandaloneCapabilities(scriptContent),
                 Author = "User"
             };
 
@@ -450,6 +515,18 @@ namespace LongBetterWindows.Host.Engine
             var scriptContent = await File.ReadAllTextAsync(scriptPath);
             var isTypeScript = ext == ".ts";
 
+            if (isTypeScript)
+            {
+                var compilerPath = Path.Combine(AppContext.BaseDirectory, "Assets", "typescript.js");
+                if (!File.Exists(compilerPath))
+                {
+                    Log.Error("TypeScript 编译器资源缺失: {Path}", compilerPath);
+                    return;
+                }
+
+                File.Copy(compilerPath, Path.Combine(tempPluginDir, "typescript.js"), true);
+            }
+
             var htmlContent = GenerateJsWrapperHtml(fileName, scriptContent, isTypeScript);
             var htmlPath = Path.Combine(tempPluginDir, "index.html");
             await File.WriteAllTextAsync(htmlPath, htmlContent);
@@ -466,7 +543,7 @@ namespace LongBetterWindows.Host.Engine
                 Version = "1.0.0",
                 Runtime = "html",
                 EntryPoint = "index.html",
-                Capabilities = new List<string>(), // 单文件脚本默认无权限限制
+                Capabilities = ExtractStandaloneCapabilities(scriptContent),
                 Author = "User"
             };
 
@@ -507,17 +584,56 @@ namespace LongBetterWindows.Host.Engine
             Log.Information("✅ 单文件 JS/TS 脚本 {Name} 加载成功（热插拔模式）", fileName);
         }
 
-        private string GenerateJsWrapperHtml(string pluginName, string scriptContent, bool isTypeScript)
+        internal static List<string> ExtractStandaloneCapabilities(string scriptContent)
         {
-            var scriptTag = isTypeScript
-                ? $"<script type=\"module\">\n// TypeScript 代码（运行时编译）\n{scriptContent}\n</script>"
-                : $"<script>\n{scriptContent}\n</script>";
+            var capabilities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var matches = Regex.Matches(
+                scriptContent,
+                @"^\s*//\s*@capabilit(?:y|ies)\s*[:=]?\s*(.+?)\s*$",
+                RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
+            foreach (Match match in matches)
+            {
+                foreach (var value in match.Groups[1].Value.Split(
+                    new[] { ',', ';', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (ManifestReader.KnownCapabilities.Contains(value))
+                        capabilities.Add(value);
+                    else
+                        Log.Warning("单文件脚本声明了未知能力: {Capability}", value);
+                }
+            }
+
+            return capabilities.OrderBy(value => value).ToList();
+        }
+
+        private static string GenerateJsWrapperHtml(string pluginName, string scriptContent, bool isTypeScript)
+        {
+            var encodedSource = Convert.ToBase64String(Encoding.UTF8.GetBytes(scriptContent));
+            var safeName = WebUtility.HtmlEncode(pluginName);
+            var compilerTag = isTypeScript ? "<script src=\"typescript.js\"></script>" : string.Empty;
+            var executeScript = isTypeScript
+                ? @"
+        const result = ts.transpileModule(source, {
+            compilerOptions: {
+                target: ts.ScriptTarget.ES2020,
+                module: ts.ModuleKind.None,
+                strict: false
+            },
+            reportDiagnostics: true
+        });
+        const errors = (result.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error);
+        if (errors.length) {
+            throw new Error(errors.map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n')).join('\n'));
+        }
+        (0, eval)(result.outputText);"
+                : "        (0, eval)(source);";
 
             return $@"<!DOCTYPE html>
 <html>
 <head>
     <meta charset=""utf-8"">
-    <title>{pluginName}</title>
+    <title>{safeName}</title>
     <style>
         body {{
             margin: 0;
@@ -552,8 +668,8 @@ namespace LongBetterWindows.Host.Engine
 </head>
 <body>
     <div class=""script-info"">
-        <h3>📜 {pluginName} {(isTypeScript ? "(TypeScript)" : "(JavaScript)")}</h3>
-        <p>单文件脚本 · 热插拔模式 · 完整 long.* API 访问</p>
+        <h3>📜 {safeName} {(isTypeScript ? "(TypeScript)" : "(JavaScript)")}</h3>
+        <p>单文件脚本 · 保存即热重载 · 能力由 @capabilities 声明</p>
     </div>
     <div id=""output""></div>
 
@@ -561,13 +677,34 @@ namespace LongBetterWindows.Host.Engine
     <script>
         const output = document.getElementById('output');
         const originalLog = console.log;
+        const postHostLog = (...args) => window.chrome?.webview?.postMessage({{
+            id: 0,
+            method: 'app.log',
+            args: args.map(value => String(value))
+        }});
         console.log = function(...args) {{
             originalLog.apply(console, args);
             output.textContent += args.join(' ') + '\\n';
+            postHostLog(...args);
+        }};
+        const originalError = console.error;
+        console.error = function(...args) {{
+            originalError.apply(console, args);
+            postHostLog('[error]', ...args);
         }};
     </script>
 
-    {scriptTag}
+    {compilerTag}
+    <script>
+    try {{
+        const bytes = Uint8Array.from(atob('{encodedSource}'), c => c.charCodeAt(0));
+        const source = new TextDecoder('utf-8').decode(bytes);
+{executeScript}
+    }} catch (error) {{
+        console.error(error);
+        output.textContent += '编译或执行失败: ' + (error?.message || error) + '\n';
+    }}
+    </script>
 </body>
 </html>";
         }

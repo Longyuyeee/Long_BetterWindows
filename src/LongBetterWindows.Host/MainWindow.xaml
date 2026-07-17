@@ -3,37 +3,62 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:LongBetterWindows.Host.Views"
         Title="Long窗口·全能助手"
-        MinWidth="440" MinHeight="360"
-        Width="500" Height="560"
+        MinWidth="720" MinHeight="520"
+        Width="960" Height="720"
         WindowStartupLocation="CenterScreen"
         Opacity="0"
         Loaded="Window_Loaded">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="36" GlassFrameThickness="0"
-                      CornerRadius="8" ResizeBorderThickness="4"
+        <WindowChrome CaptionHeight="44" GlassFrameThickness="0"
+                      CornerRadius="18" ResizeBorderThickness="6"
                       UseAeroCaptionButtons="True" />
     </WindowChrome.WindowChrome>
 
-    <Border CornerRadius="8">
-        <!-- Acrylic 毛玻璃效果 -->
-        <Border.Background>
-            <SolidColorBrush Color="#CC0F172A" Opacity="0.95" />
-        </Border.Background>
+    <Border CornerRadius="18" BorderBrush="#28FFFFFF" BorderThickness="1"
+            Background="{StaticResource BackgroundRadialGradientBrush}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="36" />
+                <RowDefinition Height="44" />
                 <RowDefinition Height="1" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
+            <!-- 低对比度光晕让毛玻璃层更有空间感。 -->
+            <Ellipse Width="420" Height="420" HorizontalAlignment="Left" VerticalAlignment="Top"
+                     Margin="-150,-210,0,0" IsHitTestVisible="False" Opacity="0.24">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#8B5CF6" Offset="0" />
+                        <GradientStop Color="#008B5CF6" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.Effect><BlurEffect Radius="42" /></Ellipse.Effect>
+            </Ellipse>
+            <Ellipse Width="360" Height="360" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-130,-190" IsHitTestVisible="False" Opacity="0.2">
+                <Ellipse.Fill>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#06B6D4" Offset="0" />
+                        <GradientStop Color="#0006B6D4" Offset="1" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.Effect><BlurEffect Radius="42" /></Ellipse.Effect>
+            </Ellipse>
+
             <!-- 自定义标题栏 -->
-            <Border Grid.Row="0" Background="{StaticResource TitleBarBrush}">
+            <Border Grid.Row="0" Background="#66141A29" CornerRadius="18,18,0,0">
                 <Grid>
-                    <TextBlock Text="Long窗口·全能助手"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               FontSize="12"
-                               VerticalAlignment="Center" Margin="14,0,0,0" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <Border Width="24" Height="24" CornerRadius="7" Background="{StaticResource PrimaryGradientBrush}">
+                            <TextBlock Text="L" Foreground="White" FontSize="13" FontWeight="Bold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="Long窗口" Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" Margin="9,0,0,0" />
+                        <TextBlock Text="插件与系统能力中枢" Foreground="{StaticResource TextMutedBrush}"
+                                   FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0" />
+                    </StackPanel>
                 </Grid>
             </Border>
 

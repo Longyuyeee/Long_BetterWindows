@@ -1,8 +1,10 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using LongBetterWindows.Host.Helpers;
+using LongBetterWindows.Host.Services;
 using Microsoft.Web.WebView2.Wpf;
 
 namespace LongBetterWindows.Host.Views
@@ -10,9 +12,13 @@ namespace LongBetterWindows.Host.Views
     public partial class PluginDevTools : Window
     {
         private readonly WebView2 _webView;
+        private readonly string _pluginsRoot;
 
         public PluginDevTools()
         {
+            _pluginsRoot = Path.Combine(AppContext.BaseDirectory, "Plugins");
+            Directory.CreateDirectory(_pluginsRoot);
+
             Width = 900; Height = 650;
             MinWidth = 600; MinHeight = 400;
             Title = "插件开发工具";
@@ -79,67 +85,113 @@ namespace LongBetterWindows.Host.Views
                 case "preview": PreviewFile(msg.Path ?? ""); break;
                 case "newPlugin": NewPlugin(msg.Template ?? "web", msg.Name ?? "my-plugin", msg.Id ?? "com.example.plugin", msg.Capabilities); break;
                 case "listCapabilities": ListCapabilities(); break;
+                case "getLogs": GetPluginLogs(msg.Id ?? ""); break;
             }
         }
 
         private void ListPlugins()
         {
             var dirs = new List<object>();
-            var srcDir = FindSrcDir();
-            if (srcDir != null && Directory.Exists(srcDir))
+            foreach (var d in Directory.GetDirectories(_pluginsRoot))
             {
-                foreach (var d in Directory.GetDirectories(srcDir))
+                var name = Path.GetFileName(d);
+                if (name.StartsWith(".long_temp_", StringComparison.OrdinalIgnoreCase)) continue;
+                var manifestPath = Path.Combine(d, "manifest.json");
+                if (!File.Exists(manifestPath)) continue;
+
+                var id = name;
+                try
                 {
-                    var name = Path.GetFileName(d);
-                    if (name == "Templates" || name == "LongBetterWindows.Host") continue;
-                    dirs.Add(new { name, path = d.Replace("\\", "/"), hasManifest = File.Exists(Path.Combine(d, "manifest.json")) });
+                    using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+                    var root = document.RootElement;
+                    if (root.TryGetProperty("id", out var idValue))
+                        id = idValue.GetString() ?? id;
+                    if (root.TryGetProperty("name", out var nameValue))
+                        name = nameValue.GetString() ?? name;
                 }
+                catch { }
+
+                dirs.Add(new { id, name, path = d.Replace("\\", "/"), hasManifest = true });
             }
             SendJs("pluginsListed", dirs);
+        }
+
+        private void GetPluginLogs(string pluginId)
+        {
+            if (string.IsNullOrWhiteSpace(pluginId))
+            {
+                SendJs("pluginLogs", new { pluginId, lines = Array.Empty<string>() });
+                return;
+            }
+
+            var logDirs = new[]
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), "logs"),
+                Path.Combine(AppContext.BaseDirectory, "logs"),
+            };
+
+            var logFile = logDirs
+                .Where(Directory.Exists)
+                .SelectMany(dir => Directory.GetFiles(dir, "log*.txt"))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+
+            var lines = logFile == null
+                ? new List<string>()
+                : File.ReadLines(logFile)
+                    .Where(line => line.Contains(pluginId, StringComparison.OrdinalIgnoreCase))
+                    .TakeLast(200)
+                    .ToList();
+
+            SendJs("pluginLogs", new { pluginId, lines });
         }
 
         private void ListFiles(string dir)
         {
             var files = new List<object>();
-            if (Directory.Exists(dir))
+            if (TryResolvePluginPath(dir, out var safeDir) && Directory.Exists(safeDir))
             {
-                foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+                foreach (var f in Directory.GetFiles(safeDir, "*", SearchOption.AllDirectories))
                 {
                     if (f.Contains("\\obj\\") || f.Contains("\\bin\\")) continue;
-                    files.Add(new { name = Path.GetRelativePath(dir, f).Replace("\\", "/"), path = f.Replace("\\", "/") });
+                    files.Add(new { name = Path.GetRelativePath(safeDir, f).Replace("\\", "/"), path = f.Replace("\\", "/") });
                 }
             }
-            SendJs("filesListed", new { dir, files });
+            SendJs("filesListed", new { dir = string.IsNullOrEmpty(safeDir) ? dir : safeDir, files });
         }
 
         private void OpenFile(string path)
         {
-            if (!File.Exists(path)) return;
-            var content = File.ReadAllText(path);
-            SendJs("fileOpened", new { path, content });
+            if (!TryResolvePluginPath(path, out var safePath) || !File.Exists(safePath)) return;
+            var content = File.ReadAllText(safePath);
+            SendJs("fileOpened", new { path = safePath, content });
         }
 
         private void SaveFile(string path, string content)
         {
             try
             {
-                var dir = Path.GetDirectoryName(path);
+                if (!TryResolvePluginPath(path, out var safePath))
+                    throw new UnauthorizedAccessException("只能编辑 Plugins 目录中的文件。");
+
+                var dir = Path.GetDirectoryName(safePath);
                 if (dir != null && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                File.WriteAllText(path, content, Encoding.UTF8);
-                SendJs("fileSaved", new { path, success = true });
+                File.WriteAllText(safePath, content, Encoding.UTF8);
+                SendJs("fileSaved", new { path = safePath, success = true });
             }
             catch (Exception ex) { SendJs("fileSaved", new { path, success = false, error = ex.Message }); }
         }
 
         private void PreviewFile(string path)
         {
-            if (!File.Exists(path)) return;
+            if (!TryResolvePluginPath(path, out var safePath) || !File.Exists(safePath)) return;
 
-            if (path.EndsWith(".html") || path.EndsWith(".htm"))
+            if (safePath.EndsWith(".html") || safePath.EndsWith(".htm"))
             {
                 var w = new Window
                 {
-                    Title = "预览: " + Path.GetFileName(path),
+                    Title = "预览: " + Path.GetFileName(safePath),
                     Width = 500, Height = 500,
                     WindowStartupLocation = WindowStartupLocation.CenterScreen,
                 };
@@ -148,24 +200,29 @@ namespace LongBetterWindows.Host.Views
                 w.Loaded += async (_, _) =>
                 {
                     await wv.EnsureCoreWebView2Async();
-                    wv.CoreWebView2.Navigate(new Uri(path).AbsoluteUri);
+                    wv.CoreWebView2.Navigate(new Uri(safePath).AbsoluteUri);
                 };
                 w.Show();
             }
             else
             {
                 // 其他文件类型：在编辑器中只读预览
-                var content = File.ReadAllText(path);
-                SendJs("fileOpened", new { path, content, readOnly = true });
+                var content = File.ReadAllText(safePath);
+                SendJs("fileOpened", new { path = safePath, content, readOnly = true });
             }
         }
 
         private void NewPlugin(string template, string name, string id, List<string>? capabilities)
         {
-            var srcDir = FindSrcDir();
-            if (srcDir == null) { SendJs("error", new { msg = "src/ 目录未找到" }); return; }
-            var safeDir = id.Replace('.', '-').Replace("\\", "-").Replace("/", "-");
-            var pluginDir = Path.Combine(srcDir, safeDir);
+            if (template is "dll" or "dotnet")
+            {
+                SendJs("error", new { msg = "DLL 插件需要编译环境，请使用项目脚手架；内置编辑器当前支持 Web 和 C# 脚本插件。" });
+                return;
+            }
+
+            var safeDir = Regex.Replace(id, "[^a-zA-Z0-9_-]", "-").Trim('-');
+            if (string.IsNullOrWhiteSpace(safeDir)) safeDir = "my-plugin";
+            var pluginDir = Path.Combine(_pluginsRoot, safeDir);
             if (Directory.Exists(pluginDir)) { SendJs("error", new { msg = "目录已存在" }); return; }
             Directory.CreateDirectory(pluginDir);
 
@@ -206,23 +263,35 @@ namespace LongBetterWindows.Host.Views
         {
             var caps = Engine.ManifestReader.KnownCapabilities
                 .OrderBy(c => c)
-                .Select(c => new { id = c, name = c })
+                .Select(c =>
+                {
+                    var info = CapabilityMetadata.GetInfo(c);
+                    return new
+                    {
+                        id = c,
+                        name = info.DisplayName,
+                        icon = info.Icon,
+                        description = info.Description,
+                        level = info.Level.ToString().ToLowerInvariant()
+                    };
+                })
                 .ToList();
             SendJs("capabilitiesListed", caps);
         }
 
-        private static string? FindSrcDir()
+        private bool TryResolvePluginPath(string path, out string safePath)
         {
-            var dir = AppContext.BaseDirectory;
-            for (int i = 0; i < 6; i++)
+            safePath = string.Empty;
+            try
             {
-                var src = Path.Combine(dir, "src");
-                if (Directory.Exists(src)) return src;
-                var parent = Directory.GetParent(dir);
-                if (parent == null) break;
-                dir = parent.FullName;
+                var root = Path.GetFullPath(_pluginsRoot)
+                    .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                var fullPath = Path.GetFullPath(path);
+                if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return false;
+                safePath = fullPath;
+                return true;
             }
-            return null;
+            catch { return false; }
         }
 
         private async void SendJs(string type, object? data = null)

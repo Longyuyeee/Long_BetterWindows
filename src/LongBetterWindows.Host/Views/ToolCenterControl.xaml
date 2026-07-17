@@ -6,14 +6,33 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto"
                   Style="{StaticResource DarkScrollViewerStyle}">
-        <StackPanel Margin="20,16">
+        <StackPanel Margin="28,20">
 
             <!-- ═══ 标题 ═══ -->
-            <TextBlock Text="Long窗口·全能助手" FontWeight="SemiBold" FontSize="16"
-                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,2" />
-            <TextBlock Text="打造极致优雅、深度集成的 Windows 效率增强中枢。"
-                       FontSize="11" Foreground="{StaticResource TextMutedBrush}"
-                       Margin="0,0,0,16" />
+            <Border CornerRadius="18" Padding="24,20" Margin="0,0,0,18"
+                    Background="{StaticResource PrimaryGradientBrush}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="让 Windows 更漂亮，也更强大" FontWeight="SemiBold" FontSize="25"
+                                   Foreground="White" Margin="0,0,0,6" />
+                        <TextBlock Text="组合底层能力，编写代码，保存后即刻成为你的新工具。"
+                                   FontSize="12" Foreground="#E8FFFFFF" />
+                    </StackPanel>
+                    <Border Grid.Column="1" CornerRadius="12" Padding="14,8" Margin="20,0,0,0"
+                            Background="#28FFFFFF" VerticalAlignment="Center">
+                        <StackPanel>
+                            <TextBlock Text="LONG PLATFORM" Foreground="#CFFFFFFF" FontSize="9"
+                                       FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Text="v1.8" Foreground="White" FontSize="17" FontWeight="Bold"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
 
             <!-- ═══ 分段控件 ═══ -->
             <Border Style="{StaticResource SegmentedBarStyle}" Margin="0,0,0,14"
@@ -145,8 +164,8 @@
 
                 <!-- 拖放区域（热插拔安装） -->
                 <Border x:Name="DropZone"
-                        Background="#1A1A1D"
-                        BorderBrush="#3A3A3D"
+                        Background="#B31B2233"
+                        BorderBrush="#4D60A5FA"
                         BorderThickness="2"
                         CornerRadius="8"
                         Padding="20,16"
@@ -162,7 +181,7 @@
                             <TextBlock Text="拖放 .csx / .js / .ts 或 .lpak 文件到这里"
                                        FontSize="12"
                                        Foreground="{StaticResource TextSecondaryBrush}" />
-                            <TextBlock Text="单文件脚本即刻生效 · 支持 C# / JavaScript / TypeScript"
+                            <TextBlock Text="单文件脚本即刻生效 · C# / JavaScript / TypeScript 离线编译"
                                        FontSize="10"
                                        Foreground="{StaticResource TextMutedBrush}"
                                        Margin="0,2,0,0" />

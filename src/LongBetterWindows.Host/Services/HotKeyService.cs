@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using Serilog;
@@ -11,6 +12,7 @@ namespace LongBetterWindows.Host.Services
     {
         private IntPtr _hwnd;
         private HwndSource? _source;
+        private Dispatcher? _dispatcher;
         private readonly Dictionary<string, HotKeyEntry> _entries = new();
         private readonly object _lock = new();
         private int _nextId = 1;
@@ -50,6 +52,7 @@ namespace LongBetterWindows.Host.Services
         public void Initialize(IntPtr hwnd)
         {
             _hwnd = hwnd;
+            _dispatcher = Dispatcher.CurrentDispatcher;
             _source = HwndSource.FromHwnd(hwnd);
             _source.AddHook(WndProc);
             Log.Information("HotKeyService 已初始化，HWnd: 0x{Hwnd:X}", hwnd);
@@ -63,27 +66,34 @@ namespace LongBetterWindows.Host.Services
 
         public Task<HostApiResponse> RegisterAsync(string hotkey, string pluginId, Action callback)
         {
+            if (_dispatcher != null && !_dispatcher.CheckAccess())
+                return _dispatcher.InvokeAsync(() => RegisterCore(hotkey, pluginId, callback)).Task;
+
+            return Task.FromResult(RegisterCore(hotkey, pluginId, callback));
+        }
+
+        private HostApiResponse RegisterCore(string hotkey, string pluginId, Action callback)
+        {
             lock (_lock)
             {
                 var normalized = Normalize(hotkey);
 
                 if (_entries.TryGetValue(normalized, out var existing))
                 {
-                    return Task.FromResult(HostApiResponse.Failure(
+                    return HostApiResponse.Failure(
                         ApiErrorCode.HotKeyConflict,
-                        $"热键 '{hotkey}' 已被「{existing.OwnerName}」占用。"));
+                        $"热键 '{hotkey}' 已被「{existing.OwnerName}」占用。");
                 }
 
                 if (!TryParseHotkey(hotkey, out var modifiers, out var vk, out var error))
                 {
-                    return Task.FromResult(HostApiResponse.Failure(
-                        ApiErrorCode.InvalidArgument, error));
+                    return HostApiResponse.Failure(ApiErrorCode.InvalidArgument, error);
                 }
 
                 if (_hwnd == IntPtr.Zero)
                 {
-                    return Task.FromResult(HostApiResponse.Failure(
-                        ApiErrorCode.Unknown, "HotKeyService 未初始化，请先调用 Initialize。"));
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.Unknown, "HotKeyService 未初始化，请先调用 Initialize。");
                 }
 
                 int id = _nextId++;
@@ -93,9 +103,9 @@ namespace LongBetterWindows.Host.Services
                     int win32Error = Marshal.GetLastWin32Error();
                     Log.Warning("RegisterHotKey 失败: {Hotkey}, Win32Error={Error}",
                         hotkey, win32Error);
-                    return Task.FromResult(HostApiResponse.Failure(
+                    return HostApiResponse.Failure(
                         ApiErrorCode.HotKeyRegistrationFailed,
-                        $"注册热键失败 (Win32 Error: {win32Error})。"));
+                        $"注册热键失败 (Win32 Error: {win32Error})。");
                 }
 
                 _entries[normalized] = new HotKeyEntry
@@ -109,11 +119,19 @@ namespace LongBetterWindows.Host.Services
                 };
 
                 Log.Information("热键已注册: {Hotkey} (ID={Id})", hotkey, id);
-                return Task.FromResult(HostApiResponse.Success());
+                return HostApiResponse.Success();
             }
         }
 
         public Task<HostApiResponse> UnregisterAsync(string hotkey)
+        {
+            if (_dispatcher != null && !_dispatcher.CheckAccess())
+                return _dispatcher.InvokeAsync(() => UnregisterCore(hotkey)).Task;
+
+            return Task.FromResult(UnregisterCore(hotkey));
+        }
+
+        private HostApiResponse UnregisterCore(string hotkey)
         {
             lock (_lock)
             {
@@ -121,15 +139,15 @@ namespace LongBetterWindows.Host.Services
 
                 if (!_entries.TryGetValue(normalized, out var entry))
                 {
-                    return Task.FromResult(HostApiResponse.Failure(
-                        ApiErrorCode.NotFound, $"热键 '{hotkey}' 未注册。"));
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.NotFound, $"热键 '{hotkey}' 未注册。");
                 }
 
                 UnregisterHotKey(_hwnd, entry.Id);
                 _entries.Remove(normalized);
 
                 Log.Information("热键已注销: {Hotkey}", hotkey);
-                return Task.FromResult(HostApiResponse.Success());
+                return HostApiResponse.Success();
             }
         }
 
