@@ -7,7 +7,7 @@
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
-[![Version](https://img.shields.io/badge/version-1.6.1-blue)](https://github.com/Longyuyeee/Long_BetterWindows/releases)
+[![Version](https://img.shields.io/badge/version-1.8.0-blue)](https://github.com/Longyuyeee/Long_BetterWindows/releases)
 
 *一个功能强大、易于扩展的 Windows 效率工具平台*
 
@@ -43,12 +43,12 @@
 <tr>
 <td>
 
-### ⚡ 20 项底层能力
+### ⚡ 25 项底层能力
 - 系统监控与性能分析
 - 文件系统高级操作
-- 网络端口管理
+- 网络端口与流量监控
 - 剪贴板监听与历史
-- 音频控制与定时任务
+- 壁纸、亮度、主题管理
 
 </td>
 <td>
@@ -66,13 +66,47 @@
 
 ---
 
+## 🎯 功能亮点
+
+### 🛠️ 系统管理
+- **电源管理** - 关机/重启/睡眠/休眠/锁屏/电源状态
+- **主题管理** - 暗色/亮色模式切换、系统强调色
+- **壁纸管理** - 设置壁纸、多种样式（填充/适应/拉伸）
+- **亮度控制** - 屏幕亮度调节（0-100）
+- **音频控制** - 音量调节、静音切换
+
+### 📊 性能监控
+- **硬件监控** - CPU/GPU/内存/磁盘实时监控
+- **进程管理** - 资源占用、进程关闭
+- **网络监控** - 实时网速、流量统计
+- **端口管理** - 端口扫描、进程映射、安全释放
+
+### 📁 文件工具
+- **文件整理** - 按类型/日期分类、查重、批量重命名
+- **文件夹备注** - NTFS ADS 备注存储
+- **剪贴板历史** - 自动记录、搜索、复用
+
+### 💻 开发工具
+- **开发者工具箱** - Base64/Hash/UUID/时间戳/进制/URL/Unicode
+- **JSON 格式化** - 格式化、压缩、校验
+- **文本对比** - 逐行对比、高亮差异
+- **颜色选择器** - 取色、格式转换
+
+### 🚀 效率助手
+- **快捷启动** - 热键呼出、模糊搜索
+- **宏录制器** - 录制回放鼠标键盘操作
+- **窗口管理** - 快速平铺、多显示器支持
+- **截图工具** - 区域截图、自动保存
+
+---
+
 ## 📦 快速开始
 
 ### 方式一：直接使用（推荐新用户）
 
 1. **下载最新版本**
    ```
-   前往 Releases 页面下载 Long_BetterWindows_v1.6.1.zip
+   前往 Releases 页面下载 Long_BetterWindows_v1.8.0.zip
    ```
 
 2. **解压并运行**
@@ -100,146 +134,96 @@ dotnet build
 dotnet run --project src/LongBetterWindows.Host
 ```
 
----
+### 方式三：开发模式
 
-## 🎯 功能亮点
-
-### 🛠️ 开发者工具箱
-<sup>**DevToolkit** - 一站式编码转换</sup>
-
-- **Base64** 编码/解码
-- **Hash** 计算（MD5/SHA1/SHA256）
-- **UUID** 生成（v4/短UUID/时间戳）
-- **时间戳** ↔ 日期转换
-- **进制转换**（DEC/HEX/OCT/BIN）
-- **URL/Unicode** 编码解码
-
-### 📋 剪贴板历史
-<sup>**ClipboardHistory** - 永不丢失的复制内容</sup>
-
-- 自动记录剪贴板历史（最多 500 条）
-- 按关键词/时间/类型搜索
-- 一键复制回剪贴板
-- 热键 `Ctrl+Shift+V` 快速打开
-
-### 🌐 端口管理器
-<sup>**PortManager** - 端口冲突终结者</sup>
-
-- 扫描所有 TCP/UDP 端口
-- 识别占用进程（PID/名称/路径）
-- 占用分析与查找
-- 安全终止进程释放端口
-
-### 📊 硬件监控
-<sup>**HardwareMonitor** - 系统状态一目了然</sup>
-
-- 实时监控 CPU/内存/磁盘
-- 系统信息展示
-- 进程资源占用 Top 10
-- 自动刷新（2秒间隔）
-
-### 📁 文件整理器
-<sup>**FileOrganizer** - 文件管理神器</sup>
-
-- 按类型/日期/大小自动分类
-- 查找大文件（自定义阈值）
-- 删除重复文件（MD5 对比）
-- 批量重命名
-- 全文搜索
-
-### 🎵 音频控制
-<sup>**AudioService** - 快捷音量管理</sup>
-
-- 获取/设置系统音量
-- 静音/取消静音
-- 音量增减控制
-- 音频设备切换
+```bash
+# 支持热重载和详细日志
+双击 开发模式.bat
+```
 
 ---
 
-## 🧩 底层能力清单
+## 🔌 插件系统
 
-<details>
-<summary><b>展开查看完整能力列表（20项）</b></summary>
+### 三种插件运行时
 
-### 系统能力
+| 类型 | 技术栈 | 优势 | 适用场景 |
+|---|---|---|---|
+| **WebView** | HTML/CSS/JS | 快速开发、跨平台UI | 工具类插件、数据展示 |
+| **DLL** | C# + WPF | 原生性能、系统集成 | 系统级功能、后台服务 |
+| **脚本** | C# Script (.csx) | 无需编译、即写即用 | 快速原型、自动化脚本 |
+
+### 内置插件列表（21个）
+
+**系统工具**
+- 📋 剪贴板历史 - 自动记录、快速搜索
+- 🌐 端口管理器 - 端口扫描、进程识别
+- 📊 硬件监控 - CPU/内存/磁盘监控
+- 🗂️ 文件整理器 - 智能分类、批量处理
+- 💻 开发者工具箱 - 编解码一站式工具
+
+**效率工具**
+- 🚀 快捷启动器 - 热键呼出、模糊搜索
+- 📷 截图工具 - 快速截图、自动保存
+- 🪟 窗口管理器 - 窗口平铺、多屏支持
+- 📝 快速笔记 - 悬浮窗记事本
+- 🔖 文件夹备注 - NTFS ADS 备注
+
+**开发工具**
+- 🧰 Base64 工具 - 编解码转换
+- 📄 JSON 格式化 - 格式化、校验
+- 🎨 颜色选择器 - 取色、格式转换
+- 📝 Markdown 预览 - 实时渲染
+- 🔄 文本对比 - 差异高亮
+
+**其他工具**
+- 🎯 宏录制器 - 自动化操作
+- 📝 文件重命名 - 批量重命名
+- 🔐 密码生成器 - 强密码生成
+- 🌐 翻译助手 - 快速翻译
+- 🔧 示例插件 - 开发参考
+
+---
+
+## 🎯 底层能力清单（25项）
+
+### 系统能力（14项）
 - `system.hotkey` - 全局热键
 - `system.clipboard` - 剪贴板读写
-- `system.clipboard.monitor` - 剪贴板监听 🆕
+- `system.clipboard.monitor` - 剪贴板监听
 - `system.notification` - Toast 通知
 - `system.screenshot` - 截图
 - `system.input` - 输入模拟
 - `system.process` - 进程管理
-- `system.performance` - 性能监控 🆕
+- `system.performance` - 性能监控
 - `system.registry.*` - 注册表操作
-- `system.cache` - 缓存清理 🆕
-- `system.schedule` - 定时任务 🆕
-- `system.audio` - 音频控制 🆕
+- `system.cache` - 缓存清理
+- `system.schedule` - 定时任务
+- `system.audio` - 音频控制
+- `system.power` - 电源管理
+- `system.theme` - 主题管理
+- `system.wallpaper` - 壁纸管理
 
-### Shell 能力
+### 显示能力（1项）
+- `display.brightness` - 亮度控制
+
+### 网络能力（3项）
+- `network.ports` - 端口管理
+- `network.monitor` - 流量监控
+- `network.http` - HTTP 请求
+
+### 文件能力（4项）
+- `file.ops` - 文件操作
+- `filesystem.advanced` - 高级文件系统
+- `fs.ads.access` - NTFS ADS
 - `shell.selection` - Explorer 感知
 - `shell.execute` - 打开 URL/文件
 
-### 文件系统
-- `fs.ads.access` - NTFS 备用数据流
-- `file.ops` - 文件操作
-- `filesystem.advanced` - 高级文件系统 🆕
-
-### 网络能力
-- `network.ports` - 端口管理 🆕
-- `network.http` - HTTP 请求
-
-### 其他能力
-- `text.pinyin` - 拼音匹配 🆕
+### 其他能力（3项）
+- `text.pinyin` - 拼音匹配
 - `storage.local` - 本地存储
 - `window.info` - 窗口信息
-- `ui.window` - UI 能力
-
-</details>
-
----
-
-## 🔌 插件开发
-
-### 快速创建一个插件
-
-```json
-// manifest.json
-{
-  "id": "com.example.myplugin",
-  "version": "1.0.0",
-  "name": "我的插件",
-  "entry_point": "index.html",
-  "runtime": "webview",
-  "capabilities": [
-    "system.clipboard",
-    "storage.local"
-  ]
-}
-```
-
-```html
-<!-- index.html -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>我的插件</title>
-</head>
-<body>
-    <h1>Hello Long窗口！</h1>
-    <button onclick="getClipboard()">读取剪贴板</button>
-    
-    <script>
-        async function getClipboard() {
-            const text = await long.clipboard.getText();
-            alert('剪贴板内容: ' + text);
-        }
-    </script>
-</body>
-</html>
-```
-
-详细教程请查看 [📖 插件开发指南](docs/插件开发指南.md)
+- `ui.window` - UI 窗口能力
 
 ---
 
@@ -249,87 +233,153 @@ dotnet run --project src/LongBetterWindows.Host
 Long_BetterWindows/
 ├── src/
 │   ├── LongBetterWindows.Host/          # 宿主程序
-│   │   ├── Capabilities/                # 能力接口
-│   │   ├── Services/                    # 能力实现
 │   │   ├── Engine/                      # 插件引擎
-│   │   └── UI/                          # 主窗口 UI
-│   ├── DevToolkit/                      # 开发者工具箱插件
-│   ├── ClipboardHistory/                # 剪贴板历史插件
-│   ├── PortManager/                     # 端口管理器插件
-│   ├── HardwareMonitor/                 # 硬件监控插件
-│   ├── FileOrganizer/                   # 文件整理器插件
-│   └── ...（更多插件）
-├── docs/                                # 文档
-│   ├── 插件开发指南.md
-│   ├── 脚本使用说明.md
-│   └── v1.6持续扩展总结.md
+│   │   ├── Services/                    # 底层能力服务
+│   │   ├── Capabilities/                # 能力接口定义
+│   │   └── UI/                          # 主界面
+│   ├── *Plugin/                         # DLL 插件
+│   └── */                               # WebView 插件
+├── docs/                                # 开发文档
+├── tests/                               # 单元测试
 ├── 启动.bat                             # 一键启动脚本
 ├── 开发模式.bat                         # 开发模式脚本
-├── 打包发布.bat                         # 打包发布脚本
-└── README.md
+└── 打包发布.bat                         # 打包脚本
 ```
-
----
-
-## 📊 版本历程
-
-| 版本 | 日期 | 更新内容 |
-|------|------|----------|
-| v1.6.1 | 2026-07-16 | 新增自动化脚本、优化文档 |
-| v1.6.0 | 2026-07-16 | 新增 8 项底层能力、5 个插件 |
-| v0.2.0 | 2026-07-15 | 插件热重载、权限沙盒、.lpak 打包 |
-| v0.1.0 | 2026-07-14 | 项目初始化、基础架构 |
 
 ---
 
 ## 🛠️ 技术栈
 
-- **框架**: .NET 8.0 + WPF
-- **UI**: XAML + MaterialDesign
-- **插件**: WebView2 + C# 脚本
-- **日志**: Serilog
-- **测试**: xUnit
+### 核心技术
+- **.NET 8.0** - 现代化框架
+- **WPF** - 原生 Windows UI
+- **WebView2** - Edge Chromium 内核
+- **Roslyn** - C# 脚本引擎
+
+### UI 框架
+- **WPF UI** - 现代化 UI 控件
+- **HTML/CSS/JS** - WebView 插件
+
+### 工具库
+- **Serilog** - 日志系统
+- **Newtonsoft.Json** - JSON 处理
+- **Microsoft.CodeAnalysis** - 脚本编译
+
+---
+
+## 📝 开发插件
+
+### WebView 插件示例
+
+```javascript
+// manifest.json
+{
+  "id": "com.example.myplugin",
+  "name": "我的插件",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": ["system.clipboard"]
+}
+```
+
+```html
+<!-- index.html -->
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>我的插件</h1>
+  <button onclick="copyText()">复制文本</button>
+  
+  <script>
+    async function copyText() {
+      await window.hostApi.clipboard.setText('Hello World');
+    }
+  </script>
+</body>
+</html>
+```
+
+### DLL 插件示例
+
+```csharp
+public class MyPlugin : IPlugin
+{
+    public void Initialize(IHostApi hostApi)
+    {
+        hostApi.Hotkey.Register("Ctrl+Shift+M", OnHotkeyPressed);
+    }
+    
+    private void OnHotkeyPressed()
+    {
+        // 插件逻辑
+    }
+}
+```
+
+更多示例请查看 [插件开发指南](docs/插件开发指南.md)
+
+---
+
+## 📊 版本历史
+
+### v1.8.0 (2026-07-16)
+- ✨ 新增壁纸管理能力
+- ✨ 新增屏幕亮度控制
+- ✨ 新增网络流量监控
+- 🐛 修复批处理文件编码问题
+
+### v1.7.0 (2026-07-16)
+- ✨ 新增电源管理能力
+- ✨ 新增主题管理能力
+
+### v1.6.1 (2026-07-16)
+- ✨ 新增 8 项底层能力
+- ✨ 新增 5 个实用插件
+- ✨ 新增自动化脚本系统
+- 📝 美化 README 文档
+
+[查看完整更新日志](docs/)
 
 ---
 
 ## 🤝 贡献指南
 
-我们欢迎任何形式的贡献！
+欢迎提交 Issue 和 Pull Request！
 
-1. **Fork 本仓库**
-2. **创建特性分支** (`git checkout -b feature/AmazingFeature`)
-3. **提交更改** (`git commit -m 'Add some AmazingFeature'`)
-4. **推送到分支** (`git push origin feature/AmazingFeature`)
-5. **提交 Pull Request**
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
 
 ---
 
 ## 📄 开源协议
 
-本项目采用 [MIT](LICENSE) 协议开源。
+本项目采用 [MIT License](LICENSE) 开源协议。
 
 ---
 
-## 💡 致谢
+## 🙏 致谢
 
-- 感谢 [Material Design In XAML](http://materialdesigninxaml.net/) 提供的优秀 UI 组件
-- 感谢 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) 提供的网页渲染引擎
-- 感谢 [Serilog](https://serilog.net/) 提供的日志框架
+- [WPF UI](https://github.com/lepoco/wpfui) - 现代化 WPF 控件库
+- [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) - Edge Chromium 内核
+- [Serilog](https://serilog.net/) - 结构化日志库
 
 ---
 
-## 📮 联系方式
+## 📧 联系方式
 
-- **Issue**: [提交问题](https://github.com/Longyuyeee/Long_BetterWindows/issues)
-- **Discussion**: [参与讨论](https://github.com/Longyuyeee/Long_BetterWindows/discussions)
-- **Email**: longyuyeee@example.com
+- **作者**: Kiro
+- **项目地址**: https://github.com/Longyuyeee/Long_BetterWindows
+- **问题反馈**: [GitHub Issues](https://github.com/Longyuyeee/Long_BetterWindows/issues)
 
 ---
 
 <div align="center">
 
-**如果这个项目对你有帮助，请给一个 ⭐ Star 支持一下！**
+**⭐ 如果这个项目对你有帮助，请给一个 Star 支持一下！⭐**
 
-Made with ❤️ by Kiro (Claude Code)
+Made with ❤️ by Kiro
 
 </div>
