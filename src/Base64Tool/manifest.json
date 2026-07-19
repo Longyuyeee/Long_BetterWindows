@@ -1,1 +1,43 @@
-{"id":"com.long.base64","version":"1.0.0","name":"Base64 编解码","author":"Long","entry_point":"index.html","runtime":"webview","capabilities":["system.clipboard"],"default_settings":{"auto_start":true}}
+{
+  "id": "com.long.base64",
+  "version": "1.1.0",
+  "name": "Base64 编解码",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": ["system.clipboard"],
+  "commands": [
+    {
+      "id": "base64.encode",
+      "title": "Base64 编码",
+      "description": "将文本或剪贴板内容编码为 Base64",
+      "aliases": ["base64", "编码", "encode", "bianma"],
+      "accepted_inputs": ["text", "clipboard"],
+      "view_mode": "form",
+      "priority": 18
+    },
+    {
+      "id": "base64.decode",
+      "title": "Base64 解码",
+      "description": "将 Base64 内容还原为文本",
+      "aliases": ["解码", "decode", "jiema"],
+      "accepted_inputs": ["text", "clipboard"],
+      "view_mode": "form",
+      "priority": 17
+    }
+  ],
+  "window": {
+    "mode": "standard",
+    "preferred_width": 760,
+    "preferred_height": 680,
+    "min_width": 620,
+    "min_height": 560
+  },
+  "lifecycle": {
+    "start_with_host": true,
+    "close_behavior": "stop",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
+  "default_settings": {"auto_start": true}
+}

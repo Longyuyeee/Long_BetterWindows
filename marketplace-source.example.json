@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 1,
+  "Entries": [
+    {
+      "Id": "com.example.plugin",
+      "Name": "Example Plugin",
+      "Summary": "A concise marketplace summary",
+      "Description": "A complete plugin description shown on the details page.",
+      "Category": "效率工具",
+      "Tags": ["example"],
+      "Versions": [
+        {
+          "Version": "1.0.0",
+          "PackageFile": "com.example.plugin-v1.0.0.lpak",
+          "PublishedAt": "2026-07-19T00:00:00+08:00",
+          "ReleaseNotes": "Initial release."
+        }
+      ]
+    }
+  ]
+}

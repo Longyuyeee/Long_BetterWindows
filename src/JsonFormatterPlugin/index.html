@@ -1,73 +1,91 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8"><title>JSON 格式化</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,system-ui,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:20px;min-height:100vh}
-h2{font-size:15px;margin-bottom:12px;color:#89b4fa}
-textarea{width:100%;height:180px;background:#313244;color:#cdd6f4;border:1px solid #45475a;
-  border-radius:8px;padding:12px;font-size:13px;font-family:'Cascadia Code','Consolas',monospace;
-  line-height:1.6;resize:vertical}
-textarea:focus{outline:none;border-color:#89b4fa}
-.btn-row{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
-button{padding:8px 16px;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer}
-.btn-primary{background:#89b4fa;color:#1e1e2e}.btn-primary:hover{background:#74c7ec}
-.btn-secondary{background:#45475a;color:#cdd6f4}.btn-secondary:hover{background:#585b70}
-.status{font-size:11px;margin-top:6px}.status.ok{color:#a6e3a1}.status.err{color:#f38ba8}
-.stat{font-size:11px;color:#6c7086;margin-left:8px}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JSON 格式化</title>
 </head>
 <body>
-<h2>JSON 格式化工具</h2>
-<textarea id="input" placeholder="粘贴 JSON 字符串..."></textarea>
-<div class="btn-row">
-  <button class="btn-primary" onclick="formatJson()">格式化</button>
-  <button class="btn-secondary" onclick="compressJson()">压缩</button>
-  <button class="btn-secondary" onclick="pasteFromClip()">从剪贴板粘贴</button>
-  <button class="btn-secondary" onclick="copyResult()">复制结果</button>
-  <span class="stat" id="statText"></span>
-</div>
-<div class="status" id="statusText"></div>
-<br/>
-<textarea id="output" placeholder="格式化结果..." readonly></textarea>
+  <main class="long-page">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">DEVELOPER TOOL</div>
+        <h1 class="long-page-title">JSON 格式化</h1>
+        <p class="long-page-description">格式化、校验或压缩 JSON，所有数据仅在本地处理。</p>
+      </div>
+      <span class="long-badge" id="stat">等待输入</span>
+    </header>
 
-<script>
-async function formatJson() {
-  try {
-    var obj = JSON.parse(document.getElementById('input').value);
-    var formatted = JSON.stringify(obj, null, 2);
-    document.getElementById('output').value = formatted;
-    showStatus('格式化成功', true);
-    document.getElementById('statText').textContent = (formatted.length)+' 字符';
-  } catch(e) { showStatus('JSON 解析失败: '+e.message, false); }
-}
+    <section class="long-grid" aria-label="JSON 编辑器">
+      <div class="long-card long-field">
+        <label class="long-field-label" for="input">输入</label>
+        <textarea class="long-editor" id="input" placeholder="粘贴 JSON 字符串…" autofocus></textarea>
+      </div>
+      <div class="long-card long-field">
+        <label class="long-field-label" for="output">处理结果</label>
+        <textarea class="long-editor" id="output" placeholder="格式化结果将在这里显示" readonly></textarea>
+      </div>
+    </section>
 
-function compressJson() {
-  try {
-    var obj = JSON.parse(document.getElementById('input').value);
-    var compressed = JSON.stringify(obj);
-    document.getElementById('output').value = compressed;
-    showStatus('压缩成功', true);
-  } catch(e) { showStatus('JSON 解析失败: '+e.message, false); }
-}
+    <div class="long-toolbar long-toolbar--spaced">
+      <button class="long-button long-button--primary btn-primary" id="formatButton" type="button">格式化</button>
+      <button class="long-button long-button--secondary btn-secondary" id="minifyButton" type="button">压缩</button>
+      <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button">粘贴</button>
+      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button">复制结果</button>
+      <span class="long-toolbar__spacer"></span>
+      <span class="long-kbd">Ctrl Enter</span>
+    </div>
+    <div id="status" class="long-status" role="status" aria-live="polite"></div>
+  </main>
 
-async function pasteFromClip() {
-  try { var r = await long.clipboard.getText();
-    if (r.success && r.data) { document.getElementById('input').value = r.data; formatJson(); }
-  } catch(e) {}
-}
+  <script>
+    const input = document.getElementById('input');
+    const output = document.getElementById('output');
+    const status = document.getElementById('status');
+    const stat = document.getElementById('stat');
 
-async function copyResult() {
-  var t = document.getElementById('output').value;
-  if (!t) return;
-  try { await long.clipboard.setText(t); showStatus('已复制', true); } catch(e) {}
-}
+    function setStatus(message, kind) {
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      window.LongUI?.announce(message);
+    }
 
-function showStatus(msg, ok) {
-  var el = document.getElementById('statusText');
-  el.textContent = msg; el.className = 'status '+(ok?'ok':'err');
-}
-</script>
+    function transform(spaces) {
+      try {
+        const result = JSON.stringify(JSON.parse(input.value), null, spaces);
+        output.value = result;
+        stat.textContent = result.length.toLocaleString() + ' 字符';
+        setStatus(spaces ? 'JSON 格式化完成' : 'JSON 压缩完成', 'success');
+      } catch (error) {
+        setStatus('JSON 解析失败：' + error.message, 'danger');
+      }
+    }
+
+    async function paste() {
+      try {
+        const result = await long.clipboard.getText();
+        if (result.success && result.data) { input.value = result.data; transform(2); }
+      } catch (_) { setStatus('无法读取剪贴板', 'danger'); }
+    }
+
+    async function copy() {
+      if (!output.value) return;
+      try { await long.clipboard.setText(output.value); setStatus('结果已复制', 'success'); }
+      catch (_) { setStatus('复制失败', 'danger'); }
+    }
+
+    document.getElementById('formatButton').addEventListener('click', function () { transform(2); });
+    document.getElementById('minifyButton').addEventListener('click', function () { transform(0); });
+    document.getElementById('pasteButton').addEventListener('click', paste);
+    document.getElementById('copyButton').addEventListener('click', copy);
+    document.addEventListener('keydown', function (event) {
+      if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); transform(event.shiftKey ? 0 : 2); }
+    });
+    window.LongUI?.onCommand(function (command) {
+      const text = window.LongUI.commandText(command);
+      if (text) input.value = text;
+      transform(command.command_id === 'json.minify' ? 0 : 2);
+    });
+  </script>
 </body>
 </html>

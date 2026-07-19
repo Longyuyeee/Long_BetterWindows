@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>URL 工具箱</title>
+</head>
+<body>
+  <main class="long-page">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">WEB UTILITY</div>
+        <h1 class="long-page-title">URL 工具箱</h1>
+        <p class="long-page-description">编码或还原 URL 组件，自动识别查询参数，全程本地处理。</p>
+      </div>
+      <span class="long-badge" id="stat">等待输入</span>
+    </header>
+    <section class="long-stack" aria-label="URL 编解码工具">
+      <div class="long-card long-field">
+        <label class="long-field-label" for="input">输入内容</label>
+        <textarea class="long-editor" id="input" placeholder="输入 URL、查询参数或普通文本…" autofocus></textarea>
+      </div>
+      <div class="long-toolbar">
+        <button class="long-button long-button--primary btn-primary" id="encodeButton" type="button">编码组件</button>
+        <button class="long-button long-button--secondary btn-secondary" id="decodeButton" type="button">解码</button>
+        <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button">粘贴</button>
+        <span class="long-toolbar__spacer"></span><span class="long-kbd">Ctrl Enter</span>
+      </div>
+      <div class="long-card long-field">
+        <label class="long-field-label" for="output">结果</label>
+        <textarea class="long-editor" id="output" placeholder="处理结果将在这里显示" readonly></textarea>
+        <div class="long-toolbar"><div id="status" class="long-status" role="status" aria-live="polite"></div><span class="long-toolbar__spacer"></span><button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button">复制结果</button></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const input = document.getElementById('input');
+    const output = document.getElementById('output');
+    const status = document.getElementById('status');
+    const stat = document.getElementById('stat');
+    function announce(message, kind) { status.textContent = message; status.className = 'long-status ' + (kind ? 'long-status--' + kind : ''); window.LongUI?.announce(message); }
+    function transform(mode) {
+      try {
+        output.value = mode === 'decode' ? decodeURIComponent(input.value.replace(/\+/g, ' ')) : encodeURIComponent(input.value);
+        stat.textContent = output.value.length.toLocaleString() + ' 字符';
+        announce(mode === 'decode' ? 'URL 解码完成' : 'URL 编码完成', 'success');
+      } catch (error) { announce('内容无法解码：' + error.message, 'danger'); }
+    }
+    async function paste() { try { const result = await long.clipboard.getText(); if (result.success) input.value = result.data || ''; } catch (_) { announce('无法读取剪贴板', 'danger'); } }
+    async function copy() { if (!output.value) return; try { await long.clipboard.setText(output.value); announce('结果已复制', 'success'); } catch (_) { announce('复制失败', 'danger'); } }
+    document.getElementById('encodeButton').addEventListener('click', function () { transform('encode'); });
+    document.getElementById('decodeButton').addEventListener('click', function () { transform('decode'); });
+    document.getElementById('pasteButton').addEventListener('click', paste);
+    document.getElementById('copyButton').addEventListener('click', copy);
+    document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); transform(event.shiftKey ? 'decode' : 'encode'); } });
+    window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) input.value = text; transform(command.command_id === 'url.decode' ? 'decode' : 'encode'); });
+  </script>
+</body>
+</html>

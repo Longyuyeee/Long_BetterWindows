@@ -16,18 +16,17 @@ namespace LongBetterWindows.Host.Views
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
         private bool _startupEnabled;
+        private bool _docsLoaded;
 
         public ToolCenterControl()
         {
             InitializeComponent();
+            SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             RefreshColumnStatus();
             RefreshContextMenuStatus();
             RefreshStartupStatus();
-            RefreshDocLinks();
-            RefreshPluginList();
-
-            // 默认激活「系统」标签
-            ActivateTab(TabSystem);
+            RefreshMouseGestureControls();
+            ShowPage("overview");
 
             // 同步主题按钮状态
             var currentTheme = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme();
@@ -45,75 +44,143 @@ namespace LongBetterWindows.Host.Views
             {
                 Dispatcher.Invoke(() =>
                 {
-                    RefreshPluginList();
+                    if (_activePage == "plugins")
+                        RefreshPluginList();
                     UpdateAboutInfo();
                 });
             };
+        }
+
+        private void RefreshMouseGestureControls()
+        {
+            var mode = ServicesInitializer.MouseGestures.Mode;
+            foreach (var button in MouseGestureButtons.Children.OfType<Button>())
+            {
+                var active = string.Equals(
+                    button.Tag?.ToString(), mode.ToString(), StringComparison.OrdinalIgnoreCase);
+                button.SetResourceReference(
+                    FrameworkElement.StyleProperty,
+                    active ? "LongButton.Primary" : "LongButton");
+            }
+            MouseGestureStatusText.Text = mode switch
+            {
+                MouseGestureMode.MiddleButton => "已启用：按下鼠标中键呼出",
+                MouseGestureMode.LongRightPress => $"已启用：静止长按右键 {LongRightPressRecognizer.HoldMilliseconds}ms 呼出",
+                _ => "当前关闭，不监听全局鼠标按键",
+            };
+        }
+
+        private async void MouseGestureMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string value }
+                || !Enum.TryParse<MouseGestureMode>(value, out var mode)) return;
+            MouseGestureButtons.IsEnabled = false;
+            try
+            {
+                await ServicesInitializer.MouseGestures.SetModeAsync(mode);
+                RefreshMouseGestureControls();
+            }
+            finally { MouseGestureButtons.IsEnabled = true; }
+        }
+
+        private void ApplyResponsiveLayout(double width)
+        {
+            var isNarrow = width < 860;
+            NavigationColumn.Width = new GridLength(isNarrow ? 160 : 220);
+            PageHeader.Margin = isNarrow
+                ? new Thickness(18, 16, 18, 12)
+                : new Thickness(32, 20, 32, 16);
+            ContentBody.Margin = isNarrow
+                ? new Thickness(18, 0, 18, 18)
+                : new Thickness(32, 0, 32, 32);
+
+            if (isNarrow)
+            {
+                OverviewPrimaryColumn.Width = new GridLength(1, GridUnitType.Star);
+                OverviewGapColumn.Width = new GridLength(0);
+                OverviewStatusColumn.Width = new GridLength(0);
+                Grid.SetRow(OverviewStatusCard, 1);
+                Grid.SetColumn(OverviewStatusCard, 0);
+                OverviewStatusCard.Margin = new Thickness(0, 12, 0, 0);
+            }
+            else
+            {
+                OverviewPrimaryColumn.Width = new GridLength(1.3, GridUnitType.Star);
+                OverviewGapColumn.Width = new GridLength(16);
+                OverviewStatusColumn.Width = new GridLength(1, GridUnitType.Star);
+                Grid.SetRow(OverviewStatusCard, 0);
+                Grid.SetColumn(OverviewStatusCard, 2);
+                OverviewStatusCard.Margin = new Thickness(0);
+            }
         }
 
         private void UpdateAboutInfo()
         {
             var plugins = HostProvider.Instance.PluginStore.GetAll();
             var capCount = Engine.ManifestReader.KnownCapabilities.Count;
-            var ver = typeof(App).Assembly.GetName().Version;
-            AboutVersion.Text = $"v{ver?.Major ?? 0}.{ver?.Minor ?? 0}.{ver?.Build ?? 0} · .NET 8.0 · WPF";
+            AboutVersion.Text = $"v{App.ProductVersion} · .NET 8.0 · WPF";
             AboutStats.Text = $"{capCount} 项原子能力 · {plugins.Count} 个插件 · 3 种运行时";
             PluginsHeader.Text = $"已安装插件 ({plugins.Count})";
+            OverviewPluginCount.Text = plugins.Count.ToString();
+            OverviewCommandCount.Text = HostProvider.Instance.PluginStore.Commands.Count.ToString();
+            OverviewCapabilityCount.Text = capCount.ToString();
         }
 
-        #region Tab Navigation
-
-        private Button? _activeTab;
-
-        private void Tab_Click(object sender, RoutedEventArgs e)
+        private async void ClearSearchPreferences_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button tab || tab == _activeTab) return;
-
-            // 停用旧标签
-            if (_activeTab != null) DeactivateTab(_activeTab);
-
-            // 激活新标签
-            ActivateTab(tab);
-
-            // 切换面板（带淡入过渡）
-            SwitchPanel(tab);
+            if (sender is not Button button) return;
+            button.IsEnabled = false;
+            await ServicesInitializer.SearchPreferences.ClearAsync();
+            await ServicesInitializer.SuperPanelGroups.ClearAsync();
+            SearchPreferenceStatusText.Text = "固定、最近使用与自定义分组已清除";
+            button.IsEnabled = true;
         }
 
-        private void SwitchPanel(Button tab)
+        #region Navigation
+
+        private string _activePage = "overview";
+
+        internal void OpenMarketForQuality() => ShowPage("market");
+
+        private void Navigation_Click(object sender, RoutedEventArgs e)
         {
-            var panels = new[] {
-                (TabSystem, PanelSystem),
-                (TabPlugins, PanelPlugins),
-                (TabDev, PanelDev)
+            if (sender is RadioButton { Tag: string page })
+                ShowPage(page);
+        }
+
+        private void ShowPage(string page)
+        {
+            (string Key, FrameworkElement Panel, RadioButton Navigation, string Title, string Subtitle)[] pages =
+            {
+                ("overview", PanelOverview, NavOverview, "概览", "平台状态、关键能力和下一步操作"),
+                ("plugins", PanelPlugins, NavPlugins, "插件", "管理已安装插件、运行状态、权限和设置"),
+                ("market", PanelMarket, NavMarket, "插件市场", "发现、审查并安装可信的 Long 原生插件"),
+                ("system", PanelSystem, NavSystem, "系统集成", "配置 Explorer、启动项和全局快捷键"),
+                ("developer", PanelDev, NavDeveloper, "开发者", "创建、调试、打包插件并查阅开发资源"),
+                ("settings", PanelSettings, NavSettings, "设置", "外观、动效、本地数据与隐私"),
             };
 
-            foreach (var (tabBtn, panel) in panels)
+            foreach (var (key, panel, navigation, title, subtitle) in pages)
             {
-                if (tabBtn == tab)
+                var selected = key == page;
+                panel.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
+                navigation.IsChecked = selected;
+                if (!selected) continue;
+
+                _activePage = key;
+                PageTitle.Text = title;
+                PageSubtitle.Text = subtitle;
+                if (key == "plugins")
+                    RefreshPluginList();
+                else if (key == "market" && MarketHost.Content == null)
+                    MarketHost.Content = new MarketplaceControl();
+                else if (key == "developer" && !_docsLoaded)
                 {
-                    panel.Visibility = Visibility.Visible;
-                    Helpers.AnimationHelper.FadeInElement(panel, durationMs: 180);
+                    RefreshDocLinks();
+                    _docsLoaded = true;
                 }
-                else
-                {
-                    panel.Visibility = Visibility.Collapsed;
-                }
+                Helpers.AnimationHelper.FadeInElement(panel, durationMs: 160);
             }
-        }
-
-        private void ActivateTab(Button tab)
-        {
-            _activeTab = tab;
-            tab.Background = BlueBrush;
-            tab.Foreground = WhiteBrush;
-            tab.FontWeight = FontWeights.SemiBold;
-        }
-
-        private void DeactivateTab(Button tab)
-        {
-            tab.Background = Brushes.Transparent;
-            tab.Foreground = GrayBrush;
-            tab.FontWeight = FontWeights.Normal;
         }
 
         private void WelcomeDismiss_Click(object sender, RoutedEventArgs e)
@@ -124,16 +191,13 @@ namespace LongBetterWindows.Host.Views
 
         private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Tab)
+            if (e.Key == Key.Tab && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
                 e.Handled = true;
-                // 循环切换面板
-                if (_activeTab == TabSystem)
-                    Tab_Click(TabPlugins, new RoutedEventArgs());
-                else if (_activeTab == TabPlugins)
-                    Tab_Click(TabDev, new RoutedEventArgs());
-                else
-                    Tab_Click(TabSystem, new RoutedEventArgs());
+                var pages = new[] { "overview", "plugins", "market", "system", "developer", "settings" };
+                var current = Array.IndexOf(pages, _activePage);
+                var direction = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;
+                ShowPage(pages[(current + direction + pages.Length) % pages.Length]);
             }
         }
 
@@ -156,6 +220,18 @@ namespace LongBetterWindows.Host.Views
             PluginDevTools.Open(Window.GetWindow(this)!);
         }
 
+        private void DesignSystemPreview_Click(object sender, RoutedEventArgs e)
+        {
+            var preview = new DesignSystemPreview
+            {
+                Owner = Window.GetWindow(this),
+            };
+            preview.Show();
+        }
+
+        private void OpenPalette_Click(object sender, RoutedEventArgs e)
+            => CommandPaletteWindow.ShowPalette();
+
         private static bool _isLightMode;
         private void ThemeToggle_Click(object sender, RoutedEventArgs e)
         {
@@ -168,15 +244,6 @@ namespace LongBetterWindows.Host.Views
             Wpf.Ui.Appearance.ApplicationThemeManager.Apply(theme);
             App.SaveThemeSetting(_isLightMode);
             App.UpdateThemeResources(_isLightMode);
-
-            // 同步窗口背景色
-            var window = Window.GetWindow(this);
-            if (window != null)
-            {
-                window.Background = _isLightMode
-                    ? (Brush)FindResource("LightSurfaceBrush")
-                    : (Brush)FindResource("SurfaceBackgroundBrush");
-            }
 
             if (sender is Button btn)
                 btn.Content = _isLightMode ? "暗色" : "亮色";
@@ -405,7 +472,7 @@ namespace LongBetterWindows.Host.Views
             var version = _pluginCardVersion;
 
             PluginsLoading.Visibility = Visibility.Collapsed;
-            PluginsPanel.Children.Clear();
+            PluginsPanel.Items.Clear();
             var plugins = HostProvider.Instance.PluginStore.GetAll();
 
             if (plugins.Count == 0)
@@ -454,7 +521,7 @@ namespace LongBetterWindows.Host.Views
                     },
                 };
 
-                PluginsPanel.Children.Add(emptyCard);
+                PluginsPanel.Items.Add(emptyCard);
                 return;
             }
 
@@ -468,7 +535,7 @@ namespace LongBetterWindows.Host.Views
 
             if (filtered.Count == 0 && !string.IsNullOrEmpty(filter))
             {
-                PluginsPanel.Children.Add(new Border
+                PluginsPanel.Items.Add(new Border
                 {
                     Background = CardBgBrush,
                     CornerRadius = new CornerRadius(10),
@@ -485,7 +552,7 @@ namespace LongBetterWindows.Host.Views
 
             foreach (var plugin in filtered)
             {
-                PluginsPanel.Children.Add(CreatePluginCard(plugin, version));
+                PluginsPanel.Items.Add(CreatePluginCard(plugin, version));
             }
         }
 
@@ -494,13 +561,8 @@ namespace LongBetterWindows.Host.Views
             var isRunning = plugin.State == Core.PluginState.Running;
             var stateColor = isRunning ? GreenBrush : GrayBrush;
             var stateText = isRunning ? "运行中" : "已停止";
-
             var hotkey = PluginRegistry.GetPluginHotkey(plugin);
-
-            // 左侧信息区
             var infoStack = new StackPanel();
-
-            // 第一行: 状态点 + 名称
             var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
             nameRow.Children.Add(new Ellipse
             {
@@ -517,7 +579,6 @@ namespace LongBetterWindows.Host.Views
                 Foreground = LightTextBrush,
                 VerticalAlignment = VerticalAlignment.Center,
             });
-            // 运行时类型徽章
             var runtimeLabel = plugin.Manifest.Runtime switch
             {
                 "dotnet" => "DLL",
@@ -525,47 +586,37 @@ namespace LongBetterWindows.Host.Views
                 "csharp-script" => "Script",
                 _ => plugin.Manifest.Runtime
             };
-            var runtimeColor = plugin.Manifest.Runtime switch
+            var runtimeBadge = new Border
             {
-                "dotnet" => BlueBrush,
-                "webview" => GreenBrush,
-                _ => GrayBrush
-            };
-            nameRow.Children.Add(new Border
-            {
-                Background = new SolidColorBrush(Color.FromArgb(0x15, 0x99, 0x99, 0x99)),
-                CornerRadius = new CornerRadius(3),
-                Padding = new Thickness(5, 1, 5, 1),
                 Margin = new Thickness(6, 0, 0, 0),
                 Child = new TextBlock
                 {
                     Text = runtimeLabel,
                     FontSize = 9,
-                    Foreground = runtimeColor,
+                    Foreground = GrayBrush,
                     VerticalAlignment = VerticalAlignment.Center,
                 },
                 VerticalAlignment = VerticalAlignment.Center,
-            });
+            };
+            runtimeBadge.SetResourceReference(FrameworkElement.StyleProperty, "LongBadge");
+            nameRow.Children.Add(runtimeBadge);
             infoStack.Children.Add(nameRow);
 
-            // 第二行: 快捷键 + 状态
             var metaRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
-
             if (hotkey != null)
             {
                 var hotkeyBadge = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(0x15, 0x00, 0x7A, 0xFF)),
-                    CornerRadius = new CornerRadius(4),
-                    Padding = new Thickness(6, 2, 6, 2),
                     Margin = new Thickness(0, 0, 8, 0),
                     Child = new TextBlock
                     {
                         Text = hotkey,
                         FontSize = 11,
-                        Foreground = BlueBrush,
+                        FontFamily = (FontFamily)FindResource("Long.Font.Mono"),
+                        Foreground = GrayBrush,
                     },
                 };
+                hotkeyBadge.SetResourceReference(FrameworkElement.StyleProperty, "LongHotkeyBadge");
                 metaRow.Children.Add(hotkeyBadge);
             }
 
@@ -578,7 +629,6 @@ namespace LongBetterWindows.Host.Views
             });
             infoStack.Children.Add(metaRow);
 
-            // 第三行: 能力标签
             var caps = plugin.Manifest.Capabilities;
             if (caps.Count > 0)
             {
@@ -586,11 +636,8 @@ namespace LongBetterWindows.Host.Views
                 var showCaps = caps.Take(3).ToList();
                 foreach (var cap in showCaps)
                 {
-                    capsRow.Children.Add(new Border
+                    var capabilityBadge = new Border
                     {
-                        Background = new SolidColorBrush(Color.FromArgb(0x10, 0x99, 0x99, 0x99)),
-                        CornerRadius = new CornerRadius(3),
-                        Padding = new Thickness(4, 1, 4, 1),
                         Margin = new Thickness(0, 0, 4, 0),
                         Child = new TextBlock
                         {
@@ -598,7 +645,9 @@ namespace LongBetterWindows.Host.Views
                             FontSize = 11,
                             Foreground = GrayBrush,
                         },
-                    });
+                    };
+                    capabilityBadge.SetResourceReference(FrameworkElement.StyleProperty, "LongBadge");
+                    capsRow.Children.Add(capabilityBadge);
                 }
                 if (caps.Count > 3)
                 {
@@ -613,61 +662,57 @@ namespace LongBetterWindows.Host.Views
                 infoStack.Children.Add(capsRow);
             }
 
-            // 右侧按钮区域
-            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal };
+            var btnPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
 
-            // 插件有主 UI 时显示「打开」按钮
             if (plugin.Instance is IHasMainUI hasUI)
             {
                 var openBtn = new Button
                 {
                     Content = "打开",
-                    Width = 48, Height = 24,
-                    FontSize = 11,
-                    Foreground = WhiteBrush,
-                    Background = BlueBrush,
-                    BorderThickness = new Thickness(0),
-                    Cursor = Cursors.Hand,
+                    MinWidth = 62,
                     Margin = new Thickness(0, 0, 6, 0),
                     Tag = hasUI,
                 };
+                openBtn.SetResourceReference(FrameworkElement.StyleProperty, "LongButton.Primary");
                 openBtn.Click += (_, _) => hasUI.ShowMainUI();
                 btnPanel.Children.Add(openBtn);
             }
 
-            // 插件有自定义设置 UI 时显示齿轮按钮
             if (plugin.Instance is IHasSettingsUI)
             {
                 var settingsBtn = new Button
                 {
-                    Content = "\u2699",
-                    Width = 28, Height = 28,
-                    FontSize = 14,
-                    Foreground = GrayBrush,
-                    Background = Brushes.Transparent,
-                    BorderThickness = new Thickness(0),
-                    Cursor = Cursors.Hand,
+                    Width = 38,
                     Margin = new Thickness(0, 0, 6, 0),
                     Tag = plugin,
                 };
+                settingsBtn.SetResourceReference(FrameworkElement.StyleProperty, "LongIconButton");
+                var settingsIcon = new System.Windows.Shapes.Path
+                {
+                    Data = (Geometry)FindResource("Long.Icon.Settings"),
+                    Width = 17,
+                    Height = 17,
+                };
+                settingsIcon.SetResourceReference(FrameworkElement.StyleProperty, "LongIcon");
+                settingsBtn.Content = settingsIcon;
                 settingsBtn.Click += PluginSettings_Click;
                 btnPanel.Children.Add(settingsBtn);
             }
 
             var btnText = isRunning ? "禁用" : "启用";
-            var btnBrush = isRunning ? RedBrush : GreenBrush;
-
             var toggleBtn = new Button
             {
                 Content = btnText,
-                Width = 56, Height = 28,
-                FontSize = 11,
-                Foreground = WhiteBrush,
-                Background = btnBrush,
-                BorderThickness = new Thickness(0),
-                Cursor = Cursors.Hand,
+                MinWidth = 62,
                 Tag = new ToggleState { PluginId = plugin.Id, Version = version },
             };
+            toggleBtn.SetResourceReference(
+                FrameworkElement.StyleProperty,
+                isRunning ? "LongButton.Danger" : "LongButton");
             toggleBtn.Click += PluginToggle_Click;
             btnPanel.Children.Add(toggleBtn);
 
@@ -682,44 +727,10 @@ namespace LongBetterWindows.Host.Views
 
             var card = new Border
             {
-                Background = CardBgBrush,
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(18, 14, 18, 14),
-                Margin = new Thickness(0, 0, 0, 10),
+                Margin = new Thickness(0, 0, 0, 12),
                 Child = grid,
-                RenderTransformOrigin = new Point(0.5, 0.5),
-                RenderTransform = new TranslateTransform(0, 0),
-                Cursor = Cursors.Hand,
             };
-
-            // ♥ 卡片 hover 微动效 — 轻微上浮 + 背景变亮
-            card.MouseEnter += (_, _) =>
-            {
-                var upAnim = new DoubleAnimation(0, -2, TimeSpan.FromMilliseconds(150))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
-                var bgAnim = new ColorAnimation(
-                    ((SolidColorBrush)CardBgBrush).Color,
-                    Color.FromRgb(0x35, 0x35, 0x38),
-                    TimeSpan.FromMilliseconds(150));
-                ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.YProperty, upAnim);
-                card.Background.BeginAnimation(SolidColorBrush.ColorProperty, bgAnim);
-            };
-            card.MouseLeave += (_, _) =>
-            {
-                var downAnim = new DoubleAnimation(-2, 0, TimeSpan.FromMilliseconds(200))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
-                var bgAnim = new ColorAnimation(
-                    Color.FromRgb(0x35, 0x35, 0x38),
-                    ((SolidColorBrush)CardBgBrush).Color,
-                    TimeSpan.FromMilliseconds(200));
-                ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.YProperty, downAnim);
-                card.Background.BeginAnimation(SolidColorBrush.ColorProperty, bgAnim);
-            };
-
+            card.SetResourceReference(FrameworkElement.StyleProperty, "LongPluginCard");
             return card;
         }
 
@@ -767,16 +778,15 @@ namespace LongBetterWindows.Host.Views
                 var settingsUI = hasUI.CreateSettingsUI();
                 if (settingsUI == null) return;
 
-                var popup = new Window
+                var popup = new PluginWindowHost(
+                    $"{entry.Manifest.Name} · 设置",
+                    settingsUI,
+                    entry.Manifest.Window)
                 {
-                    Title = $"{entry.Manifest.Name} - 设置",
-                    Content = settingsUI,
-                    Width = 420,
-                    Height = 320,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
                     Owner = Window.GetWindow(this),
+                    Width = 520,
+                    Height = 420,
                     ResizeMode = ResizeMode.NoResize,
-                    WindowStyle = WindowStyle.ToolWindow,
                     ShowInTaskbar = false,
                 };
 

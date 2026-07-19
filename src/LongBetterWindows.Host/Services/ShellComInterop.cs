@@ -155,6 +155,10 @@ namespace LongBetterWindows.Host.Services
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
         [DllImport("user32.dll", SetLastError = true)]

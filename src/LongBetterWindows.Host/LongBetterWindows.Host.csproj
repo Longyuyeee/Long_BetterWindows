@@ -2,6 +2,18 @@
 
   <ItemGroup>
     <Content Include="..\..\Assets\app.ico" Link="Assets\app.ico" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <Content Include="WebAssets\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Marketplace\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <NativePluginProject Include="..\SamplePlugin\SamplePlugin.csproj" />
+    <NativePluginProject Include="..\FolderNotePlugin\FolderNotePlugin.csproj" />
+    <NativePluginProject Include="..\QuickLaunchPlugin\QuickLaunchPlugin.csproj" />
+    <NativePluginProject Include="..\MacroPlugin\MacroPlugin.csproj" />
+    <NativePluginProject Include="..\ColorPickerPlugin\ColorPickerPlugin.csproj" />
+    <NativePluginProject Include="..\ScreenshotPlugin\ScreenshotPlugin.csproj" />
+    <NativePluginProject Include="..\WindowManagerPlugin\WindowManagerPlugin.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -14,6 +26,13 @@
     <AssemblyName>LongBetterWindows.Host</AssemblyName>
     <Title>Long窗口·全能助手</Title>
     <Company>Long</Company>
+    <Product>Long窗口·全能助手</Product>
+    <Description>优雅、华丽、扁平、动效化的 Windows 插件效率平台</Description>
+    <Version>0.5.0-rc.1</Version>
+    <AssemblyVersion>0.5.0.0</AssemblyVersion>
+    <FileVersion>0.5.0.0</FileVersion>
+    <InformationalVersion>0.5.0-rc.1</InformationalVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,7 +45,7 @@
 
   <!-- 仓库根目录（兼容 SolutionDir 不存在的情况） -->
   <PropertyGroup>
-    <RepoRoot Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)..\</RepoRoot>
+    <RepoRoot Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)..\..\</RepoRoot>
     <RepoRoot Condition="'$(SolutionDir)' != ''">$(SolutionDir)</RepoRoot>
   </PropertyGroup>
 
@@ -34,26 +53,29 @@
   <Target Name="CopyAllPlugins" AfterTargets="Build">
     <Message Importance="high" Text="复制插件到 $(OutputPath)Plugins..." />
 
-    <!-- 复制所有插件到 output/Plugins/（robocopy 简单可靠） -->
-    <Exec Command="robocopy &quot;$(RepoRoot)src\SamplePlugin&quot; &quot;$(OutputPath)Plugins\SamplePlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <!-- 原生插件仅发布运行所需的 Manifest 与 DLL，不携带源码和项目文件。 -->
+    <RemoveDir Directories="$(OutputPath)Plugins\SamplePlugin;$(OutputPath)Plugins\FolderNotePlugin;$(OutputPath)Plugins\QuickLaunchPlugin;$(OutputPath)Plugins\MacroPlugin;$(OutputPath)Plugins\ColorPickerPlugin;$(OutputPath)Plugins\ScreenshotPlugin;$(OutputPath)Plugins\WindowManagerPlugin" />
+    <MakeDir Directories="$(OutputPath)Plugins\SamplePlugin;$(OutputPath)Plugins\FolderNotePlugin;$(OutputPath)Plugins\QuickLaunchPlugin;$(OutputPath)Plugins\MacroPlugin;$(OutputPath)Plugins\ColorPickerPlugin;$(OutputPath)Plugins\ScreenshotPlugin;$(OutputPath)Plugins\WindowManagerPlugin" />
+
+    <Copy SourceFiles="$(RepoRoot)src\SamplePlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\SamplePlugin" />
     <Exec Command="if exist &quot;$(RepoRoot)src\SamplePlugin\bin\$(Configuration)\net8.0-windows\SamplePlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\SamplePlugin\bin\$(Configuration)\net8.0-windows\SamplePlugin.dll&quot; &quot;$(OutputPath)Plugins\SamplePlugin\&quot; &gt; nul" />
 
-    <Exec Command="robocopy &quot;$(RepoRoot)src\FolderNotePlugin&quot; &quot;$(OutputPath)Plugins\FolderNotePlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Copy SourceFiles="$(RepoRoot)src\FolderNotePlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\FolderNotePlugin" />
     <Exec Command="if exist &quot;$(RepoRoot)src\FolderNotePlugin\bin\$(Configuration)\net8.0-windows\FolderNotePlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\FolderNotePlugin\bin\$(Configuration)\net8.0-windows\FolderNotePlugin.dll&quot; &quot;$(OutputPath)Plugins\FolderNotePlugin\&quot; &gt; nul" />
 
-    <Exec Command="robocopy &quot;$(RepoRoot)src\QuickLaunchPlugin&quot; &quot;$(OutputPath)Plugins\QuickLaunchPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Copy SourceFiles="$(RepoRoot)src\QuickLaunchPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\QuickLaunchPlugin" />
     <Exec Command="if exist &quot;$(RepoRoot)src\QuickLaunchPlugin\bin\$(Configuration)\net8.0-windows\QuickLaunchPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\QuickLaunchPlugin\bin\$(Configuration)\net8.0-windows\QuickLaunchPlugin.dll&quot; &quot;$(OutputPath)Plugins\QuickLaunchPlugin\&quot; &gt; nul" />
 
-    <Exec Command="robocopy &quot;$(RepoRoot)src\MacroPlugin&quot; &quot;$(OutputPath)Plugins\MacroPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Copy SourceFiles="$(RepoRoot)src\MacroPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\MacroPlugin" />
     <Exec Command="if exist &quot;$(RepoRoot)src\MacroPlugin\bin\$(Configuration)\net8.0-windows\MacroPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\MacroPlugin\bin\$(Configuration)\net8.0-windows\MacroPlugin.dll&quot; &quot;$(OutputPath)Plugins\MacroPlugin\&quot; &gt; nul" />
 
-    <Exec Command="robocopy &quot;$(RepoRoot)src\ColorPickerPlugin&quot; &quot;$(OutputPath)Plugins\ColorPickerPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Copy SourceFiles="$(RepoRoot)src\ColorPickerPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\ColorPickerPlugin" />
     <Exec Command="if exist &quot;$(RepoRoot)src\ColorPickerPlugin\bin\$(Configuration)\net8.0-windows\ColorPickerPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\ColorPickerPlugin\bin\$(Configuration)\net8.0-windows\ColorPickerPlugin.dll&quot; &quot;$(OutputPath)Plugins\ColorPickerPlugin\&quot; &gt; nul" />
 
-    <Exec Command="robocopy &quot;$(RepoRoot)src\ScreenshotPlugin&quot; &quot;$(OutputPath)Plugins\ScreenshotPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Copy SourceFiles="$(RepoRoot)src\ScreenshotPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\ScreenshotPlugin" />
     <Exec Command="if exist &quot;$(RepoRoot)src\ScreenshotPlugin\bin\$(Configuration)\net8.0-windows\ScreenshotPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\ScreenshotPlugin\bin\$(Configuration)\net8.0-windows\ScreenshotPlugin.dll&quot; &quot;$(OutputPath)Plugins\ScreenshotPlugin\&quot; &gt; nul" />
 
-    <Exec Command="robocopy &quot;$(RepoRoot)src\WindowManagerPlugin&quot; &quot;$(OutputPath)Plugins\WindowManagerPlugin&quot; /S /NJH /NJS /NDL /NFL /XD bin obj &gt; nul || exit 0" />
+    <Copy SourceFiles="$(RepoRoot)src\WindowManagerPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\WindowManagerPlugin" />
     <Exec Command="if exist &quot;$(RepoRoot)src\WindowManagerPlugin\bin\$(Configuration)\net8.0-windows\WindowManagerPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\WindowManagerPlugin\bin\$(Configuration)\net8.0-windows\WindowManagerPlugin.dll&quot; &quot;$(OutputPath)Plugins\WindowManagerPlugin\&quot; &gt; nul" />
 
     <!-- Web 插件：robocopy 整个目录（排除 bin/obj） -->
@@ -66,6 +88,24 @@
     <Exec Command="robocopy &quot;$(RepoRoot)src\TextDiffPlugin&quot; &quot;$(OutputPath)Plugins\TextDiffPlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="robocopy &quot;$(RepoRoot)src\MarkdownPreview&quot; &quot;$(OutputPath)Plugins\MarkdownPreview&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="robocopy &quot;$(RepoRoot)src\PasswordGenerator&quot; &quot;$(OutputPath)Plugins\PasswordGenerator&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\UrlToolkit&quot; &quot;$(OutputPath)Plugins\UrlToolkit&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\TimestampConverter&quot; &quot;$(OutputPath)Plugins\TimestampConverter&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\RegexTester&quot; &quot;$(OutputPath)Plugins\RegexTester&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\UuidGenerator&quot; &quot;$(OutputPath)Plugins\UuidGenerator&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+  </Target>
+
+  <!-- 发布宿主时补齐原生插件，并将完整插件集写入最终 PublishDir。 -->
+  <Target Name="BuildNativePluginsForPublish" BeforeTargets="Publish">
+    <MSBuild Projects="@(NativePluginProject)"
+             Targets="Build"
+             BuildInParallel="true"
+             RemoveProperties="RuntimeIdentifier;SelfContained"
+             Properties="Configuration=$(Configuration);BuildProjectReferences=false" />
+  </Target>
+
+  <Target Name="CopyPluginsToPublish" AfterTargets="Publish">
+    <MakeDir Directories="$(PublishDir)Plugins" />
+    <Exec Command="robocopy &quot;$(OutputPath)Plugins&quot; &quot;$(PublishDir)Plugins&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
   </Target>
 
 </Project>

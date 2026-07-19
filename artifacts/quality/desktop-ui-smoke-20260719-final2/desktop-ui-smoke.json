@@ -1,0 +1,23 @@
+﻿{
+    "schema_version":  1,
+    "generated_at":  "2026-07-19T15:40:18.1307598+00:00",
+    "classification":  "desktop_ui_automation_smoke",
+    "release_executable":  "E:\\ProjectSave\\GeminiProject\\Long_BetterWindows\\repo\\src\\LongBetterWindows.Host\\bin\\Release\\net8.0-windows\\LongBetterWindows.Host.exe",
+    "palette":  {
+                    "window_discovered":  true,
+                    "search_discovered":  true,
+                    "results_discovered":  true,
+                    "search_keyboard_focus":  true,
+                    "wifi_result_discovered":  true,
+                    "shift_enter_copied_uri":  true,
+                    "copy_kept_palette_open":  true,
+                    "escape_closed_palette":  true
+                },
+    "super_panel":  {
+                        "window_discovered":  true,
+                        "results_discovered":  true,
+                        "escape_closed_panel":  true
+                    },
+    "passed":  true,
+    "error":  null
+}

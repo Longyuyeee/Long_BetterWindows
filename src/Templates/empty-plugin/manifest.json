@@ -5,5 +5,11 @@
   "author": "",
   "entry_point": "EmptyPlugin.dll",
   "capabilities": [],
+  "lifecycle": {
+    "start_with_host": false,
+    "close_behavior": "stop",
+    "default_presentation": "detached",
+    "search_in_background": false
+  },
   "default_settings": {}
 }

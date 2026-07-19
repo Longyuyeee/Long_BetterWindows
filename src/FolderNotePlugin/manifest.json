@@ -1,6 +1,6 @@
 {
   "id": "com.long.folder-note",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "文件夹备注助手",
   "author": "Long",
   "entry_point": "FolderNotePlugin.dll",
@@ -9,6 +9,24 @@
     "shell.selection",
     "fs.ads.access"
   ],
+  "commands": [
+    {
+      "id": "folder-note.edit",
+      "title": "编辑文件夹备注",
+      "description": "为当前文件夹或 Explorer 选区编辑备注",
+      "aliases": ["文件夹备注", "目录备注", "folder note", "wenjianjiabeizhu", "wjjbz"],
+      "accepted_inputs": ["folder", "explorer_selection"],
+      "view_mode": "form",
+      "priority": 30
+    }
+  ],
+  "window": {
+    "mode": "compact",
+    "preferred_width": 520,
+    "preferred_height": 320,
+    "min_width": 420,
+    "min_height": 220
+  },
   "default_settings": {
     "hotkey": "Alt+M",
     "auto_start": true

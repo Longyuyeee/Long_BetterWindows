@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\LongBetterWindows.Host\LongBetterWindows.Host.csproj" />
+    <ProjectReference Include="..\..\tools\LongBetterWindows.MarketplacePublisher\LongBetterWindows.MarketplacePublisher.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

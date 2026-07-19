@@ -1,0 +1,7 @@
+{
+  "SchemaVersion": 1,
+  "RegistryUri": null,
+  "CatalogTimeoutSeconds": 8,
+  "DownloadTimeoutSeconds": 60,
+  "AllowedPackageHosts": []
+}

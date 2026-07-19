@@ -64,7 +64,7 @@ public class FullPluginImpl : ILongPlugin, IHasSettingsUI
         if (_host?.HotKey != null)
             await _host.HotKey.UnregisterAsync(_hotkey);
 
-        State = PluginState.Disabled;
+        State = PluginState.Stopped;
         return true;
     }
 

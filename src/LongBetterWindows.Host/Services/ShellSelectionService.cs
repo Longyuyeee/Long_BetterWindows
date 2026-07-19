@@ -9,6 +9,10 @@ namespace LongBetterWindows.Host.Services
     public class ShellSelectionService : IShellSelectionService
     {
         public Task<HostApiResponse<string>> GetActiveExplorerFolderPathAsync()
+            => GetExplorerFolderPathForWindowAsync(Shell32.GetForegroundWindow());
+
+        public Task<HostApiResponse<string>> GetExplorerFolderPathForWindowAsync(
+            IntPtr foregroundHwnd)
         {
             return Task.Run(() =>
             {
@@ -22,12 +26,12 @@ namespace LongBetterWindows.Host.Services
                             ApiErrorCode.ShellWindowNotFound, "无法获取 ShellWindows。");
                     }
 
-                    var foregroundHwnd = Shell32.GetForegroundWindow();
-
-                    foreach (IWebBrowserApp browser in shellWindows)
+                    foreach (object shellWindow in shellWindows)
                     {
                         try
                         {
+                            if (shellWindow is not IWebBrowserApp browser)
+                                continue;
                             var browserHwnd = (IntPtr)(int)browser.HWND;
 
                             if (browserHwnd == foregroundHwnd)
@@ -58,6 +62,10 @@ namespace LongBetterWindows.Host.Services
         }
 
         public Task<HostApiResponse<List<string>>> GetSelectedItemsAsync()
+            => GetSelectedItemsForWindowAsync(Shell32.GetForegroundWindow());
+
+        public Task<HostApiResponse<List<string>>> GetSelectedItemsForWindowAsync(
+            IntPtr foregroundHwnd)
         {
             return Task.Run(() =>
             {
@@ -71,12 +79,12 @@ namespace LongBetterWindows.Host.Services
                             ApiErrorCode.ShellWindowNotFound, "无法获取 ShellWindows。");
                     }
 
-                    var foregroundHwnd = Shell32.GetForegroundWindow();
-
-                    foreach (IWebBrowserApp browser in shellWindows)
+                    foreach (object shellWindow in shellWindows)
                     {
                         try
                         {
+                            if (shellWindow is not IWebBrowserApp browser)
+                                continue;
                             var browserHwnd = (IntPtr)(int)browser.HWND;
 
                             if (browserHwnd == foregroundHwnd)
@@ -187,10 +195,12 @@ namespace LongBetterWindows.Host.Services
 
                     var foregroundHwnd = Shell32.GetForegroundWindow();
 
-                    foreach (IWebBrowserApp browser in shellWindows)
+                    foreach (object shellWindow in shellWindows)
                     {
                         try
                         {
+                            if (shellWindow is not IWebBrowserApp browser)
+                                continue;
                             var browserHwnd = (IntPtr)(int)browser.HWND;
 
                             if (browserHwnd == foregroundHwnd)

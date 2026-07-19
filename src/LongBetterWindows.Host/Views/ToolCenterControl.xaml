@@ -1,236 +1,227 @@
 <UserControl x:Class="LongBetterWindows.Host.Views.ToolCenterControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Focusable="True"
-             PreviewKeyDown="UserControl_PreviewKeyDown">
+             xmlns:local="clr-namespace:LongBetterWindows.Host.Views"
+             Focusable="True" PreviewKeyDown="UserControl_PreviewKeyDown">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="NavigationColumn" Width="220" />
+            <ColumnDefinition Width="1" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  Style="{StaticResource DarkScrollViewerStyle}">
-        <StackPanel Margin="20,16">
+        <!-- 管理导航，只承担配置与管理职责 -->
+        <Border Grid.Column="0" Background="{DynamicResource Long.Brush.Background.Raised}">
+            <Grid Margin="14,18,14,14">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-            <!-- ═══ 标题 ═══ -->
-            <TextBlock Text="Long窗口·全能助手" FontWeight="SemiBold" FontSize="16"
-                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,2" />
-            <TextBlock Text="打造极致优雅、深度集成的 Windows 效率增强中枢。"
-                       FontSize="11" Foreground="{StaticResource TextMutedBrush}"
-                       Margin="0,0,0,16" />
-
-            <!-- ═══ 分段控件 ═══ -->
-            <Border Style="{StaticResource SegmentedBarStyle}" Margin="0,0,0,14"
-                    HorizontalAlignment="Center">
-                <StackPanel Orientation="Horizontal">
-                    <Button x:Name="TabSystem"   Content="系统配置" Style="{StaticResource SegmentedTabStyle}" Click="Tab_Click" />
-                    <Button x:Name="TabPlugins"  Content="插件管理" Style="{StaticResource SegmentedTabStyle}" Click="Tab_Click" />
-                    <Button x:Name="TabDev"      Content="开发工具" Style="{StaticResource SegmentedTabStyle}" Click="Tab_Click" />
-                </StackPanel>
-            </Border>
-
-            <!-- ═══ 分隔线 ═══ -->
-            <Border Height="1" Background="{StaticResource DividerBrush}" Margin="0,0,0,12" />
-
-            <!-- ═══════════════════════════════════════ -->
-            <!-- 面板 1: 系统配置                         -->
-            <!-- ═══════════════════════════════════════ -->
-            <StackPanel x:Name="PanelSystem" Visibility="Visible">
-
-                <!-- 首次运行欢迎横幅 -->
-                <Border x:Name="WelcomeBanner" Visibility="Collapsed"
-                        Background="{StaticResource AccentBlueBrush}" CornerRadius="10"
-                        Padding="18,14" Margin="0,0,0,12">
-                    <StackPanel>
-                        <TextBlock Text="欢迎使用 Long窗口！" FontSize="14" FontWeight="SemiBold"
-                                   Foreground="White" Margin="0,0,0,4" />
-                        <TextBlock FontSize="11" Foreground="#D0E0FF" TextWrapping="Wrap"
-                                   Text="三个面板助你高效工作：系统配置管理底层能力，插件管理启停插件，开发工具快速创建和调试。点击顶部标签切换面板。" />
-                        <Button Content="了解了" Width="64" Height="24"
-                                FontSize="11" Foreground="White"
-                                Background="#30FFFFFF" BorderThickness="0"
-                                Cursor="Hand" Margin="0,8,0,0"
-                                Click="WelcomeDismiss_Click" />
-                    </StackPanel>
-                </Border>
-
-                <!-- 系统功能卡片 (WrapPanel = 窄屏1列 / 宽屏2列) -->
-                <WrapPanel x:Name="SystemCardsPanel" ItemWidth="215">
-
-                <!-- 备注列注入 -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="备注列注入" Style="{StaticResource CardTitleStyle}" />
-                            <TextBlock Text="在资源管理器中显示「备注」列"
-                                       Style="{StaticResource CardDescStyle}" />
-                            <TextBlock x:Name="ColumnStatusText" FontSize="11"
-                                       Margin="0,4,0,0" />
-                        </StackPanel>
-                        <Button x:Name="ColumnButton" Grid.Column="1"
-                                Content="一键开启"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Width="76" Click="ColumnButton_Click" />
-                    </Grid>
-                </Border>
-
-                <!-- 右键菜单 -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="右键菜单" Style="{StaticResource CardTitleStyle}" />
-                            <TextBlock Text="在文件夹右键菜单中添加「备注此文件夹」"
-                                       Style="{StaticResource CardDescStyle}" />
-                            <TextBlock x:Name="ContextMenuStatusText" FontSize="11"
-                                       Margin="0,4,0,0" />
-                        </StackPanel>
-                        <Button x:Name="ContextMenuButton" Grid.Column="1"
-                                Content="注册"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Width="76" Click="ContextMenuButton_Click" />
-                    </Grid>
-                </Border>
-
-                <!-- 开机自启 -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="开机自启" Style="{StaticResource CardTitleStyle}" />
-                            <TextBlock Text="系统启动时自动运行 Long窗口"
-                                       Style="{StaticResource CardDescStyle}" />
-                            <TextBlock x:Name="StartupStatusText" FontSize="11"
-                                       Margin="0,4,0,0" />
-                        </StackPanel>
-                        <Button x:Name="StartupButton" Grid.Column="1"
-                                Content="启用"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Width="76" Click="StartupButton_Click" />
-                    </Grid>
-                </Border>
-
-                <!-- 主题切换 -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="主题切换" Style="{StaticResource CardTitleStyle}" />
-                            <TextBlock Text="暗色 / 亮色主题一键切换"
-                                       Style="{StaticResource CardDescStyle}" />
-                        </StackPanel>
-                        <Button Grid.Column="1" Content="切换"
-                                Style="{StaticResource SecondaryButtonStyle}" Width="72"
-                                Click="ThemeToggle_Click" />
-                    </Grid>
-                </Border>
-
-                </WrapPanel>
-
-            </StackPanel>
-
-            <!-- ═══════════════════════════════════════ -->
-            <!-- 面板 2: 插件管理                         -->
-            <!-- ═══════════════════════════════════════ -->
-            <StackPanel x:Name="PanelPlugins" Visibility="Collapsed">
-
-                <!-- 插件列表 header + 搜索 + 刷新 -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                    <TextBlock x:Name="PluginsHeader" Text="已安装插件" FontWeight="SemiBold" FontSize="13"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               VerticalAlignment="Center" />
-                    <TextBox x:Name="PluginSearchBox" Width="120" Height="22"
-                             FontSize="11" Margin="12,0,0,0"
-                             VerticalContentAlignment="Center"
-                             Style="{x:Null}"
-                             Background="{StaticResource CardBackgroundBrush}"
-                             Foreground="{StaticResource TextPrimaryBrush}"
-                             BorderBrush="{StaticResource DividerBrush}"
-                             BorderThickness="1"
-                             CaretBrush="{StaticResource AccentBlueBrush}"
-                             TextChanged="PluginSearch_TextChanged"
-                             ToolTip="搜索插件..." />
-                    <Button Content="刷新" Width="48" Height="22"
-                            ToolTip="重新扫描插件目录"
-                            FontSize="11" Foreground="#CCCCCC"
-                            Background="#3A3A3D" BorderThickness="0"
-                            Cursor="Hand" Margin="12,0,0,0"
-                            Click="RefreshPlugins_Click" />
+                <StackPanel Margin="8,0,8,18">
+                    <TextBlock Text="TOOLCENTER" FontSize="10" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                    <TextBlock Text="平台管理与配置" FontSize="12" Margin="0,4,0,0"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                 </StackPanel>
 
-                <!-- 插件加载中提示 -->
-                <TextBlock x:Name="PluginsLoading" Text="正在扫描插件..."
-                           FontSize="12" Foreground="{StaticResource TextMutedBrush}"
-                           Margin="0,4,0,0" />
+                <StackPanel Grid.Row="1">
+                    <RadioButton x:Name="NavOverview" Content="概览" GroupName="MainNav" IsChecked="True"
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="overview" />
+                    <RadioButton x:Name="NavPlugins" Content="插件" GroupName="MainNav"
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="plugins" />
+                    <RadioButton x:Name="NavMarket" Content="插件市场" GroupName="MainNav"
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="market" />
+                    <RadioButton x:Name="NavSystem" Content="系统集成" GroupName="MainNav"
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="system" />
+                    <RadioButton x:Name="NavDeveloper" Content="开发者" GroupName="MainNav"
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="developer" />
+                    <RadioButton x:Name="NavSettings" Content="设置" GroupName="MainNav"
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="settings" />
+                </StackPanel>
 
-                <!-- 插件卡片容器 (动态填充) -->
-                <StackPanel x:Name="PluginsPanel" />
-
-            </StackPanel>
-
-            <!-- ═══════════════════════════════════════ -->
-            <!-- 面板 3: 开发工具                         -->
-            <!-- ═══════════════════════════════════════ -->
-            <StackPanel x:Name="PanelDev" Visibility="Collapsed">
-
-                <WrapPanel ItemWidth="215">
-                <!-- 插件开发工具 -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="插件开发工具" Style="{StaticResource CardTitleStyle}" />
-                            <TextBlock Text="内置代码编辑器——写插件、测试、打包一体化"
-                                       Style="{StaticResource CardDescStyle}" />
+                <Border Grid.Row="2" Style="{StaticResource LongCard}" Padding="12" Effect="{x:Null}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="7" Height="7" Fill="{DynamicResource Long.Brush.State.Success}" VerticalAlignment="Center" />
+                            <TextBlock Text="宿主运行正常" Margin="7,0,0,0" FontSize="11"
+                                       Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                         </StackPanel>
-                        <Button Grid.Column="1" Content="打开"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Click="DevTools_Click" />
+                        <TextBlock Text="Ctrl + Tab 切换页面" FontSize="9" Margin="14,5,0,0"
+                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="1" Background="{DynamicResource Long.Brush.Stroke.Default}" />
+
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="104" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid x:Name="PageHeader" Grid.Row="0" Margin="32,20,32,16">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="PageTitle" Text="概览" FontSize="{DynamicResource Long.Type.Display}"
+                               FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                    <TextBlock x:Name="PageSubtitle" Text="平台状态、关键能力和下一步操作"
+                               FontSize="{DynamicResource Long.Type.Body}" Margin="0,5,0,0"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                </StackPanel>
+            </Grid>
+
+            <ScrollViewer Grid.Row="1" Style="{StaticResource DarkScrollViewerStyle}"
+                          VerticalScrollBarVisibility="Auto">
+                <Grid x:Name="ContentBody" Margin="32,0,32,32">
+                    <!-- 概览 -->
+                    <StackPanel x:Name="PanelOverview">
+                        <Border x:Name="WelcomeBanner" Visibility="Collapsed" Margin="0,0,0,18"
+                                CornerRadius="{DynamicResource Long.Radius.Card}"
+                                Background="{DynamicResource Long.Brush.Accent.Gradient}" Padding="22,18">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="欢迎来到 Long窗口" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.OnAccent}" />
+                                    <TextBlock Text="日常执行请使用命令中心；ToolCenter 专注平台管理、插件和系统集成。"
+                                               Margin="0,6,10,0" FontSize="12" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource Long.Brush.Text.OnAccentMuted}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="知道了" Style="{StaticResource LongButton}"
+                                        Background="{DynamicResource Long.Brush.Surface.OnAccent}"
+                                        BorderBrush="{DynamicResource Long.Brush.Stroke.OnAccent}" Foreground="{DynamicResource Long.Brush.Text.OnAccent}"
+                                        Click="WelcomeDismiss_Click" />
+                            </Grid>
+                        </Border>
+
+                        <UniformGrid Columns="3" Margin="0,0,0,20">
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,0">
+                                <StackPanel><TextBlock Text="已加载插件" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    <TextBlock x:Name="OverviewPluginCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,0">
+                                <StackPanel><TextBlock Text="可用命令" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    <TextBlock x:Name="OverviewCommandCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource LongCard}">
+                                <StackPanel><TextBlock Text="原子能力" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    <TextBlock x:Name="OverviewCapabilityCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Grid x:Name="OverviewActionsGrid">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition x:Name="OverviewPrimaryColumn" Width="1.3*"/>
+                                <ColumnDefinition x:Name="OverviewGapColumn" Width="16"/>
+                                <ColumnDefinition x:Name="OverviewStatusColumn" Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource LongCard}">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel><TextBlock Text="随时开始一次操作" FontSize="16" FontWeight="SemiBold" />
+                                        <TextBlock Text="搜索插件功能、粘贴内容或处理当前 Explorer 选区。" Margin="0,7,0,0"
+                                                   TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}" /></StackPanel>
+                                    <Button Grid.Column="1" Content="打开命令中心" Style="{StaticResource LongButton.Primary}"
+                                            Click="OpenPalette_Click" /></Grid>
+                            </Border>
+                            <Border x:Name="OverviewStatusCard" Grid.Column="2" Style="{StaticResource LongCard}">
+                                <StackPanel><TextBlock Text="平台状态" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Text="命令协议与设计系统已启用" Margin="0,7,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.State.Success}" />
+                                    <TextBlock Text="阶段 5 本机基线通过 · 发布矩阵待复核" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" /></StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- 插件管理 -->
+                    <StackPanel x:Name="PanelPlugins" Visibility="Collapsed">
+                        <Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="280"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBlock x:Name="PluginsHeader" Text="已安装插件" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBox x:Name="PluginSearchBox" Grid.Column="1" Style="{StaticResource LongTextBox}"
+                                     Margin="0,0,10,0" TextChanged="PluginSearch_TextChanged" AutomationProperties.Name="搜索插件" />
+                            <Button Grid.Column="2" Content="刷新" Style="{StaticResource LongButton}" Click="RefreshPlugins_Click" />
+                        </Grid>
+                        <TextBlock x:Name="PluginsLoading" Text="正在扫描插件…" Style="{StaticResource LongEmptyState}" />
+                        <ListBox x:Name="PluginsPanel" MaxHeight="640"
+                                 Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.CanContentScroll="True"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 VirtualizingPanel.IsVirtualizing="True"
+                                 VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.Resources>
+                                <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}" />
+                            </ListBox.Resources>
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                    <Setter Property="BorderThickness" Value="0" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Focusable" Value="False" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </StackPanel>
+
+                    <!-- Long 原生插件市场 -->
+                    <Grid x:Name="PanelMarket" Visibility="Collapsed">
+                        <ContentControl x:Name="MarketHost" />
                     </Grid>
-                </Border>
 
-                <!-- 开发文档 -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel>
-                        <TextBlock Text="开发文档" Style="{StaticResource CardTitleStyle}" />
-                        <TextBlock Text="点击查看开发指南和设计文档"
-                                   Style="{StaticResource CardDescStyle}" />
-                        <StackPanel x:Name="DocLinksPanel" Margin="0,6,0,0" />
+                    <!-- 系统集成 -->
+                    <StackPanel x:Name="PanelSystem" Visibility="Collapsed">
+                        <UniformGrid Columns="2">
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Explorer 备注列" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="在资源管理器中显示文件夹备注" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ColumnStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="ColumnButton" Grid.Column="1" Content="启用" Style="{StaticResource LongButton.Primary}" Click="ColumnButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Explorer 右键菜单" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="添加“备注此文件夹”系统入口" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ContextMenuStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="ContextMenuButton" Grid.Column="1" Content="注册" Style="{StaticResource LongButton.Primary}" Click="ContextMenuButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="开机自启" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="登录 Windows 后自动启动宿主" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="StartupStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="StartupButton" Grid.Column="1" Content="启用" Style="{StaticResource LongButton.Primary}" Click="StartupButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><StackPanel><TextBlock Text="全局命令热键" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="首选 Alt + Space，冲突时使用 Ctrl + Alt + Space" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><Border Style="{StaticResource LongHotkeyBadge}" HorizontalAlignment="Left" Margin="0,10,0,0"><TextBlock Text="Alt + Space" FontFamily="{DynamicResource Long.Font.Mono}"/></Border></StackPanel></Border>
+                        </UniformGrid>
                     </StackPanel>
-                </Border>
 
-                <!-- 关于 -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel>
-                        <TextBlock Text="关于 Long窗口" Style="{StaticResource CardTitleStyle}" />
-                        <TextBlock x:Name="AboutVersion" Text="v0.4.0 · .NET 8.0 · WPF"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   FontSize="11" Margin="0,2,0,0" />
-                        <TextBlock x:Name="AboutStats"
-                                   Foreground="{StaticResource TextDimBrush}"
-                                   FontSize="11" Margin="0,2,0,0" />
+                    <!-- 开发者 -->
+                    <StackPanel x:Name="PanelDev" Visibility="Collapsed">
+                        <UniformGrid Columns="2">
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="插件开发工作台" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="创建、测试并打包 Long 插件" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="打开" Style="{StaticResource LongButton.Primary}" Click="DevTools_Click"/></Grid></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Long Design System" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="预览令牌、组件、主题与状态" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="预览" Style="{StaticResource LongButton}" Click="DesignSystemPreview_Click"/></Grid></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><StackPanel><TextBlock Text="开发文档" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="API、插件协议与设计规范" Margin="0,5,0,8" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><StackPanel x:Name="DocLinksPanel"/></StackPanel></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><StackPanel><TextBlock Text="关于 Long窗口" FontSize="14" FontWeight="SemiBold"/><TextBlock x:Name="AboutVersion" Margin="0,6,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="AboutStats" Margin="0,4,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel></Border>
+                        </UniformGrid>
                     </StackPanel>
-                </Border>
 
-                </WrapPanel>
-
-            </StackPanel>
-
-            <!-- 底部留白 -->
-            <Border Height="16" />
-
-        </StackPanel>
-    </ScrollViewer>
+                    <!-- 设置 -->
+                    <StackPanel x:Name="PanelSettings" Visibility="Collapsed">
+                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="外观主题" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="在亮色与暗色界面之间切换" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="切换主题" Style="{StaticResource LongButton}" Click="ThemeToggle_Click"/></Grid></Border>
+                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="减少动画" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="当前跟随 Windows 辅助功能设置" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><ToggleButton Grid.Column="1" Style="{StaticResource LongToggle}" IsChecked="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}, Mode=OneWay}" IsEnabled="False"/></Grid></Border>
+                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="超级面板鼠标手势" FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="默认关闭；短右键始终保留应用原有菜单，只有长按达到阈值才触发。"
+                                               Margin="0,5,12,0" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
+                                    <TextBlock x:Name="MouseGestureStatusText" Margin="0,8,0,0"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}"/>
+                                </StackPanel>
+                                <StackPanel x:Name="MouseGestureButtons" Grid.Column="1" Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <Button Content="关闭" Tag="Disabled" Style="{StaticResource LongButton}"
+                                            Click="MouseGestureMode_Click"/>
+                                    <Button Content="中键" Tag="MiddleButton" Style="{StaticResource LongButton}"
+                                            Margin="6,0,0,0" Click="MouseGestureMode_Click"/>
+                                    <Button Content="长按右键" Tag="LongRightPress" Style="{StaticResource LongButton}"
+                                            Margin="6,0,0,0" Click="MouseGestureMode_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource LongCard}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="数据与隐私" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="固定和最近使用只保存结果 ID、次数与时间，不保存查询、文本或路径。" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="SearchPreferenceStatusText" Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel><Button Grid.Column="1" Content="清除搜索偏好" Style="{StaticResource LongButton}" Click="ClearSearchPreferences_Click"/></Grid></Border>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
 </UserControl>

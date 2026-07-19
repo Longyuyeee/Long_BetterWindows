@@ -1,14 +1,37 @@
 {
   "id": "com.long.json-formatter",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "JSON 格式化",
   "author": "Long",
   "entry_point": "index.html",
   "runtime": "webview",
-  "capabilities": [
-    "system.clipboard"
+  "capabilities": ["system.clipboard"],
+  "commands": [
+    {
+      "id": "json.format",
+      "title": "格式化 JSON",
+      "description": "格式化并校验文本或剪贴板中的 JSON",
+      "aliases": ["json", "格式化", "format", "json geshihua"],
+      "accepted_inputs": ["text", "clipboard"],
+      "view_mode": "document",
+      "priority": 20
+    },
+    {
+      "id": "json.minify",
+      "title": "压缩 JSON",
+      "description": "移除 JSON 中不必要的空白字符",
+      "aliases": ["压缩json", "minify", "yasuo"],
+      "accepted_inputs": ["text", "clipboard"],
+      "view_mode": "document",
+      "priority": 16
+    }
   ],
-  "default_settings": {
-    "auto_start": true
-  }
+  "window": {
+    "mode": "wide",
+    "preferred_width": 980,
+    "preferred_height": 680,
+    "min_width": 720,
+    "min_height": 520
+  },
+  "default_settings": {"auto_start": true}
 }

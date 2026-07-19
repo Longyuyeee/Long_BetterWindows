@@ -28,7 +28,25 @@ namespace LongBetterWindows.Host.Contracts
         [JsonPropertyName("min_api_version")]
         public string? MinApiVersion { get; init; }
 
+        [JsonPropertyName("min_host_version")]
+        public string? MinHostVersion { get; init; }
+
+        [JsonPropertyName("min_ui_kit_version")]
+        public string? MinUiKitVersion { get; init; }
+
         [JsonPropertyName("default_settings")]
         public Dictionary<string, object>? DefaultSettings { get; init; }
+
+        /// <summary>插件暴露给统一入口的功能指令；旧插件缺省为空。</summary>
+        [JsonPropertyName("commands")]
+        public List<PluginCommand> Commands { get; init; } = new();
+
+        /// <summary>插件主界面的窗口模式和建议尺寸。</summary>
+        [JsonPropertyName("window")]
+        public PluginWindowPreference? Window { get; init; }
+
+        /// <summary>启动、关闭、后台和窗口承载策略；旧插件缺省使用安全默认值。</summary>
+        [JsonPropertyName("lifecycle")]
+        public PluginLifecyclePreference? Lifecycle { get; init; }
     }
 }

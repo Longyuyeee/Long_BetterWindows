@@ -1,0 +1,23 @@
+{
+  "id": "com.long.uuid-generator",
+  "version": "1.0.0",
+  "name": "UUID 生成器",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": ["system.clipboard"],
+  "commands": [
+    {
+      "id": "uuid.generate",
+      "title": "生成 UUID",
+      "description": "使用安全随机源批量生成 UUID v4",
+      "aliases": ["uuid", "guid", "唯一标识", "weiyibiaoshi"],
+      "accepted_inputs": ["none"],
+      "view_mode": "form",
+      "priority": 12
+    }
+  ],
+  "window": {"mode": "compact", "preferred_width": 650, "preferred_height": 640, "min_width": 520, "min_height": 520},
+  "lifecycle": {"start_with_host": false, "close_behavior": "stop", "default_presentation": "embedded", "search_in_background": false},
+  "default_settings": {"auto_start": false}
+}

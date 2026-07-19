@@ -15,9 +15,12 @@
   </ItemGroup>
 
   <Target Name="CopyToPlugins" AfterTargets="Build">
-    <MakeDir Directories="$(SolutionDir)Plugins\FolderNotePlugin" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)Plugins\FolderNotePlugin" />
-    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(SolutionDir)Plugins\FolderNotePlugin" />
+    <MakeDir Directories="$(ProjectDir)..\..\Plugins\FolderNotePlugin" />
+    <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\FolderNotePlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\..\Plugins\FolderNotePlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\..\Plugins\FolderNotePlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\FolderNotePlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\FolderNotePlugin" />
   </Target>
 
 </Project>

@@ -9,6 +9,12 @@
     "shell.selection",
     "storage.local"
   ],
+  "lifecycle": {
+    "start_with_host": true,
+    "close_behavior": "background",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
   "default_settings": {
     "hotkey": "Ctrl+Shift+X",
     "auto_start": true

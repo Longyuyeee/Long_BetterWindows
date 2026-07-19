@@ -1,0 +1,23 @@
+{
+  "id": "com.long.regex-tester",
+  "version": "1.0.0",
+  "name": "正则测试器",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": ["system.clipboard"],
+  "commands": [
+    {
+      "id": "regex.test",
+      "title": "测试正则表达式",
+      "description": "本地测试 JavaScript 正则表达式并查看匹配结果",
+      "aliases": ["正则", "regex", "表达式测试", "zhengze"],
+      "accepted_inputs": ["text", "clipboard", "none"],
+      "view_mode": "form",
+      "priority": 13
+    }
+  ],
+  "window": {"mode": "standard", "preferred_width": 820, "preferred_height": 700, "min_width": 640, "min_height": 560},
+  "lifecycle": {"start_with_host": false, "close_behavior": "stop", "default_presentation": "embedded", "search_in_background": false},
+  "default_settings": {"auto_start": false}
+}

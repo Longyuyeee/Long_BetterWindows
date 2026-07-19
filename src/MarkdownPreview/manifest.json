@@ -1,1 +1,29 @@
-{"id":"com.long.markdown-preview","version":"1.0.0","name":"Markdown 预览","author":"Long","entry_point":"index.html","runtime":"webview","capabilities":["system.clipboard"],"default_settings":{"auto_start":true}}
+{
+  "id": "com.long.markdown-preview",
+  "version": "1.1.0",
+  "name": "Markdown 预览",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": ["system.clipboard"],
+  "commands": [
+    {
+      "id": "markdown.preview",
+      "title": "预览 Markdown",
+      "description": "安全预览文本或剪贴板中的 Markdown",
+      "aliases": ["markdown", "md", "预览文档", "yulan"],
+      "accepted_inputs": ["text", "clipboard"],
+      "view_mode": "document",
+      "keep_alive": true,
+      "priority": 21
+    }
+  ],
+  "window": {
+    "mode": "wide",
+    "preferred_width": 1080,
+    "preferred_height": 760,
+    "min_width": 760,
+    "min_height": 540
+  },
+  "default_settings": {"auto_start": true}
+}

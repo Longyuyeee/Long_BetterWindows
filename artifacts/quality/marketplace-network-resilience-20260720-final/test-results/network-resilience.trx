@@ -1,0 +1,94 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="c9c1624d-3505-4fbd-8d46-84588493eee5" name="Administrator@DESKTOP-E3F4L1I 2026-07-20 00:36:39" runUser="DESKTOP-E3F4L1I\Administrator" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-07-20T00:36:39.3073763+08:00" queuing="2026-07-20T00:36:39.3073767+08:00" start="2026-07-20T00:36:38.2261749+08:00" finish="2026-07-20T00:36:39.3624029+08:00" />
+  <TestSettings name="default" id="7961367d-d2fb-404e-a0d8-fd69a88b6f2c">
+    <Deployment runDeploymentRoot="Administrator_DESKTOP-E3F4L1I_2026-07-20_00_36_39" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="a3dc358e-acc3-479e-9869-1aec023c0b44" testId="06d48fde-d30e-3140-0c9a-6df830b0c1da" testName="LongBetterWindows.Tests.MarketplaceTransportTests.InterruptedTransactions_RestoreOnlyUncommittedStateAndRemoveJournals" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0221606" startTime="2026-07-20T00:36:39.0882795+08:00" endTime="2026-07-20T00:36:39.0882799+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a3dc358e-acc3-479e-9869-1aec023c0b44" />
+    <UnitTestResult executionId="8e3879af-8586-43de-9953-abe3abe04983" testId="c439ac73-1b11-e55a-07cd-cce88f36d53f" testName="LongBetterWindows.Tests.MarketplaceTransportTests.Downloader_RetriesTransientFailureAndCleansStaleTemporaryFile" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0061401" startTime="2026-07-20T00:36:39.2824777+08:00" endTime="2026-07-20T00:36:39.2824779+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8e3879af-8586-43de-9953-abe3abe04983" />
+    <UnitTestResult executionId="82796034-3905-42ed-8339-5538fea57613" testId="662d3e08-b391-44ff-5d37-8bc8935facd0" testName="LongBetterWindows.Tests.MarketplaceTransportTests.SignedRemotePackage_DownloadTrustAndValidationChainPasses" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0640874" startTime="2026-07-20T00:36:39.2623610+08:00" endTime="2026-07-20T00:36:39.2623612+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="82796034-3905-42ed-8339-5538fea57613" />
+    <UnitTestResult executionId="3b62d3f3-5931-4e99-90e3-1c01a3f92d5e" testId="cb8df9e8-264f-e098-d0df-e06fd74a8f30" testName="LongBetterWindows.Tests.MarketplaceTransportTests.RemoteRepository_UsesLastValidCacheWhenNetworkFails" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0272067" startTime="2026-07-20T00:36:38.9703332+08:00" endTime="2026-07-20T00:36:38.9703336+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3b62d3f3-5931-4e99-90e3-1c01a3f92d5e" />
+    <UnitTestResult executionId="fda65acc-70d5-4eac-a55b-633a9156eef5" testId="bdac9a41-0b06-1f33-b42c-70245c186958" testName="LongBetterWindows.Tests.MarketplaceTransportTests.TrustStore_FingerprintMismatch_IsRejected" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0511053" startTime="2026-07-20T00:36:39.1415416+08:00" endTime="2026-07-20T00:36:39.1415418+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fda65acc-70d5-4eac-a55b-633a9156eef5" />
+    <UnitTestResult executionId="d604abb5-9a65-4745-ac1f-020427cc0194" testId="6f734240-fbc0-68f8-2a84-d266e5baff51" testName="LongBetterWindows.Tests.MarketplaceTransportTests.Downloader_ReportsTimeoutAfterBoundedAttemptsAndRemovesPartials" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0564260" startTime="2026-07-20T00:36:39.1981429+08:00" endTime="2026-07-20T00:36:39.1981432+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d604abb5-9a65-4745-ac1f-020427cc0194" />
+    <UnitTestResult executionId="563f82a2-9b00-4add-9c52-ad8421f8d1e1" testId="f9f83cc1-6671-c157-68bb-040cec0e8d45" testName="LongBetterWindows.Tests.MarketplaceTransportTests.Downloader_HashMismatchRejectsAndRemovesTemporaryFile" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0188436" startTime="2026-07-20T00:36:38.9429855+08:00" endTime="2026-07-20T00:36:38.9429859+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="563f82a2-9b00-4add-9c52-ad8421f8d1e1" />
+    <UnitTestResult executionId="bc8d9729-4908-4b84-b936-42ecb115e926" testId="64093950-4668-6f4c-9c42-3be9d0aea16a" testName="LongBetterWindows.Tests.MarketplaceTransportTests.SignedPackage_InstallUpgradeDowngradeAndUninstallTransactionPasses" computerName="DESKTOP-E3F4L1I" duration="00:00:00.1826602" startTime="2026-07-20T00:36:38.9239268+08:00" endTime="2026-07-20T00:36:38.9239371+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bc8d9729-4908-4b84-b936-42ecb115e926" />
+    <UnitTestResult executionId="e70790f1-b0dd-4e09-b295-9dab39ed8e6a" testId="4c09a3d5-656a-32a5-8938-070105f98022" testName="LongBetterWindows.Tests.MarketplaceTransportTests.ConcurrentInstallRequests_AreSerializedWithoutTransactionResidue" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0301794" startTime="2026-07-20T00:36:39.2989358+08:00" endTime="2026-07-20T00:36:39.2989362+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e70790f1-b0dd-4e09-b295-9dab39ed8e6a" />
+    <UnitTestResult executionId="dc2a5e28-d60e-4f04-bd99-7fc52a04d421" testId="e3d3cb24-c1c6-fcab-61c7-64c42b6a7abf" testName="LongBetterWindows.Tests.MarketplaceTransportTests.RemoteRepository_RejectsPlainHttpRegistry" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0017078" startTime="2026-07-20T00:36:39.0903355+08:00" endTime="2026-07-20T00:36:39.0903365+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="dc2a5e28-d60e-4f04-bd99-7fc52a04d421" />
+    <UnitTestResult executionId="d565b73e-bca2-4251-94ef-6e8f81015c4a" testId="c1d0ec34-4c4b-a65d-4c73-c896f4186c1d" testName="LongBetterWindows.Tests.MarketplaceTransportTests.Downloader_CoalescesConcurrentRequestsForTheSamePackage" computerName="DESKTOP-E3F4L1I" duration="00:00:00.0954319" startTime="2026-07-20T00:36:39.0659260+08:00" endTime="2026-07-20T00:36:39.0659264+08:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d565b73e-bca2-4251-94ef-6e8f81015c4a" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.SignedRemotePackage_DownloadTrustAndValidationChainPasses" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="662d3e08-b391-44ff-5d37-8bc8935facd0">
+      <Execution id="82796034-3905-42ed-8339-5538fea57613" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="SignedRemotePackage_DownloadTrustAndValidationChainPasses" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.InterruptedTransactions_RestoreOnlyUncommittedStateAndRemoveJournals" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="06d48fde-d30e-3140-0c9a-6df830b0c1da">
+      <Execution id="a3dc358e-acc3-479e-9869-1aec023c0b44" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="InterruptedTransactions_RestoreOnlyUncommittedStateAndRemoveJournals" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.SignedPackage_InstallUpgradeDowngradeAndUninstallTransactionPasses" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="64093950-4668-6f4c-9c42-3be9d0aea16a">
+      <Execution id="bc8d9729-4908-4b84-b936-42ecb115e926" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="SignedPackage_InstallUpgradeDowngradeAndUninstallTransactionPasses" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.Downloader_RetriesTransientFailureAndCleansStaleTemporaryFile" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="c439ac73-1b11-e55a-07cd-cce88f36d53f">
+      <Execution id="8e3879af-8586-43de-9953-abe3abe04983" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="Downloader_RetriesTransientFailureAndCleansStaleTemporaryFile" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.RemoteRepository_UsesLastValidCacheWhenNetworkFails" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="cb8df9e8-264f-e098-d0df-e06fd74a8f30">
+      <Execution id="3b62d3f3-5931-4e99-90e3-1c01a3f92d5e" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="RemoteRepository_UsesLastValidCacheWhenNetworkFails" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.ConcurrentInstallRequests_AreSerializedWithoutTransactionResidue" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="4c09a3d5-656a-32a5-8938-070105f98022">
+      <Execution id="e70790f1-b0dd-4e09-b295-9dab39ed8e6a" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="ConcurrentInstallRequests_AreSerializedWithoutTransactionResidue" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.Downloader_ReportsTimeoutAfterBoundedAttemptsAndRemovesPartials" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="6f734240-fbc0-68f8-2a84-d266e5baff51">
+      <Execution id="d604abb5-9a65-4745-ac1f-020427cc0194" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="Downloader_ReportsTimeoutAfterBoundedAttemptsAndRemovesPartials" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.Downloader_CoalescesConcurrentRequestsForTheSamePackage" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="c1d0ec34-4c4b-a65d-4c73-c896f4186c1d">
+      <Execution id="d565b73e-bca2-4251-94ef-6e8f81015c4a" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="Downloader_CoalescesConcurrentRequestsForTheSamePackage" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.Downloader_HashMismatchRejectsAndRemovesTemporaryFile" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="f9f83cc1-6671-c157-68bb-040cec0e8d45">
+      <Execution id="563f82a2-9b00-4add-9c52-ad8421f8d1e1" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="Downloader_HashMismatchRejectsAndRemovesTemporaryFile" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.RemoteRepository_RejectsPlainHttpRegistry" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="e3d3cb24-c1c6-fcab-61c7-64c42b6a7abf">
+      <Execution id="dc2a5e28-d60e-4f04-bd99-7fc52a04d421" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="RemoteRepository_RejectsPlainHttpRegistry" />
+    </UnitTest>
+    <UnitTest name="LongBetterWindows.Tests.MarketplaceTransportTests.TrustStore_FingerprintMismatch_IsRejected" storage="e:\projectsave\geminiproject\long_betterwindows\repo\tests\longbetterwindows.tests\bin\release\net8.0-windows\longbetterwindows.tests.dll" id="bdac9a41-0b06-1f33-b42c-70245c186958">
+      <Execution id="fda65acc-70d5-4eac-a55b-633a9156eef5" />
+      <TestMethod codeBase="E:\ProjectSave\GeminiProject\Long_BetterWindows\repo\tests\LongBetterWindows.Tests\bin\Release\net8.0-windows\LongBetterWindows.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="LongBetterWindows.Tests.MarketplaceTransportTests" name="TrustStore_FingerprintMismatch_IsRejected" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="06d48fde-d30e-3140-0c9a-6df830b0c1da" executionId="a3dc358e-acc3-479e-9869-1aec023c0b44" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c439ac73-1b11-e55a-07cd-cce88f36d53f" executionId="8e3879af-8586-43de-9953-abe3abe04983" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="662d3e08-b391-44ff-5d37-8bc8935facd0" executionId="82796034-3905-42ed-8339-5538fea57613" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cb8df9e8-264f-e098-d0df-e06fd74a8f30" executionId="3b62d3f3-5931-4e99-90e3-1c01a3f92d5e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bdac9a41-0b06-1f33-b42c-70245c186958" executionId="fda65acc-70d5-4eac-a55b-633a9156eef5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6f734240-fbc0-68f8-2a84-d266e5baff51" executionId="d604abb5-9a65-4745-ac1f-020427cc0194" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f9f83cc1-6671-c157-68bb-040cec0e8d45" executionId="563f82a2-9b00-4add-9c52-ad8421f8d1e1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="64093950-4668-6f4c-9c42-3be9d0aea16a" executionId="bc8d9729-4908-4b84-b936-42ecb115e926" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4c09a3d5-656a-32a5-8938-070105f98022" executionId="e70790f1-b0dd-4e09-b295-9dab39ed8e6a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e3d3cb24-c1c6-fcab-61c7-64c42b6a7abf" executionId="dc2a5e28-d60e-4f04-bd99-7fc52a04d421" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c1d0ec34-4c4b-a65d-4c73-c896f4186c1d" executionId="d565b73e-bca2-4251-94ef-6e8f81015c4a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="列表中未列出的结果" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="所有已加载的结果" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="11" executed="11" passed="11" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.3.1+6b60a9e56a (64-bit .NET 8.0.28)&#xD;
+[xUnit.net 00:00:00.06]   Discovering: LongBetterWindows.Tests&#xD;
+[xUnit.net 00:00:00.11]   Discovered:  LongBetterWindows.Tests&#xD;
+[xUnit.net 00:00:00.12]   Starting:    LongBetterWindows.Tests&#xD;
+[xUnit.net 00:00:00.72]   Finished:    LongBetterWindows.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

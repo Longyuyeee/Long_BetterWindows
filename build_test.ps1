@@ -1,13 +1,30 @@
-﻿Write-Host '正在尝试编译项目以验证基础代码正确性...'
- = Get-Command dotnet -ErrorAction SilentlyContinue
-if (-not ) {
-    # 尝试查找常见路径
-     = 'C:\Program Files\dotnet\dotnet.exe'
-    if (Test-Path ) {  =  }
+﻿#!/usr/bin/env pwsh
+param(
+    [ValidateSet('Debug', 'Release')]
+    [string] $Configuration = 'Debug'
+)
+
+$ErrorActionPreference = 'Stop'
+$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$dotnet = 'C:\Program Files\dotnet\dotnet.exe'
+
+if (-not (Test-Path -LiteralPath $dotnet)) {
+    $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
+    if ($null -eq $dotnetCommand) {
+        throw '未找到 dotnet CLI。请安装 .NET 8 SDK 或更新脚本中的路径。'
+    }
+    $dotnet = $dotnetCommand.Source
 }
 
-if () {
-    &  build 'src/LongBetterWindows.Host/LongBetterWindows.Host.csproj'
-} else {
-    Write-Error '未在系统中找到 dotnet CLI，无法进行自动编译测试。'
+Push-Location $repoRoot
+try {
+    & $dotnet build 'LongBetterWindows.sln' -c $Configuration
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    & $dotnet test 'tests\LongBetterWindows.Tests\LongBetterWindows.Tests.csproj' `
+        -c $Configuration --no-build --logger 'console;verbosity=minimal'
+    exit $LASTEXITCODE
+}
+finally {
+    Pop-Location
 }

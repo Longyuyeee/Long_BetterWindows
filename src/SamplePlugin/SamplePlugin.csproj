@@ -18,10 +18,13 @@
 
   <!-- 构建后复制到解决方案级 Plugins 目录 -->
   <Target Name="CopyToPlugins" AfterTargets="Build">
-    <MakeDir Directories="$(SolutionDir)Plugins\SamplePlugin" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)Plugins\SamplePlugin" />
-    <Copy SourceFiles="$(TargetPath).pdb" DestinationFolder="$(SolutionDir)Plugins\SamplePlugin" Condition="Exists('$(TargetPath).pdb')" />
-    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(SolutionDir)Plugins\SamplePlugin" />
+    <MakeDir Directories="$(ProjectDir)..\..\Plugins\SamplePlugin" />
+    <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\SamplePlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\..\Plugins\SamplePlugin" />
+    <Copy SourceFiles="$(TargetPath).pdb" DestinationFolder="$(ProjectDir)..\..\Plugins\SamplePlugin" Condition="Exists('$(TargetPath).pdb')" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\..\Plugins\SamplePlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\SamplePlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\SamplePlugin" />
   </Target>
 
 </Project>

@@ -1,7 +1,6 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Media.Animation;
 
 namespace LongBetterWindows.Host.Views
@@ -55,14 +54,6 @@ namespace LongBetterWindows.Host.Views
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            // 根据主题适配 HUD 背景色
-            var isDark = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme()
-                == Wpf.Ui.Appearance.ApplicationTheme.Dark;
-            HudBorder.Background = isDark
-                ? new SolidColorBrush(Color.FromArgb(0xE8, 0x2D, 0x2D, 0x30))
-                : new SolidColorBrush(Color.FromArgb(0xE8, 0xF0, 0xF8, 0xF5));
-
-            // 淡入 + 弹性缩放 (复用 AnimationHelper)
             Helpers.AnimationHelper.FadeIn(this, durationMs: 350);
             Helpers.AnimationHelper.ScaleBounce(this, from: 0.85, to: 1.0, durationMs: 400);
         }

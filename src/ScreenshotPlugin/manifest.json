@@ -1,6 +1,6 @@
 {
   "id": "com.long.screenshot",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "截图工具",
   "author": "Long",
   "entry_point": "ScreenshotPlugin.dll",
@@ -8,8 +8,32 @@
     "system.hotkey",
     "system.clipboard"
   ],
+  "commands": [
+    {
+      "id": "screenshot.full",
+      "title": "全屏截图",
+      "description": "截取全部显示器并复制到剪贴板",
+      "aliases": ["截图", "全屏", "screenshot", "quanpingjietu", "qpjt"],
+      "accepted_inputs": ["none"],
+      "view_mode": "none",
+      "priority": 35
+    },
+    {
+      "id": "screenshot.region",
+      "title": "区域截图",
+      "description": "框选屏幕区域并复制到剪贴板",
+      "aliases": ["框选截图", "截取区域", "region capture", "quyujietu", "qyjt"],
+      "accepted_inputs": ["none"],
+      "view_mode": "none",
+      "priority": 40
+    }
+  ],
+  "window": {
+    "mode": "overlay"
+  },
   "default_settings": {
-    "hotkey": "Ctrl+Shift+S",
+    "full_hotkey": "Ctrl+Shift+S",
+    "region_hotkey": "Ctrl+Shift+A",
     "auto_start": true
   }
 }

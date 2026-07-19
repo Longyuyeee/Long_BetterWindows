@@ -1,4 +1,6 @@
 using LongBetterWindows.Host.Core;
+using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Views;
 using Serilog;
 
 namespace SamplePlugin;
@@ -21,14 +23,14 @@ namespace SamplePlugin;
 ///   4. InitializeAsync 返回 false → 状态变为 Error
 ///   5. StartAsync 返回 false → 插件不会进入 Running
 /// </summary>
-public class HelloPlugin : ILongPlugin
+public class HelloPlugin : ILongPlugin, IHasMainUI, IPluginCommandHandler
 {
     // ═══════════════════════════════════════════════
     // 元数据 — 必须与 manifest.json 保持一致
     // ═══════════════════════════════════════════════
     public string Id => "com.long.sample";
     public string Name => "示例插件";
-    public string Version => "1.0.0";
+    public string Version => "1.1.0";
 
     // 当前状态：Loaded → Running → Disabled
     public PluginState State { get; private set; } = PluginState.Loaded;
@@ -79,9 +81,25 @@ public class HelloPlugin : ILongPlugin
         // 示例：注销热键
         // await host.HotKey!.UnregisterAsync("Alt+X");
 
-        State = PluginState.Disabled;
+        State = PluginState.Stopped;
         Log.Information("[SamplePlugin] 已停止");
         return Task.FromResult(true);
+    }
+
+    // 统一主入口：插件卡片和命令中心最终复用同一个行为。
+    public void ShowMainUI() => FloatingHudWindow.ShowToast("示例插件运行正常");
+
+    // 声明式命令处理器：command_id 来自 manifest.json。
+    public Task<PluginCommandResult> ExecuteCommandAsync(
+        PluginCommandInvocation invocation,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (invocation.CommandId != "sample.hello")
+            return Task.FromResult(PluginCommandResult.Failure($"未知示例命令: {invocation.CommandId}"));
+
+        ShowMainUI();
+        return Task.FromResult(PluginCommandResult.Success("示例命令执行成功"));
     }
 
     // ═══════════════════════════════════════════════
@@ -100,5 +118,6 @@ public class HelloPlugin : ILongPlugin
     // 4. NTFS ADS 存储:
     //    await host.ADS.WriteAsync(path, "stream", "content");
     //    var content = await host.ADS.ReadAsync(path, "stream");
+    // 5. 可发现命令: 在 manifest.json 声明 commands，并实现 IPluginCommandHandler。
     // ═══════════════════════════════════════════════
 }

@@ -10,14 +10,15 @@ using Serilog;
 
 namespace FolderNotePlugin;
 
-public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
+public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginCommandHandler
 {
     private IHostApi _host = null!;
     private IHotKeyService _hotKey = null!;
+    private string? _registeredHotkey;
 
     public string Id => "com.long.folder-note";
     public string Name => "文件夹备注助手";
-    public string Version => "1.0.0";
+    public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public Task<bool> InitializeAsync(IHostApi host)
@@ -32,24 +33,32 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
     public async Task<bool> StartAsync()
     {
         var result = await _hotKey.RegisterAsync("Alt+M", OnHotkeyTriggered);
-
-        if (!result.IsSuccess)
+        if (result.IsSuccess)
         {
-            Log.Error("[FolderNotePlugin] 热键注册失败: {Error}", result.ErrorMessage);
-            State = PluginState.Error;
-            return false;
+            _registeredHotkey = "Alt+M";
+        }
+        else
+        {
+            Log.Warning("[FolderNotePlugin] Alt+M 冲突，尝试 Ctrl+Alt+M");
+            result = await _hotKey.RegisterAsync("Ctrl+Alt+M", OnHotkeyTriggered);
+            if (result.IsSuccess)
+                _registeredHotkey = "Ctrl+Alt+M";
+            else
+                Log.Warning("[FolderNotePlugin] 热键不可用，命令中心入口仍可执行");
         }
 
         State = PluginState.Running;
-        Log.Information("[FolderNotePlugin] 已启动，热键 Alt+M");
+        Log.Information("[FolderNotePlugin] 已启动，入口 {Hotkey}", _registeredHotkey ?? "命令中心");
         return true;
     }
 
     public async Task<bool> StopAsync()
     {
-        await _hotKey.UnregisterAsync("Alt+M");
+        if (_registeredHotkey != null)
+            await _hotKey.UnregisterAsync(_registeredHotkey);
+        _registeredHotkey = null;
 
-        State = PluginState.Disabled;
+        State = PluginState.Stopped;
         Log.Information("[FolderNotePlugin] 已停止");
         return true;
     }
@@ -75,19 +84,30 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
         }
     }
 
-    private async Task ShowNoteHudAsync()
+    private async Task ShowNoteHudAsync(string? requestedFolderPath = null)
     {
         var shell = _host.ShellSelection;
         var ads = _host.ADS;
 
-        var folderResult = await shell.GetActiveExplorerFolderPathAsync();
-        if (!folderResult.IsSuccess || folderResult.Data == null)
+        var folderPath = requestedFolderPath;
+        if (string.IsNullOrWhiteSpace(folderPath))
         {
-            FloatingHudWindow.ShowToast("请先打开资源管理器并选中文件夹。");
+            var folderResult = await shell.GetActiveExplorerFolderPathAsync();
+            if (!folderResult.IsSuccess || folderResult.Data == null)
+            {
+                FloatingHudWindow.ShowToast("请先打开资源管理器并选中文件夹。");
+                return;
+            }
+
+            folderPath = folderResult.Data;
+        }
+
+        if (!Directory.Exists(folderPath))
+        {
+            FloatingHudWindow.ShowToast("目标文件夹不存在。");
             return;
         }
 
-        var folderPath = folderResult.Data;
         var noteResult = await ads.ReadAsync(folderPath, "long_note");
 
         string? existingNote = null;
@@ -124,10 +144,32 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI
         });
     }
 
+    public async Task<LongBetterWindows.Host.Contracts.PluginCommandResult> ExecuteCommandAsync(
+        LongBetterWindows.Host.Contracts.PluginCommandInvocation invocation,
+        CancellationToken cancellationToken = default)
+    {
+        if (invocation.CommandId != "folder-note.edit")
+        {
+            return LongBetterWindows.Host.Contracts.PluginCommandResult.Failure(
+                $"未知文件夹备注命令: {invocation.CommandId}");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var folderPath = invocation.InputType == LongBetterWindows.Host.Contracts.AcceptedInputType.Folder
+            ? invocation.Paths.FirstOrDefault()
+            : invocation.InputType == LongBetterWindows.Host.Contracts.AcceptedInputType.ExplorerSelection
+                ? invocation.Paths.FirstOrDefault(Directory.Exists)
+                : null;
+        await ShowNoteHudAsync(folderPath);
+        return LongBetterWindows.Host.Contracts.PluginCommandResult.Success();
+    }
+
+    public void ShowMainUI() => OnHotkeyTriggered();
+
     public FrameworkElement CreateSettingsUI()
     {
         return new LongBetterWindows.Host.Views.HotkeySettingsControl(
-            "文件夹备注助手", Id, "Alt+M",
+            "文件夹备注助手", Id, _registeredHotkey ?? "命令中心",
             newHotkey =>
             {
                 // 热键变更时的回调——由 HotkeySettingsControl 内部处理

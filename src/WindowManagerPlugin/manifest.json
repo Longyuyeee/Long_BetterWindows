@@ -1,13 +1,24 @@
 {
   "id": "com.long.window-manager",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "name": "窗口管理",
   "author": "Long",
   "entry_point": "WindowManagerPlugin.dll",
-  "capabilities": [
-    "system.hotkey"
+  "capabilities": ["system.hotkey"],
+  "commands": [
+    {"id":"window.guide","title":"窗口管理指南","description":"查看窗口布局指令与快捷键","aliases":["窗口快捷键","window guide"],"accepted_inputs":["none"],"view_mode":"form","priority":10},
+    {"id":"window.topmost","title":"切换窗口置顶","description":"置顶或取消置顶当前窗口","aliases":["置顶窗口","topmost"],"accepted_inputs":["none"],"view_mode":"none","priority":32},
+    {"id":"window.left","title":"窗口移至左半屏","description":"将当前窗口排列到左半屏","aliases":["左半屏","snap left"],"accepted_inputs":["none"],"view_mode":"none","priority":25},
+    {"id":"window.right","title":"窗口移至右半屏","description":"将当前窗口排列到右半屏","aliases":["右半屏","snap right"],"accepted_inputs":["none"],"view_mode":"none","priority":25},
+    {"id":"window.maximize","title":"窗口最大化布局","description":"将当前窗口填充显示器工作区","aliases":["最大化","maximize"],"accepted_inputs":["none"],"view_mode":"none","priority":24},
+    {"id":"window.bottom","title":"窗口移至下半屏","description":"将当前窗口排列到下半屏","aliases":["下半屏","snap bottom"],"accepted_inputs":["none"],"view_mode":"none","priority":20},
+    {"id":"window.top-left","title":"窗口移至左上四分屏","description":"将当前窗口排列到左上角","aliases":["左上窗口"],"accepted_inputs":["none"],"view_mode":"none","priority":18},
+    {"id":"window.top-right","title":"窗口移至右上四分屏","description":"将当前窗口排列到右上角","aliases":["右上窗口"],"accepted_inputs":["none"],"view_mode":"none","priority":18},
+    {"id":"window.bottom-left","title":"窗口移至左下四分屏","description":"将当前窗口排列到左下角","aliases":["左下窗口"],"accepted_inputs":["none"],"view_mode":"none","priority":18},
+    {"id":"window.bottom-right","title":"窗口移至右下四分屏","description":"将当前窗口排列到右下角","aliases":["右下窗口"],"accepted_inputs":["none"],"view_mode":"none","priority":18},
+    {"id":"window.third-left","title":"窗口移至左侧三分之一","description":"将当前窗口排列到左侧三分之一","aliases":["左三分屏"],"accepted_inputs":["none"],"view_mode":"none","priority":16},
+    {"id":"window.third-right","title":"窗口移至右侧三分之二","description":"将当前窗口排列到右侧三分之二","aliases":["右三分屏"],"accepted_inputs":["none"],"view_mode":"none","priority":16}
   ],
-  "default_settings": {
-    "auto_start": true
-  }
+  "window": {"mode":"compact","preferred_width":560,"preferred_height":590,"min_width":520,"min_height":480},
+  "default_settings": {"auto_start":true}
 }

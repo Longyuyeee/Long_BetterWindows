@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using LongBetterWindows.Host.Contracts;
 
 namespace LongBetterWindows.Host.Engine
@@ -11,6 +12,7 @@ namespace LongBetterWindows.Host.Engine
             PropertyNameCaseInsensitive = true,
             AllowTrailingCommas = true,
             ReadCommentHandling = JsonCommentHandling.Skip,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower) },
         };
 
         public static readonly HashSet<string> KnownCapabilities = new(StringComparer.OrdinalIgnoreCase)
@@ -90,6 +92,9 @@ namespace LongBetterWindows.Host.Engine
                     errors.Add($"未知能力声明: '{cap}'");
             }
 
+            ValidateCommands(manifest, errors);
+            ValidateWindowPreference(manifest.Window, errors);
+
             // ApiVersion 兼容性检查
             if (!string.IsNullOrWhiteSpace(manifest.MinApiVersion))
             {
@@ -105,6 +110,53 @@ namespace LongBetterWindows.Host.Engine
                 return ManifestResult.Fail(string.Join("; ", errors));
 
             return ManifestResult.Ok(manifest);
+        }
+
+        private static void ValidateCommands(PluginManifest manifest, List<string> errors)
+        {
+            var commandIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var command in manifest.Commands)
+            {
+                if (string.IsNullOrWhiteSpace(command.Id))
+                    errors.Add("commands 中存在缺少 id 的指令");
+                else if (!commandIds.Add(command.Id))
+                    errors.Add($"commands 中存在重复 id: '{command.Id}'");
+
+                if (string.IsNullOrWhiteSpace(command.Title))
+                    errors.Add($"指令 '{command.Id}' 缺少 title");
+
+                if (command.Priority is < -100 or > 100)
+                    errors.Add($"指令 '{command.Id}' 的 priority 必须在 -100 到 100 之间");
+
+                if (command.AcceptedInputs.Count == 0)
+                    errors.Add($"指令 '{command.Id}' 必须声明至少一种 accepted_inputs");
+            }
+        }
+
+        private static void ValidateWindowPreference(
+            PluginWindowPreference? window,
+            List<string> errors)
+        {
+            if (window == null) return;
+
+            ValidateDimension("preferred_width", window.PreferredWidth, errors);
+            ValidateDimension("preferred_height", window.PreferredHeight, errors);
+            ValidateDimension("min_width", window.MinWidth, errors);
+            ValidateDimension("min_height", window.MinHeight, errors);
+
+            if (window.PreferredWidth.HasValue && window.MinWidth.HasValue
+                && window.PreferredWidth < window.MinWidth)
+                errors.Add("window.preferred_width 不能小于 min_width");
+
+            if (window.PreferredHeight.HasValue && window.MinHeight.HasValue
+                && window.PreferredHeight < window.MinHeight)
+                errors.Add("window.preferred_height 不能小于 min_height");
+        }
+
+        private static void ValidateDimension(string name, int? value, List<string> errors)
+        {
+            if (value.HasValue && value.Value <= 0)
+                errors.Add($"window.{name} 必须大于 0");
         }
 
         private static bool IsValidVersion(string version)

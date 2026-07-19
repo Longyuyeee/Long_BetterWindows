@@ -1,5 +1,6 @@
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Interaction;
 
 namespace LongBetterWindows.Host.Services
 {
@@ -23,6 +24,11 @@ namespace LongBetterWindows.Host.Services
         public static HttpService Http { get; private set; } = null!;
         public static ShellExecuteService ShellExecute { get; private set; } = null!;
         public static StartupService Startup { get; private set; } = null!;
+        public static ContextCaptureService ContextCapture { get; private set; } = null!;
+        public static SearchCoordinator Search { get; private set; } = null!;
+        public static SearchPreferenceService SearchPreferences { get; private set; } = null!;
+        public static SuperPanelGroupService SuperPanelGroups { get; private set; } = null!;
+        public static MouseGestureService MouseGestures { get; private set; } = null!;
 
         public static void Initialize()
         {
@@ -30,11 +36,19 @@ namespace LongBetterWindows.Host.Services
 
             Storage = new StorageService();
             provider.RegisterService<IStorageService>(Storage);
+            SearchPreferences = new SearchPreferenceService(Storage);
+            SearchPreferences.InitializeAsync().GetAwaiter().GetResult();
+            SuperPanelGroups = new SuperPanelGroupService(Storage);
+            SuperPanelGroups.InitializeAsync().GetAwaiter().GetResult();
+            MouseGestures = new MouseGestureService(Storage);
+            MouseGestures.InitializeAsync().GetAwaiter().GetResult();
 
             Rollback = new RollbackEngine();
 
             HotKey = new HotKeyService();
             provider.RegisterService<IHotKeyService>(HotKey);
+            provider.PluginStore.AttachHostResourceReleaser(
+                async pluginId => { await HotKey.UnregisterPluginAsync(pluginId); });
 
             Registry = new RegistryService(Rollback);
             provider.RegisterService<IRegistryService>(Registry);
@@ -51,6 +65,22 @@ namespace LongBetterWindows.Host.Services
 
             Clipboard = new ClipboardService();
             provider.RegisterService<IClipboardService>(Clipboard);
+
+            ContextCapture = new ContextCaptureService(new IContextProvider[]
+            {
+                new ExplorerContextProvider(ShellSelection),
+                new ClipboardImageContextProvider(Clipboard),
+                new ClipboardContextProvider(Clipboard),
+            });
+            Search = new SearchCoordinator(
+                new ISearchProvider[]
+                {
+                    new StaticCommandSearchProvider(provider.PluginStore.Commands),
+                    new WindowsSettingsSearchProvider(),
+                    new LocalFileSearchProvider(),
+                },
+                preferences: SearchPreferences);
+            provider.PluginStore.AttachSearchCoordinator(Search);
 
             Notification = new NotificationService();
             provider.RegisterService<INotificationService>(Notification);
@@ -84,6 +114,7 @@ namespace LongBetterWindows.Host.Services
 
         public static void DisposeAll()
         {
+            MouseGestures?.Dispose();
             (HotKey as IDisposable)?.Dispose();
             (Http as IDisposable)?.Dispose();
             (Storage as IDisposable)?.Dispose();

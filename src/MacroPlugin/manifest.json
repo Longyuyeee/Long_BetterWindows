@@ -1,16 +1,45 @@
 {
   "id": "com.long.macro",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "宏录制器",
   "author": "Long",
   "entry_point": "MacroPlugin.dll",
-  "capabilities": [
-    "system.hotkey"
+  "capabilities": ["system.hotkey"],
+  "commands": [
+    {
+      "id": "macro.record-toggle",
+      "title": "开始或停止宏录制",
+      "description": "切换键鼠宏录制状态",
+      "aliases": ["宏录制", "record macro", "hongluzhi"],
+      "accepted_inputs": ["none"],
+      "view_mode": "none",
+      "priority": 24
+    },
+    {
+      "id": "macro.play-once",
+      "title": "播放一次宏",
+      "description": "播放最近录制的键鼠动作",
+      "aliases": ["播放宏", "play macro", "bofanghong"],
+      "accepted_inputs": ["none"],
+      "view_mode": "none",
+      "priority": 20
+    },
+    {
+      "id": "macro.loop-toggle",
+      "title": "切换宏循环播放",
+      "description": "开始或停止循环播放最近录制的宏",
+      "aliases": ["循环宏", "loop macro", "xunhuanhong"],
+      "accepted_inputs": ["none"],
+      "view_mode": "none",
+      "priority": 18
+    }
   ],
+  "window": {"mode": "overlay"},
   "default_settings": {
     "record_hotkey": "F6",
     "play_once_hotkey": "F7",
     "play_loop_hotkey": "F8",
-    "loop_interval": 100
+    "loop_interval": 100,
+    "auto_start": true
   }
 }

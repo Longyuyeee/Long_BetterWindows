@@ -254,7 +254,7 @@
                                    ViewportSize="{TemplateBinding ViewportHeight}"
                                    Maximum="{TemplateBinding ScrollableHeight}"
                                    Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
-                                   Style="{StaticResource DarkScrollBarStyle}" />
+                                   Style="{DynamicResource DarkScrollBarStyle}" />
                         <ScrollBar x:Name="PART_HorizontalScrollBar"
                                    Grid.Column="0" Grid.Row="1"
                                    Orientation="Horizontal"

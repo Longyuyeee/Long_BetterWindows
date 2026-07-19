@@ -17,9 +17,12 @@
   </ItemGroup>
 
   <Target Name="CopyToPlugins" AfterTargets="Build">
-    <MakeDir Directories="$(SolutionDir)Plugins\MacroPlugin" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)Plugins\MacroPlugin" />
-    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(SolutionDir)Plugins\MacroPlugin" />
+    <MakeDir Directories="$(ProjectDir)..\..\Plugins\MacroPlugin" />
+    <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\MacroPlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\..\Plugins\MacroPlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\..\Plugins\MacroPlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\MacroPlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\MacroPlugin" />
   </Target>
 
 </Project>

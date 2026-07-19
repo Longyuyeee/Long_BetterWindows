@@ -16,9 +16,12 @@
   </ItemGroup>
 
   <Target Name="CopyToPlugins" AfterTargets="Build">
-    <MakeDir Directories="$(SolutionDir)Plugins\QuickLaunchPlugin" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)Plugins\QuickLaunchPlugin" />
-    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(SolutionDir)Plugins\QuickLaunchPlugin" />
+    <MakeDir Directories="$(ProjectDir)..\..\Plugins\QuickLaunchPlugin" />
+    <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\QuickLaunchPlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\..\Plugins\QuickLaunchPlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\..\Plugins\QuickLaunchPlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\QuickLaunchPlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\QuickLaunchPlugin" />
   </Target>
 
 </Project>

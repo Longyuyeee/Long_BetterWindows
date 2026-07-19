@@ -16,9 +16,12 @@
   </ItemGroup>
 
   <Target Name="CopyToPlugins" AfterTargets="Build">
-    <MakeDir Directories="$(SolutionDir)Plugins\ColorPickerPlugin" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)Plugins\ColorPickerPlugin" />
-    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(SolutionDir)Plugins\ColorPickerPlugin" />
+    <MakeDir Directories="$(ProjectDir)..\..\Plugins\ColorPickerPlugin" />
+    <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\ColorPickerPlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\..\Plugins\ColorPickerPlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\..\Plugins\ColorPickerPlugin" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\ColorPickerPlugin" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\ColorPickerPlugin" />
   </Target>
 
 </Project>

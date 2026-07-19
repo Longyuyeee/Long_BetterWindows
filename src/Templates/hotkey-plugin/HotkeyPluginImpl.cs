@@ -54,7 +54,7 @@ public class HotkeyPluginImpl : ILongPlugin
     public async Task<bool> StopAsync()
     {
         await _host!.HotKey!.UnregisterAsync("Alt+X");
-        State = PluginState.Disabled;
+        State = PluginState.Stopped;
         Log.Information("[HotkeyPlugin] 已停止");
         return true;
     }

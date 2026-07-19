@@ -1,57 +1,101 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>密码生成器</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,system-ui,sans-serif;background:#f5f5f7;color:#1d1d1f;padding:20px}
-h2{font-size:15px;margin-bottom:10px;color:#007AFF}
-.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-label{font-size:12px;color:#888;display:flex;align-items:center;gap:6px;margin:6px 0}
-input[type=range]{flex:1;margin-left:8px}
-input[type=checkbox]{width:16px;height:16px}
-.btn-row{display:flex;gap:8px;margin-top:10px}
-button{padding:8px 16px;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer}
-.btn-primary{background:#007AFF;color:#fff}.btn-primary:hover{background:#0062CC}
-.btn-secondary{background:#f0f0f0;color:#333}.btn-secondary:hover{background:#e0e0e0}
-.result{background:#1e1e2e;color:#a6e3a1;font-size:18px;font-family:'Cascadia Code',monospace;padding:12px;border-radius:8px;text-align:center;word-break:break-all;margin-top:8px;min-height:44px;display:flex;align-items:center;justify-content:center}
-.strength{font-size:11px;margin-top:4px;text-align:center}
-.strength.weak{color:#FF3B30}.strength.medium{color:#FF9500}.strength.strong{color:#34C759}
-.opt-row{display:flex;justify-content:space-between;align-items:center;margin:4px 0}
-.opt-row span{font-size:12px}
-</style></head><body>
-<h2>密码生成器</h2>
-<div class="card">
-  <div class="opt-row"><span>长度: <b id="lenVal">16</b></span></div>
-  <input type="range" id="length" min="6" max="64" value="16" oninput="document.getElementById('lenVal').textContent=this.value;generate()">
-  <label><input type="checkbox" id="upper" checked onchange="generate()"> 大写字母 (A-Z)</label>
-  <label><input type="checkbox" id="numbers" checked onchange="generate()"> 数字 (0-9)</label>
-  <label><input type="checkbox" id="symbols" checked onchange="generate()"> 符号 (!@#$%)</label>
-  <div class="result" id="password"></div>
-  <div class="strength" id="strength"></div>
-  <div class="btn-row">
-    <button class="btn-primary" onclick="generate()">生成新密码</button>
-    <button class="btn-secondary" onclick="copyPwd()">复制</button>
-  </div>
-  <div id="status" style="font-size:11px;margin-top:6px;color:#34C759"></div>
-</div>
-<script>
-var chars='abcdefghijklmnopqrstuvwxyz';
-function generate(){
-  var pool=chars;
-  if(document.getElementById('upper').checked)pool+='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  if(document.getElementById('numbers').checked)pool+='0123456789';
-  if(document.getElementById('symbols').checked)pool+='!@#$%^&*()_+-=[]{}|;:,.<>?';
-  var len=parseInt(document.getElementById('length').value);
-  var pwd='';for(var i=0;i<len;i++)pwd+=pool[Math.floor(Math.random()*pool.length)];
-  document.getElementById('password').textContent=pwd;
-  var s=document.getElementById('strength');
-  if(len<10){s.textContent='弱';s.className='strength weak'}
-  else if(len<16){s.textContent='中等';s.className='strength medium'}
-  else{s.textContent='强';s.className='strength strong'}
-}
-async function copyPwd(){
-  var p=document.getElementById('password').textContent;
-  if(!p)return;
-  await long.clipboard.setText(p);
-  document.getElementById('status').textContent='已复制';setTimeout(function(){document.getElementById('status').textContent=''},2000);
-}
-generate();
-</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>密码生成器</title>
+</head>
+<body>
+  <main class="long-page">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">SECURITY</div>
+        <h1 class="long-page-title">密码生成器</h1>
+        <p class="long-page-description">使用浏览器安全随机源生成高强度密码，不上传任何数据。</p>
+      </div>
+      <span class="long-badge" id="strength">强</span>
+    </header>
+
+    <section class="long-card long-stack" aria-label="密码生成选项">
+      <div class="long-field">
+        <div class="long-toolbar">
+          <label class="long-field-label" for="length">密码长度</label>
+          <span class="long-toolbar__spacer"></span>
+          <strong id="lengthValue">20</strong>
+        </div>
+        <input class="long-range" id="length" type="range" min="6" max="64" value="20">
+      </div>
+
+      <div class="long-option-list">
+        <label class="long-option"><input type="checkbox" id="uppercase" checked>包含大写字母 <span class="long-muted">A–Z</span></label>
+        <label class="long-option"><input type="checkbox" id="numbers" checked>包含数字 <span class="long-muted">0–9</span></label>
+        <label class="long-option"><input type="checkbox" id="symbols" checked>包含常用符号 <span class="long-muted">! @ # $ %</span></label>
+      </div>
+
+      <div class="long-result" id="password" tabindex="0" aria-label="生成的密码"></div>
+      <div class="long-toolbar">
+        <button class="long-button long-button--primary btn-primary" id="generateButton" type="button">生成新密码</button>
+        <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button">复制密码</button>
+        <span class="long-toolbar__spacer"></span>
+        <span class="long-kbd">Ctrl Enter</span>
+      </div>
+      <div id="status" class="long-status" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script>
+    const lower = 'abcdefghijklmnopqrstuvwxyz';
+    const lengthInput = document.getElementById('length');
+    const lengthValue = document.getElementById('lengthValue');
+    const password = document.getElementById('password');
+    const status = document.getElementById('status');
+    const strength = document.getElementById('strength');
+
+    function secureIndex(max) {
+      const value = new Uint32Array(1);
+      crypto.getRandomValues(value);
+      return value[0] % max;
+    }
+
+    function generate() {
+      let pool = lower;
+      if (document.getElementById('uppercase').checked) pool += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      if (document.getElementById('numbers').checked) pool += '0123456789';
+      if (document.getElementById('symbols').checked) pool += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      const size = Number(lengthInput.value);
+      let value = '';
+      for (let index = 0; index < size; index++) value += pool[secureIndex(pool.length)];
+      password.textContent = value;
+      lengthValue.textContent = size;
+      strength.textContent = size < 10 ? '基础' : size < 16 ? '良好' : '强';
+      status.textContent = '';
+      window.LongUI?.announce('新密码已生成');
+    }
+
+    async function copy() {
+      if (!password.textContent) return;
+      try {
+        await long.clipboard.setText(password.textContent);
+        status.textContent = '密码已复制到剪贴板';
+        status.className = 'long-status long-status--success';
+        window.LongUI?.announce(status.textContent);
+      } catch (_) {
+        status.textContent = '复制失败';
+        status.className = 'long-status long-status--danger';
+      }
+    }
+
+    lengthInput.addEventListener('input', generate);
+    document.querySelectorAll('input[type="checkbox"]').forEach(function (item) { item.addEventListener('change', generate); });
+    document.getElementById('generateButton').addEventListener('click', generate);
+    document.getElementById('copyButton').addEventListener('click', copy);
+    document.addEventListener('keydown', function (event) {
+      if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); generate(); }
+    });
+    window.LongUI?.onCommand(function (command) {
+      if (command.command_id === 'password.generate') generate();
+    });
+    generate();
+  </script>
+</body>
+</html>

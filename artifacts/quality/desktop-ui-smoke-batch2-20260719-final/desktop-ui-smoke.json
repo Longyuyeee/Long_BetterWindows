@@ -1,0 +1,39 @@
+﻿{
+    "schema_version":  1,
+    "generated_at":  "2026-07-19T15:55:43.1051965+00:00",
+    "classification":  "desktop_ui_automation_smoke",
+    "release_executable":  "E:\\ProjectSave\\GeminiProject\\Long_BetterWindows\\repo\\src\\LongBetterWindows.Host\\bin\\Release\\net8.0-windows\\LongBetterWindows.Host.exe",
+    "palette":  {
+                    "window_discovered":  true,
+                    "search_discovered":  true,
+                    "results_discovered":  true,
+                    "search_keyboard_focus":  true,
+                    "wifi_result_discovered":  true,
+                    "shift_enter_copied_uri":  true,
+                    "copy_kept_palette_open":  true,
+                    "secondary_menu_opened":  true,
+                    "secondary_menu_copied_uri":  true,
+                    "secondary_menu_kept_palette_open":  true,
+                    "escape_closed_palette":  true
+                },
+    "super_panel":  {
+                        "window_discovered":  true,
+                        "results_discovered":  true,
+                        "escape_closed_panel":  true,
+                        "groups_discovered":  true,
+                        "open_command_center_invoked":  true,
+                        "panel_hidden_on_transition":  true,
+                        "palette_shown_on_transition":  true
+                    },
+    "plugin_lifecycle":  {
+                             "main_window_discovered":  true,
+                             "embedded_surface_discovered":  true,
+                             "detach_invoked":  true,
+                             "detached_window_discovered":  true,
+                             "detached_back_discovered":  true,
+                             "escape_closed_detached_window":  true,
+                             "tool_center_restored":  true
+                         },
+    "passed":  true,
+    "error":  null
+}

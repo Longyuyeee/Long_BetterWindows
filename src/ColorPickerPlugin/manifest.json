@@ -1,15 +1,21 @@
 {
   "id": "com.long.color-picker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "颜色拾取器",
   "author": "Long",
   "entry_point": "ColorPickerPlugin.dll",
-  "capabilities": [
-    "system.hotkey",
-    "system.clipboard"
+  "capabilities": ["system.hotkey", "system.clipboard"],
+  "commands": [
+    {
+      "id": "color.pick",
+      "title": "屏幕取色",
+      "description": "拾取屏幕像素颜色并复制色值",
+      "aliases": ["取色", "颜色拾取", "color picker", "pingmuquse", "pmqs"],
+      "accepted_inputs": ["none"],
+      "view_mode": "none",
+      "priority": 30
+    }
   ],
-  "default_settings": {
-    "hotkey": "Ctrl+Shift+P",
-    "auto_start": true
-  }
+  "window": {"mode": "overlay"},
+  "default_settings": {"hotkey": "Ctrl+Shift+P", "auto_start": true}
 }

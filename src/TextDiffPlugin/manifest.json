@@ -1,1 +1,29 @@
-{"id":"com.long.text-diff","version":"1.0.0","name":"文本对比","author":"Long","entry_point":"index.html","runtime":"webview","capabilities":["system.clipboard"],"default_settings":{"auto_start":true}}
+{
+  "id": "com.long.text-diff",
+  "version": "1.1.0",
+  "name": "文本对比",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": ["system.clipboard"],
+  "commands": [
+    {
+      "id": "text.diff",
+      "title": "对比文本差异",
+      "description": "将文本或剪贴板内容作为原始版本打开文本对比",
+      "aliases": ["文本对比", "diff", "比较文本", "duibi"],
+      "accepted_inputs": ["text", "clipboard"],
+      "view_mode": "document",
+      "keep_alive": true,
+      "priority": 19
+    }
+  ],
+  "window": {
+    "mode": "wide",
+    "preferred_width": 1040,
+    "preferred_height": 760,
+    "min_width": 760,
+    "min_height": 560
+  },
+  "default_settings": {"auto_start": true}
+}
