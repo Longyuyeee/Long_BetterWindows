@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-20T03:41:47.8628533+00:00",
+  "view": "diagnostics",
+  "theme": "dark",
+  "render_dpi": 144,
+  "actual_monitor_dpi": 192,
+  "capture_kind": "wpf_render_target",
+  "logical_width": 1280,
+  "logical_height": 800,
+  "pixel_width": 1920,
+  "pixel_height": 1200,
+  "high_contrast": false,
+  "reduced_motion": false
+}

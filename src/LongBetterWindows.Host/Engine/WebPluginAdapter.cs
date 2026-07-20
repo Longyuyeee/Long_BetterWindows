@@ -1,5 +1,4 @@
 using LongBetterWindows.Host.Core;
-using LongBetterWindows.Host.Views;
 using Serilog;
 
 namespace LongBetterWindows.Host.Engine
@@ -11,12 +10,8 @@ namespace LongBetterWindows.Host.Engine
     public class WebPluginAdapter : ILongPlugin, IHasMainUI, IPluginCommandHandler, IDisposable
     {
         private readonly WebPluginRuntime _runtime;
-        private readonly string _pluginDir;
-        private readonly string _entryPoint;
-        private PluginWindowHost? _window;
+        private readonly WebPluginPresentationCoordinator _presentation;
         private Task<bool>? _runtimeInitialization;
-        private bool _closingForStop;
-        private bool _isEmbedded;
 
         public string Id { get; }
         public string Name { get; }
@@ -26,11 +21,14 @@ namespace LongBetterWindows.Host.Engine
         public WebPluginAdapter(WebPluginRuntime runtime, string id, string name, string version, string pluginDir, string entryPoint)
         {
             _runtime = runtime;
-            _pluginDir = pluginDir;
-            _entryPoint = entryPoint;
             Id = id;
             Name = name;
             Version = version;
+            _presentation = new WebPluginPresentationCoordinator(
+                runtime,
+                id,
+                name,
+                () => HostProvider.Instance.PluginStore.HandleWindowClosedAsync(id));
         }
 
         public void ShowMainUI()
@@ -40,79 +38,10 @@ namespace LongBetterWindows.Host.Engine
         {
             EnsureWindowVisible();
             if (!await EnsureRuntimeInitializedAsync())
-                _window?.Close();
+                _presentation.CloseVisibleSurface();
         }
 
-        private void EnsureWindowVisible()
-        {
-            var dispatcher = System.Windows.Application.Current.Dispatcher;
-            if (!dispatcher.CheckAccess())
-            {
-                dispatcher.Invoke(EnsureWindowVisible);
-                return;
-            }
-
-            var webView = _runtime.EnsureView();
-            Log.Debug("[Web:{Id}] 准备呈现主界面: Presentation={Presentation}, MainWindow={MainWindowType}",
-                Id,
-                _runtime.Manifest.Lifecycle?.DefaultPresentation
-                    ?? Contracts.PluginPresentationMode.Detached,
-                System.Windows.Application.Current.MainWindow?.GetType().Name ?? "null");
-            if (_isEmbedded
-                && System.Windows.Application.Current.MainWindow is MainWindow embeddedOwner
-                && embeddedOwner.IsHostingEmbedded(webView))
-            {
-                embeddedOwner.Activate();
-                return;
-            }
-            if (_window?.IsVisible == true)
-            {
-                _window.Activate();
-                return;
-            }
-
-            if (_runtime.Manifest.Lifecycle?.DefaultPresentation
-                    == Contracts.PluginPresentationMode.Embedded
-                && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
-            {
-                _isEmbedded = true;
-                mainWindow.ShowEmbeddedPlugin(
-                    Name,
-                    webView,
-                    async () =>
-                    {
-                        _isEmbedded = false;
-                        await HostProvider.Instance.PluginStore.HandleWindowClosedAsync(Id);
-                    },
-                    () =>
-                    {
-                        _isEmbedded = false;
-                        ShowDetachedWindow(webView);
-                    });
-                return;
-            }
-
-            ShowDetachedWindow(webView);
-        }
-
-        private void ShowDetachedWindow(System.Windows.FrameworkElement webView)
-        {
-            _window = new PluginWindowHost(Name, webView, _runtime.Manifest.Window)
-            {
-                Owner = System.Windows.Application.Current.MainWindow,
-            };
-            var window = _window;
-            window.Closed += async (_, _) =>
-            {
-                window.DetachContent();
-                if (ReferenceEquals(_window, window))
-                    _window = null;
-                if (!_closingForStop)
-                    await HostProvider.Instance.PluginStore.HandleWindowClosedAsync(Id);
-            };
-            window.Show();
-        }
-
+        private void EnsureWindowVisible() => _presentation.EnsureVisible();
         public async Task<bool> InitializeAsync(IHostApi host)
         {
             await Task.CompletedTask;
@@ -160,41 +89,7 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task ReleaseWebResourcesAsync()
         {
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher != null && !dispatcher.HasShutdownStarted)
-            {
-                void ReleaseOnUiThread()
-                {
-                    _closingForStop = true;
-                    try
-                    {
-                        var webView = _runtime.WebView;
-                        if (_isEmbedded && webView is not null
-                            && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
-                        {
-                            mainWindow.CloseEmbeddedPlugin(webView);
-                            _isEmbedded = false;
-                        }
-                        if (_window is not null)
-                        {
-                            _window.DetachContent();
-                            _window.Close();
-                            _window = null;
-                        }
-                        _runtime.Dispose();
-                        _runtimeInitialization = null;
-                    }
-                    finally { _closingForStop = false; }
-                }
-
-                if (dispatcher.CheckAccess())
-                    ReleaseOnUiThread();
-                else
-                    await dispatcher.InvokeAsync(ReleaseOnUiThread);
-                return;
-            }
-
-            _runtime.Dispose();
+            await _presentation.ReleaseAsync();
             _runtimeInitialization = null;
         }
 

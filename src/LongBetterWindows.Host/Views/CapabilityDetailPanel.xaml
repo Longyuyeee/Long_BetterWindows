@@ -1,37 +1,52 @@
 <UserControl x:Class="LongBetterWindows.Host.Views.CapabilityDetailPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Background="#252628"
-             BorderBrush="#3A3A3D"
-             BorderThickness="0,1,0,0">
-
-    <UserControl.Resources>
-        <Style x:Key="CapItemStyle" TargetType="Border">
-            <Setter Property="Background" Value="#2B2D30" />
-            <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,8" />
-            <Setter Property="Margin" Value="0,0,0,6" />
-        </Style>
-    </UserControl.Resources>
-
-    <Grid>
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="{DynamicResource Long.Brush.Background.Base}">
+        <ScrollViewer Style="{StaticResource DarkScrollViewerStyle}"
+                      VerticalScrollBarVisibility="Auto" Padding="22">
             <StackPanel>
-                <!-- 标题 -->
-                <TextBlock Text="权限详情" FontSize="14" FontWeight="SemiBold"
-                           Foreground="#F8FAFC" Margin="0,0,0,12" />
+                <TextBlock x:Name="PluginNameText" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock x:Name="PermissionSummaryText" Margin="0,5,0,18"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
 
-                <!-- 权限列表容器 -->
-                <StackPanel x:Name="CapabilitiesPanel" />
+                <ItemsControl x:Name="CapabilityItems">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource LongPluginCard}" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Width="9" Height="9" Fill="{Binding LevelBrush}"
+                                             Margin="0,2,12,0" VerticalAlignment="Top" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Description}" Margin="0,4,12,0" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                        <TextBlock Text="{Binding CapabilityKey}" Margin="0,6,0,0" FontSize="10"
+                                                   FontFamily="{DynamicResource Long.Font.Mono}"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </StackPanel>
+                                    <Border Grid.Column="2" Style="{StaticResource LongBadge}"
+                                            BorderBrush="{Binding LevelBrush}" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding LevelText}" Foreground="{Binding LevelBrush}" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                <!-- 统计信息 -->
-                <Border Style="{StaticResource CapItemStyle}" Margin="0,12,0,0"
-                        Background="#1E1F22">
+                <TextBlock x:Name="NoCapabilitiesText" Text="该插件未声明宿主能力"
+                           Style="{StaticResource LongEmptyState}" Visibility="Collapsed" Margin="0,10,0,16" />
+
+                <Border Style="{StaticResource LongCard}" Margin="0,8,0,0">
                     <StackPanel>
-                        <TextBlock Text="📊 API 调用统计" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="#F8FAFC" Margin="0,0,0,8" />
-                        <TextBlock x:Name="StatsText" FontSize="11" Foreground="#94A3B8"
-                                   TextWrapping="Wrap" />
+                        <TextBlock Text="本地调用记录" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock x:Name="StatsText" Margin="0,8,0,0" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                     </StackPanel>
                 </Border>
             </StackPanel>

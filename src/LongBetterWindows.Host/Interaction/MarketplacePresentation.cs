@@ -1,0 +1,137 @@
+using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Engine;
+
+namespace LongBetterWindows.Host.Interaction
+{
+    internal static class MarketplacePresentation
+    {
+        public static IReadOnlyList<MarketCardModel> ProjectEntries(
+            MarketplaceCatalog catalog,
+            string? query,
+            string? category,
+            Func<string, string?> getInstalledVersion)
+            => MarketplaceCatalogCodec.Search(catalog.Entries, query, category)
+                .Select(entry =>
+                {
+                    var installedVersion = getInstalledVersion(entry.Id);
+                    return new MarketCardModel(
+                        entry,
+                        LocalMarketplaceRepository.GetInstallState(
+                            entry, installedVersion),
+                        installedVersion);
+                })
+                .ToArray();
+
+        public static IReadOnlyList<string> GetCategories(MarketplaceCatalog catalog)
+            => catalog.Entries
+                .Select(entry => entry.Category)
+                .Where(category => !string.IsNullOrWhiteSpace(category))
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .OrderBy(category => category)
+                .ToArray();
+
+        public static MarketplaceCompatibility GetCompatibility(
+            MarketplacePackageVersion version,
+            string hostVersion)
+        {
+            var requirements = new List<string>();
+            var compatible = true;
+            if (!string.IsNullOrWhiteSpace(version.MinHostVersion))
+            {
+                requirements.Add($"Host >= {version.MinHostVersion}");
+                compatible &= ParseVersion(hostVersion) >= ParseVersion(version.MinHostVersion);
+            }
+            if (!string.IsNullOrWhiteSpace(version.MinApiVersion))
+            {
+                requirements.Add($"API >= {version.MinApiVersion}");
+                var requiredApi = ParseVersion(version.MinApiVersion);
+                compatible &= ApiVersion.Current.IsCompatibleWith(new ApiVersion(
+                    requiredApi.Major,
+                    requiredApi.Minor,
+                    Math.Max(0, requiredApi.Build)));
+            }
+            if (!string.IsNullOrWhiteSpace(version.MinUiKitVersion))
+            {
+                requirements.Add($"UI Kit >= {version.MinUiKitVersion}");
+                compatible &= PluginPackageValidator.CurrentUiKitVersion
+                    >= ParseVersion(version.MinUiKitVersion);
+            }
+
+            return new MarketplaceCompatibility(
+                compatible,
+                requirements.Count == 0
+                    ? "使用当前稳定协议，无额外最低版本要求。"
+                    : string.Join(" · ", requirements));
+        }
+
+        public static IReadOnlyList<string> FormatPermissionDiff(PermissionDiff diff)
+        {
+            var lines = new List<string>();
+            lines.AddRange(diff.Added.Select(capability => $"＋ 新增权限  {capability}"));
+            lines.AddRange(diff.Removed.Select(capability => $"− 移除权限  {capability}"));
+            lines.AddRange(diff.Unchanged.Select(capability => $"• 保持权限  {capability}"));
+            if (lines.Count == 0) lines.Add("• 无需额外能力权限");
+            return lines;
+        }
+
+        public static MarketplacePackageMetadata CreatePackageMetadata(
+            MarketplaceEntry entry,
+            MarketplacePackageVersion version)
+            => new()
+            {
+                Source = entry.Source,
+                ExpectedPluginId = entry.Id,
+                ExpectedVersion = version.Version,
+                ExpectedSha256 = EmptyToNull(version.Sha256),
+                Signature = version.Signature,
+                PublisherPublicKeyPem = version.PublisherPublicKeyPem,
+                PublisherKeyId = version.PublisherKeyId,
+            };
+
+        public static Version ParseVersion(string? value)
+        {
+            var normalized = (value ?? "0.0.0").TrimStart('v', 'V').Split('-', '+')[0];
+            return Version.TryParse(normalized, out var version)
+                ? version
+                : new Version(0, 0, 0);
+        }
+
+        private static string? EmptyToNull(string? value)
+            => string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    internal sealed record MarketplaceCompatibility(
+        bool IsCompatible,
+        string Description);
+
+    internal sealed class MarketCardModel
+    {
+        public MarketCardModel(
+            MarketplaceEntry entry,
+            MarketplaceInstallState state,
+            string? installedVersion)
+        {
+            Entry = entry;
+            State = state;
+            InstalledVersion = installedVersion;
+        }
+
+        public MarketplaceEntry Entry { get; }
+        public MarketplaceInstallState State { get; }
+        public string? InstalledVersion { get; }
+        public string Name => Entry.Name;
+        public string Summary => Entry.Summary;
+        public string Monogram => string.IsNullOrWhiteSpace(Name)
+            ? "L"
+            : Name[..1].ToUpperInvariant();
+        public string Meta => $"{Entry.Category} · {Entry.Publisher}";
+        public string StateLabel => State switch
+        {
+            MarketplaceInstallState.Installed => "已安装",
+            MarketplaceInstallState.UpdateAvailable => "可更新",
+            MarketplaceInstallState.DowngradeAvailable => "可降级",
+            MarketplaceInstallState.Incompatible => "不兼容",
+            _ => "获取",
+        };
+    }
+}

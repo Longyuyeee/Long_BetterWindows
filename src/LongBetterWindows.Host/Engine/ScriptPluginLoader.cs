@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using LongBetterWindows.Host.Contracts;
@@ -37,7 +38,8 @@ namespace LongBetterWindows.Host.Engine
                 var options = ScriptOptions.Default
                     .WithReferences(
                         typeof(IHostApi).Assembly,
-                        typeof(PluginState).Assembly)
+                        typeof(PluginState).Assembly,
+                        Assembly.Load("System.Runtime"))
                     .WithImports(
                         // 只导入安全的命名空间，避免导入危险类型
                         "System.Threading.Tasks",

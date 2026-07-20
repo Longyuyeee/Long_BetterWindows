@@ -20,7 +20,7 @@ public class QualityGateTests
         Assert.Contains("PermissionDiffItems", xaml);
         Assert.Contains("HighTrustWarning", xaml);
         Assert.Contains("ConfirmOverlay", xaml);
-        Assert.Contains("ValidateAsync(path, metadata, installed)", source);
+        Assert.Contains("_marketplace.ValidatePackageAsync", source);
         Assert.Contains("InstallAsync(_pendingPackagePath, _pendingMetadata)", source);
         Assert.Contains("UninstallAsync(_pendingUninstallId)", source);
         Assert.Contains(".long-transaction-", installer);
@@ -144,18 +144,21 @@ public class QualityGateTests
     public void VisualCapture_RendersDeterministicPngAndRecordsActualMonitorDpiSeparately()
     {
         var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
+        var options = Read("src", "LongBetterWindows.Host", "Services", "AppStartupOptions.cs");
+        var quality = Read("src", "LongBetterWindows.Host", "Services", "QualityRuntimeService.cs");
 
-        Assert.Contains("--quality-capture", app);
-        Assert.Contains("--quality-capture-view", app);
-        Assert.Contains("--quality-render-dpi", app);
-        Assert.Contains("RenderTargetBitmap", app);
-        Assert.Contains("PngBitmapEncoder", app);
-        Assert.Contains("CapturePreviewAsync", app);
-        Assert.Contains("CoreWebView2CapturePreviewImageFormat.Png", app);
-        Assert.Contains("webview_preview", app);
-        Assert.Contains("VisualTreeHelper.GetDpi", app);
-        Assert.Contains("actual_monitor_dpi", app);
-        Assert.Contains("render_dpi", app);
+        Assert.Contains("--quality-capture", options);
+        Assert.Contains("--quality-capture-view", options);
+        Assert.Contains("--quality-render-dpi", options);
+        Assert.Contains("RenderTargetBitmap", quality);
+        Assert.Contains("PngBitmapEncoder", quality);
+        Assert.Contains("CapturePreviewAsync", quality);
+        Assert.Contains("CoreWebView2CapturePreviewImageFormat.Png", quality);
+        Assert.Contains("webview_preview", quality);
+        Assert.Contains("VisualTreeHelper.GetDpi", quality);
+        Assert.Contains("actual_monitor_dpi", quality);
+        Assert.Contains("render_dpi", quality);
+        Assert.Contains("_qualityRuntime!.CaptureAsync", app);
         Assert.Contains("Shutdown(3)", app);
     }
 
@@ -260,33 +263,141 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void Marketplace_UsesOnlyTheTrustedDistributionPipeline()
+    {
+        var root = FindRepositoryRoot();
+        var host = Path.Combine(root, "src", "LongBetterWindows.Host");
+        var retiredFiles = new[]
+        {
+            Path.Combine(host, "Contracts", "MarketPlugin.cs"),
+            Path.Combine(host, "Services", "LpakInstallerService.cs"),
+            Path.Combine(host, "Services", "MarketApiService.cs"),
+            Path.Combine(host, "Services", "PluginInstallService.cs"),
+            Path.Combine(host, "Services", "PluginUpdateService.cs"),
+            Path.Combine(host, "Views", "MarketPanel.xaml"),
+            Path.Combine(host, "Views", "MarketPanel.xaml.cs"),
+        };
+
+        Assert.All(retiredFiles, path => Assert.False(File.Exists(path), path));
+        Assert.True(File.Exists(Path.Combine(host, "Views", "MarketplaceControl.xaml")));
+        Assert.True(File.Exists(Path.Combine(host, "Engine", "MarketplaceRepository.cs")));
+        Assert.True(File.Exists(Path.Combine(host, "Engine", "MarketplaceTransport.cs")));
+        Assert.True(File.Exists(Path.Combine(host, "Engine", "LpakInstaller.cs")));
+    }
+
+    [Fact]
+    public void MarketplaceView_DelegatesNetworkTrustAndDownloadLifetimeToRuntimeService()
+    {
+        var view = Read(
+            "src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml.cs");
+        var runtime = Read(
+            "src", "LongBetterWindows.Host", "Services", "MarketplaceRuntimeService.cs");
+        var presentation = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "MarketplacePresentation.cs");
+
+        Assert.Contains("new MarketplaceRuntimeService", view);
+        Assert.Contains("_marketplace.LoadCatalogAsync", view);
+        Assert.Contains("_marketplace.ValidatePackageAsync", view);
+        Assert.Contains("_marketplace.DownloadPackageAsync", view);
+        Assert.Contains("MarketplaceControl_Unloaded", view);
+        Assert.DoesNotContain("new HttpClient", view);
+        Assert.DoesNotContain("new RemoteMarketplaceRepository", view);
+        Assert.DoesNotContain("new MarketplacePackageDownloader", view);
+        Assert.Contains("MarketplacePresentation.ProjectEntries", view);
+        Assert.Contains("MarketplacePresentation.GetCompatibility", view);
+        Assert.Contains("MarketplacePresentation.CreatePackageMetadata", view);
+        Assert.DoesNotContain("class MarketCardModel", view);
+        Assert.Contains("new RemoteMarketplaceRepository", runtime);
+        Assert.Contains("new MarketplacePackageDownloader", runtime);
+        Assert.Contains("MarketplaceConfigurationLoader.LoadTrustStoreAsync", runtime);
+        Assert.Contains("if (_ownsHttpClient) _httpClient.Dispose()", runtime);
+        Assert.Contains("class MarketCardModel", presentation);
+        Assert.Contains("MarketplaceCatalogCodec.Search", presentation);
+    }
+
+    [Fact]
     public void SuperPanel_ReusesUnifiedContextSearchExecutionAndPreferences()
     {
         var xaml = Read("src", "LongBetterWindows.Host", "Views", "SuperPanelWindow.xaml");
         var source = Read("src", "LongBetterWindows.Host", "Views", "SuperPanelWindow.xaml.cs");
+        var groups = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "SuperPanelGroupCoordinator.cs");
+        var session = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "SuperPanelSearchSession.cs");
+        var actions = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "SuperPanelActionCoordinator.cs");
+        var drag = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "SuperPanelDragSession.cs");
+        var keyboard = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "SuperPanelKeyboardRouter.cs");
+        var lifecycle = Read(
+            "src", "LongBetterWindows.Host", "Views", "SuperPanelWindowLifecycle.cs");
+        var editor = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "SuperPanelGroupEditorSession.cs");
+        var menu = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "SearchResultActionMenuProjection.cs");
+        var projection = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "SuperPanelViewProjection.cs");
         var palette = Read("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml.cs");
 
         Assert.Contains("Long 超级面板", xaml);
-        Assert.Contains("ServicesInitializer.ContextCapture.CaptureAsync", source);
-        Assert.Contains("ServicesInitializer.Search.SearchIncrementalAsync", source);
-        Assert.Contains("CommandInvocationFactory.Create", source);
-        Assert.Contains("SearchPreferences.TogglePinnedAsync", source);
-        Assert.Contains("SearchPreferences.RecordUseAsync", source);
-        Assert.Contains("SuperPanelGroupIds.Smart", source);
-        Assert.Contains("SuperPanelGroupIds.Pinned", source);
-        Assert.Contains("SuperPanelGroupIds.Recent", source);
-        Assert.Contains("SuperPanelResultOrganizer.SelectGroup", source);
-        Assert.Contains("SearchPreferences.MovePinnedAsync", source);
-        Assert.Contains("WmMouseWheel", source);
-        Assert.Contains("AddHook(WindowMessageHook)", source);
-        Assert.Contains("CycleGroup(delta)", source);
+        Assert.Contains("new SuperPanelSearchSession", source);
+        Assert.Contains("_contextCapture.CaptureAsync", session);
+        Assert.Contains("_search.SearchIncrementalAsync", session);
+        Assert.Contains("new SuperPanelActionCoordinator", source);
+        Assert.Contains("_actionCoordinator.ExecuteAsync", source);
+        Assert.Contains("SearchResultActionExecutor", actions);
+        Assert.Contains("RecordUseAsync", actions);
+        Assert.Contains("_groupCoordinator.TogglePinnedAsync", source);
+        Assert.DoesNotContain("new CommandExecutor", source);
+        Assert.Contains("SuperPanelGroupIds.Smart", groups);
+        Assert.Contains("SuperPanelGroupIds.Pinned", groups);
+        Assert.Contains("SuperPanelGroupIds.Recent", groups);
+        Assert.Contains("SuperPanelResultOrganizer.SelectGroup", groups);
+        Assert.Contains("new SuperPanelGroupCoordinator", source);
+        Assert.Contains("_groupCoordinator.BuildView()", source);
+        Assert.DoesNotContain("IReadOnlyList<SearchResultItem> _allResults", source);
+        Assert.DoesNotContain("string _activeGroupId", source);
+        Assert.DoesNotContain("CancellationTokenSource? _loadCts", source);
+        Assert.DoesNotContain("CancellationTokenSource? _searchCts", source);
+        Assert.Contains("_preferences.MovePinnedAsync", groups);
+        Assert.Contains("_groups.MoveResultAsync", groups);
+        Assert.Contains("_groups.AddResultAsync", groups);
+        Assert.Contains("_groups.RemoveResultAsync", groups);
+        Assert.DoesNotContain("SuperPanelGroups.AddResultAsync", source);
+        Assert.DoesNotContain("SuperPanelGroups.MoveResultAsync", source);
+        Assert.DoesNotContain("SuperPanelGroups.RemoveResultAsync", source);
+        Assert.DoesNotContain("SuperPanelGroups.CreateAsync", source);
+        Assert.DoesNotContain("SuperPanelGroups.RenameAsync", source);
+        Assert.DoesNotContain("SuperPanelGroups.DeleteAsync", source);
+        Assert.Contains("_windowLifecycle.AttachWindowMessageHook", source);
+        Assert.Contains("_windowLifecycle.Present", source);
+        Assert.Contains("WmMouseWheel", lifecycle);
+        Assert.Contains("AddHook(WindowMessageHook)", lifecycle);
+        Assert.Contains("CalculatePosition", lifecycle);
+        Assert.Contains("Shell32.SetForegroundWindow", lifecycle);
+        Assert.DoesNotContain("HwndSource? _windowSource", source);
+        Assert.Contains("_cycleGroup(delta)", lifecycle);
+        Assert.Contains("_dragSession.TryBegin", source);
+        Assert.Contains("_dragSession.TryStartDrag", source);
+        Assert.Contains("SuperPanelKeyboardRouter.Resolve", source);
+        Assert.Contains("minimumHorizontalDistance", drag);
+        Assert.Contains("SuperPanelKeyboardCommand.ExecuteSecondary", keyboard);
+        Assert.Contains("new SuperPanelGroupEditorSession", source);
+        Assert.Contains("SearchResultActionMenuProjection.Build", source);
+        Assert.Contains("SuperPanelViewProjection.ProjectContext", source);
+        Assert.Contains("SuperPanelViewProjection.ProjectAction", source);
+        Assert.Contains("SuperPanelActionDisposition.ContinueSearch", projection);
+        Assert.DoesNotContain("outcome.IsSuccess && !outcome.KeepPanelOpen", source);
+        Assert.Contains("SuperPanelGroupEditorState.Closed", editor);
+        Assert.Contains("Long.Result.SecondaryAction.{index}", menu);
+        Assert.DoesNotContain("SearchResultItem? _dragCandidate", source);
+        Assert.DoesNotContain("bool _suppressClick", source);
+        Assert.DoesNotContain("string? _editingGroupId", source);
         Assert.Contains("ResultsList_Drop", xaml);
         Assert.Contains("AllowDrop=\"True\"", xaml);
         Assert.Contains("AddGroupButton", xaml);
         Assert.Contains("GroupButton_Drop", xaml);
-        Assert.Contains("SuperPanelGroups.AddResultAsync", source);
-        Assert.Contains("SuperPanelGroups.MoveResultAsync", source);
-        Assert.Contains("SuperPanelGroups.RemoveResultAsync", source);
         Assert.Contains("CommandInvocationFactory.Create", palette);
         Assert.DoesNotContain("new SearchCoordinator", source);
         Assert.DoesNotContain("new CommandRegistry", source);
@@ -297,14 +408,36 @@ public class QualityGateTests
     {
         var registry = Read("src", "LongBetterWindows.Host", "Engine", "PluginRegistry.cs");
         var adapter = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginAdapter.cs");
+        var presentation = Read(
+            "src", "LongBetterWindows.Host", "Engine", "WebPluginPresentationCoordinator.cs");
         var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
 
-        Assert.Contains("HandleWindowClosedAsync(Id)", adapter);
+        Assert.Contains("HandleWindowClosedAsync(id)", adapter);
         Assert.Contains("ReleaseWebResourcesAsync", adapter);
-        Assert.Contains("_runtime.Dispose()", adapter);
+        Assert.Contains("_presentation.ReleaseAsync()", adapter);
+        Assert.Contains("_runtime.Dispose()", presentation);
         Assert.Contains("IPluginResourceLifecycle", registry);
         Assert.Contains("_hostResourceReleaser", registry);
         Assert.Contains("ShutdownAllAsync", app);
+    }
+
+    [Fact]
+    public void App_DelegatesPluginStartupAndPackageOwnershipToCoordinator()
+    {
+        var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
+        var coordinator = Read(
+            "src", "LongBetterWindows.Host", "Services", "PluginRuntimeCoordinator.cs");
+
+        Assert.Contains("new PluginRuntimeCoordinator", app);
+        Assert.Contains("_pluginRuntime.StartAsync", app);
+        Assert.Contains("_pluginRuntime?.PackageInstaller", app);
+        Assert.Contains("_pluginRuntime?.Dispose()", app);
+        Assert.DoesNotContain("new PluginScanner", app);
+        Assert.DoesNotContain("new CommandExecutor", app);
+        Assert.Contains("RecoverInterruptedTransactionsAsync", coordinator);
+        Assert.Contains("InstallAllFromDirectoryAsync", coordinator);
+        Assert.Contains("_scanner.ScanAsync", coordinator);
+        Assert.Contains("new CommandExecutor(registry).ExecuteAsync", coordinator);
     }
 
     [Fact]
@@ -315,6 +448,8 @@ public class QualityGateTests
         var pluginXaml = Read("src", "LongBetterWindows.Host", "Views", "PluginWindowHost.xaml");
         var pluginSource = Read("src", "LongBetterWindows.Host", "Views", "PluginWindowHost.xaml.cs");
         var adapter = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginAdapter.cs");
+        var presentation = Read(
+            "src", "LongBetterWindows.Host", "Engine", "WebPluginPresentationCoordinator.cs");
         var settings = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
         var gestures = Read("src", "LongBetterWindows.Host", "Services", "MouseGestureService.cs");
 
@@ -325,8 +460,8 @@ public class QualityGateTests
         Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", pluginXaml);
         Assert.Contains("返回管理中心", pluginXaml);
         Assert.Contains("Key.Escape", pluginSource);
-        Assert.Contains("DefaultPresentation", adapter);
-        Assert.Contains("ShowDetachedWindow", adapter);
+        Assert.Contains("DefaultPresentation", presentation);
+        Assert.Contains("ShowDetachedWindow", presentation);
         Assert.Contains("超级面板鼠标手势", settings);
         Assert.Contains("MouseGestureMode.LongRightPress", gestures);
         Assert.Contains("WmRButtonUp", gestures);
@@ -357,11 +492,11 @@ public class QualityGateTests
     public void ProductVersion_IsExposedConsistentlyToNativeAndWebUi()
     {
         var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
-        var webRuntime = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.cs");
+        var webDispatcher = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs");
         var toolCenter = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
 
         Assert.Contains("AssemblyInformationalVersionAttribute", app);
-        Assert.Contains("App.ProductVersion", webRuntime);
+        Assert.Contains("App.ProductVersion", webDispatcher);
         Assert.Contains("v{App.ProductVersion}", toolCenter);
     }
 
@@ -381,18 +516,27 @@ public class QualityGateTests
     }
 
     [Fact]
-    public void ToolCenter_PluginListUsesRecyclingVirtualization()
+    public void PluginManagement_UsesRecyclingVirtualizationAndOwnsPluginActions()
     {
-        var xaml = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
+        var xaml = Read("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml");
         Assert.Contains("x:Name=\"PluginsPanel\"", xaml);
         Assert.Contains("VirtualizingPanel.IsVirtualizing=\"True\"", xaml);
         Assert.Contains("VirtualizingPanel.VirtualizationMode=\"Recycling\"", xaml);
         Assert.Contains("<VirtualizingStackPanel", xaml);
         Assert.Contains("DarkScrollBarStyle", xaml);
 
-        var code = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
-        Assert.Contains("if (_activePage == \"plugins\")", code);
-        Assert.Contains("key == \"developer\" && !_docsLoaded", code);
+        var code = Read("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs");
+        Assert.Contains("PluginToggle_Click", code);
+        Assert.Contains("PluginSettings_Click", code);
+        Assert.Contains("CapabilityDetails_Click", code);
+
+        var toolCenterXaml = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
+        var toolCenterCode = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
+        Assert.Contains("PluginManagementControl", toolCenterXaml);
+        Assert.Contains("PluginManagementHost.Refresh()", toolCenterCode);
+        Assert.Contains("OpenPluginsForQuality", toolCenterCode);
+        Assert.DoesNotContain("CreatePluginCard", toolCenterCode);
+        Assert.DoesNotContain("PluginToggle_Click", toolCenterCode);
     }
 
     [Fact]
@@ -437,13 +581,15 @@ public class QualityGateTests
     public void ThemeAndMotion_RespectSystemAccessibilitySettings()
     {
         var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
+        var options = Read("src", "LongBetterWindows.Host", "Services", "AppStartupOptions.cs");
+        var quality = Read("src", "LongBetterWindows.Host", "Services", "QualityRuntimeService.cs");
         var animation = Read("src", "LongBetterWindows.Host", "Helpers", "AnimationHelper.cs");
         var devTools = Read("src", "LongBetterWindows.Host", "Views", "PluginDevTools.html");
 
         Assert.Contains("SystemParameters.HighContrast", app);
         Assert.Contains("HighContrastPalette", app);
-        Assert.Contains("--quality-high-contrast", app);
-        Assert.Contains("--quality-reduce-motion", app);
+        Assert.Contains("--quality-high-contrast", options);
+        Assert.Contains("--quality-reduce-motion", options);
         Assert.Contains("SystemParameters.HighContrast || _forceHighContrast", app);
         Assert.Contains("new SolidColorBrush(SystemColors.HighlightColor)", app);
         Assert.Contains("Long.Brush.Accent.Gradient", app);
@@ -453,20 +599,85 @@ public class QualityGateTests
         Assert.Contains("duration == TimeSpan.Zero", animation);
         Assert.Contains("prefers-reduced-motion: reduce", devTools);
         Assert.Contains(":focus-visible", devTools);
-        Assert.Contains("ReadArgument(e.Args, \"--theme\")", app);
-        Assert.Contains("--run-command", app);
-        Assert.Contains("--plugins-dir", app);
-        Assert.Contains("--quality-idle-ms", app);
-        Assert.Contains("质量驻留采样", app);
-        Assert.Contains("new CommandExecutor(registry).ExecuteAsync", app);
-        Assert.Contains("--exit-after-command", app);
+        Assert.Contains("ReadArgument(arguments, \"--theme\")", options);
+        Assert.Contains("--run-command", options);
+        Assert.Contains("--plugins-dir", options);
+        Assert.Contains("--quality-idle-ms", options);
+        Assert.Contains("Quality idle sample:", quality);
+        Assert.Contains("_qualityRuntime!.RunIdleProbeAsync", app);
+        Assert.Contains("new PluginRuntimeStartRequest", app);
+        Assert.Contains("--exit-after-command", options);
     }
 
     [Fact]
     public void ExplicitPluginDirectory_IsIsolatedFromDevelopmentFallback()
     {
         var scanner = Read("src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");
-        Assert.Contains("pluginsDir == null ? FindDevPluginsDir() : null", scanner);
+        var discovery = Read(
+            "src", "LongBetterWindows.Host", "Engine", "PluginSourceDiscovery.cs");
+
+        Assert.Contains("new PluginSourceDiscovery(pluginsDir)", scanner);
+        Assert.Contains("pluginsDirectory is null ? FindDevelopmentPluginsDirectory() : null", discovery);
+        Assert.Contains("_sourceDiscovery.Discover()", scanner);
+        Assert.DoesNotContain("Directory.GetDirectories", scanner);
+        Assert.DoesNotContain("FindDevPluginsDir", scanner);
+    }
+
+    [Fact]
+    public void PluginScanner_DelegatesRuntimeInstanceCreationToLoader()
+    {
+        var scanner = Read("src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");
+        var loader = Read(
+            "src", "LongBetterWindows.Host", "Engine", "PluginRuntimeLoader.cs");
+
+        Assert.Contains("new PluginRuntimeLoader", scanner);
+        Assert.Contains("_runtimeLoader.LoadAsync", scanner);
+        Assert.Contains("_runtimeLoader.Release", scanner);
+        Assert.DoesNotContain("string.Equals(manifest.Runtime", scanner);
+        Assert.DoesNotContain("_loader.LoadAsync", scanner);
+        Assert.Contains("new WebPluginRuntime", loader);
+        Assert.Contains("_scriptLoader.LoadAsync", loader);
+        Assert.Contains("_nativeLoader.LoadAsync", loader);
+    }
+
+    [Fact]
+    public void PluginScanner_DelegatesStandalonePackagingAndLifecycleToLoader()
+    {
+        var scanner = Read("src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");
+        var standalone = Read(
+            "src", "LongBetterWindows.Host", "Engine", "StandalonePluginLoader.cs");
+
+        Assert.Contains("new StandalonePluginLoader", scanner);
+        Assert.Contains("_standaloneLoader.LoadAsync", scanner);
+        Assert.Contains("_standaloneLoader.UnloadAsync", scanner);
+        Assert.DoesNotContain("BuildJavaScriptWrapper", scanner);
+        Assert.DoesNotContain("Regex.Matches", scanner);
+        Assert.DoesNotContain("new WebPluginRuntime", scanner);
+        Assert.DoesNotContain("_scriptLoader", scanner);
+        Assert.Contains("BuildJavaScriptWrapper", standalone);
+        Assert.Contains("DeleteTemporaryDirectory", standalone);
+        Assert.Contains("_registry.Unregister", standalone);
+    }
+
+    [Fact]
+    public void PluginScanner_DelegatesMonitoringAndHandlesRenameAtomically()
+    {
+        var scanner = Read("src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");
+        var monitor = Read(
+            "src", "LongBetterWindows.Host", "Engine", "PluginChangeMonitor.cs");
+
+        Assert.Contains("new PluginChangeMonitor", scanner);
+        Assert.Contains("_changeMonitor.Start()", scanner);
+        Assert.Contains("change.OldPath", scanner);
+        Assert.Contains("reloadIfAvailable: false", scanner);
+        Assert.Contains("change.NewPath", scanner);
+        Assert.Contains("reloadIfAvailable: true", scanner);
+        Assert.Contains("_reloadGate.WaitAsync", scanner);
+        Assert.DoesNotContain("new FileSystemWatcher", scanner);
+        Assert.DoesNotContain("DebounceReload", scanner);
+        Assert.Contains("new FileSystemWatcher", monitor);
+        Assert.Contains("Dictionary<string, CancellationTokenSource>", monitor);
+        Assert.Contains("e.OldFullPath", monitor);
     }
 
     [Fact]
@@ -596,12 +807,12 @@ public class QualityGateTests
     public void IsolatedMarketplaceTransaction_CoversSignedLifecycleAndProductionIsolation()
     {
         var script = Read("run-isolated-marketplace-transaction.ps1");
-        var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
+        var options = Read("src", "LongBetterWindows.Host", "Services", "AppStartupOptions.cs");
         var market = Read(
             "src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml.cs");
 
-        Assert.Contains("--quality-market-catalog", app);
-        Assert.Contains("--quality-market-trust-store", app);
+        Assert.Contains("--quality-market-catalog", options);
+        Assert.Contains("--quality-market-trust-store", options);
         Assert.Contains("QualityMarketplaceCatalogPath", market);
         Assert.Contains("QualityMarketplaceTrustStorePath", market);
         Assert.Contains("MarketplaceSourceKind.RemoteRegistry", market);
@@ -618,6 +829,50 @@ public class QualityGateTests
         Assert.Contains("uninstall", script);
         Assert.Contains("release_plugins_unchanged", script);
         Assert.Contains("Remove-Item -LiteralPath $resolvedTransaction -Recurse -Force", script);
+    }
+
+    [Fact]
+    public void WebBridgeProtocolAndHostDispatch_AreSeparatedFromWebViewRuntime()
+    {
+        var runtime = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.cs");
+        var protocol = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginBridgeProtocol.cs");
+        var dispatcher = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs");
+        var arguments = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginArguments.cs");
+        var lifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
+
+        Assert.Contains("WebPluginBridgeProtocol.ParseRequest", runtime);
+        Assert.Contains("WebPluginBridgeProtocol.GetRequiredCapability", runtime);
+        Assert.Contains("_hostDispatcher.DispatchAsync", runtime);
+        Assert.Contains("SerializeResult", protocol);
+        Assert.Contains("BuildInjectionScript", protocol);
+        Assert.Contains("FileOps.MoveAsync", dispatcher);
+        Assert.Contains("WebPluginArguments.GetJson", dispatcher);
+        Assert.Contains("GetHeaders", arguments);
+        Assert.Contains("CoreWebView2.NavigationStarting +=", lifecycle);
+        Assert.Contains("_navigationPolicy.IsTrustedLocalUri", lifecycle);
+        Assert.Contains("dispatcher.Invoke(Dispose)", lifecycle);
+        Assert.Contains("dispatcher.InvokeAsync(() => PostMessageCore(json))", lifecycle);
+        Assert.DoesNotContain("window.long =", runtime);
+        Assert.DoesNotContain("FileOps.MoveAsync", runtime);
+        Assert.DoesNotContain("CoreWebView2NavigationStartingEventArgs", runtime);
+        Assert.True(runtime.Split('\n').Length < 150);
+    }
+
+    [Fact]
+    public void WebPluginPresentation_IsSeparatedFromPluginStateAdapter()
+    {
+        var adapter = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginAdapter.cs");
+        var presentation = Read(
+            "src", "LongBetterWindows.Host", "Engine", "WebPluginPresentationCoordinator.cs");
+
+        Assert.Contains("_presentation.EnsureVisible()", adapter);
+        Assert.Contains("_presentation.CloseVisibleSurface()", adapter);
+        Assert.Contains("_presentation.ReleaseAsync()", adapter);
+        Assert.Contains("ShowEmbeddedPlugin", presentation);
+        Assert.Contains("PluginWindowHost", presentation);
+        Assert.Contains("NotifyWindowClosedAsync", presentation);
+        Assert.DoesNotContain("PluginWindowHost", adapter);
+        Assert.True(adapter.Split('\n').Length < 130);
     }
 
     private static string Read(params string[] parts)

@@ -94,9 +94,12 @@ public class DesignSystemTests
         {
             Path.Combine("src", "LongBetterWindows.Host", "MainWindow.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml"),
+            Path.Combine("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "PluginWindowHost.xaml"),
+            Path.Combine("src", "LongBetterWindows.Host", "Views", "PerformancePanel.xaml"),
+            Path.Combine("src", "LongBetterWindows.Host", "Views", "CapabilityDetailPanel.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "FloatingHudWindow.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "ToastWindow.xaml"),
         };
@@ -121,11 +124,44 @@ public class DesignSystemTests
             "PanelPlugins",
             "PanelMarket",
             "PanelSystem",
+            "PanelDiagnostics",
             "PanelDev",
             "PanelSettings",
         };
 
         Assert.All(requiredPages, page => Assert.Contains($"x:Name=\"{page}\"", content));
+    }
+
+    [Fact]
+    public void DiagnosticsAndCapabilityViews_UseStructuredDesignSystemEntryPoints()
+    {
+        var root = FindRepositoryRoot();
+        var toolCenter = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs"));
+        var pluginManagement = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs"));
+        var pluginManagementView = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml"));
+        var performance = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "PerformancePanel.xaml.cs"));
+        var coordinator = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Interaction", "PerformanceRefreshCoordinator.cs"));
+        var capabilityView = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "CapabilityDetailPanel.xaml"));
+
+        Assert.Contains("DiagnosticsHost.Content == null", toolCenter);
+        Assert.Contains("DiagnosticsHost.Content = new PerformancePanel()", toolCenter);
+        Assert.Contains("OpenDiagnosticsForQuality", toolCenter);
+        Assert.Contains("CapabilityDetails_Click", pluginManagement);
+        Assert.Contains("Long.Icon.Shield", pluginManagementView);
+        Assert.Contains("查看插件权限", pluginManagementView);
+        Assert.DoesNotContain("CapabilityDetails_Click", toolCenter);
+        Assert.DoesNotContain("DispatcherTimer", performance);
+        Assert.DoesNotContain("new SolidColorBrush", performance);
+        Assert.Contains("DispatcherTimer", coordinator);
+        Assert.Contains("PerformanceSnapshot", coordinator);
+        Assert.Contains("ItemsControl", capabilityView);
+        Assert.Contains("LongPluginCard", capabilityView);
     }
 
     [Fact]
@@ -193,6 +229,57 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void EveryBuiltInPlugin_DeclaresAtLeastOneUnifiedCommand()
+    {
+        var root = FindRepositoryRoot();
+        var source = Path.Combine(root, "src");
+        var manifests = Directory.GetDirectories(source)
+            .Select(folder => Path.Combine(folder, "manifest.json"))
+            .Where(File.Exists)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        Assert.Equal(25, manifests.Length);
+
+        var pluginIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in manifests)
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            var manifest = document.RootElement;
+            var id = manifest.GetProperty("id").GetString();
+
+            Assert.False(string.IsNullOrWhiteSpace(id));
+            Assert.True(pluginIds.Add(id!));
+            Assert.True(manifest.GetProperty("commands").GetArrayLength() > 0, path);
+        }
+    }
+
+    [Fact]
+    public void MainlinePreservedPlugins_DeclareWindowAndLifecycleContracts()
+    {
+        var root = FindRepositoryRoot();
+        var plugins = new[]
+        {
+            "ClipboardHistory",
+            "DevToolkit",
+            "FileOrganizer",
+            "HardwareMonitor",
+            "PortManager",
+        };
+
+        Assert.All(plugins, plugin =>
+        {
+            var path = Path.Combine(root, "src", plugin, "manifest.json");
+            using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            var manifest = document.RootElement;
+
+            Assert.True(manifest.GetProperty("window").TryGetProperty("mode", out _), path);
+            Assert.True(manifest.GetProperty("lifecycle").TryGetProperty("close_behavior", out _), path);
+            Assert.True(manifest.GetProperty("lifecycle").TryGetProperty("default_presentation", out _), path);
+        });
+    }
+
+    [Fact]
     public void WebUiKit_ExposesUnifiedPluginCommandBridge()
     {
         var root = FindRepositoryRoot();
@@ -210,10 +297,12 @@ public class DesignSystemTests
         var root = FindRepositoryRoot();
         var runtime = File.ReadAllText(Path.Combine(
             root, "src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.cs"));
+        var dispatcher = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs"));
 
         Assert.Contains("PluginAccessContext.Enter(_manifest.Id)", runtime);
-        Assert.Contains("success = r.IsSuccess", runtime);
-        Assert.DoesNotContain("return new { r.IsSuccess", runtime);
+        Assert.Contains("success = r.IsSuccess", dispatcher);
+        Assert.DoesNotContain("return new { r.IsSuccess", dispatcher);
     }
 
     [Fact]
@@ -249,12 +338,12 @@ public class DesignSystemTests
         var root = FindRepositoryRoot();
         var manifest = File.ReadAllText(Path.Combine(
             root, "src", "FileRenamerPlugin", "manifest.json"));
-        var runtime = File.ReadAllText(Path.Combine(
-            root, "src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.cs"));
+        var dispatcher = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs"));
 
         Assert.Contains("\"file.ops\"", manifest);
-        Assert.Contains("FileOps.MoveAsync", runtime);
-        Assert.DoesNotContain("File.Move(oldPath", runtime);
+        Assert.Contains("FileOps.MoveAsync", dispatcher);
+        Assert.DoesNotContain("File.Move(oldPath", dispatcher);
     }
 
     [Fact]

@@ -12,6 +12,31 @@
     "storage.local",
     "system.hotkey"
   ],
+  "commands": [
+    {
+      "id": "clipboard-history.open",
+      "title": "打开剪贴板历史",
+      "description": "搜索、固定并重新使用最近复制的内容",
+      "aliases": ["剪贴板历史", "历史剪贴板", "clipboard history", "jtbll"],
+      "accepted_inputs": ["none", "text", "clipboard"],
+      "view_mode": "list",
+      "keep_alive": true,
+      "priority": 42
+    }
+  ],
+  "window": {
+    "mode": "standard",
+    "preferred_width": 820,
+    "preferred_height": 720,
+    "min_width": 620,
+    "min_height": 500
+  },
+  "lifecycle": {
+    "start_with_host": true,
+    "close_behavior": "background",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
   "default_settings": {
     "hotkey": "Ctrl+Shift+V",
     "max_items": 500,

@@ -1,0 +1,149 @@
+<UserControl x:Class="LongBetterWindows.Host.Views.PluginManagementControl"
+             x:Name="Root"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+             Foreground="{DynamicResource Long.Brush.Text.Primary}">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
+        <Style x:Key="PluginStateDot" TargetType="Ellipse">
+            <Setter Property="Fill" Value="{DynamicResource Long.Brush.Text.Muted}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                    <Setter Property="Fill" Value="{DynamicResource Long.Brush.State.Success}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="PluginToggleButton" TargetType="Button" BasedOn="{StaticResource LongButton}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource Long.Brush.State.Danger}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource Long.Brush.State.Danger}" />
+                    <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Text.OnAccent}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="PluginsHeader" Text="已安装插件" FontSize="16" FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+            <TextBox x:Name="PluginSearchBox" Grid.Column="1" Style="{StaticResource LongTextBox}"
+                     Margin="0,0,10,0" TextChanged="PluginSearch_TextChanged"
+                     automation:AutomationProperties.Name="搜索插件" />
+            <Button Grid.Column="2" Content="刷新" Style="{StaticResource LongButton}"
+                    Click="RefreshPlugins_Click" />
+        </Grid>
+
+        <TextBlock x:Name="EmptyStateText" Text="暂无已安装插件"
+                   Style="{StaticResource LongEmptyState}" Visibility="Collapsed" />
+
+        <ListBox x:Name="PluginsPanel" MaxHeight="640"
+                 Background="Transparent" BorderThickness="0"
+                 ScrollViewer.CanContentScroll="True"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 VirtualizingPanel.IsVirtualizing="True"
+                 VirtualizingPanel.VirtualizationMode="Recycling">
+            <ListBox.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}" />
+            </ListBox.Resources>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Focusable" Value="False" />
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Border Style="{StaticResource LongPluginCard}" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="8" Height="8" Style="{StaticResource PluginStateDot}"
+                                             Margin="0,0,8,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Long.Brush.Text.Primary}"
+                                               VerticalAlignment="Center" />
+                                    <Border Style="{StaticResource LongBadge}" Margin="7,0,0,0">
+                                        <TextBlock Text="{Binding RuntimeLabel}" FontSize="9"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </Border>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="16,5,0,0">
+                                    <Border Style="{StaticResource LongHotkeyBadge}" Margin="0,0,8,0"
+                                            Visibility="{Binding HasHotkey, Converter={StaticResource BooleanToVisibility}}">
+                                        <TextBlock Text="{Binding Hotkey}" FontSize="10"
+                                                   FontFamily="{DynamicResource Long.Font.Mono}" />
+                                    </Border>
+                                    <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" Margin="16,6,0,0">
+                                    <ItemsControl ItemsSource="{Binding VisibleCapabilities}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Style="{StaticResource LongBadge}" Margin="0,0,5,0">
+                                                    <TextBlock Text="{Binding}" FontSize="10"
+                                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding AdditionalCapabilityText}" FontSize="10"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding HasAdditionalCapabilities, Converter={StaticResource BooleanToVisibility}}" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Content="打开" MinWidth="62" Margin="0,0,6,0"
+                                        Style="{StaticResource LongButton.Primary}" Tag="{Binding}"
+                                        Click="OpenPlugin_Click"
+                                        Visibility="{Binding CanOpen, Converter={StaticResource BooleanToVisibility}}" />
+                                <Button Width="38" Margin="0,0,6,0" Style="{StaticResource LongIconButton}"
+                                        Tag="{Binding}" Click="PluginSettings_Click" ToolTip="插件设置"
+                                        automation:AutomationProperties.Name="打开插件设置"
+                                        Visibility="{Binding CanOpenSettings, Converter={StaticResource BooleanToVisibility}}">
+                                    <Path Data="{StaticResource Long.Icon.Settings}" Style="{StaticResource LongIcon}"
+                                          Width="17" Height="17" />
+                                </Button>
+                                <Button Width="38" Margin="0,0,6,0" Style="{StaticResource LongIconButton}"
+                                        Tag="{Binding}" Click="CapabilityDetails_Click" ToolTip="查看权限与调用记录"
+                                        automation:AutomationProperties.Name="查看插件权限">
+                                    <Path Data="{StaticResource Long.Icon.Shield}" Style="{StaticResource LongIcon}"
+                                          Width="17" Height="17" />
+                                </Button>
+                                <Button Content="{Binding ToggleText}" MinWidth="62" Tag="{Binding}"
+                                        Style="{StaticResource PluginToggleButton}" Click="PluginToggle_Click" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </StackPanel>
+</UserControl>

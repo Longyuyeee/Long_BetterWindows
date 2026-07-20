@@ -1,16 +1,11 @@
 using System.IO;
 using System.Reflection;
 using System.Windows;
-using System.Windows.Threading;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Engine;
-using LongBetterWindows.Host.Contracts;
-using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
-using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
 using Serilog;
 using Wpf.Ui.Appearance;
 
@@ -19,11 +14,11 @@ namespace LongBetterWindows.Host
     public partial class App : Application
     {
         internal static bool KeepPaletteVisibleForQuality
-            => Current is App { _qualityOpenPalette: true };
+            => Current is App { _startupOptions.OpenPaletteForQuality: true };
         internal static bool KeepSuperPanelVisibleForQuality
-            => Current is App { _qualityOpenSuperPanel: true };
+            => Current is App { _startupOptions.OpenSuperPanelForQuality: true };
         internal static LpakInstaller? PackageInstaller
-            => (Current as App)?._packageInstaller;
+            => (Current as App)?._pluginRuntime?.PackageInstaller;
 
         public static event Action<bool>? ThemeChanged;
         public static bool IsExiting { get; set; }
@@ -33,36 +28,19 @@ namespace LongBetterWindows.Host
                    .InformationalVersion.Split('+')[0]
                ?? typeof(App).Assembly.GetName().Version?.ToString()
                ?? "0.0.0";
-        private string? _directNotePath;
-        private bool _isDirectNoteMode;
+        private AppStartupOptions _startupOptions = new();
+        private QualityRuntimeService? _qualityRuntime;
         private int _pluginRuntimeStarted;
-        private bool _showDesignSystemPreview;
-        private PluginScanner? _pluginScanner;
-        private LpakInstaller? _packageInstaller;
+        private PluginRuntimeCoordinator? _pluginRuntime;
         private static bool _currentIsLight;
         private static bool _forceHighContrast;
         private static bool _forceReduceMotion;
-        private string? _requestedCommandKey;
-        private string? _requestedCommandText;
-        private string? _requestedPluginsDir;
-        private bool _exitAfterCommand;
-        private bool _qualityOpenPalette;
-        private bool _qualityOpenSuperPanel;
-        private bool _qualityOpenMarket;
-        private string? _qualityMarketCatalog;
-        private string? _qualityMarketTrustStore;
-        private bool _qualityUseLiveContext;
-        private int _qualityIdleMilliseconds;
-        private string? _qualityCapturePath;
-        private string _qualityCaptureView = "main";
-        private int _qualityRenderDpi = 96;
-        private int _qualityCaptureDelayMilliseconds = 700;
-        private int _qualityCaptureWidth;
-        private int _qualityCaptureHeight;
-        internal bool ShowDesignSystemPreviewRequested => _showDesignSystemPreview;
-        internal bool ShowMarketForQualityRequested => _qualityOpenMarket;
-        internal string? QualityMarketplaceCatalogPath => _qualityMarketCatalog;
-        internal string? QualityMarketplaceTrustStorePath => _qualityMarketTrustStore;
+        internal bool ShowDesignSystemPreviewRequested => _startupOptions.ShowDesignSystemPreview;
+        internal bool ShowMarketForQualityRequested => _startupOptions.OpenMarketForQuality;
+        internal bool ShowDiagnosticsForQualityRequested => _startupOptions.OpenDiagnosticsForQuality;
+        internal bool ShowPluginsForQualityRequested => _startupOptions.OpenPluginsForQuality;
+        internal string? QualityMarketplaceCatalogPath => _startupOptions.MarketplaceCatalogPath;
+        internal string? QualityMarketplaceTrustStorePath => _startupOptions.MarketplaceTrustStorePath;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -78,17 +56,17 @@ namespace LongBetterWindows.Host
             ServicesInitializer.Initialize();
             Log.Information("所有服务已初始化。");
 
-            _forceHighContrast = e.Args.Any(argument =>
-                string.Equals(argument, "--quality-high-contrast", StringComparison.OrdinalIgnoreCase));
-            _forceReduceMotion = e.Args.Any(argument =>
-                string.Equals(argument, "--quality-reduce-motion", StringComparison.OrdinalIgnoreCase));
+            _startupOptions = AppStartupOptions.Parse(e.Args);
+            _qualityRuntime = new QualityRuntimeService(this);
+            _forceHighContrast = _startupOptions.ForceHighContrast;
+            _forceReduceMotion = _startupOptions.ForceReduceMotion;
             Log.Information(
                 "Quality accessibility mode: HighContrast={HighContrast}, ReducedMotion={ReducedMotion}",
                 SystemParameters.HighContrast || _forceHighContrast,
                 !SystemParameters.ClientAreaAnimation || _forceReduceMotion);
 
             // 命令行主题覆盖仅对本次进程生效，供视觉回归与诊断使用。
-            var themeOverride = ReadArgument(e.Args, "--theme")?.ToLowerInvariant();
+            var themeOverride = _startupOptions.ThemeOverride;
             var themeSetting = themeOverride is "light" or "dark" or "system"
                 ? themeOverride
                 : ReadThemeSetting();
@@ -111,44 +89,8 @@ namespace LongBetterWindows.Host
             SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
 
             // 检查命令行 --note 参数（右键菜单触发）
-            for (int i = 0; i < e.Args.Length; i++)
-            {
-                if (e.Args[i] == "--note" && i + 1 < e.Args.Length)
-                {
-                    _directNotePath = e.Args[i + 1];
-                    _isDirectNoteMode = true;
-                    break;
-                }
-                if (e.Args[i] == "--design-system-preview")
-                    _showDesignSystemPreview = true;
-            }
-
-            if (_showDesignSystemPreview)
+            if (_startupOptions.ShowDesignSystemPreview)
                 Log.Information("已请求 Long Design System 预览窗口");
-
-            _requestedCommandKey = ReadArgument(e.Args, "--run-command")?.ToLowerInvariant();
-            _requestedCommandText = ReadArgument(e.Args, "--command-text");
-            _requestedPluginsDir = ReadArgument(e.Args, "--plugins-dir");
-            _exitAfterCommand = e.Args.Any(argument =>
-                string.Equals(argument, "--exit-after-command", StringComparison.OrdinalIgnoreCase));
-            _qualityOpenPalette = e.Args.Any(argument =>
-                string.Equals(argument, "--quality-open-palette", StringComparison.OrdinalIgnoreCase));
-            _qualityOpenSuperPanel = e.Args.Any(argument =>
-                string.Equals(argument, "--quality-open-super-panel", StringComparison.OrdinalIgnoreCase));
-            _qualityOpenMarket = e.Args.Any(argument =>
-                string.Equals(argument, "--quality-open-market", StringComparison.OrdinalIgnoreCase));
-            _qualityMarketCatalog = ReadArgument(e.Args, "--quality-market-catalog");
-            _qualityMarketTrustStore = ReadArgument(e.Args, "--quality-market-trust-store");
-            _qualityUseLiveContext = e.Args.Any(argument =>
-                string.Equals(argument, "--quality-live-context", StringComparison.OrdinalIgnoreCase));
-            _qualityIdleMilliseconds = ReadIntegerArgument(e.Args, "--quality-idle-ms", 0, 60_000);
-            _qualityCapturePath = ReadArgument(e.Args, "--quality-capture");
-            _qualityCaptureView = ReadArgument(e.Args, "--quality-capture-view")?.ToLowerInvariant() ?? "main";
-            _qualityRenderDpi = ReadIntegerArgument(e.Args, "--quality-render-dpi", 96, 384);
-            _qualityCaptureDelayMilliseconds = ReadIntegerArgument(
-                e.Args, "--quality-capture-delay-ms", 100, 10_000);
-            _qualityCaptureWidth = ReadIntegerArgument(e.Args, "--quality-width", 0, 3840);
-            _qualityCaptureHeight = ReadIntegerArgument(e.Args, "--quality-height", 0, 2160);
 
             AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
             {
@@ -165,54 +107,62 @@ namespace LongBetterWindows.Host
 
         internal void StartPluginRuntime()
         {
-            if (_isDirectNoteMode || Interlocked.Exchange(ref _pluginRuntimeStarted, 1) != 0)
+            if (_startupOptions.IsDirectNoteMode ||
+                Interlocked.Exchange(ref _pluginRuntimeStarted, 1) != 0)
                 return;
 
             // Wait until the main window handle and hotkey service are ready.
             Dispatcher.BeginInvoke(
-                new Action(() => _ = LoadPluginsAsync()),
+                new Action(() => _ = RunPluginStartupAsync()),
                 DispatcherPriority.ApplicationIdle);
         }
 
-        private async Task LoadPluginsAsync()
+        private async Task RunPluginStartupAsync()
         {
             try
             {
-                _pluginScanner = new PluginScanner(_requestedPluginsDir);
-                _packageInstaller = new LpakInstaller(_pluginScanner, _requestedPluginsDir);
-                var recovered = await _packageInstaller.RecoverInterruptedTransactionsAsync();
-                if (recovered > 0)
-                    Log.Warning("启动时恢复了 {Count} 个中断的插件事务", recovered);
-                var installed = await _packageInstaller.InstallAllFromDirectoryAsync();
-                if (installed > 0)
-                    Log.Information("安装了 {Count} 个 .lpak 插件", installed);
-
-                await _pluginScanner.ScanAsync();
-                Log.Information("插件加载完成，共 {Count} 个", _pluginScanner.LoadedPlugins.Count);
-
-                if (!string.IsNullOrWhiteSpace(_requestedCommandKey))
-                    await RunRequestedCommandAsync(_requestedCommandKey, _requestedCommandText);
-
-                if (_qualityOpenPalette)
-                    CommandPaletteWindow.ShowPalette();
-                if (_qualityOpenSuperPanel)
+                _pluginRuntime = new PluginRuntimeCoordinator(
+                    _startupOptions.RequestedPluginsDirectory);
+                var runtimeResult = await _pluginRuntime.StartAsync(
+                    new PluginRuntimeStartRequest(
+                        _startupOptions.RequestedCommandKey,
+                        _startupOptions.RequestedCommandText,
+                        _startupOptions.ExitAfterCommand));
+                if (runtimeResult.ExitCode is int exitCode)
                 {
-                    if (_qualityUseLiveContext)
+                    Shutdown(exitCode);
+                    return;
+                }
+
+                if (_startupOptions.OpenPaletteForQuality)
+                    CommandPaletteWindow.ShowPalette();
+                if (_startupOptions.OpenSuperPanelForQuality)
+                {
+                    if (_startupOptions.UseLiveContextForQuality)
                         SuperPanelWindow.ShowPanel();
                     else
                         SuperPanelWindow.ShowPanelForQuality();
                 }
 
-                if (!string.IsNullOrWhiteSpace(_qualityCapturePath))
-                    await RunQualityCaptureAsync();
+                if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath))
+                    await _qualityRuntime!.CaptureAsync(
+                        _startupOptions,
+                        _currentIsLight,
+                        SystemParameters.HighContrast || _forceHighContrast,
+                        !SystemParameters.ClientAreaAnimation || _forceReduceMotion);
 
-                if (_qualityIdleMilliseconds > 0)
-                    await RunQualityIdleProbeAsync(_qualityIdleMilliseconds);
+                if (_startupOptions.QualityIdleMilliseconds > 0)
+                    await _qualityRuntime!.RunIdleProbeAsync(
+                        _startupOptions.QualityIdleMilliseconds,
+                        runtimeResult.LoadedPluginCount,
+                        HostProvider.Instance.PluginStore.Commands.Count,
+                        SystemParameters.HighContrast || _forceHighContrast,
+                        !SystemParameters.ClientAreaAnimation || _forceReduceMotion);
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "插件加载失败");
-                if (!string.IsNullOrWhiteSpace(_qualityCapturePath))
+                if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath))
                 {
                     Shutdown(3);
                     return;
@@ -222,170 +172,13 @@ namespace LongBetterWindows.Host
             }
         }
 
-        private async Task RunQualityCaptureAsync()
-        {
-            await Task.Delay(_qualityCaptureDelayMilliseconds);
-            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
-            var target = _qualityCaptureView switch
-            {
-                "palette" => Windows.OfType<CommandPaletteWindow>().FirstOrDefault(x => x.IsVisible),
-                "super-panel" => Windows.OfType<SuperPanelWindow>().FirstOrDefault(x => x.IsVisible),
-                "plugin" => Windows.OfType<PluginWindowHost>().FirstOrDefault(x => x.IsVisible) ?? MainWindow,
-                "main" or "market" => MainWindow,
-                _ => throw new InvalidDataException($"不支持的质量截图视图：{_qualityCaptureView}"),
-            } ?? throw new InvalidDataException($"质量截图窗口未显示：{_qualityCaptureView}");
-
-            if (_qualityCaptureWidth > 0) target.Width = _qualityCaptureWidth;
-            if (_qualityCaptureHeight > 0) target.Height = _qualityCaptureHeight;
-            target.WindowState = WindowState.Normal;
-            target.UpdateLayout();
-            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-
-            var logicalWidth = Math.Max(1, target.ActualWidth);
-            var logicalHeight = Math.Max(1, target.ActualHeight);
-            var path = Path.GetFullPath(_qualityCapturePath!);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            if (_qualityCaptureView == "plugin")
-            {
-                var webView = FindVisualChild<WebView2>(target)
-                    ?? throw new InvalidDataException("质量截图未找到活动 WebView2。");
-                if (webView.CoreWebView2 == null)
-                    throw new InvalidDataException("质量截图时 WebView2 尚未初始化。");
-                await using (var stream = new FileStream(
-                    path, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-                {
-                    await webView.CoreWebView2.CapturePreviewAsync(
-                        CoreWebView2CapturePreviewImageFormat.Png, stream);
-                    await stream.FlushAsync();
-                }
-                var webDpi = VisualTreeHelper.GetDpi(webView);
-                await WriteCaptureMetadataAsync(
-                    path, logicalWidth, logicalHeight,
-                    Math.Max(1, (int)Math.Ceiling(webView.ActualWidth * webDpi.DpiScaleX)),
-                    Math.Max(1, (int)Math.Ceiling(webView.ActualHeight * webDpi.DpiScaleY)),
-                    webDpi.PixelsPerInchX, "webview_preview");
-                Shutdown(0);
-                return;
-            }
-            var pixelWidth = Math.Max(1, (int)Math.Ceiling(logicalWidth * _qualityRenderDpi / 96d));
-            var pixelHeight = Math.Max(1, (int)Math.Ceiling(logicalHeight * _qualityRenderDpi / 96d));
-            var bitmap = new RenderTargetBitmap(
-                pixelWidth, pixelHeight, _qualityRenderDpi, _qualityRenderDpi, PixelFormats.Pbgra32);
-            bitmap.Render(target);
-
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            await using (var stream = new FileStream(
-                path, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
-            {
-                encoder.Save(stream);
-                await stream.FlushAsync();
-            }
-
-            var actualDpi = VisualTreeHelper.GetDpi(target);
-            await WriteCaptureMetadataAsync(
-                path, logicalWidth, logicalHeight, pixelWidth, pixelHeight,
-                actualDpi.PixelsPerInchX, "wpf_render_target");
-            Log.Information(
-                "质量截图完成: View={View}, RenderDpi={RenderDpi}, ActualDpi={ActualDpi}, Path={Path}",
-                _qualityCaptureView, _qualityRenderDpi, actualDpi.PixelsPerInchX, path);
-            Shutdown(0);
-        }
-
-        private async Task WriteCaptureMetadataAsync(
-            string path, double logicalWidth, double logicalHeight,
-            int pixelWidth, int pixelHeight, double actualDpi, string captureKind)
-        {
-            var metadata = new
-            {
-                schema_version = 1,
-                captured_at = DateTimeOffset.UtcNow,
-                view = _qualityCaptureView,
-                theme = _currentIsLight ? "light" : "dark",
-                render_dpi = _qualityRenderDpi,
-                actual_monitor_dpi = actualDpi,
-                capture_kind = captureKind,
-                logical_width = logicalWidth,
-                logical_height = logicalHeight,
-                pixel_width = pixelWidth,
-                pixel_height = pixelHeight,
-                high_contrast = SystemParameters.HighContrast || _forceHighContrast,
-                reduced_motion = !SystemParameters.ClientAreaAnimation || _forceReduceMotion,
-            };
-            await File.WriteAllTextAsync(
-                path + ".json", System.Text.Json.JsonSerializer.Serialize(
-                    metadata, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-        }
-
-        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
-        {
-            for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, index);
-                if (child is T match) return match;
-                var nested = FindVisualChild<T>(child);
-                if (nested != null) return nested;
-            }
-            return null;
-        }
-
-        private async Task RunQualityIdleProbeAsync(int delayMilliseconds)
-        {
-            await Task.Delay(delayMilliseconds);
-            var process = System.Diagnostics.Process.GetCurrentProcess();
-            process.Refresh();
-            Log.Information(
-                "质量驻留采样: Plugins={PluginCount}, Commands={CommandCount}, WorkingSetMB={WorkingSetMB:F1}, PrivateMB={PrivateMB:F1}, HighContrast={HighContrast}, ReducedMotion={ReducedMotion}",
-                _pluginScanner?.LoadedPlugins.Count ?? 0,
-                HostProvider.Instance.PluginStore.Commands.Count,
-                process.WorkingSet64 / 1024d / 1024d,
-                process.PrivateMemorySize64 / 1024d / 1024d,
-                SystemParameters.HighContrast || _forceHighContrast,
-                !SystemParameters.ClientAreaAnimation || _forceReduceMotion);
-            Shutdown(0);
-        }
-
-        private async Task RunRequestedCommandAsync(string commandKey, string? text)
-        {
-            var registry = HostProvider.Instance.PluginStore;
-            var descriptor = registry.Commands.Get(commandKey);
-            if (descriptor == null)
-            {
-                Log.Error("命令行请求的命令不存在: {CommandKey}", commandKey);
-                if (_exitAfterCommand) Shutdown(2);
-                return;
-            }
-
-            var inputType = !string.IsNullOrEmpty(text)
-                            && descriptor.Command.AcceptedInputs.Contains(AcceptedInputType.Text)
-                ? AcceptedInputType.Text
-                : AcceptedInputType.None;
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            Log.Information("开始执行命令行命令: {CommandKey}", commandKey);
-            var result = await new CommandExecutor(registry).ExecuteAsync(
-                descriptor.Key,
-                new PluginCommandInvocation
-                {
-                    CommandId = descriptor.Command.Id,
-                    InputType = inputType,
-                    Text = inputType == AcceptedInputType.Text ? text : null,
-                });
-            stopwatch.Stop();
-
-            Log.Information("命令行命令 {CommandKey} 完成: Success={Success}, ElapsedMs={ElapsedMs:F1}",
-                commandKey, result.IsSuccess, stopwatch.Elapsed.TotalMilliseconds);
-            if (_exitAfterCommand)
-                Shutdown(result.IsSuccess ? 0 : 3);
-        }
-
         protected override async void OnActivated(EventArgs e)
         {
             base.OnActivated(e);
 
-            if (_directNotePath != null)
+            if (_startupOptions.DirectNotePath != null)
             {
-                var path = _directNotePath;
-                _directNotePath = null;
+                var path = _startupOptions.DirectNotePath!;
 
                 // 隐藏主窗口（如果显示了）
                 if (MainWindow != null)
@@ -437,7 +230,7 @@ namespace LongBetterWindows.Host
         {
             SystemParameters.StaticPropertyChanged -= SystemParameters_StaticPropertyChanged;
             HostProvider.Instance.PluginStore.ShutdownAllAsync().GetAwaiter().GetResult();
-            _pluginScanner?.Dispose();
+            _pluginRuntime?.Dispose();
             // 清理服务资源
             ServicesInitializer.DisposeAll();
             Log.Information("Long窗口·全能助手 已退出。");
@@ -466,29 +259,6 @@ namespace LongBetterWindows.Host
             }
             catch (Exception ex) { Log.Warning(ex, "读取主题配置失败"); }
             return null;
-        }
-
-        private static string? ReadArgument(IReadOnlyList<string> arguments, string name)
-        {
-            for (var index = 0; index < arguments.Count - 1; index++)
-            {
-                if (string.Equals(arguments[index], name, StringComparison.OrdinalIgnoreCase))
-                    return arguments[index + 1].Trim();
-            }
-
-            return null;
-        }
-
-        private static int ReadIntegerArgument(
-            IReadOnlyList<string> arguments,
-            string name,
-            int fallback,
-            int maximum)
-        {
-            var value = ReadArgument(arguments, name);
-            return int.TryParse(value, out var parsed)
-                ? Math.Clamp(parsed, 0, maximum)
-                : fallback;
         }
 
         public static bool IsFirstRun()

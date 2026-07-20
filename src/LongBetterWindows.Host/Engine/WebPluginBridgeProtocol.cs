@@ -1,0 +1,352 @@
+using LongBetterWindows.Host.Contracts;
+
+namespace LongBetterWindows.Host.Engine
+{
+    internal static class WebPluginBridgeProtocol
+    {
+        private static readonly System.Text.Json.JsonSerializerOptions MessageJsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+        };
+
+        internal static WebBridgeRequest? ParseRequest(string json) =>
+            System.Text.Json.JsonSerializer.Deserialize<WebBridgeRequest>(json, MessageJsonOptions);
+
+        internal static string SerializeResult(int id, object? result) =>
+            System.Text.Json.JsonSerializer.Serialize(new { id, result });
+
+        internal static string SerializeError(int id, string error) =>
+            System.Text.Json.JsonSerializer.Serialize(new { id, error });
+
+        internal static string SerializeCommand(PluginCommandInvocation command) =>
+            System.Text.Json.JsonSerializer.Serialize(new { type = "long.command", command });
+
+        internal static string SerializeHotkey(string hotkey) =>
+            System.Text.Json.JsonSerializer.Serialize(new { type = "hotkey", hotkey });
+
+        internal static string? GetRequiredCapability(string method) => method switch
+        {
+            // 文件系统 ADS
+            "fs.ads.read" or "fs.ads.write" or "fs.ads.delete" or "fs.ads.exists" or "fs.ads.isNTFS"
+                => "fs.ads.access",
+
+            // 注册表
+            "registry.read" or "registry.write" or "registry.delete"
+                => "system.registry.write",
+
+            // 热键
+            "hotkey.register" or "hotkey.unregister" or "hotkey.isConflict"
+                => "system.hotkey",
+
+            // 剪贴板
+            "clipboard.getText" or "clipboard.setText" or "clipboard.clear"
+                => "system.clipboard",
+            "clipboard.startMonitoring" or "clipboard.stopMonitoring"
+                => "system.clipboard.monitor",
+
+            // Shell 选择
+            "shell.getActiveFolder" or "shell.getSelectedItems" or "shell.getItemScreenRect"
+                => "shell.selection",
+
+            // 网络 HTTP
+            "http.get" or "http.post" or "http.download"
+                => "network.http",
+
+            // 本地存储（无需声明，所有插件都可用）
+            "storage.get" or "storage.set" or "storage.delete" or "storage.containsKey"
+                => null,
+
+            // 通知
+            "app.showNotification" or "ui.showToast"
+                => "system.notification",
+
+            // 截图
+            "screenshot.captureFull" or "screenshot.captureRegion"
+                => "system.screenshot",
+
+            // Shell 执行
+            "app.openUrl" or "shell.openUrl" or "app.openFolder" or "shell.openFolder" or
+            "app.openWithDefault" or "shell.openWithDefault"
+                => "shell.execute",
+
+            // 文件操作
+            "shell.listFiles" or "shell.renameFile"
+                => "file.ops",
+
+            // 窗口信息
+            "window.getForeground"
+                => "window.info",
+            "window.getVisible"
+                => "window.info",
+
+            "process.start" or "process.getList" or "process.kill"
+                => "system.process",
+            "fileOps.copy" or "fileOps.move" or "fileOps.delete" or "fileOps.exists"
+                => "file.ops",
+            "performance.getCpuUsage" or "performance.getMemoryInfo" or "performance.getDiskInfo" or
+            "performance.getSystemInfo" or "performance.getTopByCpu" or "performance.getTopByMemory"
+                => "system.performance",
+            "networkPort.getTcpConnections" or "networkPort.getTcpListeners" or "networkPort.getUdpEndpoints" or
+            "networkPort.findOwner" or "networkPort.isInUse" or "networkPort.getSummary"
+                => "network.ports",
+            "network.getStats" or "network.getSpeed" or "network.getInterfaces"
+                => "network.monitor",
+            "audio.getVolume" or "audio.setVolume" or "audio.getMute" or "audio.setMute" or
+            "audio.increase" or "audio.decrease" or "audio.getDevices" or "audio.setDefaultDevice"
+                => "system.audio",
+            "power.getStatus" or "power.lock" or "power.sleep" or "power.hibernate" or
+            "power.shutdown" or "power.reboot" or "power.preventSleep"
+                => "system.power",
+            "theme.get" or "theme.set" or "theme.toggle" or "theme.getAccentColor" or "theme.setAccentColor"
+                => "system.theme",
+            "wallpaper.get" or "wallpaper.set" or "wallpaper.getStyle"
+                => "system.wallpaper",
+            "brightness.get" or "brightness.set" or "brightness.increase" or "brightness.decrease"
+                => "display.brightness",
+            "pinyin.get" or "pinyin.getInitials" or "pinyin.match"
+                => "text.pinyin",
+            "pinyin.filter"
+                => "text.pinyin",
+            "input.keyPress" or "input.mouseClick" or "input.moveCursor"
+                => "system.input",
+            "fileSystem.enumerate" or "fileSystem.hash" or "fileSystem.metadata" or
+            "fileSystem.findDuplicates" or "fileSystem.batchRename" or "fileSystem.classify" or
+            "fileSystem.findLarge" or "fileSystem.searchContent"
+                => "filesystem.advanced",
+            "cache.cleanTemp" or "cache.cleanWindowsUpdate" or "cache.cleanBrowser" or
+            "cache.emptyRecycleBin" or "cache.getStatistics" or "cache.cleanAll"
+                => "system.cache",
+            "schedule.create" or "schedule.delete" or "schedule.getAll" or
+            "schedule.setEnabled" or "schedule.runNow"
+                => "system.schedule",
+
+            // UI 窗口
+            "ui.createWindow" or "ui.confirm" or "ui.prompt" or "ui.select" or
+            "ui.closeWindow" or "ui.sendMessage"
+                => "ui.window",
+
+            // 应用信息（无需权限）
+            "app.getVersion" or "app.log"
+                => null,
+
+            _ => null
+        };
+
+        internal static string BuildInjectionScript(string pluginId)
+        {
+            var js = @"
+(function() {
+var _id=0,_pending={},_hotkeys={};
+function call(method,args){
+  return new Promise(function(resolve,reject){
+    var id=++_id;
+    _pending[id]={resolve:resolve,reject:reject};
+    window.chrome.webview.postMessage({id:id,method:method,args:args||[]});
+  });
+}
+window.long = {
+  app: {
+    openUrl: function(url){return call('app.openUrl',[url]);},
+    openFolder: function(path){return call('app.openFolder',[path]);},
+    openWithDefault: function(path){return call('app.openWithDefault',[path]);},
+    showNotification: function(title,body){return call('app.showNotification',[title,body]);},
+    getVersion: function(){return call('app.getVersion',[]);},
+    log: function(){return call('app.log',Array.prototype.slice.call(arguments));}
+  },
+  clipboard: {
+    getText: function(){return call('clipboard.getText',[]);},
+    setText: function(t){return call('clipboard.setText',[t]);},
+    clear: function(){return call('clipboard.clear',[]);},
+    startMonitoring: function(){return call('clipboard.startMonitoring',[]);},
+    stopMonitoring: function(){return call('clipboard.stopMonitoring',[]);}
+  },
+  shell: {
+    getActiveFolder: function(){return call('shell.getActiveFolder',[]);},
+    getSelectedItems: function(){return call('shell.getSelectedItems',[]);},
+    getItemScreenRect: function(){return call('shell.getItemScreenRect',[]);},
+    listFiles: function(dir){return call('shell.listFiles',[dir]);},
+    renameFile: function(oldPath,newName){return call('shell.renameFile',[oldPath,newName]);},
+    openUrl: function(url){return call('shell.openUrl',[url]);},
+    openFolder: function(path){return call('shell.openFolder',[path]);},
+    openWithDefault: function(path){return call('shell.openWithDefault',[path]);}
+  },
+  fs: { ads: {
+    read: function(p,s){return call('fs.ads.read',[p,s||'long_note']);},
+    write: function(p,c,s){return call('fs.ads.write',[p,c,s||'long_note']);},
+    delete: function(p,s){return call('fs.ads.delete',[p,s||'long_note']);},
+    exists: function(p,s){return call('fs.ads.exists',[p,s||'long_note']);},
+    isNTFS: function(p){return call('fs.ads.isNTFS',[p]);}
+  }},
+  hotkey: {
+    register: function(h,callback){if(typeof callback==='function')_hotkeys[h]=callback;return call('hotkey.register',[h]);},
+    unregister: function(h){delete _hotkeys[h];return call('hotkey.unregister',[h]);},
+    isConflict: function(h){return call('hotkey.isConflict',[h]);}
+  },
+  registry: {
+    read: function(k,v){return call('registry.read',[k,v]);},
+    write: function(k,n,v){return call('registry.write',[k,n,v]);},
+    delete: function(k,v){return call('registry.delete',[k,v]);}
+  },
+  storage: {
+    get: function(k){return call('storage.get',[k]);},
+    set: function(k,v){return call('storage.set',[k,v]);},
+    delete: function(k){return call('storage.delete',[k]);},
+    containsKey: function(k){return call('storage.containsKey',[k]);}
+  },
+  process: {
+    start: function(path,args){return call('process.start',[path,args]);},
+    getList: function(filter){return call('process.getList',[filter]);},
+    kill: function(id){return call('process.kill',[id]);}
+  },
+  fileOps: {
+    copy: function(source,dest){return call('fileOps.copy',[source,dest]);},
+    move: function(source,dest){return call('fileOps.move',[source,dest]);},
+    delete: function(path){return call('fileOps.delete',[path]);},
+    exists: function(path){return call('fileOps.exists',[path]);}
+  },
+  performance: {
+    getCpuUsage: function(){return call('performance.getCpuUsage',[]);},
+    getMemoryInfo: function(){return call('performance.getMemoryInfo',[]);},
+    getDiskInfo: function(){return call('performance.getDiskInfo',[]);},
+    getSystemInfo: function(){return call('performance.getSystemInfo',[]);},
+    getTopByCpu: function(count){return call('performance.getTopByCpu',[count||10]);},
+    getTopByMemory: function(count){return call('performance.getTopByMemory',[count||10]);}
+  },
+  networkPort: {
+    getTcpConnections: function(){return call('networkPort.getTcpConnections',[]);},
+    getTcpListeners: function(){return call('networkPort.getTcpListeners',[]);},
+    getUdpEndpoints: function(){return call('networkPort.getUdpEndpoints',[]);},
+    findPortOwner: function(port,protocol){return call('networkPort.findOwner',[port,protocol||'tcp']);},
+    isPortInUse: function(port,protocol){return call('networkPort.isInUse',[port,protocol||'tcp']);},
+    getSummary: function(){return call('networkPort.getSummary',[]);}
+  },
+  network: {
+    getStats: function(){return call('network.getStats',[]);},
+    getSpeed: function(){return call('network.getSpeed',[]);},
+    getInterfaces: function(){return call('network.getInterfaces',[]);}
+  },
+  audio: {
+    getVolume: function(){return call('audio.getVolume',[]);},
+    setVolume: function(volume){return call('audio.setVolume',[volume]);},
+    getMute: function(){return call('audio.getMute',[]);},
+    setMute: function(mute){return call('audio.setMute',[mute]);},
+    increase: function(step){return call('audio.increase',[step||5]);},
+    decrease: function(step){return call('audio.decrease',[step||5]);},
+    getDevices: function(){return call('audio.getDevices',[]);},
+    setDefaultDevice: function(id){return call('audio.setDefaultDevice',[id]);}
+  },
+  power: {
+    getStatus: function(){return call('power.getStatus',[]);},
+    getBatteryStatus: function(){return call('power.getStatus',[]);},
+    lock: function(){return call('power.lock',[]);},
+    sleep: function(){return call('power.sleep',[]);},
+    hibernate: function(){return call('power.hibernate',[]);},
+    shutdown: function(delay){return call('power.shutdown',[delay||0]);},
+    reboot: function(delay){return call('power.reboot',[delay||0]);},
+    preventSleep: function(prevent){return call('power.preventSleep',[prevent]);}
+  },
+  theme: {
+    get: function(){return call('theme.get',[]);},
+    set: function(theme){return call('theme.set',[theme]);},
+    toggle: function(){return call('theme.toggle',[]);},
+    getAccentColor: function(){return call('theme.getAccentColor',[]);},
+    setAccentColor: function(color){return call('theme.setAccentColor',[color]);}
+  },
+  wallpaper: {
+    get: function(){return call('wallpaper.get',[]);},
+    set: function(path,style){return call('wallpaper.set',[path,style||'fill']);},
+    getStyle: function(){return call('wallpaper.getStyle',[]);}
+  },
+  brightness: {
+    get: function(){return call('brightness.get',[]);},
+    set: function(value){return call('brightness.set',[value]);},
+    increase: function(step){return call('brightness.increase',[step||10]);},
+    decrease: function(step){return call('brightness.decrease',[step||10]);}
+  },
+  pinyin: {
+    get: function(text){return call('pinyin.get',[text]);},
+    getInitials: function(text){return call('pinyin.getInitials',[text]);},
+    match: function(text,query){return call('pinyin.match',[text,query]);},
+    filter: function(items,query){return call('pinyin.filter',[items,query]);}
+  },
+  input: {
+    keyPress: function(vkCode){return call('input.keyPress',[vkCode]);},
+    mouseClick: function(x,y,rightButton){return call('input.mouseClick',[x,y,!!rightButton]);},
+    moveCursor: function(x,y){return call('input.moveCursor',[x,y]);}
+  },
+  fileSystem: {
+    enumerate: function(path,pattern,recursive){return call('fileSystem.enumerate',[path,pattern||'*.*',recursive!==false]);},
+    hash: function(path){return call('fileSystem.hash',[path]);},
+    metadata: function(path){return call('fileSystem.metadata',[path]);},
+    findDuplicates: function(path){return call('fileSystem.findDuplicates',[path]);},
+    batchRename: function(operations){return call('fileSystem.batchRename',[operations||[]]);},
+    classify: function(path,mode){return call('fileSystem.classify',[path,mode||'ByExtension']);},
+    findLarge: function(path,minSizeBytes){return call('fileSystem.findLarge',[path,minSizeBytes]);},
+    searchContent: function(path,keyword,extensions){return call('fileSystem.searchContent',[path,keyword,extensions||[]]);}
+  },
+  cache: {
+    cleanTemp: function(){return call('cache.cleanTemp',[]);},
+    cleanWindowsUpdate: function(){return call('cache.cleanWindowsUpdate',[]);},
+    cleanBrowser: function(browser){return call('cache.cleanBrowser',[browser]);},
+    emptyRecycleBin: function(){return call('cache.emptyRecycleBin',[]);},
+    getStatistics: function(){return call('cache.getStatistics',[]);},
+    cleanAll: function(){return call('cache.cleanAll',[]);}
+  },
+  schedule: {
+    create: function(task){return call('schedule.create',[task]);},
+    delete: function(taskId){return call('schedule.delete',[taskId]);},
+    getAll: function(){return call('schedule.getAll',[]);},
+    setEnabled: function(taskId,enabled){return call('schedule.setEnabled',[taskId,enabled]);},
+    runNow: function(taskId){return call('schedule.runNow',[taskId]);}
+  },
+  ui: {
+    showToast: function(m){return call('ui.showToast',[m]);},
+    createWindow: function(title,htmlContent,width,height,resizable){return call('ui.createWindow',[title,htmlContent,width,height,resizable]);},
+    confirm: function(message,title){return call('ui.confirm',[message,title||'确认']);},
+    prompt: function(message,title,defaultValue){return call('ui.prompt',[message,title||'输入',defaultValue||'']);},
+    select: function(message,options,title){return call('ui.select',[message,options||[],title||'选择']);},
+    closeWindow: function(windowId){return call('ui.closeWindow',[windowId]);},
+    sendMessage: function(windowId,message){return call('ui.sendMessage',[windowId,message]);}
+  },
+  screenshot: {
+    captureFull: function(){return call('screenshot.captureFull',[]);},
+    captureRegion: function(x,y,w,h){return call('screenshot.captureRegion',[x,y,w,h]);}
+  },
+  http: {
+    get: function(url,headers){return call('http.get',[url,headers]);},
+    post: function(url,body,contentType,headers){return call('http.post',[url,body,contentType||'application/json',headers]);},
+    download: function(url){return call('http.download',[url]);}
+  },
+  window: {
+    getForeground: function(){return call('window.getForeground',[]);},
+    getVisible: function(){return call('window.getVisible',[]);}
+  }
+};
+window.chrome.webview.addEventListener('message',function(e){
+  try{
+    var m=typeof e.data==='string'?JSON.parse(e.data):e.data;
+    if(m.id&&_pending[m.id]){
+      if(m.error)_pending[m.id].reject(new Error(m.error));
+      else _pending[m.id].resolve(m.result);
+      delete _pending[m.id];
+    }
+    if(m.type==='hotkey'){
+      if(typeof _hotkeys[m.hotkey]==='function')_hotkeys[m.hotkey]();
+      else console.log('[Long] key:',m.hotkey);
+    }
+  }catch(ex){}
+});
+console.log('[Long] Bridge ready · __PLUGIN_ID__');
+})();";
+
+            return js.Replace("__PLUGIN_ID__", pluginId);
+        }
+    }
+
+    internal sealed class WebBridgeRequest
+    {
+        public int Id { get; set; }
+        public string Method { get; set; } = string.Empty;
+        public object?[] Args { get; set; } = Array.Empty<object?>();
+    }
+}

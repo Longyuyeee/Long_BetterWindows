@@ -1,39 +1,34 @@
 using System.IO;
-using System.Net;
-using System.Text;
-using System.Text.RegularExpressions;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using Serilog;
 
 namespace LongBetterWindows.Host.Engine
 {
+    internal sealed record LoadedDirectoryPlugin(
+        string Id,
+        PluginRuntimeLoadResult Runtime);
+
     public class PluginScanner : IDisposable
     {
-        private readonly PluginLoader _loader = new();
-        private readonly ScriptPluginLoader _scriptLoader = new();
-        private readonly List<string> _scanDirs = new();
-        private readonly List<FileSystemWatcher> _watchers = new();
-        private readonly Dictionary<string, string> _dirToPluginId = new(); // pluginDir → pluginId
-        private readonly object _reloadLock = new();
-        private CancellationTokenSource? _debounceCts;
+        private readonly PluginRuntimeLoader _runtimeLoader = new PluginRuntimeLoader();
+        private readonly StandalonePluginLoader _standaloneLoader;
+        private readonly PluginSourceDiscovery _sourceDiscovery;
+        private readonly PluginChangeMonitor _changeMonitor;
+        private readonly Dictionary<string, LoadedDirectoryPlugin> _directoryPlugins =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, StandalonePluginHandle> _standalonePlugins =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly SemaphoreSlim _reloadGate = new(1, 1);
 
         public PluginScanner(string? pluginsDir = null)
         {
-            var primary = pluginsDir ?? Path.Combine(
-                AppContext.BaseDirectory, "Plugins");
-            _scanDirs.Add(primary);
-
-            // 显式目录用于发布验收和隔离诊断，不混入仓库开发插件目录。
-            var devDir = pluginsDir == null ? FindDevPluginsDir() : null;
-            if (devDir != null && devDir != primary)
-                _scanDirs.Add(devDir);
-
-            foreach (var dir in _scanDirs)
-            {
-                if (!Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-            }
+            _sourceDiscovery = new PluginSourceDiscovery(pluginsDir);
+            _standaloneLoader = new StandalonePluginLoader(
+                HostProvider.Instance.PluginStore);
+            _changeMonitor = new PluginChangeMonitor(
+                _sourceDiscovery.ScanDirectories,
+                HandlePluginFileChangeAsync);
         }
 
         public List<PluginManifest> DiscoveredManifests { get; } = new();
@@ -41,41 +36,16 @@ namespace LongBetterWindows.Host.Engine
 
         public async Task ScanAsync()
         {
-            var allDirs = new HashSet<string>();
-
-            foreach (var scanDir in _scanDirs)
-            {
+            foreach (var scanDir in _sourceDiscovery.ScanDirectories)
                 Log.Information("扫描插件目录: {Dir}", scanDir);
 
-                if (!Directory.Exists(scanDir))
-                    continue;
+            var sources = _sourceDiscovery.Discover();
+            foreach (var scriptFile in sources.StandaloneScripts)
+                await TryLoadStandaloneAsync(scriptFile);
 
-                foreach (var dir in Directory.GetDirectories(scanDir))
-                {
-                    if (Path.GetFileName(dir).StartsWith(".long_temp_", StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    allDirs.Add(dir);
-                }
+            Log.Information("发现 {Count} 个插件目录", sources.PluginDirectories.Count);
 
-                // ✅ 新增：扫描根目录的单文件脚本（.csx, .js, .ts）
-                var scriptPatterns = new[] { "*.csx", "*.js", "*.ts" };
-                foreach (var pattern in scriptPatterns)
-                {
-                    var standaloneScripts = Directory.GetFiles(scanDir, pattern, SearchOption.TopDirectoryOnly);
-                    foreach (var scriptFile in standaloneScripts)
-                    {
-                        var ext = Path.GetExtension(scriptFile).ToLowerInvariant();
-                        if (ext == ".csx")
-                            await TryLoadStandaloneScriptAsync(scriptFile);
-                        else if (ext == ".js" || ext == ".ts")
-                            await TryLoadStandaloneJsScriptAsync(scriptFile);
-                    }
-                }
-            }
-
-            Log.Information("发现 {Count} 个插件目录", allDirs.Count);
-
-            foreach (var dir in allDirs)
+            foreach (var dir in sources.PluginDirectories)
             {
                 await TryLoadPluginAsync(dir);
             }
@@ -87,195 +57,128 @@ namespace LongBetterWindows.Host.Engine
         }
 
         public void StartFileWatchers()
+            => _changeMonitor.Start();
+
+        private async Task HandlePluginFileChangeAsync(PluginFileChange change)
         {
-            foreach (var scanDir in _scanDirs)
+            await _reloadGate.WaitAsync();
+            try
             {
-                if (!Directory.Exists(scanDir)) continue;
-
-                var watcher = new FileSystemWatcher(scanDir)
+                if (change.OldPath is not null
+                    && !string.Equals(
+                        change.OldPath, change.NewPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
-                    IncludeSubdirectories = true,
-                    EnableRaisingEvents = true,
-                };
+                    await ReloadPluginByFileAsync(change.OldPath, reloadIfAvailable: false);
+                }
 
-                watcher.Changed += OnPluginFileChanged;
-                watcher.Created += OnPluginFileChanged;
-                watcher.Deleted += OnPluginFileChanged;
-                watcher.Renamed += OnPluginFileRenamed;
-
-                _watchers.Add(watcher);
-                Log.Debug("文件监控已启动: {Dir}", scanDir);
+                if (change.NewPath is not null)
+                    await ReloadPluginByFileAsync(change.NewPath, reloadIfAvailable: true);
+            }
+            finally
+            {
+                _reloadGate.Release();
             }
         }
 
-        private void OnPluginFileChanged(object sender, FileSystemEventArgs e)
-        {
-            if (!IsPluginFile(e.FullPath)) return;
-            DebounceReload(e.FullPath);
-        }
-
-        private void OnPluginFileRenamed(object sender, RenamedEventArgs e)
-        {
-            if (!IsPluginFile(e.FullPath)) return;
-            DebounceReload(e.FullPath);
-        }
-
-        private static bool IsPluginFile(string path)
-        {
-            if (path.Contains($"{Path.DirectorySeparatorChar}.long_temp_", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            var ext = Path.GetExtension(path).ToLowerInvariant();
-            var name = Path.GetFileName(path).ToLowerInvariant();
-            return ext == ".dll" || ext == ".csx" || ext == ".js" || ext == ".ts" || name == "manifest.json";
-        }
-
-        private void DebounceReload(string filePath)
-        {
-            lock (_reloadLock)
-            {
-                _debounceCts?.Cancel();
-                _debounceCts = new CancellationTokenSource();
-                var token = _debounceCts.Token;
-
-                Task.Delay(1000, token).ContinueWith(async _ =>
-                {
-                    if (!token.IsCancellationRequested)
-                    {
-                        await ReloadPluginByFileAsync(filePath);
-                    }
-                }, TaskScheduler.Default);
-            }
-        }
-
-        private async Task ReloadPluginByFileAsync(string filePath)
+        private async Task ReloadPluginByFileAsync(
+            string filePath,
+            bool reloadIfAvailable)
         {
             if (IsStandaloneScript(filePath))
             {
-                await ReloadStandaloneScriptAsync(Path.GetFullPath(filePath));
+                await ReloadStandaloneScriptAsync(
+                    Path.GetFullPath(filePath), reloadIfAvailable);
                 return;
             }
 
-            var pluginDir = FindPluginRootDir(filePath);
-            if (pluginDir == null) return;
+            var pluginDir = PluginSourceDiscovery.FindPluginRootDirectory(filePath)
+                ?? FindTrackedPluginDirectory(filePath);
+            if (pluginDir is null)
+                return;
 
             Log.Information("检测到插件变更: {Dir}", pluginDir);
+            await UnloadDirectoryPluginAsync(pluginDir);
 
-            // 卸载旧版本
-            lock (_reloadLock)
+            if (reloadIfAvailable
+                && File.Exists(Path.Combine(pluginDir, "manifest.json")))
             {
-                if (_dirToPluginId.TryGetValue(pluginDir, out var oldId))
+                await TryLoadPluginAsync(pluginDir);
+            }
+        }
+
+        private string? FindTrackedPluginDirectory(string filePath)
+        {
+            var fullPath = Path.GetFullPath(filePath);
+            return _directoryPlugins.Keys
+                .Where(directory => fullPath.StartsWith(
+                    directory.TrimEnd(Path.DirectorySeparatorChar)
+                        + Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(directory => directory.Length)
+                .FirstOrDefault();
+        }
+
+        private async Task UnloadDirectoryPluginAsync(string pluginDirectory)
+        {
+            if (!_directoryPlugins.Remove(pluginDirectory, out var loaded))
+                return;
+
+            var registry = HostProvider.Instance.PluginStore;
+            var entry = registry.Get(loaded.Id);
+            if (entry?.Instance is ILongPlugin plugin)
+            {
+                try
                 {
-                    var registry = HostProvider.Instance.PluginStore;
-                    var entry = registry.Get(oldId);
-
-                    if (entry != null)
-                    {
-                        Log.Information("卸载旧版插件: {PluginId}", oldId);
-
-                        using (PluginAccessContext.Enter(oldId))
-                        {
-                            if (entry.Instance is ILongPlugin plugin)
-                            {
-                                plugin.StopAsync().ContinueWith(t =>
-                                {
-                                    if (t.IsFaulted)
-                                        Log.Error(t.Exception, "插件 {PluginId} 停止时出错", oldId);
-                                });
-                            }
-                        }
-
-                        registry.Unregister(oldId);
-                    }
-
-                    LoadedPlugins.RemoveAll(p => p.Id == oldId);
-                    DiscoveredManifests.RemoveAll(m => m.Id == oldId);
-                    _dirToPluginId.Remove(pluginDir);
+                    using (PluginAccessContext.Enter(loaded.Id))
+                        await plugin.StopAsync();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "插件 {PluginId} 停止时出错", loaded.Id);
                 }
             }
 
-            // 加载新版本
-            await TryLoadPluginAsync(pluginDir);
+            registry.Unregister(loaded.Id);
+            _runtimeLoader.Release(loaded.Runtime, loaded.Id);
+            LoadedPlugins.RemoveAll(plugin => plugin.Id == loaded.Id);
+            DiscoveredManifests.RemoveAll(manifest => manifest.Id == loaded.Id);
         }
 
         private bool IsStandaloneScript(string filePath)
         {
-            var extension = Path.GetExtension(filePath).ToLowerInvariant();
-            if (extension is not (".csx" or ".js" or ".ts")) return false;
-
-            var parent = Path.GetDirectoryName(Path.GetFullPath(filePath));
-            return _scanDirs.Any(dir => string.Equals(
-                Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar),
-                parent?.TrimEnd(Path.DirectorySeparatorChar),
-                StringComparison.OrdinalIgnoreCase));
+            return _sourceDiscovery.IsStandaloneScript(filePath);
         }
 
-        private async Task ReloadStandaloneScriptAsync(string scriptPath)
+        private async Task ReloadStandaloneScriptAsync(
+            string scriptPath,
+            bool reloadIfAvailable)
         {
-            if (_dirToPluginId.TryGetValue(scriptPath, out var pluginId))
+            if (_standalonePlugins.Remove(scriptPath, out var handle))
             {
-                var registry = HostProvider.Instance.PluginStore;
-                var entry = registry.Get(pluginId);
-                if (entry?.Instance is ILongPlugin plugin)
-                {
-                    using (PluginAccessContext.Enter(pluginId))
-                        await plugin.StopAsync();
-                }
-
-                registry.Unregister(pluginId);
-                _scriptLoader.Unload(pluginId);
-                LoadedPlugins.RemoveAll(p => p.Id == pluginId);
-                DiscoveredManifests.RemoveAll(m => m.Id == pluginId);
-                _dirToPluginId.Remove(scriptPath);
+                await _standaloneLoader.UnloadAsync(handle);
+                LoadedPlugins.RemoveAll(entry => entry.Id == handle.Manifest.Id);
+                DiscoveredManifests.RemoveAll(manifest => manifest.Id == handle.Manifest.Id);
             }
 
-            if (!File.Exists(scriptPath)) return;
-
-            if (Path.GetExtension(scriptPath).Equals(".csx", StringComparison.OrdinalIgnoreCase))
-                await TryLoadStandaloneScriptAsync(scriptPath);
-            else
-                await TryLoadStandaloneJsScriptAsync(scriptPath);
+            if (reloadIfAvailable && File.Exists(scriptPath))
+                await TryLoadStandaloneAsync(scriptPath);
         }
 
-        private static string? FindPluginRootDir(string filePath)
+        private async Task TryLoadStandaloneAsync(string scriptPath)
         {
-            var dir = Path.GetDirectoryName(filePath);
-            if (dir == null) return null;
-
-            // 检查是否为插件根目录（包含 manifest.json）
-            for (int i = 0; i < 3 && dir != null; i++)
+            var result = await _standaloneLoader.LoadAsync(scriptPath);
+            if (!result.IsSuccess)
             {
-                if (File.Exists(Path.Combine(dir, "manifest.json")))
-                    return dir;
-
-                dir = Path.GetDirectoryName(dir);
+                Log.Warning("单文件插件加载失败: {Path} - {Error}",
+                    scriptPath, result.Error);
+                return;
             }
 
-            return null;
-        }
-
-        private static string? FindDevPluginsDir()
-        {
-            try
-            {
-                var dir = AppContext.BaseDirectory;
-
-                for (int i = 0; i < 5; i++)
-                {
-                    var parent = Directory.GetParent(dir);
-                    if (parent == null) break;
-
-                    dir = parent.FullName;
-                    var pluginsDir = Path.Combine(dir, "Plugins");
-
-                    if (Directory.Exists(pluginsDir))
-                        return pluginsDir;
-                }
-            }
-            catch { }
-
-            return null;
+            var handle = result.Handle!;
+            _standalonePlugins[handle.SourcePath] = handle;
+            DiscoveredManifests.Add(handle.Manifest);
+            LoadedPlugins.Add(handle.Entry);
+            Log.Information("单文件插件 {PluginId} 加载成功", handle.Manifest.Id);
         }
 
         private async Task TryLoadPluginAsync(string pluginDir)
@@ -303,56 +206,17 @@ namespace LongBetterWindows.Host.Engine
                 return;
             }
 
-            ILongPlugin plugin;
-            PluginLoadContext? loadContext = null;
-
-            // 检测脚本插件 (.csx)
-            if (string.Equals(manifest.Runtime, "csharp-script", StringComparison.OrdinalIgnoreCase))
+            var runtime = await _runtimeLoader.LoadAsync(pluginDir, manifest);
+            if (!runtime.IsSuccess)
             {
-                var scriptResult = await _scriptLoader.LoadAsync(pluginDir, manifest);
-                if (!scriptResult.IsSuccess)
-                {
-                    Log.Error("脚本插件 {PluginId} 加载失败: {Error}",
-                        manifest.Id, scriptResult.Error);
-                    return;
-                }
-
-                plugin = new ScriptPluginAdapter(
-                    scriptResult.Globals!, manifest.Id, manifest.Name, manifest.Version);
+                Log.Error("插件 {PluginId} 运行时加载失败: {Error}",
+                    manifest.Id, runtime.Error);
+                return;
             }
-            // 检测 Web 插件 (HTML/JS)
-            else if (string.Equals(manifest.Runtime, "webview", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    var webRuntime = new WebPluginRuntime(manifest, pluginDir);
-                    plugin = new WebPluginAdapter(
-                        webRuntime, manifest.Id, manifest.Name, manifest.Version,
-                        pluginDir, manifest.EntryPoint);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error("Web 插件 {PluginId} 创建失败: {Error}", manifest.Id, ex.Message);
-                    return;
-                }
-            }
-            else
-            {
-                var loadResult = await _loader.LoadAsync(pluginDir, manifest);
-                if (!loadResult.IsSuccess)
-                {
-                    Log.Error("插件 {PluginId} 加载失败: {Error}",
-                        manifest.Id, loadResult.Error);
-                    return;
-                }
-
-                plugin = loadResult.Instance!;
-                loadContext = loadResult.Context;
-            }
+            var plugin = runtime.Instance!;
 
             // ★ 先注册再初始化，以便 InitializeAsync 中权限检查能生效
-            registry.Register(manifest, plugin, loadContext, pluginDir);
-            _dirToPluginId[pluginDir] = manifest.Id;
+            registry.Register(manifest, plugin, runtime.LoadContext, pluginDir);
 
             var hostApi = HostProvider.Instance;
 
@@ -363,14 +227,15 @@ namespace LongBetterWindows.Host.Engine
                 {
                     Log.Error("插件 {PluginId} 初始化失败", manifest.Id);
                     registry.Unregister(manifest.Id);
-                    if (loadContext != null) _loader.Unload(loadContext);
-                    else _scriptLoader.Unload(manifest.Id);
+                    _runtimeLoader.Release(runtime, manifest.Id);
                     return;
                 }
             }
 
             // 检查用户配置：仅 auto_start=true 时自动启动
             var entry = registry.Get(manifest.Id)!;
+            _directoryPlugins[pluginDir] = new LoadedDirectoryPlugin(
+                manifest.Id, runtime);
             var autoStart = entry.GetSetting("auto_start")
                 ?? (entry.Lifecycle.StartWithHost ? "true" : "false");
 
@@ -411,319 +276,9 @@ namespace LongBetterWindows.Host.Engine
             LoadedPlugins.Add(entry);
         }
 
-        /// <summary>
-        /// 加载单文件 .csx 脚本（热插拔模式）
-        /// 用户只需将 .csx 文件放入 Plugins/ 根目录即可使用，无需创建目录和 manifest.json
-        /// </summary>
-        private async Task TryLoadStandaloneScriptAsync(string scriptPath)
-        {
-            var fileName = Path.GetFileNameWithoutExtension(scriptPath);
-            var scriptDir = Path.GetDirectoryName(scriptPath);
-
-            if (string.IsNullOrEmpty(scriptDir))
-                return;
-
-            var scriptContent = await File.ReadAllTextAsync(scriptPath);
-
-            // 自动生成虚拟 manifest
-            var manifest = new PluginManifest
-            {
-                Id = $"script-{fileName}",
-                Name = fileName,
-                Version = "1.0.0",
-                Runtime = "csharp-script",
-                EntryPoint = Path.GetFileName(scriptPath),
-                Capabilities = ExtractStandaloneCapabilities(scriptContent),
-                Author = "User"
-            };
-
-            Log.Information("发现单文件脚本: {Name} ({Path})", fileName, scriptPath);
-
-            var registry = HostProvider.Instance.PluginStore;
-
-            // 检查是否已加载
-            if (registry.Get(manifest.Id) != null)
-            {
-                Log.Debug("单文件脚本 {PluginId} 已加载，跳过", manifest.Id);
-                return;
-            }
-
-            // 加载脚本
-            var scriptResult = await _scriptLoader.LoadAsync(scriptDir, manifest);
-            if (!scriptResult.IsSuccess)
-            {
-                Log.Error("单文件脚本 {Name} 加载失败: {Error}", fileName, scriptResult.Error);
-                return;
-            }
-
-            var plugin = new ScriptPluginAdapter(
-                scriptResult.Globals!, manifest.Id, manifest.Name, manifest.Version);
-
-            // 注册并初始化
-            registry.Register(manifest, plugin, null, scriptDir);
-            _dirToPluginId[scriptPath] = manifest.Id; // 使用文件路径作为键
-
-            var hostApi = HostProvider.Instance;
-
-            using (PluginAccessContext.Enter(manifest.Id))
-            {
-                var initOk = await plugin.InitializeAsync(hostApi);
-                if (!initOk)
-                {
-                    Log.Error("单文件脚本 {Name} 初始化失败", fileName);
-                    registry.Unregister(manifest.Id);
-                    _scriptLoader.Unload(manifest.Id);
-                    return;
-                }
-
-                var startOk = await plugin.StartAsync();
-                if (!startOk)
-                {
-                    Log.Error("单文件脚本 {Name} 启动失败", fileName);
-                    _scriptLoader.Unload(manifest.Id);
-                    return;
-                }
-            }
-
-            registry.SetState(manifest.Id, PluginState.Running);
-            DiscoveredManifests.Add(manifest);
-
-            var entry = registry.Get(manifest.Id)!;
-            LoadedPlugins.Add(entry);
-
-            Log.Information("✅ 单文件脚本 {Name} 加载成功（热插拔模式）", fileName);
-        }
-
-        /// <summary>
-        /// 加载单文件 .js/.ts 脚本（热插拔模式）
-        /// 自动包装为 HTML 插件，提供 long.* API 访问
-        /// </summary>
-        private async Task TryLoadStandaloneJsScriptAsync(string scriptPath)
-        {
-            var fileName = Path.GetFileNameWithoutExtension(scriptPath);
-            var scriptDir = Path.GetDirectoryName(scriptPath);
-            var ext = Path.GetExtension(scriptPath).ToLowerInvariant();
-
-            if (string.IsNullOrEmpty(scriptDir))
-                return;
-
-            Log.Information("发现单文件 JS/TS 脚本: {Name} ({Path})", fileName, scriptPath);
-
-            // 创建临时插件目录
-            var tempPluginDir = Path.Combine(scriptDir, $".long_temp_{fileName}");
-            if (Directory.Exists(tempPluginDir))
-                Directory.Delete(tempPluginDir, true);
-            Directory.CreateDirectory(tempPluginDir);
-
-            // 生成包装 HTML
-            var scriptContent = await File.ReadAllTextAsync(scriptPath);
-            var isTypeScript = ext == ".ts";
-
-            if (isTypeScript)
-            {
-                var compilerPath = Path.Combine(AppContext.BaseDirectory, "Assets", "typescript.js");
-                if (!File.Exists(compilerPath))
-                {
-                    Log.Error("TypeScript 编译器资源缺失: {Path}", compilerPath);
-                    return;
-                }
-
-                File.Copy(compilerPath, Path.Combine(tempPluginDir, "typescript.js"), true);
-            }
-
-            var htmlContent = GenerateJsWrapperHtml(fileName, scriptContent, isTypeScript);
-            var htmlPath = Path.Combine(tempPluginDir, "index.html");
-            await File.WriteAllTextAsync(htmlPath, htmlContent);
-
-            // 复制脚本文件（保留原始源码）
-            var scriptDestPath = Path.Combine(tempPluginDir, Path.GetFileName(scriptPath));
-            File.Copy(scriptPath, scriptDestPath, true);
-
-            // 生成 manifest
-            var manifest = new PluginManifest
-            {
-                Id = $"js-{fileName}",
-                Name = fileName,
-                Version = "1.0.0",
-                Runtime = "html",
-                EntryPoint = "index.html",
-                Capabilities = ExtractStandaloneCapabilities(scriptContent),
-                Author = "User"
-            };
-
-            var registry = HostProvider.Instance.PluginStore;
-
-            // 检查是否已加载
-            if (registry.Get(manifest.Id) != null)
-            {
-                Log.Debug("单文件 JS/TS 脚本 {PluginId} 已加载，跳过", manifest.Id);
-                return;
-            }
-
-            // 加载 HTML 插件
-            var plugin = new WebPluginRuntime(manifest, tempPluginDir);
-            registry.Register(manifest, plugin, null, tempPluginDir);
-            _dirToPluginId[scriptPath] = manifest.Id; // 使用原始脚本路径作为键
-
-            var hostApi = HostProvider.Instance;
-
-            using (PluginAccessContext.Enter(manifest.Id))
-            {
-                var initOk = await plugin.InitializeAsync();
-                if (!initOk)
-                {
-                    Log.Error("单文件 JS/TS 脚本 {Name} 初始化失败", fileName);
-                    registry.Unregister(manifest.Id);
-                    return;
-                }
-
-                // WebPluginRuntime 没有 Start/Stop 方法，初始化后即运行
-                registry.SetState(manifest.Id, PluginState.Running);
-            }
-            DiscoveredManifests.Add(manifest);
-
-            var entry = registry.Get(manifest.Id)!;
-            LoadedPlugins.Add(entry);
-
-            Log.Information("✅ 单文件 JS/TS 脚本 {Name} 加载成功（热插拔模式）", fileName);
-        }
-
-        internal static List<string> ExtractStandaloneCapabilities(string scriptContent)
-        {
-            var capabilities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var matches = Regex.Matches(
-                scriptContent,
-                @"^\s*//\s*@capabilit(?:y|ies)\s*[:=]?\s*(.+?)\s*$",
-                RegexOptions.Multiline | RegexOptions.IgnoreCase);
-
-            foreach (Match match in matches)
-            {
-                foreach (var value in match.Groups[1].Value.Split(
-                    new[] { ',', ';', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (ManifestReader.KnownCapabilities.Contains(value))
-                        capabilities.Add(value);
-                    else
-                        Log.Warning("单文件脚本声明了未知能力: {Capability}", value);
-                }
-            }
-
-            return capabilities.OrderBy(value => value).ToList();
-        }
-
-        private static string GenerateJsWrapperHtml(string pluginName, string scriptContent, bool isTypeScript)
-        {
-            var encodedSource = Convert.ToBase64String(Encoding.UTF8.GetBytes(scriptContent));
-            var safeName = WebUtility.HtmlEncode(pluginName);
-            var compilerTag = isTypeScript ? "<script src=\"typescript.js\"></script>" : string.Empty;
-            var executeScript = isTypeScript
-                ? @"
-        const result = ts.transpileModule(source, {
-            compilerOptions: {
-                target: ts.ScriptTarget.ES2020,
-                module: ts.ModuleKind.None,
-                strict: false
-            },
-            reportDiagnostics: true
-        });
-        const errors = (result.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error);
-        if (errors.length) {
-            throw new Error(errors.map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n')).join('\n'));
-        }
-        (0, eval)(result.outputText);"
-                : "        (0, eval)(source);";
-
-            return $@"<!DOCTYPE html>
-<html>
-<head>
-    <meta charset=""utf-8"">
-    <title>{safeName}</title>
-    <style>
-        body {{
-            margin: 0;
-            padding: 16px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1a1a1d;
-            color: #f8fafc;
-        }}
-        .script-info {{
-            padding: 12px;
-            background: #2a2a2d;
-            border-radius: 6px;
-            border-left: 3px solid #38bdf8;
-            margin-bottom: 16px;
-        }}
-        .script-info h3 {{
-            margin: 0 0 8px 0;
-            font-size: 14px;
-            color: #38bdf8;
-        }}
-        .script-info p {{
-            margin: 0;
-            font-size: 12px;
-            color: #999;
-        }}
-        #output {{
-            white-space: pre-wrap;
-            font-family: 'Consolas', monospace;
-            font-size: 12px;
-        }}
-    </style>
-</head>
-<body>
-    <div class=""script-info"">
-        <h3>📜 {safeName} {(isTypeScript ? "(TypeScript)" : "(JavaScript)")}</h3>
-        <p>单文件脚本 · 保存即热重载 · 能力由 @capabilities 声明</p>
-    </div>
-    <div id=""output""></div>
-
-    <!-- 拦截 console.log 显示在页面上 -->
-    <script>
-        const output = document.getElementById('output');
-        const originalLog = console.log;
-        const postHostLog = (...args) => window.chrome?.webview?.postMessage({{
-            id: 0,
-            method: 'app.log',
-            args: args.map(value => String(value))
-        }});
-        console.log = function(...args) {{
-            originalLog.apply(console, args);
-            output.textContent += args.join(' ') + '\\n';
-            postHostLog(...args);
-        }};
-        const originalError = console.error;
-        console.error = function(...args) {{
-            originalError.apply(console, args);
-            postHostLog('[error]', ...args);
-        }};
-    </script>
-
-    {compilerTag}
-    <script>
-    try {{
-        const bytes = Uint8Array.from(atob('{encodedSource}'), c => c.charCodeAt(0));
-        const source = new TextDecoder('utf-8').decode(bytes);
-{executeScript}
-    }} catch (error) {{
-        console.error(error);
-        output.textContent += '编译或执行失败: ' + (error?.message || error) + '\n';
-    }}
-    </script>
-</body>
-</html>";
-        }
-
         public void Dispose()
         {
-            foreach (var watcher in _watchers)
-            {
-                watcher.EnableRaisingEvents = false;
-                watcher.Dispose();
-            }
-
-            _watchers.Clear();
-            _debounceCts?.Cancel();
-            _debounceCts?.Dispose();
+            _changeMonitor.Dispose();
 
             Log.Information("PluginScanner 已释放，文件监控已停止。");
         }

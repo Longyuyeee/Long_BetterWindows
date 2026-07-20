@@ -35,6 +35,8 @@
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="market" />
                     <RadioButton x:Name="NavSystem" Content="系统集成" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="system" />
+                    <RadioButton x:Name="NavDiagnostics" Content="平台诊断" GroupName="MainNav"
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="diagnostics" />
                     <RadioButton x:Name="NavDeveloper" Content="开发者" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="developer" />
                     <RadioButton x:Name="NavSettings" Content="设置" GroupName="MainNav"
@@ -135,37 +137,9 @@
                     </StackPanel>
 
                     <!-- 插件管理 -->
-                    <StackPanel x:Name="PanelPlugins" Visibility="Collapsed">
-                        <Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="280"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                            <TextBlock x:Name="PluginsHeader" Text="已安装插件" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBox x:Name="PluginSearchBox" Grid.Column="1" Style="{StaticResource LongTextBox}"
-                                     Margin="0,0,10,0" TextChanged="PluginSearch_TextChanged" AutomationProperties.Name="搜索插件" />
-                            <Button Grid.Column="2" Content="刷新" Style="{StaticResource LongButton}" Click="RefreshPlugins_Click" />
-                        </Grid>
-                        <TextBlock x:Name="PluginsLoading" Text="正在扫描插件…" Style="{StaticResource LongEmptyState}" />
-                        <ListBox x:Name="PluginsPanel" MaxHeight="640"
-                                 Background="Transparent" BorderThickness="0"
-                                 ScrollViewer.CanContentScroll="True"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 VirtualizingPanel.IsVirtualizing="True"
-                                 VirtualizingPanel.VirtualizationMode="Recycling">
-                            <ListBox.Resources>
-                                <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}" />
-                            </ListBox.Resources>
-                            <ListBox.ItemsPanel>
-                                <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
-                            </ListBox.ItemsPanel>
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="Background" Value="Transparent" />
-                                    <Setter Property="BorderThickness" Value="0" />
-                                    <Setter Property="Padding" Value="0" />
-                                    <Setter Property="Focusable" Value="False" />
-                                </Style>
-                            </ListBox.ItemContainerStyle>
-                        </ListBox>
-                    </StackPanel>
+                    <Grid x:Name="PanelPlugins" Visibility="Collapsed">
+                        <local:PluginManagementControl x:Name="PluginManagementHost" />
+                    </Grid>
 
                     <!-- Long 原生插件市场 -->
                     <Grid x:Name="PanelMarket" Visibility="Collapsed">
@@ -181,6 +155,11 @@
                             <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><StackPanel><TextBlock Text="全局命令热键" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="首选 Alt + Space，冲突时使用 Ctrl + Alt + Space" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><Border Style="{StaticResource LongHotkeyBadge}" HorizontalAlignment="Left" Margin="0,10,0,0"><TextBlock Text="Alt + Space" FontFamily="{DynamicResource Long.Font.Mono}"/></Border></StackPanel></Border>
                         </UniformGrid>
                     </StackPanel>
+
+                    <!-- 平台诊断 -->
+                    <Grid x:Name="PanelDiagnostics" Visibility="Collapsed">
+                        <ContentControl x:Name="DiagnosticsHost" />
+                    </Grid>
 
                     <!-- 开发者 -->
                     <StackPanel x:Name="PanelDev" Visibility="Collapsed">

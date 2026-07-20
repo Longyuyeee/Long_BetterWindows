@@ -1,23 +1,20 @@
 using System.IO;
-using System.Net.Http;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Interaction;
+using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
 
 namespace LongBetterWindows.Host.Views
 {
     public partial class MarketplaceControl : UserControl
     {
-        private IMarketplaceRepository _repository;
-        private PluginPackageValidator _validator = new();
-        private PublisherTrustStore _trustStore = PublisherTrustStore.Empty;
-        private MarketplacePackageDownloader? _downloader;
-        private readonly HttpClient _marketHttpClient = new();
-        private bool _remoteConfigured;
+        private readonly MarketplaceRuntimeService _marketplace;
+        private bool _pluginEventsSubscribed;
         private MarketplaceCatalog? _catalog;
         private MarketplaceEntry? _selectedEntry;
         private MarketplacePackageVersion? _selectedVersion;
@@ -33,59 +30,49 @@ namespace LongBetterWindows.Host.Views
             var catalogPath = string.IsNullOrWhiteSpace(qualityCatalog)
                 ? Path.Combine(AppContext.BaseDirectory, "Marketplace", "registry.json")
                 : Path.GetFullPath(qualityCatalog);
-            _repository = new LocalMarketplaceRepository(
-                catalogPath,
-                string.IsNullOrWhiteSpace(qualityCatalog)
-                    ? MarketplaceSourceKind.LocalPackage
-                    : MarketplaceSourceKind.RemoteRegistry);
-            _marketHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd($"LongBetterWindows/{App.ProductVersion}");
-            Loaded += async (_, _) =>
-            {
-                await ConfigureRemoteMarketplaceAsync();
-                await LoadCatalogAsync();
-            };
-            HostProvider.Instance.PluginStore.PluginsChanged += OnPluginsChanged;
-        }
-
-        private async Task ConfigureRemoteMarketplaceAsync()
-        {
-            if (_remoteConfigured) return;
-            _remoteConfigured = true;
             var marketDir = Path.Combine(AppContext.BaseDirectory, "Marketplace");
-            var settings = await MarketplaceConfigurationLoader.LoadSettingsAsync(
-                Path.Combine(marketDir, "marketplace-settings.json"));
             var qualityTrustStore = (Application.Current as App)?.QualityMarketplaceTrustStorePath;
-            var trust = await MarketplaceConfigurationLoader.LoadTrustStoreAsync(
-                string.IsNullOrWhiteSpace(qualityTrustStore)
-                    ? Path.Combine(marketDir, "trusted-publishers.json")
-                    : Path.GetFullPath(qualityTrustStore));
-            _trustStore = trust.IsSuccess ? trust.Store : PublisherTrustStore.Empty;
-            _validator = new PluginPackageValidator(trustStore: _trustStore);
-
-            if (settings.RegistryUri == null) return;
+            var trustStorePath = string.IsNullOrWhiteSpace(qualityTrustStore)
+                ? Path.Combine(marketDir, "trusted-publishers.json")
+                : Path.GetFullPath(qualityTrustStore);
             var dataRoot = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "LongBetterWindows", "Marketplace");
-            var remote = new RemoteMarketplaceRepository(
-                _marketHttpClient,
-                settings.RegistryUri,
-                Path.Combine(dataRoot, "registry-cache.json"),
-                TimeSpan.FromSeconds(settings.CatalogTimeoutSeconds));
-            _repository = new CompositeMarketplaceRepository(_repository, remote);
-            var allowedHosts = settings.AllowedPackageHosts
-                .Append(settings.RegistryUri.IdnHost)
-                .Distinct(StringComparer.OrdinalIgnoreCase);
-            _downloader = new MarketplacePackageDownloader(
-                _marketHttpClient,
-                Path.Combine(dataRoot, "Packages"),
-                allowedHosts,
-                TimeSpan.FromSeconds(settings.DownloadTimeoutSeconds));
+            _marketplace = new MarketplaceRuntimeService(
+                catalogPath,
+                string.IsNullOrWhiteSpace(qualityCatalog)
+                    ? MarketplaceSourceKind.LocalPackage
+                    : MarketplaceSourceKind.RemoteRegistry,
+                Path.Combine(marketDir, "marketplace-settings.json"),
+                trustStorePath,
+                dataRoot,
+                App.ProductVersion);
+            Loaded += MarketplaceControl_Loaded;
+            Unloaded += MarketplaceControl_Unloaded;
+            Dispatcher.ShutdownStarted += (_, _) => _marketplace.Dispose();
         }
 
+        private async void MarketplaceControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (!_pluginEventsSubscribed)
+            {
+                HostProvider.Instance.PluginStore.PluginsChanged += OnPluginsChanged;
+                _pluginEventsSubscribed = true;
+            }
+
+            await LoadCatalogAsync();
+        }
+
+        private void MarketplaceControl_Unloaded(object sender, RoutedEventArgs e)
+        {
+            if (!_pluginEventsSubscribed) return;
+            HostProvider.Instance.PluginStore.PluginsChanged -= OnPluginsChanged;
+            _pluginEventsSubscribed = false;
+        }
         private async Task LoadCatalogAsync()
         {
             CatalogStatusText.Text = "正在读取可信目录…";
-            var result = await _repository.LoadAsync();
+            var result = await _marketplace.LoadCatalogAsync();
             if (!result.IsSuccess)
             {
                 _catalog = null;
@@ -104,10 +91,7 @@ namespace LongBetterWindows.Host.Views
                 ? "远程 Registry · 强制签名"
                 : "内置可信目录 · 本地优先";
             CategoryBox.ItemsSource = new[] { "全部分类" }
-                .Concat(_catalog.Entries.Select(x => x.Category)
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                    .OrderBy(x => x))
+                .Concat(MarketplacePresentation.GetCategories(_catalog))
                 .ToArray();
             CategoryBox.SelectedIndex = 0;
             CatalogStatusText.Text = string.IsNullOrWhiteSpace(result.Status)
@@ -121,21 +105,14 @@ namespace LongBetterWindows.Host.Views
             if (_catalog == null) return Task.CompletedTask;
             var category = CategoryBox.SelectedItem?.ToString();
             if (category == "全部分类") category = null;
-            var terms = (MarketSearchBox.Text ?? string.Empty)
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var entries = _catalog.Entries
-                .Where(x => category == null
-                    || string.Equals(x.Category, category, StringComparison.OrdinalIgnoreCase))
-                .Where(x => terms.All(term =>
-                    x.Name.Contains(term, StringComparison.CurrentCultureIgnoreCase)
-                    || x.Summary.Contains(term, StringComparison.CurrentCultureIgnoreCase)
-                    || x.Publisher.Contains(term, StringComparison.CurrentCultureIgnoreCase)
-                    || x.Tags.Any(tag => tag.Contains(term, StringComparison.CurrentCultureIgnoreCase))))
-                .OrderBy(x => x.Name)
-                .ToArray();
-            var cards = entries.Select(CreateCard).ToArray();
+            var cards = MarketplacePresentation.ProjectEntries(
+                _catalog,
+                MarketSearchBox.Text,
+                category,
+                pluginId => HostProvider.Instance.PluginStore
+                    .Get(pluginId)?.Manifest.Version);
             MarketList.ItemsSource = cards;
-            ResultCountText.Text = $"发现 {cards.Length} 个插件";
+            ResultCountText.Text = $"发现 {cards.Count} 个插件";
             if (_selectedEntry != null)
             {
                 var selected = cards.FirstOrDefault(x => string.Equals(
@@ -143,18 +120,11 @@ namespace LongBetterWindows.Host.Views
                 if (selected != null) MarketList.SelectedItem = selected;
                 else ShowEmptyDetail();
             }
-            else if (cards.Length > 0)
+            else if (cards.Count > 0)
             {
                 MarketList.SelectedIndex = 0;
             }
             return Task.CompletedTask;
-        }
-
-        private MarketCardModel CreateCard(MarketplaceEntry entry)
-        {
-            var installed = HostProvider.Instance.PluginStore.Get(entry.Id)?.Manifest.Version;
-            var state = LocalMarketplaceRepository.GetInstallState(entry, installed);
-            return new MarketCardModel(entry, state, installed);
         }
 
         private void ShowEntry(MarketCardModel card)
@@ -170,7 +140,7 @@ namespace LongBetterWindows.Host.Views
                 : card.Entry.Description;
             DetailState.Text = card.StateLabel;
             VersionBox.ItemsSource = card.Entry.Versions
-                .OrderByDescending(x => ParseVersion(x.Version))
+                .OrderByDescending(x => MarketplacePresentation.ParseVersion(x.Version))
                 .ToArray();
             VersionBox.DisplayMemberPath = nameof(MarketplacePackageVersion.Version);
             VersionBox.SelectedIndex = VersionBox.Items.Count > 0 ? 0 : -1;
@@ -199,7 +169,8 @@ namespace LongBetterWindows.Host.Views
                 ? "此版本未提供更新说明。"
                 : version.ReleaseNotes;
 
-            var compatibility = GetCompatibility(version);
+            var compatibility = MarketplacePresentation.GetCompatibility(
+                version, App.ProductVersion);
             CompatibilityTitle.Text = compatibility.IsCompatible ? "✓ 与当前 Long 兼容" : "此版本暂不兼容";
             CompatibilityTitle.SetResourceReference(
                 ForegroundProperty,
@@ -213,7 +184,7 @@ namespace LongBetterWindows.Host.Views
                 ? "目录仅提供版本信息，请选择对应的本地 .lpak。"
                 : version.PackageUri.IsFile
                     ? "安装前将验证包哈希、发布者与权限变化。"
-                    : _downloader == null
+                : !_marketplace.CanDownload
                         ? "远程下载通道未配置，可先导入已下载的 .lpak。"
                         : "将从允许的 HTTPS 主机下载，并在缓存前核对 SHA-256。";
         }
@@ -225,7 +196,8 @@ namespace LongBetterWindows.Host.Views
             var installed = metadata.ExpectedPluginId == null
                 ? null
                 : HostProvider.Instance.PluginStore.Get(metadata.ExpectedPluginId)?.Manifest;
-            var validation = await _validator.ValidateAsync(path, metadata, installed);
+            var validation = await _marketplace.ValidatePackageAsync(
+                path, metadata, installed);
             if (!validation.IsSuccess)
             {
                 ShowConfirmationError("插件包被拒绝", validation.Error ?? "未知校验错误");
@@ -246,7 +218,8 @@ namespace LongBetterWindows.Host.Views
                 ConfirmTrustText, validation.TrustLevel.ToString());
             ConfirmHashText.Text = $"SHA-256  {validation.Sha256}";
             ConfirmCompatibilityText.Text = "✓ 包结构、入口文件与最低版本兼容检查通过";
-            PermissionDiffItems.ItemsSource = FormatPermissionDiff(validation.PermissionDiff);
+            PermissionDiffItems.ItemsSource = MarketplacePresentation.FormatPermissionDiff(
+                validation.PermissionDiff);
             HighTrustWarning.Visibility = validation.RequiresHighTrustWarning
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -282,16 +255,6 @@ namespace LongBetterWindows.Host.Views
             ConfirmActionButton.SetResourceReference(StyleProperty, "LongButton.Danger");
             ConfirmOverlay.Visibility = Visibility.Visible;
             ConfirmActionButton.Focus();
-        }
-
-        private static IReadOnlyList<string> FormatPermissionDiff(PermissionDiff diff)
-        {
-            var lines = new List<string>();
-            lines.AddRange(diff.Added.Select(x => $"＋ 新增权限  {x}"));
-            lines.AddRange(diff.Removed.Select(x => $"− 移除权限  {x}"));
-            lines.AddRange(diff.Unchanged.Select(x => $"• 保持权限  {x}"));
-            if (lines.Count == 0) lines.Add("• 无需额外能力权限");
-            return lines;
         }
 
         private void ShowConfirmationError(string title, string error)
@@ -335,7 +298,7 @@ namespace LongBetterWindows.Host.Views
             SetBusy(true);
             try
             {
-                installer.ConfigureTrustStore(_trustStore);
+                installer.ConfigureTrustStore(_marketplace.TrustStore);
                 InstallResult result;
                 if (_pendingUninstallId != null)
                     result = await installer.UninstallAsync(_pendingUninstallId);
@@ -384,7 +347,7 @@ namespace LongBetterWindows.Host.Views
                 path = _selectedVersion.PackageUri.LocalPath;
             else if (_selectedVersion.PackageUri is { Scheme: "https" })
             {
-                if (_downloader == null)
+                if (!_marketplace.CanDownload)
                 {
                     ShowConfirmationError("下载通道不可用", "远程下载器尚未配置。");
                     return;
@@ -393,7 +356,7 @@ namespace LongBetterWindows.Host.Views
                 DetailHint.Text = "正在安全下载并核对 SHA-256…";
                 try
                 {
-                    var download = await _downloader.DownloadAsync(
+                    var download = await _marketplace.DownloadPackageAsync(
                         _selectedEntry.Id, _selectedVersion);
                     if (!download.IsSuccess)
                     {
@@ -412,16 +375,8 @@ namespace LongBetterWindows.Host.Views
             path ??= PickPackage();
             if (path == null) return;
 
-            var metadata = new MarketplacePackageMetadata
-            {
-                Source = _selectedEntry.Source,
-                ExpectedPluginId = _selectedEntry.Id,
-                ExpectedVersion = _selectedVersion.Version,
-                ExpectedSha256 = EmptyToNull(_selectedVersion.Sha256),
-                Signature = _selectedVersion.Signature,
-                PublisherPublicKeyPem = _selectedVersion.PublisherPublicKeyPem,
-                PublisherKeyId = _selectedVersion.PublisherKeyId,
-            };
+            var metadata = MarketplacePresentation.CreatePackageMetadata(
+                _selectedEntry, _selectedVersion);
             await PreviewPackageAsync(path, metadata);
         }
 
@@ -485,70 +440,5 @@ namespace LongBetterWindows.Host.Views
             MarketEmptyDetail.Visibility = Visibility.Visible;
         }
 
-        private static (bool IsCompatible, string Description) GetCompatibility(
-            MarketplacePackageVersion version)
-        {
-            var requirements = new List<string>();
-            var compatible = true;
-            if (!string.IsNullOrWhiteSpace(version.MinHostVersion))
-            {
-                requirements.Add($"Host ≥ {version.MinHostVersion}");
-                compatible &= ParseVersion(App.ProductVersion) >= ParseVersion(version.MinHostVersion);
-            }
-            if (!string.IsNullOrWhiteSpace(version.MinApiVersion))
-            {
-                requirements.Add($"API ≥ {version.MinApiVersion}");
-                var requiredApi = ParseVersion(version.MinApiVersion);
-                compatible &= ApiVersion.Current.IsCompatibleWith(new ApiVersion(
-                    requiredApi.Major, requiredApi.Minor, Math.Max(0, requiredApi.Build)));
-            }
-            if (!string.IsNullOrWhiteSpace(version.MinUiKitVersion))
-            {
-                requirements.Add($"UI Kit ≥ {version.MinUiKitVersion}");
-                compatible &= PluginPackageValidator.CurrentUiKitVersion
-                    >= ParseVersion(version.MinUiKitVersion);
-            }
-            return (compatible, requirements.Count == 0
-                ? "使用当前稳定协议，无额外最低版本要求。"
-                : string.Join(" · ", requirements));
-        }
-
-        private static Version ParseVersion(string? value)
-        {
-            var normalized = (value ?? "0.0.0").TrimStart('v', 'V').Split('-', '+')[0];
-            return Version.TryParse(normalized, out var version) ? version : new Version(0, 0, 0);
-        }
-
-        private static string? EmptyToNull(string? value)
-            => string.IsNullOrWhiteSpace(value) ? null : value;
-
-        private sealed class MarketCardModel
-        {
-            public MarketCardModel(
-                MarketplaceEntry entry,
-                MarketplaceInstallState state,
-                string? installedVersion)
-            {
-                Entry = entry;
-                State = state;
-                InstalledVersion = installedVersion;
-            }
-
-            public MarketplaceEntry Entry { get; }
-            public MarketplaceInstallState State { get; }
-            public string? InstalledVersion { get; }
-            public string Name => Entry.Name;
-            public string Summary => Entry.Summary;
-            public string Monogram => string.IsNullOrWhiteSpace(Name) ? "L" : Name[..1].ToUpperInvariant();
-            public string Meta => $"{Entry.Category} · {Entry.Publisher}";
-            public string StateLabel => State switch
-            {
-                MarketplaceInstallState.Installed => "已安装",
-                MarketplaceInstallState.UpdateAvailable => "可更新",
-                MarketplaceInstallState.DowngradeAvailable => "可降级",
-                MarketplaceInstallState.Incompatible => "不兼容",
-                _ => "获取",
-            };
-        }
     }
 }

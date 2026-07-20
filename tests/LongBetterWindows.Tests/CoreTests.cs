@@ -125,7 +125,7 @@ public class CoreTests
             console.log('ready');
             """;
 
-        var capabilities = PluginScanner.ExtractStandaloneCapabilities(source);
+        var capabilities = StandalonePluginLoader.ExtractCapabilities(source);
 
         Assert.Equal(
             new[] { "network.http", "system.hotkey", "system.notification" },
@@ -157,13 +157,13 @@ public class CoreTests
     [InlineData("ui.confirm", "ui.window")]
     public void WebBridgeMethod_RequiresExpectedCapability(string method, string capability)
     {
-        Assert.Equal(capability, WebPluginRuntime.GetRequiredCapability(method));
+        Assert.Equal(capability, WebPluginBridgeProtocol.GetRequiredCapability(method));
     }
 
     [Fact]
     public void WebBridgeScript_ContainsPlatformApisAndPromiseResolution()
     {
-        var script = WebPluginRuntime.BuildJsBridge("com.test.bridge");
+        var script = WebPluginBridgeProtocol.BuildInjectionScript("com.test.bridge");
 
         Assert.Contains("process:", script);
         Assert.Contains("performance:", script);
@@ -176,6 +176,69 @@ public class CoreTests
         Assert.Contains("input:", script);
         Assert.Contains("confirm: function", script);
         Assert.Contains("_pending[m.id].resolve", script);
+        Assert.Contains("com.test.bridge", script);
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_ParsesRequestsCaseInsensitively()
+    {
+        var request = WebPluginBridgeProtocol.ParseRequest(
+            "{\"ID\":17,\"METHOD\":\"clipboard.setText\",\"ARGS\":[\"hello\"]}");
+
+        Assert.NotNull(request);
+        Assert.Equal(17, request.Id);
+        Assert.Equal("clipboard.setText", request.Method);
+        Assert.Single(request.Args);
+        Assert.Equal("hello", Assert.IsType<JsonElement>(request.Args[0]).GetString());
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_SerializesLowercaseResponseAndEventContracts()
+    {
+        using var success = JsonDocument.Parse(
+            WebPluginBridgeProtocol.SerializeResult(9, new { success = true }));
+        using var failure = JsonDocument.Parse(
+            WebPluginBridgeProtocol.SerializeError(10, "denied"));
+        using var hotkey = JsonDocument.Parse(
+            WebPluginBridgeProtocol.SerializeHotkey("Alt+Space"));
+
+        Assert.Equal(9, success.RootElement.GetProperty("id").GetInt32());
+        Assert.True(success.RootElement.GetProperty("result").GetProperty("success").GetBoolean());
+        Assert.False(success.RootElement.TryGetProperty("error", out _));
+        Assert.Equal("denied", failure.RootElement.GetProperty("error").GetString());
+        Assert.Equal("hotkey", hotkey.RootElement.GetProperty("type").GetString());
+        Assert.Equal("Alt+Space", hotkey.RootElement.GetProperty("hotkey").GetString());
+    }
+
+    [Fact]
+    public void WebPluginArguments_ConvertsJsonPrimitivesAndUsesDefaults()
+    {
+        using var document = JsonDocument.Parse("[42,true,\"17\",\"invalid\"]");
+        var args = document.RootElement.EnumerateArray()
+            .Select(element => (object?)element.Clone())
+            .ToArray();
+
+        Assert.Equal(42, WebPluginArguments.GetInt(args, 0));
+        Assert.True(WebPluginArguments.GetBool(args, 1));
+        Assert.Equal(17L, WebPluginArguments.GetLong(args, 2));
+        Assert.Equal(9, WebPluginArguments.GetInt(args, 3, 9));
+        Assert.Equal("fallback", WebPluginArguments.GetString(args, 8, "fallback"));
+    }
+
+    [Fact]
+    public void WebPluginArguments_DeserializesStructuredCollectionsAndHeaders()
+    {
+        using var document = JsonDocument.Parse(
+            "[[\"txt\",\"md\"],{\"Authorization\":\"Bearer token\"}]");
+        var args = document.RootElement.EnumerateArray()
+            .Select(element => (object?)element.Clone())
+            .ToArray();
+
+        Assert.Equal(new[] { "txt", "md" }, WebPluginArguments.GetStringList(args, 0));
+        var headers = WebPluginArguments.GetHeaders(args, 1);
+        Assert.NotNull(headers);
+        Assert.Equal("Bearer token", headers["Authorization"]);
+        Assert.Null(WebPluginArguments.GetHeaders(new object?[] { "not-json" }, 0));
     }
 
     [Fact]

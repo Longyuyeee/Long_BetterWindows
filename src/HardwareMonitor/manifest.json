@@ -10,6 +10,31 @@
     "system.performance",
     "system.process"
   ],
+  "commands": [
+    {
+      "id": "hardware-monitor.open",
+      "title": "查看硬件监控",
+      "description": "查看 CPU、内存、磁盘和进程资源状态",
+      "aliases": ["硬件监控", "性能监控", "hardware monitor", "xingnengjiankong"],
+      "accepted_inputs": ["none"],
+      "view_mode": "custom",
+      "keep_alive": true,
+      "priority": 24
+    }
+  ],
+  "window": {
+    "mode": "wide",
+    "preferred_width": 1080,
+    "preferred_height": 760,
+    "min_width": 760,
+    "min_height": 540
+  },
+  "lifecycle": {
+    "start_with_host": false,
+    "close_behavior": "background",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
   "default_settings": {
     "refresh_interval": 2000,
     "cpu_warning_threshold": 80,

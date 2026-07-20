@@ -4,90 +4,111 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="800">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="20">
-            <!-- 标题 -->
-            <TextBlock Text="性能监控" FontSize="24" FontWeight="Bold"
-                       Foreground="{DynamicResource LightTextBrush}" Margin="0,0,0,20"/>
-
-            <!-- 系统性能卡片 -->
-            <Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Padding="20" Margin="0,0,0,16">
+             d:DesignHeight="620" d:DesignWidth="900"
+             SizeChanged="PerformancePanel_SizeChanged">
+    <StackPanel>
+        <UniformGrid Columns="3" Margin="0,0,0,16">
+            <Border Style="{StaticResource LongCard}" Margin="0,0,12,0">
                 <StackPanel>
-                    <TextBlock Text="系统性能" FontSize="16" FontWeight="SemiBold"
-                               Foreground="{DynamicResource LightTextBrush}" Margin="0,0,0,16"/>
+                    <TextBlock Text="CPU 使用率" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                    <TextBlock x:Name="CpuPercentText" Text="0.0%" FontSize="28" FontWeight="SemiBold"
+                               Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.Accent.Primary}" />
+                    <TextBlock x:Name="CpuAvgText" Text="平均 0.0%" Margin="0,5,0,0"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource LongCard}" Margin="0,0,12,0">
+                <StackPanel>
+                    <TextBlock Text="宿主工作集" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                    <TextBlock x:Name="MemoryText" Text="0 MB" FontSize="28" FontWeight="SemiBold"
+                               Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.State.Success}" />
+                    <TextBlock Text="当前进程内存" Margin="0,5,0,0"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource LongCard}">
+                <StackPanel>
+                    <TextBlock Text="能力调用" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                    <TextBlock x:Name="ApiCallsText" Text="0" FontSize="28" FontWeight="SemiBold"
+                               Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.State.Warning}" />
+                    <TextBlock x:Name="PluginCountText" Text="0 个活跃插件" Margin="0,5,0,0"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                </StackPanel>
+            </Border>
+        </UniformGrid>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- CPU 使用率 -->
-                        <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                            <TextBlock Text="CPU 使用率" FontSize="12"
-                                       Foreground="{DynamicResource GrayBrush}" Margin="0,0,0,4"/>
-                            <TextBlock x:Name="CpuPercentText" Text="0.0%" FontSize="28" FontWeight="Bold"
-                                       Foreground="{DynamicResource BlueBrush}"/>
-                            <TextBlock x:Name="CpuAvgText" Text="平均: 0.0%" FontSize="11"
-                                       Foreground="{DynamicResource GrayBrush}" Margin="0,4,0,0"/>
-                        </StackPanel>
-
-                        <!-- 内存使用 -->
-                        <StackPanel Grid.Column="1" Margin="0,0,16,0">
-                            <TextBlock Text="内存使用" FontSize="12"
-                                       Foreground="{DynamicResource GrayBrush}" Margin="0,0,0,4"/>
-                            <TextBlock x:Name="MemoryText" Text="0 MB" FontSize="28" FontWeight="Bold"
-                                       Foreground="{DynamicResource GreenBrush}"/>
-                            <TextBlock Text="工作集" FontSize="11"
-                                       Foreground="{DynamicResource GrayBrush}" Margin="0,4,0,0"/>
-                        </StackPanel>
-
-                        <!-- API 调用总数 -->
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="API 调用" FontSize="12"
-                                       Foreground="{DynamicResource GrayBrush}" Margin="0,0,0,4"/>
-                            <TextBlock x:Name="ApiCallsText" Text="0" FontSize="28" FontWeight="Bold"
-                                       Foreground="{DynamicResource OrangeBrush}"/>
-                            <TextBlock x:Name="PluginCountText" Text="0 个插件" FontSize="11"
-                                       Foreground="{DynamicResource GrayBrush}" Margin="0,4,0,0"/>
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- CPU 历史图表占位 -->
-                    <Border Background="{DynamicResource SurfaceBackgroundBrush}"
-                            CornerRadius="8" Height="120" Margin="0,16,0,0">
-                        <Canvas x:Name="CpuChartCanvas"/>
+        <Border Style="{StaticResource LongCard}" Margin="0,0,0,16">
+            <StackPanel>
+                <Grid Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="CPU 历史" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="最近 60 秒的宿主进程占用" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    </StackPanel>
+                    <Border HorizontalAlignment="Right" Style="{StaticResource LongBadge}">
+                        <TextBlock Text="每秒刷新" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                     </Border>
+                </Grid>
+                <Border Height="140" Background="{DynamicResource Long.Brush.Background.Base}"
+                        BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1"
+                        CornerRadius="{DynamicResource Long.Radius.Control}" Padding="8">
+                    <Canvas x:Name="CpuChartCanvas" ClipToBounds="True" />
+                </Border>
+            </StackPanel>
+        </Border>
 
-                    <TextBlock Text="CPU 使用率历史（最近 60 秒）" FontSize="11"
-                               Foreground="{DynamicResource GrayBrush}"
-                               HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                </StackPanel>
-            </Border>
+        <Border Style="{StaticResource LongCard}">
+            <StackPanel>
+                <Grid Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="插件调用排行" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="按本次宿主会话中的能力调用次数排序" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="刷新" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Style="{StaticResource LongButton}" Click="RefreshButton_Click" />
+                </Grid>
 
-            <!-- 插件性能排行 -->
-            <Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Padding="20">
-                <StackPanel>
-                    <Grid Margin="0,0,0,16">
-                        <TextBlock Text="插件性能排行" FontSize="16" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource LightTextBrush}"
-                                   VerticalAlignment="Center"/>
-                        <Button Content="🔄 刷新" HorizontalAlignment="Right"
-                                Background="Transparent"
-                                Foreground="{DynamicResource BlueBrush}"
-                                BorderThickness="0" Cursor="Hand"
-                                Click="RefreshButton_Click"/>
-                    </Grid>
+                <ItemsControl x:Name="PluginPerformanceItems">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                                    BorderThickness="0,0,0,1" Padding="0,11">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="110" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding PluginName}" FontSize="13" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding PluginId}" Margin="0,3,0,0" FontSize="10"
+                                                   FontFamily="{DynamicResource Long.Font.Mono}"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding CallCount}" HorizontalAlignment="Right"
+                                                   FontSize="15" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Long.Brush.Accent.Primary}" />
+                                        <TextBlock Text="调用" HorizontalAlignment="Right" FontSize="10"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding AverageDuration}" HorizontalAlignment="Right"
+                                                   FontSize="15" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Long.Brush.State.Success}" />
+                                        <TextBlock Text="平均耗时" HorizontalAlignment="Right" FontSize="10"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                    <StackPanel x:Name="PluginPerformancePanel"/>
-
-                    <TextBlock x:Name="NoDataText" Text="暂无性能数据"
-                               FontSize="13" Foreground="{DynamicResource GrayBrush}"
-                               HorizontalAlignment="Center" Margin="0,20,0,0"/>
-                </StackPanel>
-            </Border>
-        </StackPanel>
-    </ScrollViewer>
+                <TextBlock x:Name="NoDataText" Text="本次会话暂无插件能力调用"
+                           Style="{StaticResource LongEmptyState}" Margin="0,18,0,6" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
 </UserControl>

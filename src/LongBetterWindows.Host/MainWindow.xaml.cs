@@ -24,6 +24,10 @@ namespace LongBetterWindows.Host
         {
             if ((Application.Current as App)?.ShowMarketForQualityRequested == true)
                 ToolCenter.OpenMarketForQuality();
+            if ((Application.Current as App)?.ShowDiagnosticsForQualityRequested == true)
+                ToolCenter.OpenDiagnosticsForQuality();
+            if ((Application.Current as App)?.ShowPluginsForQualityRequested == true)
+                ToolCenter.OpenPluginsForQuality();
 
             if ((Application.Current as App)?.ShowDesignSystemPreviewRequested == true)
             {

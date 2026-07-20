@@ -9,6 +9,30 @@
   "capabilities": [
     "system.clipboard"
   ],
+  "commands": [
+    {
+      "id": "dev-toolkit.open",
+      "title": "打开开发者工具箱",
+      "description": "使用编码、哈希、时间戳、UUID 和进制转换工具",
+      "aliases": ["开发者工具", "转换工具", "dev toolkit", "kaifagongju"],
+      "accepted_inputs": ["none", "text", "clipboard"],
+      "view_mode": "form",
+      "priority": 20
+    }
+  ],
+  "window": {
+    "mode": "wide",
+    "preferred_width": 1040,
+    "preferred_height": 760,
+    "min_width": 760,
+    "min_height": 560
+  },
+  "lifecycle": {
+    "start_with_host": false,
+    "close_behavior": "stop",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
   "default_settings": {
     "theme": "dark",
     "auto_copy": true

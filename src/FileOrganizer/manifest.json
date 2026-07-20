@@ -11,6 +11,30 @@
     "shell.selection",
     "storage.local"
   ],
+  "commands": [
+    {
+      "id": "file-organizer.open",
+      "title": "整理文件夹",
+      "description": "分析并整理指定文件夹或 Explorer 当前选区",
+      "aliases": ["文件整理", "整理文件夹", "file organizer", "wenjianzhengli"],
+      "accepted_inputs": ["folder", "explorer_selection", "none"],
+      "view_mode": "form",
+      "priority": 28
+    }
+  ],
+  "window": {
+    "mode": "wide",
+    "preferred_width": 1080,
+    "preferred_height": 760,
+    "min_width": 780,
+    "min_height": 560
+  },
+  "lifecycle": {
+    "start_with_host": false,
+    "close_behavior": "stop",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
   "default_settings": {
     "large_file_threshold": 104857600,
     "auto_backup": true

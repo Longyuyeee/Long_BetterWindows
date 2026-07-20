@@ -39,7 +39,7 @@ public class SearchCoordinatorTests
         var coordinator = new SearchCoordinator(
             new ISearchProvider[]
             {
-                new FakeSearchProvider("fast", 10, 5, Result("fast", 200)),
+                new FakeSearchProvider("fast", 10, 0, Result("fast", 200)),
                 new NeverSearchProvider(),
             },
             TimeSpan.FromMilliseconds(60));

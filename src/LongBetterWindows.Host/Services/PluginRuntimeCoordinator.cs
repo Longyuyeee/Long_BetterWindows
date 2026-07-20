@@ -1,0 +1,113 @@
+using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Interaction;
+using Serilog;
+
+namespace LongBetterWindows.Host.Services
+{
+    internal sealed class PluginRuntimeCoordinator : IDisposable
+    {
+        private readonly PluginScanner _scanner;
+        private readonly PluginRegistry _registry;
+        private bool _disposed;
+
+        public PluginRuntimeCoordinator(
+            string? pluginsDirectory = null,
+            PluginRegistry? registry = null)
+        {
+            _scanner = new PluginScanner(pluginsDirectory);
+            _registry = registry ?? HostProvider.Instance.PluginStore;
+            PackageInstaller = new LpakInstaller(_scanner, pluginsDirectory);
+        }
+
+        public LpakInstaller PackageInstaller { get; }
+
+        public async Task<PluginRuntimeStartResult> StartAsync(
+            PluginRuntimeStartRequest request)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var recovered = await PackageInstaller.RecoverInterruptedTransactionsAsync();
+            if (recovered > 0)
+                Log.Warning(
+                    "Recovered {Count} interrupted plugin transactions during startup",
+                    recovered);
+
+            var installed = await PackageInstaller.InstallAllFromDirectoryAsync();
+            if (installed > 0)
+                Log.Information("Installed {Count} .lpak plugins during startup", installed);
+
+            await _scanner.ScanAsync();
+            Log.Information(
+                "Plugin runtime started with {Count} loaded plugins",
+                _scanner.LoadedPlugins.Count);
+
+            var exitCode = await ExecuteRequestedCommandAsync(_registry, request);
+            return new PluginRuntimeStartResult(
+                _scanner.LoadedPlugins.Count,
+                recovered,
+                installed,
+                exitCode);
+        }
+
+        internal static async Task<int?> ExecuteRequestedCommandAsync(
+            PluginRegistry registry,
+            PluginRuntimeStartRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.CommandKey))
+                return null;
+
+            var descriptor = registry.Commands.Get(request.CommandKey);
+            if (descriptor == null)
+            {
+                Log.Error(
+                    "Requested startup command does not exist: {CommandKey}",
+                    request.CommandKey);
+                return request.ExitAfterCommand ? 2 : null;
+            }
+
+            var inputType = !string.IsNullOrEmpty(request.CommandText)
+                            && descriptor.Command.AcceptedInputs.Contains(AcceptedInputType.Text)
+                ? AcceptedInputType.Text
+                : AcceptedInputType.None;
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Log.Information(
+                "Executing requested startup command: {CommandKey}",
+                request.CommandKey);
+            var result = await new CommandExecutor(registry).ExecuteAsync(
+                descriptor.Key,
+                new PluginCommandInvocation
+                {
+                    CommandId = descriptor.Command.Id,
+                    InputType = inputType,
+                    Text = inputType == AcceptedInputType.Text ? request.CommandText : null,
+                });
+            stopwatch.Stop();
+
+            Log.Information(
+                "Startup command {CommandKey} completed: Success={Success}, ElapsedMs={ElapsedMs:F1}",
+                request.CommandKey,
+                result.IsSuccess,
+                stopwatch.Elapsed.TotalMilliseconds);
+            return request.ExitAfterCommand ? result.IsSuccess ? 0 : 3 : null;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _scanner.Dispose();
+        }
+    }
+
+    internal sealed record PluginRuntimeStartRequest(
+        string? CommandKey,
+        string? CommandText,
+        bool ExitAfterCommand);
+
+    internal sealed record PluginRuntimeStartResult(
+        int LoadedPluginCount,
+        int RecoveredTransactionCount,
+        int InstalledPackageCount,
+        int? ExitCode);
+}

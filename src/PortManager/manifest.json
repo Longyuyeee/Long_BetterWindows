@@ -11,6 +11,30 @@
     "system.process",
     "system.clipboard"
   ],
+  "commands": [
+    {
+      "id": "port-manager.open",
+      "title": "打开端口管理器",
+      "description": "查询端口占用、关联进程并执行受控释放",
+      "aliases": ["端口管理", "端口占用", "port manager", "duankouguanli"],
+      "accepted_inputs": ["none", "text"],
+      "view_mode": "list",
+      "priority": 26
+    }
+  ],
+  "window": {
+    "mode": "wide",
+    "preferred_width": 1040,
+    "preferred_height": 720,
+    "min_width": 760,
+    "min_height": 520
+  },
+  "lifecycle": {
+    "start_with_host": false,
+    "close_behavior": "stop",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
   "default_settings": {
     "auto_refresh": true,
     "refresh_interval": 5000

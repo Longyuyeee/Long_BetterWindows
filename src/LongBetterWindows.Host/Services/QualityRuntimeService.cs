@@ -1,0 +1,199 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using LongBetterWindows.Host.Views;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
+using Serilog;
+
+namespace LongBetterWindows.Host.Services
+{
+    internal sealed class QualityRuntimeService
+    {
+        private readonly Application _application;
+
+        public QualityRuntimeService(Application application)
+        {
+            _application = application;
+        }
+
+        public async Task CaptureAsync(
+            AppStartupOptions options,
+            bool isLight,
+            bool highContrast,
+            bool reducedMotion)
+        {
+            await Task.Delay(options.QualityCaptureDelayMilliseconds);
+            await _application.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ContextIdle);
+
+            var target = options.QualityCaptureView switch
+            {
+                "palette" => _application.Windows.OfType<CommandPaletteWindow>()
+                    .FirstOrDefault(window => window.IsVisible),
+                "super-panel" => _application.Windows.OfType<SuperPanelWindow>()
+                    .FirstOrDefault(window => window.IsVisible),
+                "plugin" => _application.Windows.OfType<PluginWindowHost>()
+                    .FirstOrDefault(window => window.IsVisible) ?? _application.MainWindow,
+                "main" or "market" or "diagnostics" or "plugins" => _application.MainWindow,
+                _ => throw new InvalidDataException(
+                    $"Unsupported quality capture view: {options.QualityCaptureView}"),
+            } ?? throw new InvalidDataException(
+                $"Quality capture window is not visible: {options.QualityCaptureView}");
+
+            if (options.QualityCaptureWidth > 0) target.Width = options.QualityCaptureWidth;
+            if (options.QualityCaptureHeight > 0) target.Height = options.QualityCaptureHeight;
+            target.WindowState = WindowState.Normal;
+            target.UpdateLayout();
+            await _application.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+
+            var logicalWidth = Math.Max(1, target.ActualWidth);
+            var logicalHeight = Math.Max(1, target.ActualHeight);
+            var path = Path.GetFullPath(options.QualityCapturePath!);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+            if (options.QualityCaptureView == "plugin")
+            {
+                await CaptureWebViewAsync(
+                    target, path, options, logicalWidth, logicalHeight,
+                    isLight, highContrast, reducedMotion);
+                _application.Shutdown(0);
+                return;
+            }
+
+            var pixelWidth = Math.Max(
+                1, (int)Math.Ceiling(logicalWidth * options.QualityRenderDpi / 96d));
+            var pixelHeight = Math.Max(
+                1, (int)Math.Ceiling(logicalHeight * options.QualityRenderDpi / 96d));
+            var bitmap = new RenderTargetBitmap(
+                pixelWidth, pixelHeight,
+                options.QualityRenderDpi, options.QualityRenderDpi,
+                PixelFormats.Pbgra32);
+            bitmap.Render(target);
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            await using (var stream = new FileStream(
+                path, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+            {
+                encoder.Save(stream);
+                await stream.FlushAsync();
+            }
+
+            var actualDpi = VisualTreeHelper.GetDpi(target);
+            await WriteCaptureMetadataAsync(
+                path, options, logicalWidth, logicalHeight, pixelWidth, pixelHeight,
+                actualDpi.PixelsPerInchX, "wpf_render_target",
+                isLight, highContrast, reducedMotion);
+            Log.Information(
+                "Quality capture complete: View={View}, RenderDpi={RenderDpi}, ActualDpi={ActualDpi}, Path={Path}",
+                options.QualityCaptureView, options.QualityRenderDpi,
+                actualDpi.PixelsPerInchX, path);
+            _application.Shutdown(0);
+        }
+
+        public async Task RunIdleProbeAsync(
+            int delayMilliseconds,
+            int pluginCount,
+            int commandCount,
+            bool highContrast,
+            bool reducedMotion)
+        {
+            await Task.Delay(delayMilliseconds);
+            var process = System.Diagnostics.Process.GetCurrentProcess();
+            process.Refresh();
+            Log.Information(
+                "Quality idle sample: Plugins={PluginCount}, Commands={CommandCount}, WorkingSetMB={WorkingSetMB:F1}, PrivateMB={PrivateMB:F1}, HighContrast={HighContrast}, ReducedMotion={ReducedMotion}",
+                pluginCount,
+                commandCount,
+                process.WorkingSet64 / 1024d / 1024d,
+                process.PrivateMemorySize64 / 1024d / 1024d,
+                highContrast,
+                reducedMotion);
+            _application.Shutdown(0);
+        }
+
+        private static async Task CaptureWebViewAsync(
+            DependencyObject target,
+            string path,
+            AppStartupOptions options,
+            double logicalWidth,
+            double logicalHeight,
+            bool isLight,
+            bool highContrast,
+            bool reducedMotion)
+        {
+            var webView = FindVisualChild<WebView2>(target)
+                ?? throw new InvalidDataException("Quality capture could not find an active WebView2.");
+            if (webView.CoreWebView2 == null)
+                throw new InvalidDataException("WebView2 is not initialized for quality capture.");
+
+            await using (var stream = new FileStream(
+                path, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+            {
+                await webView.CoreWebView2.CapturePreviewAsync(
+                    CoreWebView2CapturePreviewImageFormat.Png, stream);
+                await stream.FlushAsync();
+            }
+
+            var webDpi = VisualTreeHelper.GetDpi(webView);
+            await WriteCaptureMetadataAsync(
+                path, options, logicalWidth, logicalHeight,
+                Math.Max(1, (int)Math.Ceiling(webView.ActualWidth * webDpi.DpiScaleX)),
+                Math.Max(1, (int)Math.Ceiling(webView.ActualHeight * webDpi.DpiScaleY)),
+                webDpi.PixelsPerInchX, "webview_preview",
+                isLight, highContrast, reducedMotion);
+        }
+
+        private static async Task WriteCaptureMetadataAsync(
+            string path,
+            AppStartupOptions options,
+            double logicalWidth,
+            double logicalHeight,
+            int pixelWidth,
+            int pixelHeight,
+            double actualDpi,
+            string captureKind,
+            bool isLight,
+            bool highContrast,
+            bool reducedMotion)
+        {
+            var metadata = new
+            {
+                schema_version = 1,
+                captured_at = DateTimeOffset.UtcNow,
+                view = options.QualityCaptureView,
+                theme = isLight ? "light" : "dark",
+                render_dpi = options.QualityRenderDpi,
+                actual_monitor_dpi = actualDpi,
+                capture_kind = captureKind,
+                logical_width = logicalWidth,
+                logical_height = logicalHeight,
+                pixel_width = pixelWidth,
+                pixel_height = pixelHeight,
+                high_contrast = highContrast,
+                reduced_motion = reducedMotion,
+            };
+            await File.WriteAllTextAsync(
+                path + ".json",
+                System.Text.Json.JsonSerializer.Serialize(
+                    metadata,
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        private static T? FindVisualChild<T>(DependencyObject parent)
+            where T : DependencyObject
+        {
+            for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, index);
+                if (child is T match) return match;
+                var nested = FindVisualChild<T>(child);
+                if (nested != null) return nested;
+            }
+
+            return null;
+        }
+    }
+}
