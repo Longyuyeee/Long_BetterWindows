@@ -260,12 +260,30 @@ public sealed class LocalDirectoryDeploymentTarget : IMarketplaceDeploymentTarge
             var existingRegistry = Path.Combine(_targetDirectory, "registry.json");
             if (File.Exists(existingRegistry))
                 previousRegistry = await File.ReadAllBytesAsync(existingRegistry, cancellationToken);
+            if (Directory.Exists(_targetDirectory))
+            {
+                await CopyPreservedDirectoryAsync(
+                    Path.Combine(_targetDirectory, "packages"),
+                    Path.Combine(stage, "packages"), cancellationToken);
+                await CopyPreservedDirectoryAsync(
+                    Path.Combine(_targetDirectory, "releases"),
+                    Path.Combine(stage, "releases"), cancellationToken);
+            }
             foreach (var file in plan.Files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var destination = Path.GetFullPath(Path.Combine(stage, file.RemotePath.Replace('/', Path.DirectorySeparatorChar)));
                 if (!IsWithin(stage, destination)) throw new InvalidDataException("Deployment plan contains an unsafe path.");
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                if (File.Exists(destination))
+                {
+                    var existingHash = await ComputeFileHashAsync(destination, cancellationToken);
+                    if (file.Kind != MarketplaceDeploymentFileKind.ImmutablePackage
+                        || new FileInfo(destination).Length != file.Bytes
+                        || !string.Equals(existingHash, file.Sha256, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException($"Deployment conflicts with preserved artifact: {file.RemotePath}");
+                    continue;
+                }
                 await using var source = File.OpenRead(file.LocalPath);
                 await using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true);
                 await source.CopyToAsync(output, cancellationToken);
@@ -309,6 +327,40 @@ public sealed class LocalDirectoryDeploymentTarget : IMarketplaceDeploymentTarge
         var path = Path.GetFullPath(candidate).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         return path.StartsWith(root, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static async Task CopyPreservedDirectoryAsync(
+        string source, string destination, CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(source)) return;
+        if ((File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidDataException($"Preserved deployment directory cannot be a reparse point: {source}");
+        Directory.CreateDirectory(destination);
+        foreach (var entry in Directory.EnumerateFileSystemEntries(source))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var attributes = File.GetAttributes(entry);
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException($"Preserved deployment artifact cannot be a reparse point: {entry}");
+            var target = Path.Combine(destination, Path.GetFileName(entry));
+            if ((attributes & FileAttributes.Directory) != 0)
+                await CopyPreservedDirectoryAsync(entry, target, cancellationToken);
+            else
+            {
+                await using var input = File.OpenRead(entry);
+                await using var output = new FileStream(
+                    target, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true);
+                await input.CopyToAsync(output, cancellationToken);
+            }
+        }
+    }
+
+    private static async Task<string> ComputeFileHashAsync(
+        string path, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(path);
+        return Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
+    }
+
     private static void TryDelete(string path) { try { if (Directory.Exists(path)) Directory.Delete(path, true); } catch { } }
 }
 

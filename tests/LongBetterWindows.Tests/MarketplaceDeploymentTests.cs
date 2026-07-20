@@ -162,6 +162,8 @@ public sealed class MarketplaceDeploymentTests : IDisposable
             LocalTargetDirectory = target,
         });
         var previous = await File.ReadAllBytesAsync(Path.Combine(target, "registry.json"));
+        var previousPackages = Directory.GetFiles(Path.Combine(target, "packages"))
+            .Select(Path.GetFileName).ToArray();
         var second = await pipeline.DeployAsync(new MarketplaceDeploymentOptions
         {
             BundleDirectory = secondBundle,
@@ -189,6 +191,14 @@ public sealed class MarketplaceDeploymentTests : IDisposable
 
         Assert.Equal(previous, await File.ReadAllBytesAsync(Path.Combine(target, "registry.json")));
         Assert.Equal(second.Plan.ReleaseId, rollback.ReleaseId);
+        Assert.All(previousPackages, package =>
+            Assert.True(File.Exists(Path.Combine(target, "packages", package!))));
+        using var restoredRegistry = JsonDocument.Parse(
+            await File.ReadAllTextAsync(Path.Combine(target, "registry.json")));
+        var restoredPackageName = Path.GetFileName(restoredRegistry.RootElement
+            .GetProperty("Entries")[0].GetProperty("Versions")[0]
+            .GetProperty("PackageUri").GetString());
+        Assert.True(File.Exists(Path.Combine(target, "packages", restoredPackageName!)));
     }
 
     [Fact]

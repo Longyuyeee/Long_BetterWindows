@@ -42,9 +42,11 @@
         </Grid>
 
         <TextBlock x:Name="EmptyStateText" Text="暂无已安装插件"
-                   Style="{StaticResource LongEmptyState}" Visibility="Collapsed" />
+                   Style="{StaticResource LongEmptyState}" Visibility="Collapsed"
+                   automation:AutomationProperties.LiveSetting="Polite" />
 
         <ListBox x:Name="PluginsPanel" MaxHeight="640"
+                 automation:AutomationProperties.Name="已安装插件列表"
                  Background="Transparent" BorderThickness="0"
                  ScrollViewer.CanContentScroll="True"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"

@@ -155,7 +155,8 @@
                           Width="28" Height="28" HorizontalAlignment="Center"
                           Stroke="{DynamicResource Long.Brush.Text.Muted}" />
                     <TextBlock x:Name="EmptyStateText" Text="没有匹配的命令"
-                               Style="{StaticResource LongEmptyState}" Margin="0,10,0,0" />
+                               Style="{StaticResource LongEmptyState}" Margin="0,10,0,0"
+                               AutomationProperties.LiveSetting="Polite" />
                 </StackPanel>
             </Grid>
 
@@ -190,6 +191,7 @@
                 </ItemsControl>
                 <TextBlock x:Name="StatusText" HorizontalAlignment="Right"
                            FontSize="10"
+                           AutomationProperties.LiveSetting="Polite"
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
             </Grid>
         </Grid>

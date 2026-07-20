@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [ValidateRange(5,60)] [int] $TimeoutSeconds = 25,
+    [string] $ReleaseDirectory,
     [switch] $NoBuild
 )
 
@@ -20,13 +21,22 @@ if (-not (Test-Path -LiteralPath $dotnet)) {
     $dotnet = $dotnetCommand.Source
 }
 $project = Join-Path $repoRoot 'src\LongBetterWindows.Host\LongBetterWindows.Host.csproj'
-$executable = Join-Path $repoRoot 'src\LongBetterWindows.Host\bin\Release\net8.0-windows\LongBetterWindows.Host.exe'
-$pluginsDirectory = Join-Path $repoRoot 'src\LongBetterWindows.Host\bin\Release\net8.0-windows\Plugins'
-if (-not $NoBuild) {
+$releaseRoot = if ([string]::IsNullOrWhiteSpace($ReleaseDirectory)) {
+    Join-Path $repoRoot 'src\LongBetterWindows.Host\bin\Release\net8.0-windows'
+}
+else {
+    [IO.Path]::GetFullPath($ReleaseDirectory)
+}
+$executable = Join-Path $releaseRoot 'LongBetterWindows.Host.exe'
+$pluginsDirectory = Join-Path $releaseRoot 'Plugins'
+if ([string]::IsNullOrWhiteSpace($ReleaseDirectory) -and -not $NoBuild) {
     & $dotnet build $project -c Release
     if ($LASTEXITCODE -ne 0) { throw 'Desktop UI smoke Release build failed.' }
 }
 if (-not (Test-Path -LiteralPath $executable)) { throw "Host executable was not found: $executable" }
+if (-not (Test-Path -LiteralPath $pluginsDirectory -PathType Container)) {
+    throw "Plugins directory was not found: $pluginsDirectory"
+}
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
@@ -71,14 +81,16 @@ public static class LongDesktopInput {
         }
     }
     public static void ShiftEnter(IntPtr window) {
-        SetForegroundWindow(window);
+        Activate(window);
+        System.Threading.Thread.Sleep(120);
         keybd_event(0x10, 0, 0, UIntPtr.Zero);
         keybd_event(0x0D, 0, 0, UIntPtr.Zero);
         keybd_event(0x0D, 0, KeyUp, UIntPtr.Zero);
         keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
     }
     public static void Escape(IntPtr window) {
-        SetForegroundWindow(window);
+        Activate(window);
+        System.Threading.Thread.Sleep(80);
         keybd_event(0x1B, 0, 0, UIntPtr.Zero);
         keybd_event(0x1B, 0, KeyUp, UIntPtr.Zero);
     }
@@ -172,6 +184,27 @@ function Invoke-AutomationElement(
     ([Windows.Automation.InvokePattern]$pattern).Invoke()
 }
 
+function Get-AutomationSemantics(
+    [Windows.Automation.AutomationElement] $element,
+    [string] $expectedControlType,
+    [string] $failureMessage) {
+    if ($null -eq $element) { throw $failureMessage }
+    $name = [string]$element.Current.Name
+    $controlType = [string]$element.Current.ControlType.ProgrammaticName
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        throw "$failureMessage Automation name is empty."
+    }
+    if ($controlType -ne $expectedControlType) {
+        throw "$failureMessage Expected $expectedControlType, received $controlType."
+    }
+    return [ordered]@{
+        name = $name
+        control_type = $controlType
+        enabled = [bool]$element.Current.IsEnabled
+        keyboard_focusable = [bool]$element.Current.IsKeyboardFocusable
+    }
+}
+
 function Get-LastAccessibilityLogLine {
     $logDirectory = Join-Path $outputRoot 'logs'
     if (-not (Test-Path -LiteralPath $logDirectory)) { return $null }
@@ -211,6 +244,7 @@ $report = [ordered]@{
     super_panel = [ordered]@{}
     plugin_lifecycle = [ordered]@{}
     marketplace = [ordered]@{}
+    automation_semantics = [ordered]@{}
     accessibility_modes = @()
     passed = $false
     error = $null
@@ -236,6 +270,11 @@ try {
     $results = Wait-Until {
         Find-DescendantByAutomationId $palette 'Long.CommandPalette.Results'
     } 'Command Palette result list was not discoverable.'
+    $report.automation_semantics['palette'] = [ordered]@{
+        window = Get-AutomationSemantics $palette 'ControlType.Window' 'Command Palette window semantics failed.'
+        search = Get-AutomationSemantics $search 'ControlType.Edit' 'Command Palette search semantics failed.'
+        results = Get-AutomationSemantics $results 'ControlType.List' 'Command Palette results semantics failed.'
+    }
 
     Write-Stage 'Setting wifi through the standard UI Automation value pattern.'
     [LongDesktopInput]::Activate([IntPtr]$palette.Current.NativeWindowHandle) | Out-Null
@@ -294,6 +333,9 @@ try {
         }
         $button
     } 'The result secondary-action button was not discoverable.'
+    $report.automation_semantics.palette['more_actions'] = `
+        Get-AutomationSemantics $moreActions 'ControlType.Button' `
+            'Command Palette secondary-action semantics failed.'
     Invoke-AutomationElement $moreActions `
         'The result secondary-action button did not support InvokePattern.'
     $copyMenuItem = Wait-Until {
@@ -339,6 +381,10 @@ try {
     $panelResults = Wait-Until {
         Find-DescendantByAutomationId $superPanel 'Long.SuperPanel.Results'
     } 'Super Panel result list was not discoverable.'
+    $report.automation_semantics['super_panel'] = [ordered]@{
+        window = Get-AutomationSemantics $superPanel 'ControlType.Window' 'Super Panel window semantics failed.'
+        results = Get-AutomationSemantics $panelResults 'ControlType.List' 'Super Panel results semantics failed.'
+    }
     $superPanel.SetFocus()
     Write-Stage 'Closing Super Panel with Escape.'
     [LongDesktopInput]::Escape([IntPtr]$superPanel.Current.NativeWindowHandle)
@@ -367,6 +413,11 @@ try {
         Find-DescendantByAutomationId `
             $transitionPanel 'Long.SuperPanel.OpenCommandCenter'
     } 'The Open Command Center button was not discoverable.'
+    $report.automation_semantics.super_panel['groups'] = `
+        Get-AutomationSemantics $groups 'ControlType.List' 'Super Panel group semantics failed.'
+    $report.automation_semantics.super_panel['open_command_center'] = `
+        Get-AutomationSemantics $openCommandCenter 'ControlType.Button' `
+            'Super Panel command-center semantics failed.'
     Write-Stage 'Invoking the Super Panel to Command Palette transition.'
     Invoke-AutomationElement $openCommandCenter `
         'The Open Command Center button did not support InvokePattern.'
@@ -403,6 +454,10 @@ try {
     $detach = Wait-Until {
         Find-DescendantByAutomationId $mainWindow 'Long.Plugin.Detach'
     } 'The embedded plugin detach button was not discoverable.'
+    $report.automation_semantics['plugin_lifecycle'] = [ordered]@{
+        main_window = Get-AutomationSemantics $mainWindow 'ControlType.Window' 'Main window semantics failed.'
+        detach = Get-AutomationSemantics $detach 'ControlType.Button' 'Plugin detach semantics failed.'
+    }
     Write-Stage 'Detaching the embedded plugin through UI Automation.'
     Invoke-AutomationElement $detach `
         'The embedded plugin detach button did not support InvokePattern.'
@@ -412,6 +467,12 @@ try {
     $detachedBack = Wait-Until {
         Find-DescendantByAutomationId $detachedWindow 'Long.Plugin.DetachedBack'
     } 'The detached plugin Back button was not discoverable.'
+    $report.automation_semantics.plugin_lifecycle['detached_window'] = `
+        Get-AutomationSemantics $detachedWindow 'ControlType.Window' `
+            'Detached plugin window semantics failed.'
+    $report.automation_semantics.plugin_lifecycle['back'] = `
+        Get-AutomationSemantics $detachedBack 'ControlType.Button' `
+            'Detached plugin Back semantics failed.'
     Write-Stage 'Returning from the detached plugin with Escape.'
     [LongDesktopInput]::Activate([IntPtr]$detachedWindow.Current.NativeWindowHandle) | Out-Null
     [LongDesktopInput]::Escape([IntPtr]$detachedWindow.Current.NativeWindowHandle)
@@ -445,6 +506,10 @@ try {
     $marketResults = Wait-Until {
         Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Marketplace.Results'
     } 'The Marketplace result list was not discoverable.'
+    $report.automation_semantics['marketplace'] = [ordered]@{
+        search = Get-AutomationSemantics $marketSearch 'ControlType.Edit' 'Marketplace search semantics failed.'
+        results = Get-AutomationSemantics $marketResults 'ControlType.List' 'Marketplace results semantics failed.'
+    }
     $marketCount = Wait-Until {
         $element = Find-ProcessElementByAutomationId `
             $marketProcess.Id 'Long.Marketplace.ResultCount'
@@ -471,6 +536,9 @@ try {
     $uninstall = Wait-Until {
         Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Marketplace.Uninstall'
     } 'The installed plugin uninstall-preview button was not discoverable.'
+    $report.automation_semantics.marketplace['uninstall'] = `
+        Get-AutomationSemantics $uninstall 'ControlType.Button' `
+            'Marketplace uninstall semantics failed.'
     Write-Stage 'Opening and cancelling the Marketplace uninstall confirmation.'
     Invoke-AutomationElement $uninstall `
         'The Marketplace uninstall-preview button did not support InvokePattern.'
@@ -482,6 +550,9 @@ try {
         Find-ProcessElementByAutomationId `
             $marketProcess.Id 'Long.Marketplace.ConfirmCancel'
     } 'The Marketplace confirmation cancel button was not discoverable.'
+    $report.automation_semantics.marketplace['confirm_cancel'] = `
+        Get-AutomationSemantics $confirmCancel 'ControlType.Button' `
+            'Marketplace confirmation semantics failed.'
     Invoke-AutomationElement $confirmCancel `
         'The Marketplace confirmation cancel button did not support InvokePattern.'
     Wait-Until {
@@ -540,6 +611,8 @@ try {
             name = $mode.name
             palette_discovered = $true
             search_keyboard_focus = [bool]$modeFocus
+            search_accessible_name = [string]$modeSearch.Current.Name
+            search_control_type = [string]$modeSearch.Current.ControlType.ProgrammaticName
             high_contrast_active = $modeLog -match 'HighContrast=true'
             reduced_motion_active = $modeLog -match 'ReducedMotion=true'
             requested_state_confirmed = `

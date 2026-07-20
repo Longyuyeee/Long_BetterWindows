@@ -136,6 +136,15 @@ HTTPS Registry
   -Force
 ```
 
+本地完整演练可使用一次性 3072 位 RSA 密钥自动生成两个 Base64 测试版本，依次执行签名发布、基线部署、候选 Dry Run、覆盖部署和显式回滚：
+
+```powershell
+.\rehearse-marketplace-local.ps1 `
+  -OutputDirectory .\artifacts\quality\marketplace-local-release-rehearsal
+```
+
+输出目录必须不存在。演练会保留机器可读报告和回滚后的本地部署，删除私钥及构建工作区，并验证旧 Registry 引用的不可变包仍存在。该演练用于提前发现工具链与回滚问题，不能替代正式 HTTPS 端点、正式根信任和无上传凭据公开拉取验收。
+
 HTTPS 部署只从命名环境变量读取 Bearer 凭据，凭据值不会进入命令行、报告或部署产物：
 
 ```powershell
@@ -212,9 +221,21 @@ $env:LONG_MARKETPLACE_DEPLOY_TOKEN = '<由受控凭据系统注入>'
   -ConfirmRehearsal
 ```
 
-演练目录必须不存在，防止覆盖既有证据。部署器会在提交前写入包含 Release ID 的 `deployment.json`，成功后更新状态；脚本随后生成部署后与回滚后的两份公开验收报告，以及 `rehearsal-summary.json`。
+演练目录必须不存在，防止覆盖既有证据。任何线上写入前，脚本先生成 `preflight-dry-run.json`，确认候选文件完整且 Registry 最后提交；随后从无上传凭据的公开路径生成 `baseline-verification.json`，确认现网基线和回滚起点可读取。两项均通过后才设置部署开始状态。部署器会在提交前写入包含同一 Release ID 的 `deployment.json`，成功后更新状态；脚本随后生成部署后与回滚后的两份公开验收报告，以及 `rehearsal-summary.json`。
 
-如果部署后验收或后续步骤失败，`finally` 安全路径仍会尝试回滚并再次验收，同时把原始失败、回滚失败和回滚验收失败分别写入摘要。脚本不把 Bearer Token 作为参数传递给 .NET 工具，也不将其写入任何报告。只有摘要中的 `deployment_verified`、`rollback_completed` 和 `rollback_verified` 全部为 `true`，才可签核全链演练。
+发布负责人可先在不注入上传令牌、不写入线上状态的情况下执行只读预检；此模式不要求 `-ConfirmRehearsal`：
+
+```powershell
+.\rehearse-marketplace.ps1 `
+  -BundleDir .\artifacts\marketplace `
+  -Destination https://market.example.com/ `
+  -TrustStorePath C:\secure\trusted-publishers.json `
+  -AllowedPackageHosts packages.example.com `
+  -EvidenceDirectory C:\release-evidence\marketplace-preflight-20260720 `
+  -PreflightOnly
+```
+
+候选 Dry Run 或现网基线验收失败时不会开始部署。设置部署开始状态后的任一步骤失败，`finally` 安全路径都会尝试回滚并再次验收，同时把原始失败、回滚失败和回滚验收失败分别写入摘要。脚本不把 Bearer Token 作为参数传递给 .NET 工具，也不将其写入任何报告。只有摘要中的 `preflight_dry_run_verified`、`baseline_verified`、`deployment_completed`、`deployment_verified`、`rollback_completed` 和 `rollback_verified` 全部为 `true`，才可签核全链演练。
 
 ## 10. 客户端网络恢复策略
 

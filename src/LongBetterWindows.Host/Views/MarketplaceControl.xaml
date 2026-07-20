@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              MinHeight="650"
              AutomationProperties.AutomationId="Long.Marketplace"
+             AutomationProperties.Name="Long 插件市场"
              PreviewKeyDown="MarketplaceControl_PreviewKeyDown">
     <Grid>
         <Grid.RowDefinitions>
@@ -68,9 +69,11 @@
             <ComboBox x:Name="CategoryBox" Grid.Column="1" Height="48" Margin="10,0"
                       Style="{StaticResource LongComboBox}"
                       AutomationProperties.AutomationId="Long.Marketplace.Category"
+                      AutomationProperties.Name="插件分类"
                       VerticalContentAlignment="Center" SelectionChanged="CategoryBox_SelectionChanged" />
             <Button Grid.Column="2" Content="刷新目录" Style="{StaticResource LongButton}"
                     AutomationProperties.AutomationId="Long.Marketplace.Refresh"
+                    AutomationProperties.Name="刷新插件目录"
                     Height="48" Click="RefreshCatalog_Click" />
         </Grid>
 
@@ -86,12 +89,14 @@
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <Grid Margin="8,6,8,10">
                         <TextBlock x:Name="ResultCountText" Text="发现 0 个插件" FontSize="13" FontWeight="SemiBold"
-                                   AutomationProperties.AutomationId="Long.Marketplace.ResultCount" />
+                                   AutomationProperties.AutomationId="Long.Marketplace.ResultCount"
+                                   AutomationProperties.LiveSetting="Polite" />
                         <TextBlock Text="可信发现" HorizontalAlignment="Right" FontSize="10"
                                    Foreground="{DynamicResource Long.Brush.State.Success}" />
                     </Grid>
                     <ListBox x:Name="MarketList" Grid.Row="1" Background="Transparent" BorderThickness="0"
                              AutomationProperties.AutomationId="Long.Marketplace.Results"
+                             AutomationProperties.Name="插件市场结果"
                              SelectionChanged="MarketList_SelectionChanged"
                              ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <ListBox.ItemContainerStyle>
@@ -128,6 +133,7 @@
                     </ListBox>
                     <TextBlock x:Name="CatalogStatusText" Grid.Row="2" Margin="8,10,8,6" FontSize="10"
                                AutomationProperties.AutomationId="Long.Marketplace.Status"
+                               AutomationProperties.LiveSetting="Polite"
                                TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                 </Grid>
             </Border>
@@ -182,6 +188,7 @@
                                     <TextBlock Text="版本" FontSize="10" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     <ComboBox x:Name="VersionBox" Height="34" Margin="0,7,0,0"
                                               AutomationProperties.AutomationId="Long.Marketplace.Version"
+                                              AutomationProperties.Name="选择插件版本"
                                               Style="{StaticResource LongComboBox}"
                                               SelectionChanged="VersionBox_SelectionChanged" />
                                 </StackPanel>
@@ -225,9 +232,11 @@
                                        FontSize="10" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                             <Button x:Name="UninstallButton" Grid.Column="1" Content="卸载" Margin="0,0,8,0"
                                     AutomationProperties.AutomationId="Long.Marketplace.Uninstall"
+                                    AutomationProperties.Name="卸载所选插件"
                                     Style="{StaticResource LongButton}" Click="UninstallButton_Click" />
                             <Button x:Name="InstallButton" Grid.Column="2" Content="选择安装包"
                                     AutomationProperties.AutomationId="Long.Marketplace.Install"
+                                    AutomationProperties.Name="选择并审查安装包"
                                     Style="{StaticResource LongButton.Primary}" Click="InstallButton_Click" />
                         </Grid>
                     </Grid>
@@ -245,6 +254,7 @@
                                    AutomationProperties.AutomationId="Long.Marketplace.ConfirmTitle" />
                         <Button Content="×" HorizontalAlignment="Right" Style="{StaticResource LongIconButton}"
                                 AutomationProperties.AutomationId="Long.Marketplace.ConfirmClose"
+                                AutomationProperties.Name="关闭安装审查"
                                 Click="CancelConfirmation_Click" />
                     </Grid>
                     <TextBlock x:Name="ConfirmSubtitle" Margin="0,8,42,0" TextWrapping="Wrap"
@@ -253,7 +263,8 @@
                             Padding="14" Margin="0,18,0,0">
                         <StackPanel>
                             <TextBlock x:Name="ConfirmTrustText" FontWeight="SemiBold"
-                                       AutomationProperties.AutomationId="Long.Marketplace.ConfirmTrust" />
+                                       AutomationProperties.AutomationId="Long.Marketplace.ConfirmTrust"
+                                       AutomationProperties.LiveSetting="Polite" />
                             <TextBlock x:Name="ConfirmHashText" Margin="0,6,0,0" FontSize="10" FontFamily="Consolas"
                                        TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                             <TextBlock x:Name="ConfirmCompatibilityText" Margin="0,7,0,0" FontSize="11" TextWrapping="Wrap" />
@@ -274,15 +285,19 @@
                     </Border>
                     <TextBlock x:Name="ConfirmErrorText" Margin="0,12,0,0" TextWrapping="Wrap"
                                AutomationProperties.AutomationId="Long.Marketplace.ConfirmError"
+                               AutomationProperties.LiveSetting="Assertive"
                                Foreground="{DynamicResource Long.Brush.State.Danger}" />
                     <Grid Margin="0,22,0,0">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                        <ProgressBar x:Name="InstallProgress" Width="120" Height="4" Visibility="Collapsed" IsIndeterminate="True" />
+                        <ProgressBar x:Name="InstallProgress" Width="120" Height="4" Visibility="Collapsed" IsIndeterminate="True"
+                                     AutomationProperties.Name="插件操作正在进行" />
                         <Button Grid.Column="1" Content="取消" Margin="0,0,8,0" Style="{StaticResource LongButton}"
                                 AutomationProperties.AutomationId="Long.Marketplace.ConfirmCancel"
+                                AutomationProperties.Name="取消插件操作"
                                 Click="CancelConfirmation_Click" />
                         <Button x:Name="ConfirmActionButton" Grid.Column="2" Content="确认安装"
                                 AutomationProperties.AutomationId="Long.Marketplace.ConfirmAction"
+                                AutomationProperties.Name="确认插件操作"
                                 Style="{StaticResource LongButton.Primary}" Click="ConfirmAction_Click" />
                     </Grid>
                 </StackPanel>

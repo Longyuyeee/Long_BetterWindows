@@ -14,14 +14,10 @@ namespace LongBetterWindows.Host.Views
     public partial class MarketplaceControl : UserControl
     {
         private readonly MarketplaceRuntimeService _marketplace;
+        private readonly MarketplaceSessionCoordinator _session;
         private bool _pluginEventsSubscribed;
-        private MarketplaceCatalog? _catalog;
         private MarketplaceEntry? _selectedEntry;
         private MarketplacePackageVersion? _selectedVersion;
-        private string? _pendingPackagePath;
-        private string? _pendingUninstallId;
-        private MarketplacePackageMetadata? _pendingMetadata;
-        private PackageValidationResult? _pendingValidation;
 
         public MarketplaceControl()
         {
@@ -47,9 +43,16 @@ namespace LongBetterWindows.Host.Views
                 trustStorePath,
                 dataRoot,
                 App.ProductVersion);
+            _session = new MarketplaceSessionCoordinator(
+                _marketplace,
+                pluginId => HostProvider.Instance.PluginStore.Get(pluginId)?.Manifest);
             Loaded += MarketplaceControl_Loaded;
             Unloaded += MarketplaceControl_Unloaded;
-            Dispatcher.ShutdownStarted += (_, _) => _marketplace.Dispose();
+            Dispatcher.ShutdownStarted += (_, _) =>
+            {
+                _session.Dispose();
+                _marketplace.Dispose();
+            };
         }
 
         private async void MarketplaceControl_Loaded(object sender, RoutedEventArgs e)
@@ -65,6 +68,7 @@ namespace LongBetterWindows.Host.Views
 
         private void MarketplaceControl_Unloaded(object sender, RoutedEventArgs e)
         {
+            _session.CancelActiveRequests();
             if (!_pluginEventsSubscribed) return;
             HostProvider.Instance.PluginStore.PluginsChanged -= OnPluginsChanged;
             _pluginEventsSubscribed = false;
@@ -72,10 +76,11 @@ namespace LongBetterWindows.Host.Views
         private async Task LoadCatalogAsync()
         {
             CatalogStatusText.Text = "正在读取可信目录…";
-            var result = await _marketplace.LoadCatalogAsync();
+            var load = await _session.LoadCatalogAsync();
+            if (load.IsSuperseded || load.Result == null) return;
+            var result = load.Result;
             if (!result.IsSuccess)
             {
-                _catalog = null;
                 MarketList.ItemsSource = Array.Empty<MarketCardModel>();
                 ResultCountText.Text = "市场暂时离线";
                 CatalogStatusText.Text = result.Error;
@@ -86,27 +91,28 @@ namespace LongBetterWindows.Host.Views
                 return;
             }
 
-            _catalog = result.Catalog;
-            MarketSourceBadge.Text = _catalog!.Source == MarketplaceSourceKind.RemoteRegistry
+            var catalog = _session.Catalog!;
+            MarketSourceBadge.Text = catalog.Source == MarketplaceSourceKind.RemoteRegistry
                 ? "远程 Registry · 强制签名"
                 : "内置可信目录 · 本地优先";
             CategoryBox.ItemsSource = new[] { "全部分类" }
-                .Concat(MarketplacePresentation.GetCategories(_catalog))
+                .Concat(MarketplacePresentation.GetCategories(catalog))
                 .ToArray();
             CategoryBox.SelectedIndex = 0;
             CatalogStatusText.Text = string.IsNullOrWhiteSpace(result.Status)
-                ? $"目录生成于 {_catalog.GeneratedAt:yyyy-MM-dd} · Schema {_catalog.SchemaVersion}"
+                ? $"目录生成于 {catalog.GeneratedAt:yyyy-MM-dd} · Schema {catalog.SchemaVersion}"
                 : result.Status;
             await ApplyFiltersAsync();
         }
 
         private Task ApplyFiltersAsync()
         {
-            if (_catalog == null) return Task.CompletedTask;
+            var catalog = _session.Catalog;
+            if (catalog == null) return Task.CompletedTask;
             var category = CategoryBox.SelectedItem?.ToString();
             if (category == "全部分类") category = null;
             var cards = MarketplacePresentation.ProjectEntries(
-                _catalog,
+                catalog,
                 MarketSearchBox.Text,
                 category,
                 pluginId => HostProvider.Instance.PluginStore
@@ -193,21 +199,13 @@ namespace LongBetterWindows.Host.Views
             string path,
             MarketplacePackageMetadata metadata)
         {
-            var installed = metadata.ExpectedPluginId == null
-                ? null
-                : HostProvider.Instance.PluginStore.Get(metadata.ExpectedPluginId)?.Manifest;
-            var validation = await _marketplace.ValidatePackageAsync(
-                path, metadata, installed);
-            if (!validation.IsSuccess)
-            {
-                ShowConfirmationError("插件包被拒绝", validation.Error ?? "未知校验错误");
-                return;
-            }
+            var preparation = await _session.PrepareLocalPackageAsync(path, metadata);
+            ShowPreparation(preparation, "插件包被拒绝");
+        }
 
-            _pendingPackagePath = path;
-            _pendingMetadata = metadata;
-            _pendingValidation = validation;
-            _pendingUninstallId = null;
+        private void ShowInstallConfirmation(MarketplacePendingAction pending)
+        {
+            var validation = pending.Validation!;
             var manifest = validation.Manifest!;
             ConfirmTitle.Text = "安装前审查";
             ConfirmSubtitle.Text = $"{manifest.Name} · v{manifest.Version}";
@@ -236,10 +234,12 @@ namespace LongBetterWindows.Host.Views
             if (_selectedEntry == null) return;
             var installed = HostProvider.Instance.PluginStore.Get(_selectedEntry.Id)?.Manifest;
             if (installed == null) return;
-            _pendingUninstallId = installed.Id;
-            _pendingPackagePath = null;
-            _pendingMetadata = null;
-            _pendingValidation = null;
+            var preparation = _session.PrepareUninstall(installed);
+            if (!preparation.IsSuccess)
+            {
+                DetailHint.Text = preparation.Error;
+                return;
+            }
             ConfirmTitle.Text = "确认卸载";
             ConfirmSubtitle.Text = $"{installed.Name} · v{installed.Version}";
             ConfirmTrustText.Text = "插件文件将通过可回滚事务移除";
@@ -259,9 +259,6 @@ namespace LongBetterWindows.Host.Views
 
         private void ShowConfirmationError(string title, string error)
         {
-            _pendingPackagePath = null;
-            _pendingValidation = null;
-            _pendingUninstallId = null;
             ConfirmTitle.Text = title;
             ConfirmSubtitle.Text = "Long 已阻止此次操作";
             ConfirmTrustText.Text = "校验未通过";
@@ -298,14 +295,26 @@ namespace LongBetterWindows.Host.Views
             SetBusy(true);
             try
             {
-                installer.ConfigureTrustStore(_marketplace.TrustStore);
-                InstallResult result;
-                if (_pendingUninstallId != null)
-                    result = await installer.UninstallAsync(_pendingUninstallId);
-                else if (_pendingPackagePath != null && _pendingValidation != null)
-                    result = await installer.InstallAsync(_pendingPackagePath, _pendingMetadata);
-                else
+                var execution = await _session.ExecutePendingAsync(async (pending, _) =>
+                {
+                    installer.ConfigureTrustStore(_marketplace.TrustStore);
+                    return pending.Kind == MarketplacePendingActionKind.Uninstall
+                        ? await installer.UninstallAsync(pending.PluginId!)
+                        : await installer.InstallAsync(pending.PackagePath!, pending.Metadata);
+                });
+                if (execution.IsBusy)
+                {
+                    ConfirmErrorText.Text = "已有市场操作正在进行。";
                     return;
+                }
+                if (execution.IsCanceled || execution.IsMissing || execution.Result == null)
+                {
+                    ConfirmErrorText.Text = execution.IsCanceled
+                        ? "操作已取消。"
+                        : "确认状态已失效，请重新选择插件版本。";
+                    return;
+                }
+                var result = execution.Result;
 
                 if (!result.IsSuccess)
                 {
@@ -341,43 +350,63 @@ namespace LongBetterWindows.Host.Views
         private async void InstallButton_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedEntry == null || _selectedVersion == null) return;
+            var entry = _selectedEntry;
+            var version = _selectedVersion;
             string? path = null;
             if (_selectedVersion.PackageUri?.IsFile == true
                 && File.Exists(_selectedVersion.PackageUri.LocalPath))
                 path = _selectedVersion.PackageUri.LocalPath;
             else if (_selectedVersion.PackageUri is { Scheme: "https" })
             {
-                if (!_marketplace.CanDownload)
-                {
-                    ShowConfirmationError("下载通道不可用", "远程下载器尚未配置。");
-                    return;
-                }
                 InstallButton.IsEnabled = false;
                 DetailHint.Text = "正在安全下载并核对 SHA-256…";
                 try
                 {
-                    var download = await _marketplace.DownloadPackageAsync(
-                        _selectedEntry.Id, _selectedVersion);
-                    if (!download.IsSuccess)
-                    {
-                        ShowConfirmationError("插件包下载失败", download.Error!);
-                        return;
-                    }
-                    path = download.PackagePath;
-                    DetailHint.Text = download.FromCache
-                        ? "已使用通过哈希复核的本地缓存。"
-                        : download.Attempts > 1
-                            ? $"网络恢复后第 {download.Attempts} 次下载成功，已核对 {download.Bytes / 1024d:F1} KB。"
-                            : $"已下载 {download.Bytes / 1024d:F1} KB，等待安装审查。";
+                    var preparation = await _session.PrepareRemotePackageAsync(entry, version);
+                    ShowPreparation(preparation, "插件包下载失败");
                 }
-                finally { InstallButton.IsEnabled = true; }
+                finally { ShowVersion(_selectedVersion); }
+                return;
             }
             path ??= PickPackage();
             if (path == null) return;
 
             var metadata = MarketplacePresentation.CreatePackageMetadata(
-                _selectedEntry, _selectedVersion);
+                entry, version);
             await PreviewPackageAsync(path, metadata);
+        }
+
+        private void ShowPreparation(
+            MarketplacePreparationResult preparation,
+            string rejectionTitle)
+        {
+            if (preparation.IsBusy)
+            {
+                DetailHint.Text = "已有市场操作正在进行，请等待当前操作完成。";
+                return;
+            }
+            if (preparation.IsCanceled)
+            {
+                DetailHint.Text = "操作已取消。";
+                return;
+            }
+            if (!preparation.IsSuccess || preparation.PendingAction == null)
+            {
+                ShowConfirmationError(
+                    rejectionTitle,
+                    preparation.Error ?? "未知市场操作错误。");
+                return;
+            }
+
+            if (preparation.Download is { } download)
+            {
+                DetailHint.Text = download.FromCache
+                    ? "已使用通过哈希复核的本地缓存。"
+                    : download.Attempts > 1
+                        ? $"网络恢复后第 {download.Attempts} 次下载成功，已核对 {download.Bytes / 1024d:F1} KB。"
+                        : $"已下载 {download.Bytes / 1024d:F1} KB，等待安装审查。";
+            }
+            ShowInstallConfirmation(preparation.PendingAction);
         }
 
         private static string? PickPackage()
@@ -397,6 +426,7 @@ namespace LongBetterWindows.Host.Views
         private void CancelConfirmation_Click(object sender, RoutedEventArgs e)
         {
             if (InstallProgress.Visibility == Visibility.Visible) return;
+            _session.CancelPending();
             ConfirmOverlay.Visibility = Visibility.Collapsed;
             ConfirmActionButton.IsEnabled = true;
         }
@@ -418,6 +448,7 @@ namespace LongBetterWindows.Host.Views
             if (e.Key == Key.Escape && ConfirmOverlay.Visibility == Visibility.Visible
                 && InstallProgress.Visibility != Visibility.Visible)
             {
+                _session.CancelPending();
                 ConfirmOverlay.Visibility = Visibility.Collapsed;
                 e.Handled = true;
             }

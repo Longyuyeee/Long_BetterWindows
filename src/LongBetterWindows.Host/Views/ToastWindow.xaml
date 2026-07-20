@@ -2,7 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight">
+        Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight"
+        AutomationProperties.Name="Long 通知">
     <Border x:Name="ToastBorder" Style="{StaticResource LongToast}" MaxWidth="380">
         <Grid>
             <Grid.ColumnDefinitions>
@@ -12,6 +13,7 @@
             <Border x:Name="AccentBar" Visibility="Collapsed" CornerRadius="2"
                     Background="{DynamicResource Long.Brush.Accent.Primary}" />
             <TextBlock x:Name="MessageText" Grid.Column="1" Margin="12,0,2,0"
+                       AutomationProperties.LiveSetting="Assertive"
                        Foreground="{DynamicResource Long.Brush.Text.Primary}"
                        FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" />
         </Grid>

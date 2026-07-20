@@ -57,6 +57,7 @@
                     <TextBlock Text="Long 超级面板" FontSize="15" FontWeight="SemiBold"
                                Foreground="{DynamicResource Long.Brush.Text.Primary}" />
                     <TextBlock x:Name="ContextSummary" Text="正在读取当前上下文…" FontSize="10" Margin="0,2,0,0"
+                               AutomationProperties.LiveSetting="Polite"
                                Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                 </StackPanel>
                 <Button Grid.Column="2" Style="{StaticResource LongButton}" Height="30"
@@ -83,7 +84,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <ItemsControl x:Name="GroupTabs"
-                              AutomationProperties.AutomationId="Long.SuperPanel.Groups">
+                              AutomationProperties.AutomationId="Long.SuperPanel.Groups"
+                              AutomationProperties.Name="操作分组">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -298,6 +300,7 @@
                 <TextBlock x:Name="InteractionHint" Text="Enter 执行 · Shift+Enter 次级动作 · 滚轮切组 · Esc 返回" FontSize="10"
                            Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                 <TextBlock x:Name="StatusText" HorizontalAlignment="Right" FontSize="10"
+                           AutomationProperties.LiveSetting="Polite"
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
             </Grid>
         </Grid>

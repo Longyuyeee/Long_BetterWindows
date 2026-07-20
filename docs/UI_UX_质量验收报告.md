@@ -132,6 +132,10 @@ v0.6 真实搜索补充数据：
 
 第五批桌面 UI 证据：`artifacts/quality/marketplace-failure-recovery-20260720-final/marketplace-transaction.json`。在完整生命周期基础上增加篡改哈希与伪造签名更新，界面均明确拒绝且确认动作保持禁用，已安装 v1 未变化；随后人工构造升级移动完成但事务未提交的现场，真实 Release 宿主重启后自动恢复 v1 并清除事务目录。安装器行为测试另行覆盖首次安装中断撤销和已提交事务残留清理。
 
+v1.9 当前主线桌面可访问性证据：`artifacts/quality/desktop-ui-accessibility-semantics-20260720-final/desktop-ui-smoke.json`。该轮在原有键盘路径、窗口交接、Web 插件生命周期和市场确认取消基础上，进一步读取命令中心、超级面板、主窗口、分离插件窗口和市场核心控件的 UI Automation 名称、Window/Edit/List/Button 类型、可用状态与键盘焦点能力；三种高对比度/减少动画模式均确认搜索框名称、Edit 类型和焦点。市场错误、目录状态、结果数量、命令状态、上下文摘要和通知已补充 Polite/Assertive Live Region。该工程验证不能替代 Narrator/NVDA 实际朗读与真实 Windows 辅助功能设置下的人工签核。
+
+真实辅助功能人工门禁已由 `capture-accessibility-evidence.ps1`、`approve-accessibility-evidence.ps1` 和 `verify-accessibility-matrix.ps1` 固化。采集器读取 Windows 实际高对比度与客户端动画状态，并可要求 Narrator/NVDA 进程已运行；批准器锁定桌面 UI 报告和日志哈希；汇总器要求高对比度、减少动画、组合三种配置全部人工批准，且至少一组确认读屏器朗读。当前机器状态为高对比度关闭、动画开启、无读屏器，负向测试确认组合模式会在创建证据目录前被拒绝，因此正式人工矩阵继续保持未签核。
+
 第六批网络韧性证据：`artifacts/quality/marketplace-network-resilience-20260720-final/network-resilience.json`。受控传输测试确认瞬时断网可有限重试恢复、持续超时在预算内终止、相同包并发请求合并为一次传输、异常退出遗留分片自动回收、可信目录离线回退保持可用；并发版本安装由事务门串行化，最终 Manifest 有效且无事务目录残留。
 
 ## 6. 构建、测试与发布包

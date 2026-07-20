@@ -10,7 +10,8 @@
         WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded"
         PreviewKeyDown="Window_PreviewKeyDown"
-        AutomationProperties.AutomationId="Long.MainWindow">
+        AutomationProperties.AutomationId="Long.MainWindow"
+        AutomationProperties.Name="Long 窗口管理中心">
 
     <Border Background="{DynamicResource Long.Brush.Background.Base}"
             BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"

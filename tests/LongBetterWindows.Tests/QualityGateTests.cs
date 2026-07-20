@@ -14,15 +14,18 @@ public class QualityGateTests
         var source = Read("src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml.cs");
         var installer = Read("src", "LongBetterWindows.Host", "Engine", "LpakInstaller.cs");
         var transport = Read("src", "LongBetterWindows.Host", "Engine", "MarketplaceTransport.cs");
+        var session = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "MarketplaceSessionCoordinator.cs");
 
         Assert.Contains("MarketSearchBox", xaml);
         Assert.Contains("VersionBox", xaml);
         Assert.Contains("PermissionDiffItems", xaml);
         Assert.Contains("HighTrustWarning", xaml);
         Assert.Contains("ConfirmOverlay", xaml);
-        Assert.Contains("_marketplace.ValidatePackageAsync", source);
-        Assert.Contains("InstallAsync(_pendingPackagePath, _pendingMetadata)", source);
-        Assert.Contains("UninstallAsync(_pendingUninstallId)", source);
+        Assert.Contains("_session.PrepareLocalPackageAsync", source);
+        Assert.Contains("installer.InstallAsync(pending.PackagePath!, pending.Metadata)", source);
+        Assert.Contains("installer.UninstallAsync(pending.PluginId!)", source);
+        Assert.Contains("runtime.ValidatePackageAsync", session);
         Assert.Contains(".long-transaction-", installer);
         Assert.Contains("RecoverInterruptedTransactionsAsync", installer);
         Assert.Contains("TransactionPhase.Committed", installer);
@@ -134,6 +137,20 @@ public class QualityGateTests
         Assert.Contains("rollback_failure", rehearsal);
         Assert.Contains("rollback_verification_failure", rehearsal);
         Assert.Contains("rehearsal-summary.json", rehearsal);
+        Assert.Contains("preflight-dry-run.json", rehearsal);
+        Assert.Contains("baseline-verification.json", rehearsal);
+        Assert.Contains("preflight_dry_run_verified", rehearsal);
+        Assert.Contains("baseline_verified", rehearsal);
+        Assert.Contains("PreflightOnly", rehearsal);
+        Assert.Contains("if (-not $PreflightOnly -and -not $ConfirmRehearsal)", rehearsal);
+        Assert.Contains("if ($PreflightOnly)", rehearsal);
+        Assert.Contains("deployment_started", rehearsal);
+        Assert.True(
+            rehearsal.IndexOf("$summary.preflight_dry_run_verified = $true", StringComparison.Ordinal)
+            < rehearsal.IndexOf("$summary.deployment_started = $true", StringComparison.Ordinal));
+        Assert.True(
+            rehearsal.IndexOf("$summary.baseline_verified = $true", StringComparison.Ordinal)
+            < rehearsal.IndexOf("$summary.deployment_started = $true", StringComparison.Ordinal));
         Assert.Contains("ResultPath", Read("deploy-marketplace.ps1"));
         Assert.Contains("\"prepared\"", deployment);
         Assert.Contains("MarketplaceDeploymentExecutionReport", deployment);
@@ -200,6 +217,88 @@ public class QualityGateTests
         Assert.Contains("Get-FileHash", verify);
         Assert.Contains("Expected 8 captures", verify);
         Assert.Contains("approved_physical_device_dpi_matrix", verify);
+    }
+
+    [Fact]
+    public void PhysicalAccessibilityEvidence_RequiresRealSettingsManualReviewAndScreenReaderApproval()
+    {
+        var capture = Read("capture-accessibility-evidence.ps1");
+        var approve = Read("approve-accessibility-evidence.ps1");
+        var verify = Read("verify-accessibility-matrix.ps1");
+
+        Assert.Contains("SystemParameters]::HighContrast", capture);
+        Assert.Contains("SystemParameters]::ClientAreaAnimation", capture);
+        Assert.Contains("Requested screen reader process is not running", capture);
+        Assert.Contains("run-desktop-ui-smoke.ps1", capture);
+        Assert.Contains("physical_accessibility_evidence", capture);
+        Assert.Contains("ConfirmKeyboardNavigation", approve);
+        Assert.Contains("ConfirmFocusVisibility", approve);
+        Assert.Contains("ConfirmMotionBehavior", approve);
+        Assert.Contains("ConfirmScreenReaderAnnouncements", approve);
+        Assert.Contains("evidence changed after capture", approve, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("high_contrast", verify);
+        Assert.Contains("reduced_motion", verify);
+        Assert.Contains("combined", verify);
+        Assert.Contains("at least one approved Narrator or NVDA", verify);
+        Assert.Contains("approved_physical_accessibility_matrix", verify);
+    }
+
+    [Fact]
+    public void CleanWindowsReleaseEvidence_UsesCandidatePackageAndRequiresIndependentLifecycleApproval()
+    {
+        var capture = Read("capture-clean-environment-evidence.ps1");
+        var approve = Read("approve-clean-environment-evidence.ps1");
+        var verify = Read("verify-clean-environment-evidence.ps1");
+        var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
+
+        Assert.Contains("ConfirmCleanUserEnvironment", capture);
+        Assert.Contains("Release ZIP hash does not match", capture);
+        Assert.Contains("Start capture before the first launch", capture);
+        Assert.Contains("-ReleaseDirectory $installRoot", capture);
+        Assert.Contains("clean_windows_release_evidence", capture);
+        Assert.Contains("ConfirmTrayIcon", approve);
+        Assert.Contains("ConfirmGlobalHotkey", approve);
+        Assert.Contains("ConfirmWebViewRuntime", approve);
+        Assert.Contains("ConfirmParallelUpgradeDataPreserved", approve);
+        Assert.Contains("ConfirmRollbackToPreviousVersion", approve);
+        Assert.Contains("ConfirmUninstallIntegrationsRemoved", approve);
+        Assert.Contains("Reviewer must differ", approve);
+        Assert.Contains("evidence changed after capture", approve, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("human_review.status -ne 'approved'", verify);
+        Assert.Contains("signed, release-eligible package", verify);
+        Assert.Contains("Manual lifecycle checklist is incomplete", verify);
+        Assert.Contains("approved_clean_windows_release_gate", verify);
+        Assert.Contains("ReleaseDirectory", desktopSmoke);
+        Assert.Contains("Plugins directory was not found", desktopSmoke);
+    }
+
+    [Fact]
+    public void WindowsCodeSigning_UsesProtectedCertificateStoreTimestampAndIndependentZipVerification()
+    {
+        var sign = Read("sign-release.ps1");
+        var verify = Read("verify-signed-release.ps1");
+
+        Assert.Contains("ConfirmSign", sign);
+        Assert.Contains("Code signing requires a candidate rebuilt from a clean source commit", sign);
+        Assert.Contains("Cert:\\$CertificateStoreLocation\\My\\$thumbprint", sign);
+        Assert.DoesNotContain("PfxPassword", sign, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1.3.6.1.5.5.7.3.3", sign);
+        Assert.Contains("/fd','SHA256'", sign);
+        Assert.Contains("/tr',$TimestampUrl.AbsoluteUri", sign);
+        Assert.Contains("/td','SHA256'", sign);
+        Assert.Contains(".long-signing-", sign);
+        Assert.Contains("Resolve-Within", sign);
+        Assert.Contains("must not contain reparse points", sign);
+        Assert.Contains("escapes release root", sign);
+        Assert.Contains("Move-Item -LiteralPath $stagingRoot -Destination $outputRoot", sign);
+        Assert.Contains("release_eligible = $true", sign);
+        Assert.Contains("Expand-Archive", verify);
+        Assert.Contains("Resolve-Within", verify);
+        Assert.Contains("escapes release root", verify);
+        Assert.Contains("Get-AuthenticodeSignature", verify);
+        Assert.Contains("verify /pa /all /tw", verify);
+        Assert.Contains("Signed file count mismatch", verify);
+        Assert.Contains("verified_windows_authenticode_release", verify);
     }
 
     [Fact]
@@ -286,7 +385,7 @@ public class QualityGateTests
     }
 
     [Fact]
-    public void MarketplaceView_DelegatesNetworkTrustAndDownloadLifetimeToRuntimeService()
+    public void MarketplaceView_DelegatesSessionStateAndRuntimeLifetimeToCoordinators()
     {
         var view = Read(
             "src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml.cs");
@@ -294,12 +393,19 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Services", "MarketplaceRuntimeService.cs");
         var presentation = Read(
             "src", "LongBetterWindows.Host", "Interaction", "MarketplacePresentation.cs");
+        var session = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "MarketplaceSessionCoordinator.cs");
 
         Assert.Contains("new MarketplaceRuntimeService", view);
-        Assert.Contains("_marketplace.LoadCatalogAsync", view);
-        Assert.Contains("_marketplace.ValidatePackageAsync", view);
-        Assert.Contains("_marketplace.DownloadPackageAsync", view);
+        Assert.Contains("new MarketplaceSessionCoordinator", view);
+        Assert.Contains("_session.LoadCatalogAsync", view);
+        Assert.Contains("_session.PrepareLocalPackageAsync", view);
+        Assert.Contains("_session.PrepareRemotePackageAsync", view);
+        Assert.Contains("_session.ExecutePendingAsync", view);
         Assert.Contains("MarketplaceControl_Unloaded", view);
+        Assert.DoesNotContain("_pendingPackagePath", view);
+        Assert.DoesNotContain("_pendingUninstallId", view);
+        Assert.DoesNotContain("_pendingValidation", view);
         Assert.DoesNotContain("new HttpClient", view);
         Assert.DoesNotContain("new RemoteMarketplaceRepository", view);
         Assert.DoesNotContain("new MarketplacePackageDownloader", view);
@@ -311,6 +417,12 @@ public class QualityGateTests
         Assert.Contains("new MarketplacePackageDownloader", runtime);
         Assert.Contains("MarketplaceConfigurationLoader.LoadTrustStoreAsync", runtime);
         Assert.Contains("if (_ownsHttpClient) _httpClient.Dispose()", runtime);
+        Assert.Contains("runtime.LoadCatalogAsync", session);
+        Assert.Contains("runtime.ValidatePackageAsync", session);
+        Assert.Contains("runtime.DownloadPackageAsync", session);
+        Assert.Contains("_catalogLoad?.Cancel()", session);
+        Assert.Contains("return MarketplacePreparationResult.Busy()", session);
+        Assert.Contains("if (result.IsSuccess", session);
         Assert.Contains("class MarketCardModel", presentation);
         Assert.Contains("MarketplaceCatalogCodec.Search", presentation);
     }
@@ -512,7 +624,7 @@ public class QualityGateTests
         Assert.Contains("release_eligible", release);
         Assert.Contains("Get-FileHash", release);
         Assert.Contains("WaitForExit(20000)", release);
-        Assert.Contains("pluginCount -ne 25", release);
+        Assert.Contains("pluginCount -ne $expectedPluginCount", release);
     }
 
     [Fact]
@@ -607,6 +719,20 @@ public class QualityGateTests
         Assert.Contains("_qualityRuntime!.RunIdleProbeAsync", app);
         Assert.Contains("new PluginRuntimeStartRequest", app);
         Assert.Contains("--exit-after-command", options);
+        var marketplace = Read("src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml");
+        var palette = Read("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml");
+        var superPanel = Read("src", "LongBetterWindows.Host", "Views", "SuperPanelWindow.xaml");
+        var toast = Read("src", "LongBetterWindows.Host", "Views", "ToastWindow.xaml");
+        var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
+        Assert.Contains("AutomationProperties.LiveSetting=\"Assertive\"", marketplace);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", marketplace);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", palette);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", superPanel);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Assertive\"", toast);
+        Assert.Contains("Get-AutomationSemantics", desktopSmoke);
+        Assert.Contains("Current.Name", desktopSmoke);
+        Assert.Contains("ControlType.ProgrammaticName", desktopSmoke);
+        Assert.Contains("automation_semantics", desktopSmoke);
     }
 
     [Fact]
@@ -621,6 +747,36 @@ public class QualityGateTests
         Assert.Contains("_sourceDiscovery.Discover()", scanner);
         Assert.DoesNotContain("Directory.GetDirectories", scanner);
         Assert.DoesNotContain("FindDevPluginsDir", scanner);
+    }
+
+    [Fact]
+    public void ReleasePipeline_ValidatesPublishedCommandsAndWebViewCleanup()
+    {
+        var release = Read("release.ps1");
+
+        Assert.Contains("$expectedPluginCount = 25", release);
+        Assert.Contains("$expectedCommandCount = 42", release);
+        Assert.Contains("$uniquePluginIdCount", release);
+        Assert.Contains("$commandCount -ne $expectedCommandCount", release);
+        Assert.Contains("com.long.base64:base64.encode", release);
+        Assert.Contains("Get-ProductWebViewProcessIds", release);
+        Assert.Contains("$addedWebViewProcessIds.Count -gt 0", release);
+        Assert.Contains("command_smoke_exit_code", release);
+    }
+
+    [Fact]
+    public void LocalMarketplaceRehearsal_UsesEphemeralSigningAndVerifiesRollbackPackages()
+    {
+        var rehearsal = Read("rehearse-marketplace-local.ps1");
+
+        Assert.Contains("RSA]::Create(3072)", rehearsal);
+        Assert.Contains("candidate-dry-run.json", rehearsal);
+        Assert.Contains("-Target Local", rehearsal);
+        Assert.Contains("-ConfirmReleaseId", rehearsal);
+        Assert.Contains("rollback_registry_hash_matches", rehearsal);
+        Assert.Contains("rollback_packages_available", rehearsal);
+        Assert.Contains("Remove-Item -LiteralPath $workRoot -Recurse -Force", rehearsal);
+        Assert.Contains("ephemeral_private_key_deleted", rehearsal);
     }
 
     [Fact]

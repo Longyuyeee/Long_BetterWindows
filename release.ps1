@@ -21,6 +21,19 @@ $project = Join-Path $repoRoot 'src\LongBetterWindows.Host\LongBetterWindows.Hos
 $tests = Join-Path $repoRoot 'tests\LongBetterWindows.Tests\LongBetterWindows.Tests.csproj'
 $releaseBase = Join-Path $repoRoot 'artifacts\releases'
 $releaseRoot = Join-Path $releaseBase "v$Version"
+$expectedPluginCount = 25
+$expectedCommandCount = 42
+$smokeCommandKey = 'com.long.base64:base64.encode'
+
+function Get-ProductWebViewProcessIds {
+    return @(
+        Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" |
+            Where-Object {
+                $_.CommandLine -like '*--webview-exe-name=LongBetterWindows.Host.exe*'
+            } |
+            ForEach-Object ProcessId
+    )
+}
 
 if (-not (Test-Path -LiteralPath $dotnet)) {
     $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
@@ -78,9 +91,26 @@ try {
         $hostExecutable = Join-Path $publishDirectory 'LongBetterWindows.Host.exe'
         $pluginDirectory = Join-Path $publishDirectory 'Plugins'
         $pluginCount = @(Get-ChildItem -LiteralPath $pluginDirectory -Directory).Count
-        $manifestCount = @(Get-ChildItem -LiteralPath $pluginDirectory -Filter manifest.json -File -Recurse).Count
-        if (-not (Test-Path -LiteralPath $hostExecutable) -or $pluginCount -ne 25 -or $manifestCount -ne 25) {
-            throw "$($variant.Name) 完整性检查失败：Plugins=$pluginCount, Manifests=$manifestCount"
+        $manifestFiles = @(Get-ChildItem -LiteralPath $pluginDirectory -Filter manifest.json -File -Recurse)
+        $manifestCount = $manifestFiles.Count
+        $pluginManifests = @($manifestFiles | ForEach-Object {
+            Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+        })
+        $pluginIds = @($pluginManifests | ForEach-Object id)
+        $uniquePluginIdCount = @($pluginIds | Sort-Object -Unique).Count
+        $commandCount = ($pluginManifests | ForEach-Object {
+            @($_.commands).Count
+        } | Measure-Object -Sum).Sum
+        $hasMissingPluginId = @($pluginIds | Where-Object {
+            [string]::IsNullOrWhiteSpace($_)
+        }).Count -gt 0
+        if (-not (Test-Path -LiteralPath $hostExecutable) `
+            -or $pluginCount -ne $expectedPluginCount `
+            -or $manifestCount -ne $expectedPluginCount `
+            -or $uniquePluginIdCount -ne $expectedPluginCount `
+            -or $hasMissingPluginId `
+            -or $commandCount -ne $expectedCommandCount) {
+            throw "$($variant.Name) 完整性检查失败：Plugins=$pluginCount, Manifests=$manifestCount, UniqueIds=$uniquePluginIdCount, Commands=$commandCount"
         }
 
         Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\安装升级与卸载.md') -Destination $publishDirectory
@@ -94,6 +124,27 @@ try {
             throw "$($variant.Name) 冒烟测试超时。"
         }
         if ($process.ExitCode -ne 0) { throw "$($variant.Name) 冒烟测试退出码为 $($process.ExitCode)。" }
+
+        $webViewBefore = Get-ProductWebViewProcessIds
+        $commandProcess = Start-Process -FilePath $hostExecutable `
+            -ArgumentList @(
+                '--run-command', $smokeCommandKey,
+                '--command-text', 'release-smoke',
+                '--exit-after-command') `
+            -WorkingDirectory $smokeDirectory -PassThru
+        if (-not $commandProcess.WaitForExit(30000)) {
+            Stop-Process -Id $commandProcess.Id -Force
+            throw "$($variant.Name) 真实命令冒烟测试超时。"
+        }
+        if ($commandProcess.ExitCode -ne 0) {
+            throw "$($variant.Name) 真实命令冒烟测试退出码为 $($commandProcess.ExitCode)。"
+        }
+        Start-Sleep -Milliseconds 1500
+        $webViewAfter = Get-ProductWebViewProcessIds
+        $addedWebViewProcessIds = @($webViewAfter | Where-Object { $_ -notin $webViewBefore })
+        if ($addedWebViewProcessIds.Count -gt 0) {
+            throw "$($variant.Name) 真实命令退出后残留 WebView2 进程：$($addedWebViewProcessIds -join ', ')"
+        }
 
         $productVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($hostExecutable).ProductVersion
         $semanticProductVersion = $productVersion.Split('+')[0]
@@ -111,6 +162,12 @@ try {
             sha256 = $hash
             bytes = (Get-Item -LiteralPath $zipPath).Length
             plugins = $pluginCount
+            manifests = $manifestCount
+            unique_plugin_ids = $uniquePluginIdCount
+            commands = $commandCount
+            command_smoke = $smokeCommandKey
+            command_smoke_exit_code = $commandProcess.ExitCode
+            added_webview_processes = $addedWebViewProcessIds.Count
         }
     }
 
