@@ -1,264 +1,219 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>剪贴板工具箱</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  background:#f5f5f7;color:#1d1d1f;padding:20px;user-select:none}
-h2{font-size:16px;font-weight:600;margin-bottom:12px;color:#007AFF}
-.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;
-  box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.clip-item{display:flex;align-items:center;padding:8px 10px;border-radius:8px;
-  cursor:pointer;margin-bottom:4px;transition:background .15s}
-.clip-item:hover{background:#f0f0f5}
-.clip-item.active{background:#e8f0fe}
-.clip-text{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;
-  white-space:nowrap;margin-right:8px}
-.clip-time{font-size:10px;color:#aaa;margin-right:6px}
-.btn-sm{padding:2px 8px;font-size:10px;border:none;border-radius:4px;
-  cursor:pointer;background:#f0f0f0;color:#555;transition:all .15s}
-.btn-sm:hover{background:#007AFF;color:#fff}
-.btn-sm.pinned{background:#FFD60A;color:#333}
-textarea{width:100%;height:80px;border:1px solid #e0e0e0;border-radius:8px;
-  padding:10px;font-size:13px;resize:vertical;font-family:inherit}
-textarea:focus{outline:none;border-color:#007AFF}
-.btn-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-button{padding:6px 14px;border:none;border-radius:6px;font-size:12px;
-  font-weight:500;cursor:pointer;transition:all .2s}
-.btn-primary{background:#007AFF;color:#fff}
-.btn-primary:hover{background:#0062CC}
-.btn-secondary{background:#f0f0f0;color:#333}
-.btn-secondary:hover{background:#e0e0e0}
-.status{font-size:11px;color:#34C759;margin-top:6px;display:none}
-.status.show{display:block}
-.pin-indicator{font-size:10px;margin-right:4px}
-input[type=text]{width:100%;border:1px solid #e0e0e0;border-radius:6px;
-  padding:6px 10px;font-size:12px;margin-bottom:8px}
-input[type=text]:focus{outline:none;border-color:#007AFF}
-.tabs{display:flex;gap:0;margin-bottom:12px}
-.tab{padding:6px 16px;font-size:12px;cursor:pointer;border-radius:6px 6px 0 0;
-  background:transparent;color:#666;border:none}
-.tab.active{background:#007AFF;color:#fff}
-.tab .badge{background:rgba(255,255,255,.3);padding:0 6px;border-radius:10px;
-  font-size:10px;margin-left:4px}
-.empty{text-align:center;padding:20px;color:#aaa;font-size:12px}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>剪贴板工具箱</title>
 </head>
 <body>
+  <main class="long-page">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">CLIPBOARD</div>
+        <h1 class="long-page-title">剪贴板工具箱</h1>
+        <p class="long-page-description">搜索、固定和转换最近复制的文本，历史仅保存在本机。</p>
+      </div>
+      <span class="long-badge" id="historyBadge">0 条记录</span>
+    </header>
 
-<div class="tabs">
-  <button class="tab active" onclick="switchTab('history')">历史<span class="badge" id="historyCount">0</span></button>
-  <button class="tab" onclick="switchTab('pinned')">固定<span class="badge" id="pinnedCount">0</span></button>
-  <button class="tab" onclick="switchTab('tools')">工具</button>
-</div>
+    <nav class="long-segment" aria-label="剪贴板工具页签">
+      <button type="button" data-tab="history" aria-selected="true">历史</button>
+      <button type="button" data-tab="pinned" aria-selected="false">固定</button>
+      <button type="button" data-tab="tools" aria-selected="false">文本工具</button>
+    </nav>
 
-<!-- 历史/固定列表 -->
-<div id="historyTab">
-  <input type="text" id="searchBox" placeholder="搜索剪贴板历史..." oninput="renderList()" />
-  <div id="clipList"></div>
-  <div id="emptyState" class="empty">暂无剪贴板记录</div>
-</div>
+    <section class="long-panel long-stack long-toolbar--spaced" id="listPanel">
+      <input id="searchInput" type="search" placeholder="搜索剪贴板历史…" aria-label="搜索剪贴板历史">
+      <div class="long-list" id="clipList"></div>
+      <div class="long-empty" id="emptyState">暂无剪贴板记录</div>
+    </section>
 
-<!-- 工具面板 -->
-<div id="toolsTab" style="display:none">
-  <div class="card">
-    <h2>剪贴板操作</h2>
-    <textarea id="clipContent" placeholder="内容将显示在这里..."></textarea>
-    <div class="btn-row">
-      <button class="btn-primary" onclick="readClip()">读取剪贴板</button>
-      <button class="btn-secondary" onclick="writeClip()">写入剪贴板</button>
-      <button class="btn-secondary" onclick="document.getElementById('clipContent').value=''">清空</button>
-    </div>
-    <div id="clipStatus" class="status"></div>
-  </div>
+    <section class="long-panel long-stack long-toolbar--spaced" id="toolsPanel" hidden>
+      <div class="long-card long-field">
+        <label class="long-field-label" for="content">文本内容</label>
+        <textarea class="long-editor" id="content" placeholder="读取剪贴板，或输入需要转换的文本…"></textarea>
+        <div class="long-toolbar">
+          <button class="long-button long-button--primary btn-primary" id="readButton" type="button">读取剪贴板</button>
+          <button class="long-button long-button--secondary btn-secondary" id="writeButton" type="button">写入剪贴板</button>
+          <button class="long-button long-button--secondary btn-secondary" data-transform="upper" type="button">大写</button>
+          <button class="long-button long-button--secondary btn-secondary" data-transform="lower" type="button">小写</button>
+          <button class="long-button long-button--secondary btn-secondary" data-transform="trim" type="button">整理空白</button>
+        </div>
+        <div class="long-status" id="status" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
 
-  <div class="card">
-    <h2>文本转换</h2>
-    <div class="btn-row">
-      <button class="btn-secondary" onclick="transform('upper')">转大写</button>
-      <button class="btn-secondary" onclick="transform('lower')">转小写</button>
-      <button class="btn-secondary" onclick="transform('trim')">去空格</button>
-    </div>
-  </div>
+  <script>
+    const historyKey = 'clip_history';
+    const pinnedKey = 'clip_pinned';
+    const listElement = document.getElementById('clipList');
+    const emptyState = document.getElementById('emptyState');
+    const searchInput = document.getElementById('searchInput');
+    const content = document.getElementById('content');
+    const status = document.getElementById('status');
+    let history = [];
+    let pinned = [];
+    let currentTab = 'history';
+    let lastClipboard = '';
+    let monitor = 0;
 
-  <div class="card">
-    <h2>存储</h2>
-    <input type="text" id="storageKey" placeholder="键名..." value="clip_saved" />
-    <div class="btn-row">
-      <button class="btn-primary" onclick="saveStorage()">保存当前</button>
-      <button class="btn-secondary" onclick="loadStorage()">加载</button>
-    </div>
-    <div id="storageStatus" class="status"></div>
-  </div>
-</div>
+    async function initialize() {
+      try {
+        const historyResult = await long.storage.get(historyKey);
+        const pinnedResult = await long.storage.get(pinnedKey);
+        if (historyResult.success && historyResult.data) history = JSON.parse(historyResult.data);
+        if (pinnedResult.success && pinnedResult.data) pinned = JSON.parse(pinnedResult.data);
+      } catch (_) { setStatus('历史记录读取失败', 'danger'); }
+      render();
+      startMonitor();
+    }
 
-<script>
-var currentTab = 'history';
-var historyList = [];
-var pinnedList = [];
-var maxHistory = 50;
-var lastClip = '';
-var monitorTimer = null;
+    function startMonitor() {
+      if (monitor || document.hidden) return;
+      monitor = window.setInterval(captureClipboard, 1800);
+    }
 
-// 初始化：加载存储数据
-async function init() {
-  try {
-    var h = await long.storage.get('clip_history');
-    if (h.success && h.data) { historyList = JSON.parse(h.data); }
-    var p = await long.storage.get('clip_pinned');
-    if (p.success && p.data) { pinnedList = JSON.parse(p.data); }
-  } catch(e) {}
-  renderList();
-  startMonitor();
-}
+    function stopMonitor() { window.clearInterval(monitor); monitor = 0; }
 
-function startMonitor() {
-  monitorTimer = setInterval(async function() {
-    try {
-      var r = await long.clipboard.getText();
-      if (r.success && r.data && r.data !== lastClip && r.data.trim()) {
-        lastClip = r.data;
-        addToHistory(r.data);
-      }
-    } catch(e) {}
-  }, 1500);
-}
+    async function captureClipboard() {
+      try {
+        const response = await long.clipboard.getText();
+        const text = response.success ? (response.data || '').trim() : '';
+        if (text && text !== lastClipboard) { lastClipboard = text; addHistory(text); }
+      } catch (_) { }
+    }
 
-function addToHistory(text) {
-  // 去重
-  historyList = historyList.filter(function(h) { return h.text !== text; });
-  historyList.unshift({ text: text, time: Date.now() });
-  if (historyList.length > maxHistory) historyList = historyList.slice(0, maxHistory);
-  saveHistory();
-  if (currentTab === 'history') renderList();
-}
+    async function persist() {
+      await Promise.all([
+        long.storage.set(historyKey, JSON.stringify(history)),
+        long.storage.set(pinnedKey, JSON.stringify(pinned))
+      ]);
+    }
 
-function saveHistory() {
-  try { long.storage.set('clip_history', JSON.stringify(historyList)); } catch(e) {}
-  try { long.storage.set('clip_pinned', JSON.stringify(pinnedList)); } catch(e) {}
-}
+    function addHistory(text) {
+      history = history.filter(function (item) { return item.text !== text; });
+      history.unshift({ text: text, time: Date.now() });
+      history = history.slice(0, 50);
+      persist();
+      if (currentTab === 'history') render();
+    }
 
-function switchTab(tab) {
-  currentTab = tab;
-  document.querySelectorAll('.tab').forEach(function(t,i) {
-    t.classList.toggle('active', i === ['history','pinned','tools'].indexOf(tab));
-  });
-  document.getElementById('historyTab').style.display = tab !== 'tools' ? 'block' : 'none';
-  document.getElementById('toolsTab').style.display = tab === 'tools' ? 'block' : 'none';
-  if (tab === 'history') document.getElementById('searchBox').style.display = 'block';
-  else if (tab === 'pinned') document.getElementById('searchBox').style.display = 'none';
-  renderList();
-}
+    function setStatus(message, kind) {
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      window.LongUI?.announce(message);
+    }
 
-function renderList() {
-  var query = document.getElementById('searchBox').value.toLowerCase();
-  var list = currentTab === 'pinned' ? pinnedList :
-    historyList.filter(function(h) { return !query || h.text.toLowerCase().indexOf(query) >= 0; });
+    function selectTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('[data-tab]').forEach(function (button) {
+        button.setAttribute('aria-selected', String(button.dataset.tab === tab));
+      });
+      const tools = tab === 'tools';
+      document.getElementById('listPanel').hidden = tools;
+      document.getElementById('toolsPanel').hidden = !tools;
+      searchInput.hidden = tab === 'pinned';
+      if (!tools) render(); else content.focus();
+    }
 
-  var html = '';
-  var now = Date.now();
+    function render() {
+      const query = searchInput.value.trim().toLocaleLowerCase();
+      const source = currentTab === 'pinned' ? pinned : history;
+      const visible = source.filter(function (item) { return !query || item.text.toLocaleLowerCase().includes(query); });
+      listElement.replaceChildren();
+      emptyState.hidden = visible.length > 0;
+      document.getElementById('historyBadge').textContent = history.length + ' 条记录 · ' + pinned.length + ' 条固定';
+      visible.forEach(function (item) {
+        const row = document.createElement('article');
+        row.className = 'long-list-item';
+        const value = document.createElement('button');
+        value.type = 'button';
+        value.className = 'long-list-item__content';
+        value.textContent = item.text.length > 240 ? item.text.slice(0, 240) + '…' : item.text;
+        value.addEventListener('click', function () { copyItem(item); });
+        const actions = document.createElement('div');
+        actions.className = 'long-list-item__meta long-stack';
+        const time = document.createElement('time');
+        time.textContent = relativeTime(item.time);
+        const pin = document.createElement('button');
+        pin.type = 'button'; pin.className = 'long-button long-button--small';
+        const isPinned = pinned.some(function (entry) { return entry.text === item.text; });
+        pin.textContent = isPinned ? '取消固定' : '固定';
+        pin.addEventListener('click', function () { togglePin(item); });
+        const remove = document.createElement('button');
+        remove.type = 'button'; remove.className = 'long-button long-button--small'; remove.textContent = '删除';
+        remove.addEventListener('click', function () { removeItem(item); });
+        actions.append(time, pin, remove);
+        row.append(value, actions);
+        listElement.appendChild(row);
+      });
+    }
 
-  list.forEach(function(item, i) {
-    var isPinned = pinnedList.some(function(p) { return p.text === item.text; });
-    var ago = Math.floor((now - item.time) / 1000);
-    var timeStr = ago < 60 ? ago+'s' : ago < 3600 ? Math.floor(ago/60)+'m' : Math.floor(ago/3600)+'h';
-    var shortText = item.text.length > 50 ? item.text.substring(0,50)+'...' : item.text;
+    async function copyItem(item) {
+      await long.clipboard.setText(item.text);
+      lastClipboard = item.text;
+      addHistory(item.text);
+      setStatus('已复制 · ' + item.text.length + ' 字符', 'success');
+    }
 
-    html += '<div class="clip-item" onclick="copyItem('+i+')">' +
-      (isPinned ? '<span class="pin-indicator">📌</span>' : '') +
-      '<span class="clip-text">'+escHtml(shortText)+'</span>' +
-      '<span class="clip-time">'+timeStr+'</span>' +
-      '<button class="btn-sm'+(isPinned?' pinned':'')+'" onclick="event.stopPropagation();togglePin('+i+')">'+
-        (isPinned?'已固定':'固定')+'</button>' +
-      '<button class="btn-sm" onclick="event.stopPropagation();deleteItem('+i+')" style="margin-left:4px">✕</button>' +
-      '</div>';
-  });
+    async function togglePin(item) {
+      const index = pinned.findIndex(function (entry) { return entry.text === item.text; });
+      if (index >= 0) pinned.splice(index, 1); else pinned.unshift({ text: item.text, time: Date.now() });
+      await persist(); render();
+    }
 
-  document.getElementById('clipList').innerHTML = html || '';
-  document.getElementById('emptyState').style.display = list.length === 0 ? 'block' : 'none';
-  document.getElementById('historyCount').textContent = historyList.length;
-  document.getElementById('pinnedCount').textContent = pinnedList.length;
-}
+    async function removeItem(item) {
+      const target = currentTab === 'pinned' ? pinned : history;
+      const index = target.indexOf(item);
+      if (index >= 0) target.splice(index, 1);
+      await persist(); render();
+    }
 
-function copyItem(i) {
-  var list = currentTab === 'pinned' ? pinnedList : historyList;
-  if (i < 0 || i >= list.length) return;
-  var text = list[i].text;
-  long.clipboard.setText(text);
-  showStatus('clipStatus', '已复制 ('+text.length+' 字符)');
-  // 也加入历史
-  addToHistory(text);
-}
+    async function readClipboard() {
+      const response = await long.clipboard.getText();
+      content.value = response.success ? response.data || '' : '';
+      setStatus(response.success ? '剪贴板内容已读取' : response.error || '读取失败', response.success ? 'success' : 'danger');
+    }
 
-function togglePin(i) {
-  var list = currentTab === 'pinned' ? pinnedList : historyList;
-  if (i < 0 || i >= list.length) return;
-  var item = list[i];
-  var idx = pinnedList.findIndex(function(p) { return p.text === item.text; });
-  if (idx >= 0) { pinnedList.splice(idx, 1); }
-  else { pinnedList.unshift({ text: item.text, time: Date.now() }); }
-  saveHistory();
-  renderList();
-}
+    async function writeClipboard() {
+      const response = await long.clipboard.setText(content.value);
+      if (response.success) { lastClipboard = content.value; addHistory(content.value); }
+      setStatus(response.success ? '内容已写入剪贴板' : response.error || '写入失败', response.success ? 'success' : 'danger');
+    }
 
-function deleteItem(i) {
-  var list = currentTab === 'pinned' ? pinnedList : historyList;
-  if (i < 0 || i >= list.length) return;
-  list.splice(i, 1);
-  saveHistory();
-  renderList();
-}
+    function transform(kind) {
+      if (kind === 'upper') content.value = content.value.toLocaleUpperCase();
+      if (kind === 'lower') content.value = content.value.toLocaleLowerCase();
+      if (kind === 'trim') content.value = content.value.split('\n').map(function (line) { return line.trim(); }).join('\n').trim();
+      writeClipboard();
+    }
 
-// 工具面板
-async function readClip() {
-  var r = await long.clipboard.getText();
-  document.getElementById('clipContent').value = r.success ? (r.data||'') : '';
-  showStatus('clipStatus', r.success ? '已读取 ('+((r.data||'').length)+' 字符)' : '失败');
-}
+    function relativeTime(value) {
+      const seconds = Math.max(0, Math.floor((Date.now() - value) / 1000));
+      if (seconds < 60) return '刚刚';
+      if (seconds < 3600) return Math.floor(seconds / 60) + ' 分钟前';
+      if (seconds < 86400) return Math.floor(seconds / 3600) + ' 小时前';
+      return Math.floor(seconds / 86400) + ' 天前';
+    }
 
-async function writeClip() {
-  var t = document.getElementById('clipContent').value;
-  await long.clipboard.setText(t);
-  showStatus('clipStatus', '已写入');
-}
-
-function transform(type) {
-  var el = document.getElementById('clipContent');
-  if (type === 'upper') el.value = el.value.toUpperCase();
-  if (type === 'lower') el.value = el.value.toLowerCase();
-  if (type === 'trim') el.value = el.value.trim();
-  long.clipboard.setText(el.value);
-  showStatus('clipStatus', '已转换并写入');
-}
-
-async function saveStorage() {
-  var k = document.getElementById('storageKey').value || 'clip_saved';
-  var v = document.getElementById('clipContent').value;
-  await long.storage.set(k, v);
-  showStatus('storageStatus', '已保存 ('+v.length+' 字符)');
-}
-
-async function loadStorage() {
-  var k = document.getElementById('storageKey').value || 'clip_saved';
-  var r = await long.storage.get(k);
-  if (r.success && r.data) {
-    document.getElementById('clipContent').value = r.data;
-    showStatus('storageStatus', '已加载 ('+r.data.length+' 字符)');
-  } else { showStatus('storageStatus', '无数据'); }
-}
-
-function showStatus(id, msg) {
-  var el = document.getElementById(id);
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(function() { el.classList.remove('show'); }, 2500);
-}
-
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-init();
-</script>
+    document.querySelectorAll('[data-tab]').forEach(function (button) { button.addEventListener('click', function () { selectTab(button.dataset.tab); }); });
+    document.querySelectorAll('[data-transform]').forEach(function (button) { button.addEventListener('click', function () { transform(button.dataset.transform); }); });
+    document.getElementById('readButton').addEventListener('click', readClipboard);
+    document.getElementById('writeButton').addEventListener('click', writeClipboard);
+    searchInput.addEventListener('input', render);
+    document.addEventListener('keydown', function (event) {
+      if (event.ctrlKey && event.key.toLocaleLowerCase() === 'f') { event.preventDefault(); selectTab('history'); searchInput.focus(); }
+      else if (event.ctrlKey && event.key === 'Enter' && currentTab === 'tools') { event.preventDefault(); writeClipboard(); }
+    });
+    document.addEventListener('visibilitychange', function () { document.hidden ? stopMonitor() : startMonitor(); });
+    window.LongUI?.onCommand(function (command) {
+      const text = window.LongUI.commandText(command);
+      selectTab('tools');
+      if (text) { content.value = text; addHistory(text); }
+      content.focus();
+    });
+    initialize();
+  </script>
 </body>
 </html>

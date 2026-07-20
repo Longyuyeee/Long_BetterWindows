@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
-using System.Windows;
 using System.Windows.Interop;
+using System.Threading;
+using System.Windows;
+using System.Windows.Media.Imaging;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 
@@ -18,16 +20,11 @@ namespace LongBetterWindows.Host.Services
 
         public Task<HostApiResponse<string?>> GetTextAsync()
         {
-            return Task.Run(() =>
+            return RunOnStaThreadAsync(() =>
             {
                 try
                 {
-                    string? text = null;
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        if (Clipboard.ContainsText())
-                            text = Clipboard.GetText();
-                    });
+                    var text = Clipboard.ContainsText() ? Clipboard.GetText() : null;
                     return HostApiResponse<string?>.Success(text);
                 }
                 catch (Exception ex)
@@ -40,12 +37,11 @@ namespace LongBetterWindows.Host.Services
 
         public Task<HostApiResponse> SetTextAsync(string text)
         {
-            return Task.Run(() =>
+            return RunOnStaThreadAsync(() =>
             {
                 try
                 {
-                    Application.Current.Dispatcher.Invoke(() =>
-                        Clipboard.SetText(text));
+                    Clipboard.SetText(text);
                     return HostApiResponse.Success();
                 }
                 catch (Exception ex)
@@ -56,13 +52,52 @@ namespace LongBetterWindows.Host.Services
             });
         }
 
-        public Task<HostApiResponse> ClearAsync()
+        public Task<HostApiResponse> SetImageAsync(BitmapSource image)
         {
-            return Task.Run(() =>
+            ArgumentNullException.ThrowIfNull(image);
+            var transferableImage = image.IsFrozen ? image : image.Clone();
+            if (transferableImage.CanFreeze && !transferableImage.IsFrozen)
+                transferableImage.Freeze();
+            return RunOnStaThreadAsync(() =>
             {
                 try
                 {
-                    Application.Current.Dispatcher.Invoke(Clipboard.Clear);
+                    Clipboard.SetImage(transferableImage);
+                    return HostApiResponse.Success();
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message);
+                }
+            });
+        }
+
+        public Task<HostApiResponse<BitmapSource?>> GetImageAsync()
+        {
+            return RunOnStaThreadAsync(() =>
+            {
+                try
+                {
+                    var image = Clipboard.ContainsImage() ? Clipboard.GetImage() : null;
+                    if (image?.CanFreeze == true)
+                        image.Freeze();
+                    return HostApiResponse<BitmapSource?>.Success(image);
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse<BitmapSource?>.Failure(
+                        ApiErrorCode.Unknown, ex.Message);
+                }
+            });
+        }
+
+        public Task<HostApiResponse> ClearAsync()
+        {
+            return RunOnStaThreadAsync(() =>
+            {
+                try
+                {
+                    Clipboard.Clear();
                     return HostApiResponse.Success();
                 }
                 catch (Exception ex)
@@ -227,5 +262,29 @@ namespace LongBetterWindows.Host.Services
         private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
         #endregion
+
+        private static Task<T> RunOnStaThreadAsync<T>(Func<T> action)
+        {
+            var completion = new TaskCompletionSource<T>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    completion.TrySetResult(action());
+                }
+                catch (Exception ex)
+                {
+                    completion.TrySetException(ex);
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "Long.Clipboard.STA",
+            };
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return completion.Task;
+        }
     }
 }

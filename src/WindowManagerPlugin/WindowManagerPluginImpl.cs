@@ -1,37 +1,22 @@
 using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
+using LongBetterWindows.Host.Views;
 using Serilog;
 
 namespace WindowManagerPlugin;
 
-public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
+public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginCommandHandler
 {
     private IHostApi _host = null!;
+    private readonly List<string> _registeredHotkeys = new();
+    private WindowManagerGuide? _guide;
 
     public string Id => "com.long.window-manager";
     public string Name => "窗口管理";
-    public string Version => "2.0.0";
+    public string Version => "2.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
-
-    // P/Invoke
-    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hWnd, IntPtr hAfter, int x, int y, int cx, int cy, uint flags);
-    [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hWnd, int index);
-    [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr hWnd, int index, int newStyle);
-    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint dwFlags);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFO lpmi);
-    static readonly IntPtr HWND_TOPMOST = new(-1), HWND_NOTOPMOST = new(-2);
-    const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_SHOWWINDOW = 0x0040;
-    const int GWL_EXSTYLE = -20, WS_EX_TOPMOST = 0x0008;
-    const uint MONITOR_DEFAULTTONEAREST = 2;
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct MONITORINFO { public uint cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
-    [StructLayout(LayoutKind.Sequential)]
-    struct RECT { public int Left, Top, Right, Bottom; }
 
     public Task<bool> InitializeAsync(IHostApi host)
     {
@@ -41,35 +26,42 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
 
     public async Task<bool> StartAsync()
     {
-        var hk = _host.HotKey;
-        // 置顶
-        var r1 = await hk.RegisterAsync("Ctrl+Alt+T", Id, ToggleTopmost);
-        // 半屏
-        var r2 = await hk.RegisterAsync("Ctrl+Alt+Left", Id, () => Snap("left"));
-        var r3 = await hk.RegisterAsync("Ctrl+Alt+Right", Id, () => Snap("right"));
-        var r4 = await hk.RegisterAsync("Ctrl+Alt+Up", Id, () => Snap("max"));
-        var r5 = await hk.RegisterAsync("Ctrl+Alt+Down", Id, () => Snap("bottom"));
-        // 四分屏
-        var r6 = await hk.RegisterAsync("Ctrl+Alt+1", Id, () => Snap("top-left"));
-        var r7 = await hk.RegisterAsync("Ctrl+Alt+2", Id, () => Snap("top-right"));
-        var r8 = await hk.RegisterAsync("Ctrl+Alt+3", Id, () => Snap("bottom-left"));
-        var r9 = await hk.RegisterAsync("Ctrl+Alt+4", Id, () => Snap("bottom-right"));
-        // 三分屏
-        var r10 = await hk.RegisterAsync("Ctrl+Alt+Shift+Left", Id, () => Snap("third-left"));
-        var r11 = await hk.RegisterAsync("Ctrl+Alt+Shift+Right", Id, () => Snap("third-right"));
+        var bindings = new (string Key, Action Callback)[]
+        {
+            ("Ctrl+Alt+T", ToggleTopmost),
+            ("Ctrl+Alt+Left", () => Snap("left")),
+            ("Ctrl+Alt+Right", () => Snap("right")),
+            ("Ctrl+Alt+Up", () => Snap("max")),
+            ("Ctrl+Alt+Down", () => Snap("bottom")),
+            ("Ctrl+Alt+1", () => Snap("top-left")),
+            ("Ctrl+Alt+2", () => Snap("top-right")),
+            ("Ctrl+Alt+3", () => Snap("bottom-left")),
+            ("Ctrl+Alt+4", () => Snap("bottom-right")),
+            ("Ctrl+Alt+Shift+Left", () => Snap("third-left")),
+            ("Ctrl+Alt+Shift+Right", () => Snap("third-right")),
+        };
 
-        if (!r1.IsSuccess || !r2.IsSuccess) { State = PluginState.Error; return false; }
+        foreach (var binding in bindings)
+        {
+            var result = await _host.HotKey.RegisterAsync(binding.Key, Id, binding.Callback);
+            if (result.IsSuccess)
+                _registeredHotkeys.Add(binding.Key);
+            else
+                Log.Warning("[WindowManager] 热键冲突，命令入口仍可用: {Hotkey}", binding.Key);
+        }
+
         State = PluginState.Running;
+        Log.Information("[WindowManager] 已启动，注册 {Count}/{Total} 个热键", _registeredHotkeys.Count, bindings.Length);
         return true;
     }
 
     public async Task<bool> StopAsync()
     {
-        var hk = _host.HotKey;
-        foreach (var key in new[] { "Ctrl+Alt+T", "Ctrl+Alt+Left", "Ctrl+Alt+Right", "Ctrl+Alt+Up", "Ctrl+Alt+Down",
-            "Ctrl+Alt+1","Ctrl+Alt+2","Ctrl+Alt+3","Ctrl+Alt+4","Ctrl+Alt+Shift+Left","Ctrl+Alt+Shift+Right" })
-            await hk.UnregisterAsync(key);
-        State = PluginState.Disabled;
+        foreach (var key in _registeredHotkeys)
+            await _host.HotKey.UnregisterAsync(key);
+        _registeredHotkeys.Clear();
+        Application.Current.Dispatcher.Invoke(() => _guide?.Close());
+        State = PluginState.Stopped;
         return true;
     }
 
@@ -77,92 +69,109 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            var w = new Window
+            if (_guide is { IsVisible: true })
             {
-                Title = "窗口管理 - 快捷键",
-                Width = 400, Height = 360,
-                WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                WindowStyle = WindowStyle.ToolWindow,
-                Content = CreateLayoutGuide(),
-            };
-            w.Show();
+                _guide.Activate();
+                return;
+            }
+
+            _guide = new WindowManagerGuide();
+            _guide.Closed += (_, _) => _guide = null;
+            _guide.Show();
         });
     }
 
     public FrameworkElement CreateSettingsUI()
+        => new HotkeySettingsControl("窗口置顶", Id, "Ctrl+Alt+T", _ => { });
+
+    public Task<PluginCommandResult> ExecuteCommandAsync(
+        PluginCommandInvocation invocation,
+        CancellationToken cancellationToken = default)
     {
-        return new LongBetterWindows.Host.Views.HotkeySettingsControl(
-            "窗口管理", Id, "Ctrl+Alt+T", _ => { });
-    }
-
-    private static FrameworkElement CreateLayoutGuide()
-    {
-        var panel = new StackPanel { Margin = new Thickness(20) };
-        panel.Children.Add(new TextBlock { Text = "窗口管理快捷键", FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,16) });
-
-        var sections = new (string, string[])[]
+        cancellationToken.ThrowIfCancellationRequested();
+        switch (invocation.CommandId)
         {
-            ("置顶", new[] { "Ctrl+Alt+T  切换置顶/取消" }),
-            ("半屏", new[] { "Ctrl+Alt+←  左半屏", "Ctrl+Alt+→  右半屏", "Ctrl+Alt+↑  最大化", "Ctrl+Alt+↓  下半屏" }),
-            ("四分屏", new[] { "Ctrl+Alt+1  左上 ¼", "Ctrl+Alt+2  右上 ¼", "Ctrl+Alt+3  左下 ¼", "Ctrl+Alt+4  右下 ¼" }),
-            ("三分屏", new[] { "Ctrl+Alt+Shift+←  左⅓", "Ctrl+Alt+Shift+→  右⅔" }),
-        };
-
-        foreach (var (title, items) in sections)
-        {
-            panel.Children.Add(new TextBlock { Text = title, FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(0x00,0x7A,0xFF)), Margin = new Thickness(0,8,0,4) });
-            foreach (var item in items)
-                panel.Children.Add(new TextBlock { Text = item, FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(0x55,0x55,0x55)), Margin = new Thickness(8,2,0,2) });
+            case "window.guide": ShowMainUI(); break;
+            case "window.topmost": ToggleTopmost(); break;
+            case "window.left": Snap("left"); break;
+            case "window.right": Snap("right"); break;
+            case "window.maximize": Snap("max"); break;
+            case "window.bottom": Snap("bottom"); break;
+            case "window.top-left": Snap("top-left"); break;
+            case "window.top-right": Snap("top-right"); break;
+            case "window.bottom-left": Snap("bottom-left"); break;
+            case "window.bottom-right": Snap("bottom-right"); break;
+            case "window.third-left": Snap("third-left"); break;
+            case "window.third-right": Snap("third-right"); break;
+            default: return Task.FromResult(PluginCommandResult.Failure($"未知窗口命令: {invocation.CommandId}"));
         }
 
-        return panel;
+        return Task.FromResult(PluginCommandResult.Success("窗口布局已应用"));
     }
 
     private void ToggleTopmost()
     {
-        var hwnd = GetForegroundWindow();
-        if (hwnd == IntPtr.Zero) return;
-        bool isTopmost = (GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
-        SetWindowPos(hwnd, isTopmost ? HWND_NOTOPMOST : HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW);
-        LongBetterWindows.Host.Views.FloatingHudWindow.ShowToast(isTopmost ? "已取消置顶" : "窗口已置顶");
+        var window = GetForegroundWindow();
+        if (window == IntPtr.Zero) return;
+        var isTopmost = (GetWindowLong(window, GwlExstyle) & WsExTopmost) != 0;
+        SetWindowPos(window, isTopmost ? HwndNotopmost : HwndTopmost, 0, 0, 0, 0,
+            SwpNosize | SwpNomove | SwpShowwindow);
+        FloatingHudWindow.ShowToast(isTopmost ? "已取消窗口置顶" : "窗口已置顶");
     }
 
     private void Snap(string layout)
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            var hwnd = GetForegroundWindow();
-            if (hwnd == IntPtr.Zero) return;
+            var window = GetForegroundWindow();
+            if (window == IntPtr.Zero) return;
+            var monitor = MonitorFromWindow(window, MonitorDefaulttonearest);
+            var monitorInfo = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
+            if (!GetMonitorInfoW(monitor, ref monitorInfo)) return;
 
-            // 获取窗口所在显示器的工作区域（支持多屏）
-            var hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            var mi = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
-            GetMonitorInfoW(hMonitor, ref mi);
-
-            int L = mi.rcWork.Left, T = mi.rcWork.Top;
-            int W = mi.rcWork.Right - mi.rcWork.Left;
-            int H = mi.rcWork.Bottom - mi.rcWork.Top;
-
-            (int x, int y, int w, int h) = layout switch
+            var left = monitorInfo.Work.Left;
+            var top = monitorInfo.Work.Top;
+            var width = monitorInfo.Work.Right - left;
+            var height = monitorInfo.Work.Bottom - top;
+            var target = layout switch
             {
-                "left" => (L, T, W / 2, H),
-                "right" => (L + W / 2, T, W / 2, H),
-                "max" => (L, T, W, H),
-                "bottom" => (L, T + H / 2, W, H / 2),
-                "top-left" => (L, T, W / 2, H / 2),
-                "top-right" => (L + W / 2, T, W / 2, H / 2),
-                "bottom-left" => (L, T + H / 2, W / 2, H / 2),
-                "bottom-right" => (L + W / 2, T + H / 2, W / 2, H / 2),
-                "third-left" => (L, T, W / 3, H),
-                "third-right" => (L, T, W * 2 / 3, H),
-                _ => (L, T, W, H),
+                "left" => (left, top, width / 2, height),
+                "right" => (left + width / 2, top, width / 2, height),
+                "max" => (left, top, width, height),
+                "bottom" => (left, top + height / 2, width, height / 2),
+                "top-left" => (left, top, width / 2, height / 2),
+                "top-right" => (left + width / 2, top, width / 2, height / 2),
+                "bottom-left" => (left, top + height / 2, width / 2, height / 2),
+                "bottom-right" => (left + width / 2, top + height / 2, width / 2, height / 2),
+                "third-left" => (left, top, width / 3, height),
+                "third-right" => (left + width / 3, top, width * 2 / 3, height),
+                _ => (left, top, width, height),
             };
 
-            SetWindowPos(hwnd, IntPtr.Zero, x, y, w, h, SWP_SHOWWINDOW);
-            LongBetterWindows.Host.Views.FloatingHudWindow.ShowToast(
-                layout switch { "left"=>"左半屏","right"=>"右半屏","max"=>"最大化","bottom"=>"下半屏",
-                "top-left"=>"左上","top-right"=>"右上","bottom-left"=>"左下","bottom-right"=>"右下",
-                "third-left"=>"左⅓","third-right"=>"右⅔", _=>layout });
+            SetWindowPos(window, IntPtr.Zero, target.Item1, target.Item2, target.Item3, target.Item4, SwpShowwindow);
+            FloatingHudWindow.ShowToast(LayoutName(layout));
         });
     }
+
+    private static string LayoutName(string layout) => layout switch
+    {
+        "left" => "左半屏", "right" => "右半屏", "max" => "最大化", "bottom" => "下半屏",
+        "top-left" => "左上四分屏", "top-right" => "右上四分屏",
+        "bottom-left" => "左下四分屏", "bottom-right" => "右下四分屏",
+        "third-left" => "左侧三分之一", "third-right" => "右侧三分之二", _ => layout,
+    };
+
+    private static readonly IntPtr HwndTopmost = new(-1);
+    private static readonly IntPtr HwndNotopmost = new(-2);
+    private const uint SwpNosize = 0x0001, SwpNomove = 0x0002, SwpShowwindow = 0x0040;
+    private const int GwlExstyle = -20, WsExTopmost = 0x0008;
+    private const uint MonitorDefaulttonearest = 2;
+
+    [StructLayout(LayoutKind.Sequential)] private struct MonitorInfo { public uint Size; public Rect Monitor; public Rect Work; public uint Flags; }
+    [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr window, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+    [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr window, int index);
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfoW(IntPtr monitor, ref MonitorInfo info);
 }

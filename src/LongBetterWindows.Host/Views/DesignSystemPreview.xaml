@@ -1,0 +1,137 @@
+<Window x:Class="LongBetterWindows.Host.Views.DesignSystemPreview"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Long Design System"
+        Width="920" Height="720" MinWidth="760" MinHeight="560"
+        Style="{StaticResource LongWindowChrome}"
+        WindowStartupLocation="CenterOwner">
+    <Border Background="{DynamicResource Long.Brush.Background.Base}"
+            BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+            BorderThickness="1" CornerRadius="{DynamicResource Long.Radius.Card}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="56" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{DynamicResource Long.Brush.Background.Raised}"
+                    CornerRadius="14,14,0,0" BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                    BorderThickness="0,0,0,1" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid Margin="20,0,10,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Path Data="{StaticResource Long.Icon.Sparkle}" Style="{StaticResource LongIcon}"
+                              Stroke="{DynamicResource Long.Brush.Accent.Primary}" />
+                        <TextBlock Text="Long Design System" Margin="10,0,0,0" FontSize="16"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                        <Border Style="{StaticResource LongBadge}" Margin="10,0,0,0">
+                            <TextBlock Text="v1.0" FontSize="10" Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                        </Border>
+                    </StackPanel>
+                    <Button HorizontalAlignment="Right" Style="{StaticResource LongIconButton}"
+                            AutomationProperties.Name="关闭设计系统预览" Click="Close_Click">
+                        <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}" Width="16" Height="16" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" Style="{StaticResource DarkScrollViewerStyle}"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="28">
+                    <TextBlock Text="克制华丽，清晰高效" FontSize="{DynamicResource Long.Type.Display}"
+                               FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                    <TextBlock Text="深色石墨、冷色高光与电光紫构成长窗口的视觉骨架；所有组件共享语义令牌和状态逻辑。"
+                               Margin="0,8,0,26" FontSize="{DynamicResource Long.Type.Body}"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+
+                    <TextBlock Text="色彩令牌" FontSize="{DynamicResource Long.Type.Title}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Long.Brush.Text.Primary}" Margin="0,0,0,14" />
+                    <UniformGrid Columns="6" Margin="0,0,0,28">
+                        <Border Style="{StaticResource LongCard}" Background="{DynamicResource Long.Brush.Accent.Primary}" Margin="0,0,8,0"><TextBlock Text="Accent" Foreground="White" /></Border>
+                        <Border Style="{StaticResource LongCard}" Background="{DynamicResource Long.Brush.Surface.Card}" Margin="0,0,8,0"><TextBlock Text="Card" Foreground="{DynamicResource Long.Brush.Text.Primary}" /></Border>
+                        <Border Style="{StaticResource LongCard}" Background="{DynamicResource Long.Brush.Surface.Hover}" Margin="0,0,8,0"><TextBlock Text="Hover" Foreground="{DynamicResource Long.Brush.Text.Primary}" /></Border>
+                        <Border Style="{StaticResource LongCard}" Background="{DynamicResource Long.Brush.State.Success}" Margin="0,0,8,0"><TextBlock Text="Success" Foreground="White" /></Border>
+                        <Border Style="{StaticResource LongCard}" Background="{DynamicResource Long.Brush.State.Warning}" Margin="0,0,8,0"><TextBlock Text="Warning" Foreground="White" /></Border>
+                        <Border Style="{StaticResource LongCard}" Background="{DynamicResource Long.Brush.State.Danger}"><TextBlock Text="Danger" Foreground="White" /></Border>
+                    </UniformGrid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="24" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="操作与状态" FontSize="{DynamicResource Long.Type.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Long.Brush.Text.Primary}" Margin="0,0,0,14" />
+                            <Border Style="{StaticResource LongCard}">
+                                <StackPanel>
+                                    <WrapPanel Margin="0,0,0,16">
+                                        <Button Content="主要操作" Style="{StaticResource LongButton.Primary}" Margin="0,0,8,8" AutomationProperties.Name="主要操作" />
+                                        <Button Content="次要操作" Style="{StaticResource LongButton}" Margin="0,0,8,8" AutomationProperties.Name="次要操作" />
+                                        <Button Content="危险操作" Style="{StaticResource LongButton.Danger}" Margin="0,0,8,8" AutomationProperties.Name="危险操作" />
+                                        <Button Content="禁用状态" Style="{StaticResource LongButton}" IsEnabled="False" Margin="0,0,8,8" />
+                                    </WrapPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <ToggleButton Style="{StaticResource LongToggle}" IsChecked="True" AutomationProperties.Name="启用动效" />
+                                        <TextBlock Text="启用自然动效" Margin="10,0,0,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                    </StackPanel>
+                                    <ProgressBar Style="{StaticResource LongLoadingState}" Margin="0,18,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="导航" FontSize="{DynamicResource Long.Type.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Long.Brush.Text.Primary}" Margin="0,24,0,14" />
+                            <Border Style="{StaticResource LongCard}">
+                                <StackPanel>
+                                    <RadioButton Content="命令中心" GroupName="PreviewNav" IsChecked="True" Style="{StaticResource LongNavigationItem}" />
+                                    <RadioButton Content="插件管理" GroupName="PreviewNav" Style="{StaticResource LongNavigationItem}" />
+                                    <RadioButton Content="设计与开发" GroupName="PreviewNav" Style="{StaticResource LongNavigationItem}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="输入与内容" FontSize="{DynamicResource Long.Type.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Long.Brush.Text.Primary}" Margin="0,0,0,14" />
+                            <Border Style="{StaticResource LongCard}">
+                                <StackPanel>
+                                    <TextBox Style="{StaticResource LongSearchBox}" Text="搜索插件或输入命令"
+                                             AutomationProperties.Name="搜索示例" Margin="0,0,0,12" />
+                                    <TextBox Style="{StaticResource LongTextBox}" Text="标准输入框"
+                                             AutomationProperties.Name="标准输入示例" Margin="0,0,0,12" />
+                                    <TextBox Style="{StaticResource LongTextBox.Error}" Text="错误状态输入"
+                                             AutomationProperties.Name="错误输入示例" />
+                                    <TextBlock Text="请检查输入内容" Foreground="{DynamicResource Long.Brush.State.Danger}"
+                                               FontSize="{DynamicResource Long.Type.Caption}" Margin="4,6,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="标签与反馈" FontSize="{DynamicResource Long.Type.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Long.Brush.Text.Primary}" Margin="0,24,0,14" />
+                            <Border Style="{StaticResource LongCard}">
+                                <StackPanel>
+                                    <WrapPanel Margin="0,0,0,16">
+                                        <Border Style="{StaticResource LongBadge}" Margin="0,0,8,0"><TextBlock Text="内置插件" Foreground="{DynamicResource Long.Brush.Text.Primary}" /></Border>
+                                        <Border Style="{StaticResource LongHotkeyBadge}" Margin="0,0,8,0"><TextBlock Text="Alt + Space" FontFamily="{DynamicResource Long.Font.Mono}" Foreground="{DynamicResource Long.Brush.Text.Secondary}" /></Border>
+                                    </WrapPanel>
+                                    <Border Style="{StaticResource LongToast}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="{StaticResource Long.Icon.Check}" Style="{StaticResource LongIcon}"
+                                                  Stroke="{DynamicResource Long.Brush.State.Success}" />
+                                            <StackPanel Margin="10,0,0,0">
+                                                <TextBlock Text="操作已完成" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                                                <TextBlock Text="结果已复制到剪贴板" FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

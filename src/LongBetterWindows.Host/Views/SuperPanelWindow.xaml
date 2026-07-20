@@ -1,0 +1,305 @@
+<Window x:Class="LongBetterWindows.Host.Views.SuperPanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Long 超级面板"
+        Width="640" Height="450"
+        MinWidth="560" MinHeight="360"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="False"
+        Background="{DynamicResource Long.Brush.Surface.Overlay}"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Style="{StaticResource LongWindowChrome}"
+        WindowStartupLocation="Manual"
+        Deactivated="Window_Deactivated"
+        AutomationProperties.AutomationId="Long.SuperPanel"
+        AutomationProperties.Name="Long 超级面板"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Border x:Name="PanelChrome"
+            Background="{DynamicResource Long.Brush.Surface.Overlay}"
+            BorderBrush="{DynamicResource Long.Brush.Stroke.Strong}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource Long.Radius.Flyout}"
+            Padding="16">
+        <Border.Effect>
+            <StaticResource ResourceKey="Long.Shadow.Level3" />
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Height="2" VerticalAlignment="Top" Margin="18,-16,18,0"
+                    CornerRadius="0,0,3,3"
+                    Background="{DynamicResource Long.Brush.Accent.Gradient}" />
+
+            <Grid Grid.Row="0" Margin="2,2,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="34" Height="34" CornerRadius="11"
+                        Background="{DynamicResource Long.Brush.Accent.Gradient}">
+                    <Path Data="{StaticResource Long.Icon.Sparkle}" Style="{StaticResource LongIcon}"
+                          Width="18" Height="18" Stroke="White"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <StackPanel Grid.Column="1" Margin="11,0,12,0" VerticalAlignment="Center">
+                    <TextBlock Text="Long 超级面板" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                    <TextBlock x:Name="ContextSummary" Text="正在读取当前上下文…" FontSize="10" Margin="0,2,0,0"
+                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                </StackPanel>
+                <Button Grid.Column="2" Style="{StaticResource LongButton}" Height="30"
+                        Padding="10,0" Margin="0,0,6,0" Click="OpenCommandCenter_Click"
+                        AutomationProperties.AutomationId="Long.SuperPanel.OpenCommandCenter"
+                        AutomationProperties.Name="打开完整命令中心">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Long.Icon.Search}" Style="{StaticResource LongIcon}"
+                              Width="13" Height="13" />
+                        <TextBlock Text="命令中心" FontSize="10" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="3" Style="{StaticResource LongIconButton}" Width="30" Height="30"
+                        Click="Close_Click" AutomationProperties.Name="关闭超级面板">
+                    <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}"
+                          Width="12" Height="12" />
+                </Button>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="0,11,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ItemsControl x:Name="GroupTabs"
+                              AutomationProperties.AutomationId="Long.SuperPanel.Groups">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Tag="{Binding Id}" Click="GroupButton_Click"
+                                        AllowDrop="True" DragOver="GroupButton_DragOver" Drop="GroupButton_Drop"
+                                        Height="30" MinWidth="86" Padding="10,0" Margin="0,0,6,0"
+                                        ToolTip="{Binding Hint}"
+                                        AutomationProperties.Name="{Binding Title}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource LongButton}">
+                                            <Setter Property="Background" Value="{DynamicResource Long.Brush.Surface.Card}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource Long.Brush.Accent.Soft}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource Long.Brush.Accent.Primary}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Title}" MaxWidth="88" TextTrimming="CharacterEllipsis"
+                                                   FontSize="10" FontWeight="SemiBold" />
+                                        <Border Margin="7,0,0,0" Padding="5,1" CornerRadius="6"
+                                                Background="{DynamicResource Long.Brush.Background.Raised}">
+                                            <TextBlock Text="{Binding Count}" FontSize="9"
+                                                       Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                        </Border>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel x:Name="CustomGroupActions" Grid.Column="1" Orientation="Horizontal"
+                            Margin="2,0,4,0" Visibility="Collapsed">
+                    <Button Style="{StaticResource LongIconButton}" Width="28" Height="28"
+                            Content="✎" Click="RenameGroup_Click"
+                            ToolTip="重命名当前分组" AutomationProperties.Name="重命名当前分组" />
+                    <Button Style="{StaticResource LongIconButton}" Width="28" Height="28"
+                            Content="×" Margin="2,0,0,0" Click="DeleteGroup_Click"
+                            ToolTip="删除当前分组" AutomationProperties.Name="删除当前分组" />
+                </StackPanel>
+                <Button x:Name="AddGroupButton" Grid.Column="2" Style="{StaticResource LongIconButton}"
+                        Width="30" Height="30" Content="+" Click="AddGroup_Click"
+                        ToolTip="新建操作分组" AutomationProperties.Name="新建操作分组" />
+                <Popup x:Name="GroupEditorPopup" PlacementTarget="{Binding ElementName=AddGroupButton}"
+                       Placement="Bottom" HorizontalOffset="-196" VerticalOffset="6"
+                       AllowsTransparency="True" StaysOpen="False">
+                    <Border Width="232" Padding="12" CornerRadius="12"
+                            Background="{DynamicResource Long.Brush.Surface.Overlay}"
+                            BorderBrush="{DynamicResource Long.Brush.Stroke.Strong}" BorderThickness="1">
+                        <Border.Effect><StaticResource ResourceKey="Long.Shadow.Level2" /></Border.Effect>
+                        <StackPanel>
+                            <TextBlock x:Name="GroupEditorTitle" Text="新建分组" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                            <TextBox x:Name="GroupNameTextBox" Margin="0,9,0,9" MaxLength="24" Height="32"
+                                     VerticalContentAlignment="Center" PreviewKeyDown="GroupNameTextBox_PreviewKeyDown"
+                                     AutomationProperties.Name="分组名称" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Style="{StaticResource LongButton}" Content="取消" Height="28"
+                                        Click="CancelGroupEditor_Click" />
+                                <Button Style="{StaticResource LongButton.Primary}" Content="保存" Height="28"
+                                        Margin="6,0,0,0" Click="SaveGroupEditor_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Popup>
+            </Grid>
+
+            <ItemsControl x:Name="ContextBadges" Grid.Row="2" Margin="0,0,0,7"
+                          Visibility="Collapsed">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource LongBadge}" Margin="2,0,4,3">
+                            <TextBlock Text="{Binding Label}" MaxWidth="180" TextTrimming="CharacterEllipsis"
+                                       FontSize="10" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Grid Grid.Row="3">
+                <ListBox x:Name="ResultsList" BorderThickness="0" Background="Transparent"
+                         AutomationProperties.AutomationId="Long.SuperPanel.Results"
+                         AutomationProperties.Name="超级面板结果"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         AllowDrop="True"
+                         PreviewMouseLeftButtonDown="ResultsList_PreviewMouseLeftButtonDown"
+                         PreviewMouseMove="ResultsList_PreviewMouseMove"
+                         MouseLeftButtonUp="ResultsList_MouseLeftButtonUp"
+                         DragOver="ResultsList_DragOver"
+                         Drop="ResultsList_Drop">
+                    <ListBox.Resources>
+                        <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}" />
+                    </ListBox.Resources>
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemWidth="292" ItemHeight="78" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="3" />
+                            <Setter Property="Background" Value="Transparent" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Card" Padding="12,10" MinHeight="72"
+                                                Background="{DynamicResource Long.Brush.Surface.Card}"
+                                                BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                                                BorderThickness="1" CornerRadius="12">
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Card" Property="Background"
+                                                        Value="{DynamicResource Long.Brush.Surface.Hover}" />
+                                                <Setter TargetName="Card" Property="BorderBrush"
+                                                        Value="{DynamicResource Long.Brush.Accent.Primary}" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Card" Property="Background"
+                                                        Value="{DynamicResource Long.Brush.Accent.Soft}" />
+                                                <Setter TargetName="Card" Property="BorderBrush"
+                                                        Value="{DynamicResource Long.Brush.Accent.Primary}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Long.Brush.Text.Primary}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Long.Brush.Text.Secondary}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Source}" FontSize="9" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Click="SecondaryActions_Click"
+                                        Width="26" Height="26" Margin="8,0,0,0"
+                                        Content="⋯" ToolTip="更多操作"
+                                        AutomationProperties.AutomationId="Long.Result.MoreActions"
+                                        AutomationProperties.Name="更多结果操作">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource LongIconButton}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasSecondaryActions}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Button Grid.Column="2" Tag="{Binding Id}" Click="PinResult_Click"
+                                        Width="26" Height="26" Margin="8,0,0,0"
+                                        ToolTip="固定或取消固定" AutomationProperties.Name="固定或取消固定结果">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource LongIconButton}">
+                                            <Setter Property="Content" Value="☆" />
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Text.Muted}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CanPin}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                                    <Setter Property="Content" Value="★" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Accent.Primary}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <StackPanel x:Name="EmptyState" Visibility="Collapsed"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Path Data="{StaticResource Long.Icon.Command}" Style="{StaticResource LongIcon}"
+                          Width="28" Height="28" HorizontalAlignment="Center"
+                          Stroke="{DynamicResource Long.Brush.Text.Muted}" />
+                    <TextBlock x:Name="EmptyStateText" Text="当前上下文没有可用操作" Style="{StaticResource LongEmptyState}"
+                               Margin="0,10,0,0" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="4" Margin="4,9,4,0">
+                <TextBlock x:Name="InteractionHint" Text="Enter 执行 · Shift+Enter 次级动作 · 滚轮切组 · Esc 返回" FontSize="10"
+                           Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                <TextBlock x:Name="StatusText" HorizontalAlignment="Right" FontSize="10"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

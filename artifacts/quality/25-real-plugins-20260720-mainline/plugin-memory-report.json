@@ -1,0 +1,80 @@
+﻿{
+    "schema_version":  1,
+    "measured_at":  "2026-07-20T02:53:13.1047661+00:00",
+    "classification":  "distinct_builtin_plugin_memory_probe",
+    "plugin_count":  25,
+    "unique_plugin_ids":  [
+                              "com.long.base64",
+                              "com.long.clipboardhistory",
+                              "com.long.clipboard-tool",
+                              "com.long.color-picker",
+                              "com.long.devtoolkit",
+                              "com.long.fileorganizer",
+                              "com.long.file-renamer",
+                              "com.long.folder-note",
+                              "com.long.hardwaremonitor",
+                              "com.long.json-formatter",
+                              "com.long.macro",
+                              "com.long.markdown-preview",
+                              "com.long.password-gen",
+                              "com.long.portmanager",
+                              "com.long.quicklaunch",
+                              "com.long.quick-note",
+                              "com.long.regex-tester",
+                              "com.long.sample",
+                              "com.long.screenshot",
+                              "com.long.text-diff",
+                              "com.long.timestamp-converter",
+                              "com.long.translate",
+                              "com.long.url-toolkit",
+                              "com.long.uuid-generator",
+                              "com.long.window-manager"
+                          ],
+    "command_count_minimum":  37,
+    "samples":  [
+                    {
+                        "sample":  1,
+                        "plugins":  25,
+                        "commands":  37,
+                        "working_set_mb":  181.4,
+                        "private_mb":  149.1,
+                        "exit_code":  0
+                    },
+                    {
+                        "sample":  2,
+                        "plugins":  25,
+                        "commands":  37,
+                        "working_set_mb":  165.6,
+                        "private_mb":  157.9,
+                        "exit_code":  0
+                    },
+                    {
+                        "sample":  3,
+                        "plugins":  25,
+                        "commands":  37,
+                        "working_set_mb":  180.8,
+                        "private_mb":  170.5,
+                        "exit_code":  0
+                    },
+                    {
+                        "sample":  4,
+                        "plugins":  25,
+                        "commands":  37,
+                        "working_set_mb":  165.4,
+                        "private_mb":  157.9,
+                        "exit_code":  0
+                    },
+                    {
+                        "sample":  5,
+                        "plugins":  25,
+                        "commands":  37,
+                        "working_set_mb":  165.4,
+                        "private_mb":  157.1,
+                        "exit_code":  0
+                    }
+                ],
+    "median_working_set_mb":  165.6,
+    "maximum_working_set_mb":  181.4,
+    "working_set_limit_mb":  200,
+    "passed":  true
+}

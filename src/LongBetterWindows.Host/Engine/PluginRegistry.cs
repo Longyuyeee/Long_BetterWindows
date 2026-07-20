@@ -1,6 +1,7 @@
 using System.Text.Json;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
+using LongBetterWindows.Host.Interaction;
 using Serilog;
 
 namespace LongBetterWindows.Host.Engine
@@ -9,9 +10,29 @@ namespace LongBetterWindows.Host.Engine
     {
         private readonly Dictionary<string, PluginEntry> _entries = new();
         private readonly object _lock = new();
+        private SearchCoordinator? _searchCoordinator;
+        private Func<string, Task>? _hostResourceReleaser;
+
+        /// <summary>随插件注册和注销自动同步的功能指令索引。</summary>
+        public CommandRegistry Commands { get; } = new();
 
         /// <summary>插件注册/注销/状态变化时触发（在 UI 线程订阅后需自行 Dispatch）</summary>
         public event Action? PluginsChanged;
+
+        public void AttachSearchCoordinator(SearchCoordinator coordinator)
+        {
+            ArgumentNullException.ThrowIfNull(coordinator);
+            lock (_lock)
+            {
+                _searchCoordinator = coordinator;
+                foreach (var entry in _entries.Values)
+                    SyncSearchProvider(entry);
+            }
+        }
+
+        public void AttachHostResourceReleaser(Func<string, Task> releaser)
+            => _hostResourceReleaser = releaser
+                ?? throw new ArgumentNullException(nameof(releaser));
 
         public int Count
         {
@@ -51,6 +72,7 @@ namespace LongBetterWindows.Host.Engine
                 };
 
                 _entries[manifest.Id] = entry;
+                Commands.RegisterManifest(manifest);
                 Log.Information("插件 {PluginId} (v{Version}) 已注册", manifest.Id, manifest.Version);
             }
 
@@ -65,8 +87,10 @@ namespace LongBetterWindows.Host.Engine
                 if (!_entries.TryGetValue(pluginId, out var entry))
                     return false;
 
-                entry.State = PluginState.Disabled;
+                entry.State = PluginState.Stopped;
+                _searchCoordinator?.UnregisterProvider("plugin:" + pluginId);
                 _entries.Remove(pluginId);
+                Commands.UnregisterPlugin(pluginId);
                 Log.Information("插件 {PluginId} 已注销", pluginId);
             }
 
@@ -81,7 +105,18 @@ namespace LongBetterWindows.Host.Engine
                 if (!_entries.TryGetValue(pluginId, out var entry))
                     return false;
 
+                if (!CanTransition(entry.State, state))
+                {
+                    Log.Warning(
+                        "插件 {PluginId} 生命周期转换被拒绝: {FromState} -> {ToState}",
+                        pluginId,
+                        entry.State,
+                        state);
+                    return false;
+                }
+
                 entry.State = state;
+                SyncSearchProvider(entry);
             }
 
             NotifyChanged();
@@ -97,6 +132,25 @@ namespace LongBetterWindows.Host.Engine
         private void NotifyChanged()
         {
             PluginsChanged?.Invoke();
+        }
+
+        private void SyncSearchProvider(PluginEntry entry)
+        {
+            if (_searchCoordinator is null || entry.Instance is not ISearchProvider provider)
+                return;
+
+            var providerId = "plugin:" + entry.Id;
+            var searchAvailable = entry.State == PluginState.Running
+                || entry.State == PluginState.Background && entry.Lifecycle.SearchInBackground;
+            if (searchAvailable)
+            {
+                _searchCoordinator.RegisterProvider(
+                    new PluginSearchProviderAdapter(entry.Id, provider));
+            }
+            else
+            {
+                _searchCoordinator.UnregisterProvider(providerId);
+            }
         }
 
         public IReadOnlyList<string> GetPluginCapabilities(string pluginId)
@@ -122,7 +176,11 @@ namespace LongBetterWindows.Host.Engine
                 {
                     if (entry.Instance is ILongPlugin plugin)
                     {
-                        var ok = await plugin.StartAsync();
+                        var ok = entry.State == PluginState.Background
+                            ? plugin is IPluginBackgroundLifecycle background
+                                ? await background.ResumeAsync()
+                                : true
+                            : await plugin.StartAsync();
                         if (ok)
                         {
                             SetState(pluginId, PluginState.Running);
@@ -149,7 +207,9 @@ namespace LongBetterWindows.Host.Engine
             }
         }
 
-        public async Task<bool> StopPluginAsync(string pluginId)
+        public async Task<bool> StopPluginAsync(
+            string pluginId,
+            bool persistAutoStart = true)
         {
             PluginEntry? entry;
             lock (_lock)
@@ -157,7 +217,8 @@ namespace LongBetterWindows.Host.Engine
                 entry = Get(pluginId);
             }
 
-            if (entry == null || entry.State != PluginState.Running) return false;
+            if (entry == null || entry.State is not (PluginState.Running or PluginState.Background))
+                return false;
 
             try
             {
@@ -165,12 +226,21 @@ namespace LongBetterWindows.Host.Engine
                 {
                     if (entry.Instance is ILongPlugin plugin)
                     {
-                        await plugin.StopAsync();
+                        if (!await plugin.StopAsync())
+                        {
+                            Log.Warning("插件 {PluginId} 拒绝停止", pluginId);
+                            return false;
+                        }
                     }
+                    if (entry.Instance is IPluginResourceLifecycle resources)
+                        await resources.ReleaseResourcesAsync();
                 }
-                SetState(pluginId, PluginState.Disabled);
-                entry.SetSetting("auto_start", "false");
-                Log.Information("插件 {PluginId} 已禁用", pluginId);
+                if (_hostResourceReleaser is not null)
+                    await _hostResourceReleaser(pluginId);
+                SetState(pluginId, PluginState.Stopped);
+                if (persistAutoStart)
+                    entry.SetSetting("auto_start", "false");
+                Log.Information("插件 {PluginId} 已停止", pluginId);
                 return true;
             }
             catch (Exception ex)
@@ -178,6 +248,92 @@ namespace LongBetterWindows.Host.Engine
                 Log.Error(ex, "插件 {PluginId} 停止失败", pluginId);
                 return false;
             }
+        }
+
+        public async Task<bool> MoveToBackgroundAsync(string pluginId)
+        {
+            var entry = Get(pluginId);
+            if (entry == null || entry.State != PluginState.Running
+                || entry.Lifecycle.CloseBehavior != PluginCloseBehavior.Background)
+                return false;
+
+            try
+            {
+                using (PluginAccessContext.Enter(pluginId))
+                {
+                    if (entry.Instance is IPluginBackgroundLifecycle background
+                        && !await background.EnterBackgroundAsync())
+                        return false;
+                }
+
+                if (!SetState(pluginId, PluginState.Background))
+                    return false;
+
+                Log.Information("插件 {PluginId} 已转入后台", pluginId);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "插件 {PluginId} 转入后台失败", pluginId);
+                SetState(pluginId, PluginState.Error);
+                return false;
+            }
+        }
+
+        public Task<bool> HandleWindowClosedAsync(string pluginId)
+        {
+            var entry = Get(pluginId);
+            if (entry == null) return Task.FromResult(false);
+            return entry.Lifecycle.CloseBehavior == PluginCloseBehavior.Background
+                ? MoveToBackgroundAsync(pluginId)
+                : StopPluginAsync(pluginId, persistAutoStart: false);
+        }
+
+        public async Task ShutdownAllAsync()
+        {
+            foreach (var entry in GetAll())
+            {
+                try
+                {
+                    if (entry.State is PluginState.Running or PluginState.Background)
+                    {
+                        await StopPluginAsync(entry.Id, persistAutoStart: false);
+                    }
+                    else
+                    {
+                        using (PluginAccessContext.Enter(entry.Id))
+                        {
+                            if (entry.Instance is IPluginResourceLifecycle resources)
+                                await resources.ReleaseResourcesAsync();
+                        }
+                        if (_hostResourceReleaser is not null)
+                            await _hostResourceReleaser(entry.Id);
+                    }
+
+                    if (entry.Instance is IAsyncDisposable asyncDisposable)
+                        await asyncDisposable.DisposeAsync();
+                    else if (entry.Instance is IDisposable disposable)
+                        disposable.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "插件 {PluginId} 退出释放失败", entry.Id);
+                }
+            }
+        }
+
+        public static bool CanTransition(PluginState from, PluginState to)
+        {
+            if (from == to) return true;
+            return from switch
+            {
+                PluginState.Loaded => to is PluginState.Running or PluginState.Stopped or PluginState.Error,
+                PluginState.Running => to is PluginState.Background or PluginState.Stopped or PluginState.Error,
+                PluginState.Background => to is PluginState.Running or PluginState.Stopped or PluginState.Error,
+                PluginState.Stopped => to is PluginState.Running or PluginState.Error,
+                PluginState.Error => to is PluginState.Running or PluginState.Stopped,
+                _ => false,
+            };
         }
 
         public static string? GetPluginHotkey(PluginEntry entry)

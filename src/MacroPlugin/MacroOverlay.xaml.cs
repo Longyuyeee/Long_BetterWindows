@@ -1,11 +1,14 @@
 using System.Windows;
-using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace MacroPlugin;
 
 public partial class MacroOverlay : Window
 {
+    private DispatcherTimer? _hideTimer;
+
     public MacroOverlay()
     {
         InitializeComponent();
@@ -28,12 +31,22 @@ public partial class MacroOverlay : Window
     {
         Dispatcher.Invoke(() =>
         {
-            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
+            CancelPendingHide();
+            StatusBorder.Background = (Brush)FindResource("Long.Brush.State.Danger");
+            SetForeground("Long.Brush.Text.OnAccent", "Long.Brush.Text.OnAccentMuted");
             StatusText.Text = "REC";
             CountText.Text = count > 0 ? $"{count}" : "";
 
             // 录制时闪烁红点
-            var anim = new DoubleAnimation(0.3, 1, TimeSpan.FromMilliseconds(500))
+            var duration = Application.Current.Resources["Long.Motion.Slow"] is Duration token
+                ? token.TimeSpan
+                : TimeSpan.FromMilliseconds(280);
+            if (duration == TimeSpan.Zero)
+            {
+                StatusDot.Opacity = 1;
+                return;
+            }
+            var anim = new DoubleAnimation(0.35, 1, duration)
             {
                 RepeatBehavior = RepeatBehavior.Forever,
                 AutoReverse = true,
@@ -46,7 +59,9 @@ public partial class MacroOverlay : Window
     {
         Dispatcher.Invoke(() =>
         {
-            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xFF));
+            CancelPendingHide();
+            StatusBorder.Background = (Brush)FindResource("Long.Brush.Accent.Primary");
+            SetForeground("Long.Brush.Text.OnAccent", "Long.Brush.Text.OnAccentMuted");
             StatusText.Text = isLoop ? "LOOP" : "PLAY";
             StatusDot.BeginAnimation(OpacityProperty, null);
             StatusDot.Opacity = 1;
@@ -59,23 +74,48 @@ public partial class MacroOverlay : Window
         {
             StatusText.Text = "STOP";
             CountText.Text = "";
-            StatusDot.Fill = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80));
+            StatusBorder.Background = (Brush)FindResource("Long.Brush.Surface.Card");
+            SetForeground("Long.Brush.Text.Primary", "Long.Brush.Text.Muted");
             StatusDot.BeginAnimation(OpacityProperty, null);
             StatusDot.Opacity = 1;
 
             // 2秒后自动隐藏
-            var timer = new System.Windows.Threading.DispatcherTimer
+            CancelPendingHide();
+            _hideTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(2),
             };
-            timer.Tick += (_, _) =>
+            _hideTimer.Tick += (_, _) =>
             {
-                timer.Stop();
-                var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
+                CancelPendingHide();
+                var duration = Application.Current.Resources["Long.Motion.Normal"] is Duration token
+                    ? token.TimeSpan
+                    : TimeSpan.FromMilliseconds(180);
+                if (duration == TimeSpan.Zero)
+                {
+                    Hide();
+                    return;
+                }
+                var fade = new DoubleAnimation(1, 0, duration);
                 fade.Completed += (_, _) => Hide();
                 BeginAnimation(OpacityProperty, fade);
             };
-            timer.Start();
+            _hideTimer.Start();
         });
+    }
+
+    private void SetForeground(string primaryKey, string secondaryKey)
+    {
+        StatusDot.Fill = (Brush)FindResource(primaryKey);
+        StatusText.Foreground = (Brush)FindResource(primaryKey);
+        CountText.Foreground = (Brush)FindResource(secondaryKey);
+    }
+
+    private void CancelPendingHide()
+    {
+        _hideTimer?.Stop();
+        _hideTimer = null;
+        BeginAnimation(OpacityProperty, null);
+        Opacity = 1;
     }
 }

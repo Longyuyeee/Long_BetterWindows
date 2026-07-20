@@ -1,17 +1,29 @@
 {
   "id": "com.long.clipboard-tool",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "剪贴板工具箱",
   "author": "Long",
   "entry_point": "index.html",
   "runtime": "webview",
-  "capabilities": [
-    "system.clipboard",
-    "system.hotkey",
-    "shell.selection",
-    "storage.local"
+  "capabilities": ["system.clipboard", "storage.local"],
+  "commands": [
+    {
+      "id": "clipboard.open",
+      "title": "打开剪贴板工具箱",
+      "description": "查看历史、固定内容或转换文本",
+      "aliases": ["剪贴板", "clipboard", "历史剪贴板", "jiantieban"],
+      "accepted_inputs": ["text", "clipboard"],
+      "view_mode": "list",
+      "keep_alive": true,
+      "priority": 26
+    }
   ],
-  "default_settings": {
-    "hotkey": "Ctrl+Shift+V"
-  }
+  "window": {
+    "mode": "standard",
+    "preferred_width": 780,
+    "preferred_height": 760,
+    "min_width": 620,
+    "min_height": 540
+  },
+  "default_settings": {"auto_start": true}
 }

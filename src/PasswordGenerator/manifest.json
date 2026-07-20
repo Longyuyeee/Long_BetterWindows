@@ -1,1 +1,28 @@
-{"id":"com.long.password-gen","version":"1.0.0","name":"密码生成器","author":"Long","entry_point":"index.html","runtime":"webview","capabilities":["system.clipboard"],"default_settings":{"auto_start":true}}
+{
+  "id": "com.long.password-gen",
+  "version": "1.1.0",
+  "name": "密码生成器",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": ["system.clipboard"],
+  "commands": [
+    {
+      "id": "password.generate",
+      "title": "生成安全密码",
+      "description": "打开密码生成器并立即生成一组安全密码",
+      "aliases": ["密码", "password", "随机密码", "mima"],
+      "accepted_inputs": ["none"],
+      "view_mode": "form",
+      "priority": 14
+    }
+  ],
+  "window": {
+    "mode": "compact",
+    "preferred_width": 620,
+    "preferred_height": 650,
+    "min_width": 520,
+    "min_height": 560
+  },
+  "default_settings": {"auto_start": true}
+}

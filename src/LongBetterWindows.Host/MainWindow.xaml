@@ -2,71 +2,142 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:LongBetterWindows.Host.Views"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Long窗口·全能助手"
-        MinWidth="720" MinHeight="520"
-        Width="960" Height="720"
+        MinWidth="720" MinHeight="560"
+        Width="1120" Height="760"
+        Style="{StaticResource LongWindowChrome}"
         WindowStartupLocation="CenterScreen"
-        Opacity="0"
-        Loaded="Window_Loaded">
+        Loaded="Window_Loaded"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        AutomationProperties.AutomationId="Long.MainWindow">
 
-    <WindowChrome.WindowChrome>
-        <WindowChrome CaptionHeight="44" GlassFrameThickness="0"
-                      CornerRadius="18" ResizeBorderThickness="6"
-                      UseAeroCaptionButtons="True" />
-    </WindowChrome.WindowChrome>
-
-    <Border CornerRadius="18" BorderBrush="#28FFFFFF" BorderThickness="1"
-            Background="{StaticResource BackgroundRadialGradientBrush}">
+    <Border Background="{DynamicResource Long.Brush.Background.Base}"
+            BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+            BorderThickness="1" CornerRadius="{DynamicResource Long.Radius.Card}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="44" />
-                <RowDefinition Height="1" />
+                <RowDefinition Height="48" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- 低对比度光晕让毛玻璃层更有空间感。 -->
-            <Ellipse Width="420" Height="420" HorizontalAlignment="Left" VerticalAlignment="Top"
-                     Margin="-150,-210,0,0" IsHitTestVisible="False" Opacity="0.24">
-                <Ellipse.Fill>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#8B5CF6" Offset="0" />
-                        <GradientStop Color="#008B5CF6" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-                <Ellipse.Effect><BlurEffect Radius="42" /></Ellipse.Effect>
-            </Ellipse>
-            <Ellipse Width="360" Height="360" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                     Margin="0,0,-130,-190" IsHitTestVisible="False" Opacity="0.2">
-                <Ellipse.Fill>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#06B6D4" Offset="0" />
-                        <GradientStop Color="#0006B6D4" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-                <Ellipse.Effect><BlurEffect Radius="42" /></Ellipse.Effect>
-            </Ellipse>
+            <Border Grid.Row="0" Background="{DynamicResource Long.Brush.Background.Raised}"
+                    BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                    BorderThickness="0,0,0,1" CornerRadius="14,14,0,0"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Margin="18,0,10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-            <!-- 自定义标题栏 -->
-            <Border Grid.Row="0" Background="#66141A29" CornerRadius="18,18,0,0">
-                <Grid>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                        <Border Width="24" Height="24" CornerRadius="7" Background="{StaticResource PrimaryGradientBrush}">
-                            <TextBlock Text="L" Foreground="White" FontSize="13" FontWeight="Bold"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="26" Height="26" CornerRadius="8"
+                                Background="{DynamicResource Long.Brush.Accent.Gradient}">
+                            <Path Data="{StaticResource Long.Icon.Sparkle}" Style="{StaticResource LongIcon}"
+                                  Width="15" Height="15" Stroke="White"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="Long窗口" Foreground="{StaticResource TextPrimaryBrush}"
-                                   FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" Margin="9,0,0,0" />
-                        <TextBlock Text="插件与系统能力中枢" Foreground="{StaticResource TextMutedBrush}"
-                                   FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0" />
+                        <TextBlock Text="Long窗口" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Long.Brush.Text.Primary}" VerticalAlignment="Center" />
+                        <TextBlock Text="管理中心" Margin="8,0,0,0" FontSize="11"
+                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" VerticalAlignment="Center" />
                     </StackPanel>
+
+                    <Button Grid.Column="1" Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                            Margin="0,0,6,0" Click="OpenSuperPanel_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            ToolTip="打开 Long 超级面板" AutomationProperties.Name="打开 Long 超级面板">
+                        <Path Data="{StaticResource Long.Icon.Command}" Style="{StaticResource LongIcon}" Width="14" Height="14" />
+                    </Button>
+
+                    <Button Grid.Column="2" Style="{StaticResource LongButton}" Height="30" MinWidth="148"
+                            Margin="0,0,10,0" Click="OpenPalette_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            AutomationProperties.Name="打开命令中心">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource Long.Icon.Search}" Style="{StaticResource LongIcon}" Width="14" Height="14" />
+                            <TextBlock Text="打开命令中心" Margin="7,0,12,0" FontSize="11" />
+                            <Border Style="{StaticResource LongHotkeyBadge}">
+                                <TextBlock Text="Alt Space" FontFamily="{DynamicResource Long.Font.Mono}" FontSize="9"
+                                           Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                            </Border>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Grid.Column="3" Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                            Margin="0,0,4,0" Click="Minimize_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True" AutomationProperties.Name="最小化">
+                        <TextBlock Text="—" FontSize="14" />
+                    </Button>
+                    <Button Grid.Column="4" Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                            Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            AutomationProperties.Name="关闭">
+                        <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}" Width="13" Height="13" />
+                    </Button>
                 </Grid>
             </Border>
 
-            <!-- 标题栏底部分隔线 -->
-            <Border Grid.Row="1" Background="{StaticResource DividerBrush}" />
-
-            <!-- 内容区域 -->
-            <views:ToolCenterControl Grid.Row="2" />
+            <Grid Grid.Row="1">
+                <views:ToolCenterControl x:Name="ToolCenter" />
+                <Grid x:Name="EmbeddedPluginSurface" Visibility="Collapsed"
+                      AutomationProperties.AutomationId="Long.Plugin.EmbeddedSurface"
+                      Background="{DynamicResource Long.Brush.Background.Base}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="54" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border Background="{DynamicResource Long.Brush.Background.Raised}"
+                            BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                            BorderThickness="0,0,0,1">
+                        <Grid Margin="18,0,14,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                                    Click="EmbeddedBack_Click" ToolTip="返回管理中心"
+                                    AutomationProperties.AutomationId="Long.Plugin.EmbeddedBack"
+                                    AutomationProperties.Name="返回管理中心">
+                                <TextBlock Text="‹" FontSize="22" Margin="0,-3,0,0" />
+                            </Button>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="11,0,0,0"
+                                        VerticalAlignment="Center">
+                                <Border Width="26" Height="26" CornerRadius="8"
+                                        Background="{DynamicResource Long.Brush.Accent.Soft}">
+                                    <Path Data="{StaticResource Long.Icon.Plugin}" Style="{StaticResource LongIcon}"
+                                          Width="14" Height="14" Stroke="{DynamicResource Long.Brush.Accent.Primary}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock x:Name="EmbeddedPluginTitle" Margin="9,0,0,0"
+                                           AutomationProperties.AutomationId="Long.Plugin.EmbeddedTitle"
+                                           FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <Border Style="{StaticResource LongBadge}" Margin="9,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="嵌入模式" FontSize="9"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                </Border>
+                            </StackPanel>
+                            <Button Grid.Column="2" Content="分离窗口" Style="{StaticResource LongButton}"
+                                    Height="30" Margin="0,0,7,0" Click="DetachEmbedded_Click"
+                                    AutomationProperties.AutomationId="Long.Plugin.Detach"
+                                    AutomationProperties.Name="分离插件窗口" />
+                            <Button Grid.Column="3" Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                                    Click="EmbeddedClose_Click"
+                                    AutomationProperties.AutomationId="Long.Plugin.EmbeddedClose"
+                                    AutomationProperties.Name="关闭插件界面">
+                                <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}"
+                                      Width="13" Height="13" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                    <ContentControl x:Name="EmbeddedPluginContent" Grid.Row="1" Margin="1" />
+                </Grid>
+            </Grid>
         </Grid>
     </Border>
 </Window>

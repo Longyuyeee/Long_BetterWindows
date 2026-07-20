@@ -7,6 +7,12 @@
   "capabilities": [
     "system.hotkey"
   ],
+  "lifecycle": {
+    "start_with_host": true,
+    "close_behavior": "background",
+    "default_presentation": "detached",
+    "search_in_background": false
+  },
   "default_settings": {
     "hotkey": "Alt+X",
     "auto_start": true

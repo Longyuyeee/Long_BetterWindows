@@ -181,6 +181,25 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
+        public Task<int> UnregisterPluginAsync(string pluginId)
+        {
+            lock (_lock)
+            {
+                var owned = _entries
+                    .Where(pair => string.Equals(
+                        pair.Value.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                foreach (var pair in owned)
+                {
+                    UnregisterHotKey(_hwnd, pair.Value.Id);
+                    _entries.Remove(pair.Key);
+                }
+                if (owned.Count > 0)
+                    Log.Information("插件 {PluginId} 的 {Count} 个热键已统一释放", pluginId, owned.Count);
+                return Task.FromResult(owned.Count);
+            }
+        }
+
         public async Task<HostApiResponse> ChangeHotkeyAsync(
             string oldHotkey, string newHotkey, string pluginId, Action callback)
         {

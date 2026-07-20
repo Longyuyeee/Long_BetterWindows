@@ -20,6 +20,13 @@ x86/
 logs/
 *.log
 
+# Marketplace signing secrets and generated bundles
+*.private.pem
+*.private.key
+artifacts/marketplace/
+artifacts/publish/
+artifacts/releases/
+
 # NuGet packages
 *.nupkg
 *.snupkg

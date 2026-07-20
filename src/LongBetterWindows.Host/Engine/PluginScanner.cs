@@ -24,7 +24,8 @@ namespace LongBetterWindows.Host.Engine
                 AppContext.BaseDirectory, "Plugins");
             _scanDirs.Add(primary);
 
-            var devDir = FindDevPluginsDir();
+            // 显式目录用于发布验收和隔离诊断，不混入仓库开发插件目录。
+            var devDir = pluginsDir == null ? FindDevPluginsDir() : null;
             if (devDir != null && devDir != primary)
                 _scanDirs.Add(devDir);
 
@@ -370,7 +371,8 @@ namespace LongBetterWindows.Host.Engine
 
             // 检查用户配置：仅 auto_start=true 时自动启动
             var entry = registry.Get(manifest.Id)!;
-            var autoStart = entry.GetSetting("auto_start") ?? "true";
+            var autoStart = entry.GetSetting("auto_start")
+                ?? (entry.Lifecycle.StartWithHost ? "true" : "false");
 
             if (autoStart == "true")
             {
@@ -394,10 +396,12 @@ namespace LongBetterWindows.Host.Engine
                         LoadedPlugins.Add(entry);
                         return;
                     }
+                    else
+                    {
+                        registry.SetState(manifest.Id, PluginState.Running);
+                        Log.Information("插件 {PluginId} 已自动启动", manifest.Id);
+                    }
                 }
-
-                registry.SetState(manifest.Id, PluginState.Running);
-                Log.Information("插件 {PluginId} 已自动启动", manifest.Id);
             }
             else
             {

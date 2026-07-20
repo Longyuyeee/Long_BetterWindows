@@ -1,6 +1,4 @@
 using System.IO;
-using System.Windows;
-using System.Windows.Controls;
 using Microsoft.Web.WebView2.Wpf;
 using Microsoft.Web.WebView2.Core;
 using LongBetterWindows.Host.Capabilities;
@@ -24,137 +22,225 @@ namespace LongBetterWindows.Host.Engine
     ///   let note = await long.ads.read(path, "long_note")
     ///   await long.storage.set("key", "value")
     /// </summary>
-    public class WebPluginRuntime
+    public class WebPluginRuntime : IDisposable
     {
         private static readonly System.Text.Json.JsonSerializerOptions MessageJsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
         };
 
-        private static readonly Lazy<Task<CoreWebView2Environment>> SharedEnvironment = new(() =>
-        {
-            var userDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LongBetterWindows",
-                "WebView2");
-            return CoreWebView2Environment.CreateAsync(null, userDataDir);
-        });
-        private static Window? RuntimeHostWindow;
-        private static Grid? RuntimeHostPanel;
-
-        private WebView2 _webView = null!;
-        private readonly string _pluginDir;
+        private WebView2? _webView;
         private readonly PluginManifest _manifest;
+        private readonly WebPluginNavigationPolicy _navigationPolicy;
+        private bool _themeSubscribed;
 
-        public WebView2 WebView => _webView;
+        public WebView2? WebView => _webView;
+        public PluginManifest Manifest => _manifest;
 
         public WebPluginRuntime(PluginManifest manifest, string pluginDir)
         {
             _manifest = manifest;
-            _pluginDir = pluginDir;
+            _navigationPolicy = new WebPluginNavigationPolicy(pluginDir);
             // WebView2 延迟到 UI 线程创建（InitializeAsync）
+        }
+
+        public WebView2 EnsureView()
+        {
+            var dispatcher = System.Windows.Application.Current.Dispatcher;
+            if (!dispatcher.CheckAccess())
+                return dispatcher.Invoke(EnsureView);
+            return _webView ??= new WebView2();
         }
 
         public async Task<bool> InitializeAsync()
         {
+            // WebView2 必须在 STA 线程（UI 线程）初始化和使用
+            var initialization = System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+            {
+                var webView = EnsureView();
+
+                var env = await CoreWebView2Environment.CreateAsync();
+                await webView.EnsureCoreWebView2Async(env);
+
+#if DEBUG
+                webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
+#else
+                webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+#endif
+                webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                webView.CoreWebView2.NavigationStarting += OnNavigationStarting;
+                webView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
+                webView.CoreWebView2.DownloadStarting += OnDownloadStarting;
+                webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+
+                var uiKitScript = BuildUiKitInjectionScript();
+                if (!string.IsNullOrEmpty(uiKitScript))
+                    await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(uiKitScript);
+
+                // 注入 long.* JS API 桥接
+                // 在页面加载前注入初始化脚本（与导航并行执行）
+                _ = webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                    BuildJsBridge(_manifest.Id))
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                            Log.Error(t.Exception, "[Web:{Id}] JS Bridge 注入失败", _manifest.Id);
+                        else
+                            Log.Debug("[Web:{Id}] JS Bridge 注入完成", _manifest.Id);
+                    }, TaskScheduler.Default);
+
+                if (!_themeSubscribed)
+                {
+                    App.ThemeChanged += OnThemeChanged;
+                    _themeSubscribed = true;
+                }
+
+                // 加载插件 HTML
+                if (!_navigationPolicy.TryResolveEntryPoint(_manifest.EntryPoint, out var entryUri))
+                    throw new InvalidDataException(
+                        $"Web 插件入口不存在或越出插件目录：{_manifest.EntryPoint}");
+
+                webView.CoreWebView2.Navigate(entryUri!.AbsoluteUri);
+            });
             try
             {
-                // WebView2 控件必须在 STA 线程创建和使用。
-                var operation = System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
-                {
-                    Log.Debug("[Web:{Id}] 正在初始化共享 WebView2 环境", _manifest.Id);
-                    var env = await SharedEnvironment.Value.WaitAsync(TimeSpan.FromSeconds(20));
-                    _webView = new WebView2();
-                    AttachToRuntimeHost(_webView);
-                    await _webView.EnsureCoreWebView2Async(env);
-                    Log.Debug("[Web:{Id}] WebView2 Core 初始化完成", _manifest.Id);
-
-                    // 注入 long.* JS API 桥接
-                    _webView.CoreWebView2.WebMessageReceived += (s, e) =>
-                    {
-                        HandleJsMessage(e.WebMessageAsJson);
-                    };
-
-                    await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
-                        BuildJsBridge(_manifest.Id));
-                    Log.Debug("[Web:{Id}] JS Bridge 注入完成", _manifest.Id);
-
-                    var navigation = new TaskCompletionSource<bool>(
-                        TaskCreationOptions.RunContinuationsAsynchronously);
-                    EventHandler<CoreWebView2NavigationCompletedEventArgs>? navigationHandler = null;
-                    navigationHandler = (_, args) =>
-                    {
-                        _webView.CoreWebView2.NavigationCompleted -= navigationHandler;
-                        navigation.TrySetResult(args.IsSuccess);
-                    };
-                    _webView.CoreWebView2.NavigationCompleted += navigationHandler;
-
-                    // 桥接注入完成后再导航，避免插件首屏调用 long.* 时发生竞态。
-                    var indexPath = Path.Combine(_pluginDir, _manifest.EntryPoint);
-                    if (File.Exists(indexPath))
-                    {
-                        _webView.CoreWebView2.Navigate(new Uri(indexPath).AbsoluteUri);
-                    }
-                    else
-                    {
-                        _webView.CoreWebView2.NavigateToString(
-                            "<html><body><p>JS Plugin Ready</p></body></html>");
-                    }
-
-                    if (!await navigation.Task.WaitAsync(TimeSpan.FromSeconds(20)))
-                        throw new InvalidOperationException($"插件页面导航失败: {_manifest.EntryPoint}");
-                    Log.Debug("[Web:{Id}] 插件页面导航完成", _manifest.Id);
-
-                    if (_manifest.Id.StartsWith("js-", StringComparison.OrdinalIgnoreCase))
-                    {
-                        await Task.Delay(500);
-                        var outputJson = await _webView.CoreWebView2.ExecuteScriptAsync(
-                            "document.getElementById('output')?.textContent ?? ''");
-                        var output = System.Text.Json.JsonSerializer.Deserialize<string>(outputJson);
-                        if (!string.IsNullOrWhiteSpace(output))
-                            Log.Information("[Web:{PluginId}] {Output}", _manifest.Id, output.Trim());
-                    }
-                });
-                await (await operation).WaitAsync(TimeSpan.FromSeconds(45));
-
-                Log.Information("WebPlugin {PluginId} 已初始化", _manifest.Id);
-                return true;
+                await await initialization;
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "WebPlugin {PluginId} 初始化失败", _manifest.Id);
                 return false;
             }
+
+            Log.Information("WebPlugin {PluginId} 已初始化", _manifest.Id);
+            return true;
         }
 
-        private static void AttachToRuntimeHost(WebView2 webView)
+        private string BuildUiKitInjectionScript()
         {
-            if (RuntimeHostWindow == null)
+            try
             {
-                RuntimeHostPanel = new Grid();
-                RuntimeHostWindow = new Window
+                var assetsDirectory = Path.Combine(AppContext.BaseDirectory, "WebAssets");
+                var cssPath = Path.Combine(assetsDirectory, "long-ui.css");
+                var jsPath = Path.Combine(assetsDirectory, "long-ui.js");
+                if (!File.Exists(cssPath))
                 {
-                    Width = 8,
-                    Height = 8,
-                    Left = SystemParameters.VirtualScreenLeft,
-                    Top = SystemParameters.VirtualScreenTop,
-                    Opacity = 0.01,
-                    ShowInTaskbar = false,
-                    ShowActivated = false,
-                    WindowStyle = WindowStyle.None,
-                    ResizeMode = ResizeMode.NoResize,
-                    Content = RuntimeHostPanel,
-                };
-                RuntimeHostWindow.Show();
+                    Log.Warning("[Web:{Id}] Long Web UI Kit 未找到: {Path}", _manifest.Id, cssPath);
+                    return string.Empty;
+                }
+
+                var css = File.ReadAllText(cssPath);
+                var helpers = File.Exists(jsPath) ? File.ReadAllText(jsPath) : string.Empty;
+                var isLight = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme()
+                    == Wpf.Ui.Appearance.ApplicationTheme.Light;
+                var cssJson = System.Text.Json.JsonSerializer.Serialize(css);
+                var themeJson = System.Text.Json.JsonSerializer.Serialize(isLight ? "light" : "dark");
+
+                return $$"""
+                    (function () {
+                      const installLongUi = function () {
+                        document.documentElement.dataset.longTheme = {{themeJson}};
+                        if (!document.getElementById('long-ui-kit')) {
+                          const style = document.createElement('style');
+                          style.id = 'long-ui-kit';
+                          style.textContent = {{cssJson}};
+                          (document.head || document.documentElement).appendChild(style);
+                        }
+                      };
+                      if (document.readyState === 'loading')
+                        document.addEventListener('DOMContentLoaded', installLongUi, { once: true });
+                      else
+                        installLongUi();
+                      {{helpers}}
+                    })();
+                    """;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[Web:{Id}] Long Web UI Kit 注入准备失败", _manifest.Id);
+                return string.Empty;
+            }
+        }
+
+        private void OnThemeChanged(bool isLight)
+        {
+            var webView = _webView;
+            if (webView?.CoreWebView2 == null) return;
+
+            _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    var theme = isLight ? "light" : "dark";
+                    await webView.CoreWebView2.ExecuteScriptAsync(
+                        $"window.LongUI?.setTheme('{theme}');");
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "[Web:{Id}] 同步主题失败", _manifest.Id);
+                }
+            });
+        }
+
+        private void OnNavigationStarting(
+            object? sender,
+            CoreWebView2NavigationStartingEventArgs args)
+        {
+            if (_navigationPolicy.IsTrustedLocalUri(args.Uri)) return;
+
+            args.Cancel = true;
+            Log.Warning("[Web:{Id}] 已阻止越界页面导航：{Uri}", _manifest.Id, args.Uri);
+        }
+
+        private void OnNewWindowRequested(
+            object? sender,
+            CoreWebView2NewWindowRequestedEventArgs args)
+        {
+            args.Handled = true;
+            Log.Warning("[Web:{Id}] 已阻止新窗口请求：{Uri}", _manifest.Id, args.Uri);
+        }
+
+        private void OnDownloadStarting(
+            object? sender,
+            CoreWebView2DownloadStartingEventArgs args)
+        {
+            args.Cancel = true;
+            args.Handled = true;
+            Log.Warning("[Web:{Id}] 已阻止浏览器下载；插件应使用 long.http.download", _manifest.Id);
+        }
+
+        private void OnWebMessageReceived(
+            object? sender,
+            CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            if (!_navigationPolicy.IsTrustedLocalUri(args.Source))
+            {
+                Log.Warning("[Web:{Id}] 已拒绝非插件页面的 Bridge 消息：{Source}",
+                    _manifest.Id, args.Source);
+                return;
             }
 
-            RuntimeHostPanel!.Children.Add(webView);
+            HandleJsMessage(args.WebMessageAsJson);
         }
 
-        public void DetachFromRuntimeHost()
+        public void Dispose()
         {
-            if (_webView.Parent is Panel panel)
-                panel.Children.Remove(_webView);
+            if (_themeSubscribed)
+            {
+                App.ThemeChanged -= OnThemeChanged;
+                _themeSubscribed = false;
+            }
+
+            if (_webView?.CoreWebView2 != null)
+            {
+                _webView.CoreWebView2.NavigationStarting -= OnNavigationStarting;
+                _webView.CoreWebView2.NewWindowRequested -= OnNewWindowRequested;
+                _webView.CoreWebView2.DownloadStarting -= OnDownloadStarting;
+                _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+            }
+
+            _webView?.Dispose();
+            _webView = null;
         }
 
         private void HandleJsMessage(string json)
@@ -177,14 +263,16 @@ namespace LongBetterWindows.Host.Engine
         {
             try
             {
-                var result = await DispatchJsCall(msg.Method, msg.Args);
+                object? result;
+                using (PluginAccessContext.Enter(_manifest.Id))
+                    result = await DispatchJsCall(msg.Method, msg.Args);
                 var response = System.Text.Json.JsonSerializer.Serialize(new
                 {
                     id = msg.Id,
                     result,
                 });
 
-                _webView.CoreWebView2.PostWebMessageAsJson(response);
+                PostWebMessage(response);
             }
             catch (Exception ex)
             {
@@ -193,8 +281,34 @@ namespace LongBetterWindows.Host.Engine
                     id = msg.Id,
                     error = ex.Message,
                 });
-                _webView.CoreWebView2.PostWebMessageAsJson(error);
+                PostWebMessage(error);
             }
+        }
+
+        private void PostWebMessage(string json)
+        {
+            var coreWebView = _webView?.CoreWebView2;
+            if (coreWebView == null)
+            {
+                Log.Warning("[Web:{Id}] WebView 尚未就绪，消息已忽略", _manifest.Id);
+                return;
+            }
+
+            coreWebView.PostWebMessageAsJson(json);
+        }
+
+        public async Task SendCommandAsync(PluginCommandInvocation invocation)
+        {
+            var webView = _webView;
+            if (webView?.CoreWebView2 == null) return;
+
+            var json = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                type = "long.command",
+                command = invocation,
+            });
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(
+                () => webView.CoreWebView2.PostWebMessageAsJson(json));
         }
 
         private async Task<object?> DispatchJsCall(string method, object?[] args)
@@ -232,7 +346,7 @@ namespace LongBetterWindows.Host.Engine
                 "app.openFolder" => Ok(h.ShellExecute.OpenFolderAsync(Arg(args, 0))),
                 "app.openWithDefault" => Ok(h.ShellExecute.OpenWithDefaultAsync(Arg(args, 0))),
                 "app.showNotification" => Task.FromResult<object?>(UIToast(Arg(args, 0) + "\n" + Arg(args, 1))),
-                "app.getVersion" => Task.FromResult<object?>(new { version = typeof(WebPluginRuntime).Assembly.GetName().Version?.ToString() ?? "0.4.0" }),
+                "app.getVersion" => Task.FromResult<object?>(new { version = App.ProductVersion }),
                 "app.log" => Task.FromResult<object?>(PluginLog(args)),
 
                 // === long.clipboard ===
@@ -392,7 +506,7 @@ namespace LongBetterWindows.Host.Engine
 
                 // === long.shell file ops ===
                 "shell.listFiles" => Task.FromResult<object?>(ShellListFiles(Arg(args, 0))),
-                "shell.renameFile" => Task.FromResult<object?>(ShellRenameFile(Arg(args, 0), Arg(args, 1))),
+                "shell.renameFile" => ShellRenameFileAsync(Arg(args, 0), Arg(args, 1)),
 
                 // === long.window ===
                 "window.getForeground" => WindowGetForeground(),
@@ -558,11 +672,11 @@ namespace LongBetterWindows.Host.Engine
         private static List<string> StringListArg(object?[] args, int i) =>
             JsonArg<List<string>>(args, i) ?? new List<string>();
 
-        private static async Task<object?> Ok<T>(Task<HostApiResponse<T>> t) { var r = await t; return new { success = r.IsSuccess, r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
+        private static async Task<object?> Ok<T>(Task<HostApiResponse<T>> t) { var r = await t; return new { success = r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
 
-        private static async Task<object?> Ok(Task<HostApiResponse> t) { var r = await t; return new { success = r.IsSuccess, r.IsSuccess, error = r.ErrorMessage }; }
+        private static async Task<object?> Ok(Task<HostApiResponse> t) { var r = await t; return new { success = r.IsSuccess, error = r.ErrorMessage }; }
 
-        private static async Task<object?> OkList<T>(Task<HostApiResponse<List<T>>> t) { var r = await t; return new { success = r.IsSuccess, r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
+        private static async Task<object?> OkList<T>(Task<HostApiResponse<List<T>>> t) { var r = await t; return new { success = r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
 
         private static object OkObj() => new { success = true };
 
@@ -602,18 +716,15 @@ namespace LongBetterWindows.Host.Engine
             return new { success = true, files };
         }
 
-        private object ShellRenameFile(string oldPath, string newName)
+        private async Task<object?> ShellRenameFileAsync(string oldPath, string newName)
         {
-            try
-            {
-                var dir = Path.GetDirectoryName(oldPath);
-                if (dir == null) return new { success = false };
-                var newPath = Path.Combine(dir, newName);
-                if (File.Exists(newPath)) return new { success = false, error = "目标文件已存在" };
-                File.Move(oldPath, newPath);
-                return new { success = true };
-            }
-            catch (Exception ex) { return new { success = false, error = ex.Message }; }
+            var directory = Path.GetDirectoryName(oldPath);
+            if (directory == null)
+                return new { success = false, error = "源路径无效" };
+
+            var newPath = Path.Combine(directory, newName);
+            var result = await HostProvider.Instance.FileOps.MoveAsync(oldPath, newPath);
+            return new { success = result.IsSuccess, error = result.ErrorMessage };
         }
 
         private async Task<object?> WindowGetForeground()
@@ -650,7 +761,7 @@ namespace LongBetterWindows.Host.Engine
             var contentType = Arg(args, 2, "application/json");
             var headers = ParseHeaders(args, 3);
             var r = await HostProvider.Instance.Http.PostAsync(url, body, contentType, headers);
-            return new { r.IsSuccess, data = r.Data, error = r.ErrorMessage };
+            return new { success = r.IsSuccess, data = r.Data, error = r.ErrorMessage };
         }
 
         private async Task<object?> HttpDownload(object?[] args)
@@ -675,17 +786,17 @@ namespace LongBetterWindows.Host.Engine
             var hotkey = Arg(args, 0);
             var r = await HostProvider.Instance.HotKey.RegisterAsync(hotkey, () =>
             {
-                _webView.CoreWebView2.PostWebMessageAsJson(
+                PostWebMessage(
                     System.Text.Json.JsonSerializer.Serialize(new { type = "hotkey", hotkey }));
             });
-            return new { r.IsSuccess, error = r.ErrorMessage };
+            return new { success = r.IsSuccess, error = r.ErrorMessage };
         }
 
         private async Task<object?> HotKeyUnregister(object?[] args)
         {
             var hotkey = Arg(args, 0);
             var r = await HostProvider.Instance.HotKey.UnregisterAsync(hotkey);
-            return new { r.IsSuccess, error = r.ErrorMessage };
+            return new { success = r.IsSuccess, error = r.ErrorMessage };
         }
 
         private async Task<object?> UICreateWindow(object?[] args)
@@ -697,7 +808,7 @@ namespace LongBetterWindows.Host.Engine
             var resizable = args.Length > 4 ? bool.Parse(Arg(args, 4, "true")) : true;
 
             var r = await HostProvider.Instance.UI.CreateWindowAsync(title, htmlContent, width, height, resizable);
-            return new { r.IsSuccess, data = r.Data, error = r.ErrorMessage };
+            return new { success = r.IsSuccess, data = r.Data, error = r.ErrorMessage };
         }
 
         internal static string BuildJsBridge(string pluginId)

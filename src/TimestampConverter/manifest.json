@@ -1,0 +1,23 @@
+{
+  "id": "com.long.timestamp-converter",
+  "version": "1.0.0",
+  "name": "时间戳转换",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "capabilities": ["system.clipboard"],
+  "commands": [
+    {
+      "id": "timestamp.convert",
+      "title": "时间戳转换",
+      "description": "在 Unix 时间戳与本地日期时间之间转换",
+      "aliases": ["时间戳", "unix time", "timestamp", "shijianchuo"],
+      "accepted_inputs": ["text", "clipboard", "none"],
+      "view_mode": "form",
+      "priority": 14
+    }
+  ],
+  "window": {"mode": "compact", "preferred_width": 680, "preferred_height": 620, "min_width": 540, "min_height": 500},
+  "lifecycle": {"start_with_host": false, "close_behavior": "stop", "default_presentation": "embedded", "search_in_background": false},
+  "default_settings": {"auto_start": false}
+}

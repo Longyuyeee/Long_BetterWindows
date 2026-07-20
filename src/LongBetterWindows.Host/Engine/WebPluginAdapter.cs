@@ -1,4 +1,5 @@
 using LongBetterWindows.Host.Core;
+using LongBetterWindows.Host.Views;
 using Serilog;
 
 namespace LongBetterWindows.Host.Engine
@@ -7,11 +8,15 @@ namespace LongBetterWindows.Host.Engine
     /// 将 WebView2 插件适配为 ILongPlugin。
     /// WebView2 生命周期与插件生命周期保持一致。
     /// </summary>
-    public class WebPluginAdapter : ILongPlugin, IHasMainUI, IDisposable
+    public class WebPluginAdapter : ILongPlugin, IHasMainUI, IPluginCommandHandler, IDisposable
     {
         private readonly WebPluginRuntime _runtime;
         private readonly string _pluginDir;
         private readonly string _entryPoint;
+        private PluginWindowHost? _window;
+        private Task<bool>? _runtimeInitialization;
+        private bool _closingForStop;
+        private bool _isEmbedded;
 
         public string Id { get; }
         public string Name { get; }
@@ -29,35 +34,106 @@ namespace LongBetterWindows.Host.Engine
         }
 
         public void ShowMainUI()
+            => _ = ShowMainUIAsync();
+
+        private async Task ShowMainUIAsync()
         {
-            var wv = _runtime.WebView;
-            if (wv == null)
+            EnsureWindowVisible();
+            if (!await EnsureRuntimeInitializedAsync())
+                _window?.Close();
+        }
+
+        private void EnsureWindowVisible()
+        {
+            var dispatcher = System.Windows.Application.Current.Dispatcher;
+            if (!dispatcher.CheckAccess())
             {
-                Log.Warning("[Web:{Id}] WebView 尚未初始化，无法打开 UI", Id);
+                dispatcher.Invoke(EnsureWindowVisible);
                 return;
             }
-            _runtime.DetachFromRuntimeHost();
-            var w = new System.Windows.Window
+
+            var webView = _runtime.EnsureView();
+            Log.Debug("[Web:{Id}] 准备呈现主界面: Presentation={Presentation}, MainWindow={MainWindowType}",
+                Id,
+                _runtime.Manifest.Lifecycle?.DefaultPresentation
+                    ?? Contracts.PluginPresentationMode.Detached,
+                System.Windows.Application.Current.MainWindow?.GetType().Name ?? "null");
+            if (_isEmbedded
+                && System.Windows.Application.Current.MainWindow is MainWindow embeddedOwner
+                && embeddedOwner.IsHostingEmbedded(webView))
             {
-                Title = Name,
-                Width = 480, Height = 520,
-                WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen,
-                Content = wv,
+                embeddedOwner.Activate();
+                return;
+            }
+            if (_window?.IsVisible == true)
+            {
+                _window.Activate();
+                return;
+            }
+
+            if (_runtime.Manifest.Lifecycle?.DefaultPresentation
+                    == Contracts.PluginPresentationMode.Embedded
+                && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
+            {
+                _isEmbedded = true;
+                mainWindow.ShowEmbeddedPlugin(
+                    Name,
+                    webView,
+                    async () =>
+                    {
+                        _isEmbedded = false;
+                        await HostProvider.Instance.PluginStore.HandleWindowClosedAsync(Id);
+                    },
+                    () =>
+                    {
+                        _isEmbedded = false;
+                        ShowDetachedWindow(webView);
+                    });
+                return;
+            }
+
+            ShowDetachedWindow(webView);
+        }
+
+        private void ShowDetachedWindow(System.Windows.FrameworkElement webView)
+        {
+            _window = new PluginWindowHost(Name, webView, _runtime.Manifest.Window)
+            {
+                Owner = System.Windows.Application.Current.MainWindow,
             };
-            w.Show();
+            var window = _window;
+            window.Closed += async (_, _) =>
+            {
+                window.DetachContent();
+                if (ReferenceEquals(_window, window))
+                    _window = null;
+                if (!_closingForStop)
+                    await HostProvider.Instance.PluginStore.HandleWindowClosedAsync(Id);
+            };
+            window.Show();
         }
 
         public async Task<bool> InitializeAsync(IHostApi host)
         {
+            await Task.CompletedTask;
+            Log.Debug("[Web:{Id}] 已注册，WebView2 将在首次打开时初始化", Id);
+            return true;
+        }
+
+        private Task<bool> EnsureRuntimeInitializedAsync()
+            => _runtimeInitialization ??= InitializeRuntimeCoreAsync();
+
+        private async Task<bool> InitializeRuntimeCoreAsync()
+        {
             try
             {
-                var initialized = await _runtime.InitializeAsync();
-                if (!initialized)
+                if (!await _runtime.InitializeAsync())
                 {
                     State = PluginState.Error;
                     return false;
                 }
-                Log.Debug("[Web:{Id}] WebView2 初始化完成", Id);
+                Log.Debug("[Web:{Id}] WebView2 延迟初始化完成", Id);
+                return true;
             }
             catch (Exception ex)
             {
@@ -65,8 +141,6 @@ namespace LongBetterWindows.Host.Engine
                 State = PluginState.Error;
                 return false;
             }
-
-            return true;
         }
 
         public Task<bool> StartAsync()
@@ -76,15 +150,70 @@ namespace LongBetterWindows.Host.Engine
             return Task.FromResult(true);
         }
 
-        public Task<bool> StopAsync()
+        public async Task<bool> StopAsync()
         {
-            State = PluginState.Disabled;
-            return Task.FromResult(true);
+            await ReleaseWebResourcesAsync();
+            State = PluginState.Stopped;
+            Log.Information("[Web:{Id}] 窗口与 WebView2 资源已释放", Id);
+            return true;
+        }
+
+        private async Task ReleaseWebResourcesAsync()
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher != null && !dispatcher.HasShutdownStarted)
+            {
+                void ReleaseOnUiThread()
+                {
+                    _closingForStop = true;
+                    try
+                    {
+                        var webView = _runtime.WebView;
+                        if (_isEmbedded && webView is not null
+                            && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
+                        {
+                            mainWindow.CloseEmbeddedPlugin(webView);
+                            _isEmbedded = false;
+                        }
+                        if (_window is not null)
+                        {
+                            _window.DetachContent();
+                            _window.Close();
+                            _window = null;
+                        }
+                        _runtime.Dispose();
+                        _runtimeInitialization = null;
+                    }
+                    finally { _closingForStop = false; }
+                }
+
+                if (dispatcher.CheckAccess())
+                    ReleaseOnUiThread();
+                else
+                    await dispatcher.InvokeAsync(ReleaseOnUiThread);
+                return;
+            }
+
+            _runtime.Dispose();
+            _runtimeInitialization = null;
         }
 
         public void Dispose()
         {
-            _runtime.WebView?.Dispose();
+            ReleaseWebResourcesAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task<Contracts.PluginCommandResult> ExecuteCommandAsync(
+            Contracts.PluginCommandInvocation invocation,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EnsureWindowVisible();
+            if (!await EnsureRuntimeInitializedAsync())
+                return Contracts.PluginCommandResult.Failure("插件界面初始化失败，请检查 WebView2 Runtime。");
+
+            await _runtime.SendCommandAsync(invocation);
+            return Contracts.PluginCommandResult.Success();
         }
     }
 }

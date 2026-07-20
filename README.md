@@ -1,385 +1,250 @@
-<div align="center">
+# Long窗口·全能助手
 
-# 🪟 Long窗口·全能助手
+> 打造极致优雅、深度集成的 Windows 效率增强中枢。
 
-**Windows 效率增强平台 | 热插拔插件系统 | Apple 风格 UI**
+Long窗口 是一个运行在 Windows 原生系统之上的轻量级效率工具平台。产品交互参考 uTools 的统一入口与插件化工作流，视觉采用 Long 自有的优雅、华丽、扁平、动效化设计语言。
 
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows)](https://www.microsoft.com/windows)
-[![Version](https://img.shields.io/badge/version-1.8.0-blue)](https://github.com/Longyuyeee/Long_BetterWindows/releases)
-
-*一个功能强大、易于扩展的 Windows 效率工具平台*
-
-[📥 下载](https://github.com/Longyuyeee/Long_BetterWindows/releases) | [📖 文档](docs/) | [🔌 插件开发](docs/插件开发指南.md) | [⭐ Star 支持](https://github.com/Longyuyeee/Long_BetterWindows)
-
-</div>
+当前主线版本为 **v1.9.0**，包含 27 个宿主能力接口、25 个内置插件，以及统一命令中心、超级面板和可信插件市场。当前开发状态见 [`docs/当前开发状态.md`](docs/当前开发状态.md)。
 
 ---
 
-## ✨ 核心特性
+## 特性
 
-<table>
-<tr>
-<td width="50%">
-
-### 🎨 Apple 风格设计
-- 暖色调配色方案
-- 流畅动画与过渡
-- 大圆角 + 模糊效果
-- 精致的卡片布局
-
-</td>
-<td width="50%">
-
-### 🔌 热插拔插件系统
-- 三种运行时（DLL/WebView/C#脚本）
-- 无需重启即可热重载
-- 权限沙盒机制
-- .lpak 打包分发
-
-</td>
-</tr>
-<tr>
-<td>
-
-### ⚡ 25 项底层能力
-- 系统监控与性能分析
-- 文件系统高级操作
-- 网络端口与流量监控
-- 剪贴板监听与历史
-- 壁纸、亮度、主题管理
-
-</td>
-<td>
-
-### 🚀 21 个实用插件
-- 开发者工具箱
-- 剪贴板历史管理
-- 端口管理器
-- 硬件监控面板
-- 文件整理器
-
-</td>
-</tr>
-</table>
+- **插件驱动架构** — 宿主提供原子级系统能力（热键、Shell 感知、NTFS ADS、注册表），插件实现具体功能
+- **文件夹备注助手** — 为任意文件夹添加隐藏备注，数据存入 NTFS 备用数据流，完全不可见
+- **统一搜索与快捷启动** — 混排命令、开始菜单应用、Windows 设置和常用目录深层文件，并提供主/次级快捷动作
+- **宏录制器** — 录制鼠标点击序列并回放，支持循环执行
+- **Long Design System** — 优雅的亮暗主题、扁平层级、克制光影与语义化动效
+- **统一命令中心** — 使用 `Alt + Space` 搜索并执行全部插件能力
+- **系统托盘** — 关闭窗口后台运行，热键始终可用
+- **插件热重载** — 修改插件 DLL 自动检测并重载，无需重启
+- **分层权限边界** — Web 插件的宿主 API、页面导航与消息桥受能力和本地来源约束；DLL / C# 脚本属于本地完全信任扩展
+- **原子化回滚** — 卸载插件时自动清除所有系统修改
+- **离线优先** — 核心功能不依赖网络
 
 ---
 
-## 🎯 功能亮点
+## 快速开始
 
-### 🛠️ 系统管理
-- **电源管理** - 关机/重启/睡眠/休眠/锁屏/电源状态
-- **主题管理** - 暗色/亮色模式切换、系统强调色
-- **壁纸管理** - 设置壁纸、多种样式（填充/适应/拉伸）
-- **亮度控制** - 屏幕亮度调节（0-100）
-- **音频控制** - 音量调节、静音切换
+### 用户环境要求
 
-### 📊 性能监控
-- **硬件监控** - CPU/GPU/内存/磁盘实时监控
-- **进程管理** - 资源占用、进程关闭
-- **网络监控** - 实时网速、流量统计
-- **端口管理** - 端口扫描、进程映射、安全释放
+- Windows 10/11
+- 自包含包：无需安装 .NET
+- 精简包：需要 [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0)
+- Web 插件需要 Microsoft Edge WebView2 Runtime
 
-### 📁 文件工具
-- **文件整理** - 按类型/日期分类、查重、批量重命名
-- **文件夹备注** - NTFS ADS 备注存储
-- **剪贴板历史** - 自动记录、搜索、复用
+推荐普通用户下载 `self-contained` 自包含便携包。安装、升级、卸载和校验方法见 [`docs/安装升级与卸载.md`](docs/安装升级与卸载.md)。
 
-### 💻 开发工具
-- **开发者工具箱** - Base64/Hash/UUID/时间戳/进制/URL/Unicode
-- **JSON 格式化** - 格式化、压缩、校验
-- **文本对比** - 逐行对比、高亮差异
-- **颜色选择器** - 取色、格式转换
+### 开发环境要求
 
-### 🚀 效率助手
-- **快捷启动** - 热键呼出、模糊搜索
-- **宏录制器** - 录制回放鼠标键盘操作
-- **窗口管理** - 快速平铺、多显示器支持
-- **截图工具** - 区域截图、自动保存
+- .NET 8 SDK 或更高版本
 
----
+### 构建运行
 
-## 📦 快速开始
-
-### 方式一：直接使用（推荐新用户）
-
-1. **下载最新版本**
-   ```
-   前往 Releases 页面下载 Long_BetterWindows_v1.8.0.zip
-   ```
-
-2. **解压并运行**
-   ```
-   解压到任意目录，双击 LongBetterWindows.Host.exe
-   ```
-
-3. **打开工具中心**
-   ```
-   按下 Ctrl + Space 快捷键
-   ```
-
-### 方式二：源码编译（开发者）
-
-```bash
-# 克隆仓库
+```powershell
 git clone https://github.com/Longyuyeee/Long_BetterWindows.git
 cd Long_BetterWindows
-
-# 一键启动（自动编译）
-双击 启动.bat
-
-# 或使用命令行
 dotnet build
 dotnet run --project src/LongBetterWindows.Host
 ```
 
-### 方式三：开发模式
+### 使用方式
 
-```bash
-# 支持热重载和详细日志
-双击 开发模式.bat
+| 操作 | 快捷键 |
+|---|---|
+| 打开统一命令中心 | `Alt + Space`，冲突时 `Ctrl + Alt + Space` |
+| 文件夹备注 | `Alt + M` |
+| 宏录制 开始/停止 | `F6` |
+| 宏回放 单次 | `F7` |
+| 宏回放 循环 | `F8` |
+| 全屏截图 | `Ctrl + Shift + S` |
+
+也可以通过**右键文件夹 → 备注此文件夹**触发。
+
+---
+
+## 架构
+
+```
+┌─────────────────────────────────────────┐
+│  宿主 (Host)                             │
+│  ┌───────────────────────────────────┐  │
+│  │  能力服务层 (Capability Services)  │  │
+│  │  HotKey │ Shell │ ADS │ Registry  │  │
+│  │  Storage │ Rollback │ Tray       │  │
+│  └───────────────┬───────────────────┘  │
+│                  │ IHostApi              │
+│  ┌───────────────┴───────────────────┐  │
+│  │  插件引擎 (Plugin Engine)         │  │
+│  │  Scanner → Loader → Registry      │  │
+│  │ Web 能力边界 · 热重载 · 配置持久化 │  │
+│  └───────────────┬───────────────────┘  │
+│                  │ ILongPlugin           │
+│  ┌───────────────┴───────────────────┐  │
+│  │  插件层 (Plugins)                 │  │
+│  │  FolderNote │ QuickLaunch │ Macro │  │
+│  └───────────────────────────────────┘  │
+└─────────────────────────────────────────┘
 ```
 
+### 宿主能力 API（27 项）
+
+| 接口 | 能力 ID | 说明 |
+|---|---|---|
+| `IHotKeyService` | `system.hotkey` | 全局热键注册/冲突/所有权 |
+| `IClipboardService` | `system.clipboard` | 剪贴板读写 |
+| `IShellSelectionService` | `shell.selection` | Explorer 文件夹感知/选中项坐标 |
+| `IADSService` | `fs.ads.access` | NTFS 备用数据流读写 |
+| `IRegistryService` | `system.registry.*` | 安全注册表操作 + 回滚 |
+| `IStorageService` | `storage.local` | 本地 Key-Value 持久化存储 |
+| `INotificationService` | `system.notification` | Toast 通知 |
+| `IFileOpsService` | `file.ops` | 文件复制/移动/删除 |
+| `IWindowInfoService` | `window.info` | 前台窗口信息/可见窗口列表 |
+| `IScreenCaptureService` | `system.screenshot` | 全屏截图 |
+| `IInputService` | `system.input` | 模拟按键/鼠标点击 |
+| `IProcessService` | `system.process` | 进程启动/列表/终止 |
+| `IPerformanceService` | `system.performance` | CPU、内存、磁盘与进程性能 |
+| `INetworkPortService` | `network.ports` | TCP/UDP 端口与占用进程 |
+| `INetworkMonitorService` | `network.monitor` | 网络接口、流量与速度 |
+| `IHttpService` | `network.http` | 受控 HTTP 请求与下载 |
+| `IFileSystemService` | `filesystem.advanced` | 搜索、哈希、分类、批量重命名 |
+| `ICacheService` | `system.cache` | 系统缓存统计与清理 |
+| `IScheduleService` | `system.schedule` | 计划任务管理 |
+| `IAudioService` | `system.audio` | 音量、静音与音频设备 |
+| `IPowerService` | `system.power` | 锁定、睡眠、休眠与电源状态 |
+| `IThemeService` | `system.theme` | 系统主题与强调色 |
+| `IWallpaperService` | `system.wallpaper` | 壁纸与显示样式 |
+| `IBrightnessService` | `display.brightness` | 屏幕亮度控制 |
+| `IPinyinService` | `text.pinyin` | 拼音转换、首字母与匹配 |
+| `IUICapability` | `ui.window` | 插件窗口和交互控件 |
+
 ---
 
-## 🔌 插件系统
+## 插件开发
 
-### 三种插件运行时
+### 三种方式，自由选择
 
-| 类型 | 技术栈 | 优势 | 适用场景 |
+| 方式 | 语言 | 编译 | 适合 |
 |---|---|---|---|
-| **WebView** | HTML/CSS/JS | 快速开发、跨平台UI | 工具类插件、数据展示 |
-| **DLL** | C# + WPF | 原生性能、系统集成 | 系统级功能、后台服务 |
-| **脚本** | C# Script (.csx) | 无需编译、即写即用 | 快速原型、自动化脚本 |
+| **HTML/JS** | HTML+CSS+JS | 不需要 | Web 开发者、富 UI 工具 |
+| **C# 脚本** | C# (.csx) | 不需要 | 快速自动化 |
+| **DLL 插件** | C# (.NET) | 需要 | 复杂系统插件 |
 
-### 内置插件列表（21个）
+### HTML/JS 插件 — 1 分钟上手
 
-**系统工具**
-- 📋 剪贴板历史 - 自动记录、快速搜索
-- 🌐 端口管理器 - 端口扫描、进程识别
-- 📊 硬件监控 - CPU/内存/磁盘监控
-- 🗂️ 文件整理器 - 智能分类、批量处理
-- 💻 开发者工具箱 - 编解码一站式工具
+```html
+<!-- index.html -->
+<button onclick="go()">备注此文件夹</button>
+<script>
+async function go() {
+  let f = await long.shell.getActiveFolder();
+  let t = await long.clipboard.getText();
+  await long.fs.ads.write(f.data, t.data);
+  long.ui.showToast('已保存！');
+}
+</script>
+```
 
-**效率工具**
-- 🚀 快捷启动器 - 热键呼出、模糊搜索
-- 📷 截图工具 - 快速截图、自动保存
-- 🪟 窗口管理器 - 窗口平铺、多屏支持
-- 📝 快速笔记 - 悬浮窗记事本
-- 🔖 文件夹备注 - NTFS ADS 备注
+### 打包分发
 
-**开发工具**
-- 🧰 Base64 工具 - 编解码转换
-- 📄 JSON 格式化 - 格式化、校验
-- 🎨 颜色选择器 - 取色、格式转换
-- 📝 Markdown 预览 - 实时渲染
-- 🔄 文本对比 - 差异高亮
+```powershell
+.\pack-plugin.ps1 -PluginDir "src/MyPlugin"   # → dist/MyPlugin-v1.0.0.lpak
+```
 
-**其他工具**
-- 🎯 宏录制器 - 自动化操作
-- 📝 文件重命名 - 批量重命名
-- 🔐 密码生成器 - 强密码生成
-- 🌐 翻译助手 - 快速翻译
-- 🔧 示例插件 - 开发参考
+用户拖放 `.lpak` 文件到 ToolCenter 即完成安装。
+
+详细文档见 [`docs/插件开发指南.md`](docs/插件开发指南.md)
 
 ---
 
-## 🎯 底层能力清单（25项）
-
-### 系统能力（14项）
-- `system.hotkey` - 全局热键
-- `system.clipboard` - 剪贴板读写
-- `system.clipboard.monitor` - 剪贴板监听
-- `system.notification` - Toast 通知
-- `system.screenshot` - 截图
-- `system.input` - 输入模拟
-- `system.process` - 进程管理
-- `system.performance` - 性能监控
-- `system.registry.*` - 注册表操作
-- `system.cache` - 缓存清理
-- `system.schedule` - 定时任务
-- `system.audio` - 音频控制
-- `system.power` - 电源管理
-- `system.theme` - 主题管理
-- `system.wallpaper` - 壁纸管理
-
-### 显示能力（1项）
-- `display.brightness` - 亮度控制
-
-### 网络能力（3项）
-- `network.ports` - 端口管理
-- `network.monitor` - 流量监控
-- `network.http` - HTTP 请求
-
-### 文件能力（4项）
-- `file.ops` - 文件操作
-- `filesystem.advanced` - 高级文件系统
-- `fs.ads.access` - NTFS ADS
-- `shell.selection` - Explorer 感知
-- `shell.execute` - 打开 URL/文件
-
-### 其他能力（3项）
-- `text.pinyin` - 拼音匹配
-- `storage.local` - 本地存储
-- `window.info` - 窗口信息
-- `ui.window` - UI 窗口能力
-
----
-
-## 📂 项目结构
+## 项目结构
 
 ```
 Long_BetterWindows/
 ├── src/
-│   ├── LongBetterWindows.Host/          # 宿主程序
-│   │   ├── Engine/                      # 插件引擎
-│   │   ├── Services/                    # 底层能力服务
-│   │   ├── Capabilities/                # 能力接口定义
-│   │   └── UI/                          # 主界面
-│   ├── *Plugin/                         # DLL 插件
-│   └── */                               # WebView 插件
-├── docs/                                # 开发文档
-├── tests/                               # 单元测试
-├── 启动.bat                             # 一键启动脚本
-├── 开发模式.bat                         # 开发模式脚本
-└── 打包发布.bat                         # 打包脚本
+│   ├── LongBetterWindows.Host/    # 宿主应用 (WPF .NET 8)
+│   │   ├── Core/                  #   插件接口契约
+│   │   ├── Capabilities/          #   原子能力接口
+│   │   ├── Contracts/             #   数据模型
+│   │   ├── Engine/                #   插件引擎
+│   │   ├── Services/              #   能力与平台服务实现
+│   │   └── Views/                 #   UI 组件
+│   ├── SamplePlugin/              # 教学参考插件
+│   ├── FolderNotePlugin/          # 文件夹备注插件
+│   ├── QuickLaunchPlugin/         # 快捷启动器插件
+│   ├── MacroPlugin/               # 宏录制器插件
+│   └── Templates/                 # 插件开发模板 (3 级)
+├── Plugins/                       # 插件输出目录
+├── docs/                          # 设计 + 开发文档
+└── new-plugin.ps1                 # 插件脚手架脚本
 ```
 
 ---
 
-## 🛠️ 技术栈
+## 技术栈
 
-### 核心技术
-- **.NET 8.0** - 现代化框架
-- **WPF** - 原生 Windows UI
-- **WebView2** - Edge Chromium 内核
-- **Roslyn** - C# 脚本引擎
-
-### UI 框架
-- **WPF UI** - 现代化 UI 控件
-- **HTML/CSS/JS** - WebView 插件
-
-### 工具库
-- **Serilog** - 日志系统
-- **Newtonsoft.Json** - JSON 处理
-- **Microsoft.CodeAnalysis** - 脚本编译
+| 技术 | 用途 |
+|---|---|
+| .NET 8.0 + WPF | 应用框架 |
+| WPF-UI 3.0.4 | Fluent Design 主题 |
+| Serilog | 结构化日志 |
+| Win32 P/Invoke | 系统级集成 (热键、ADS、全局钩子) |
+| COM Interop | Explorer Shell 感知 (IShellWindows) |
 
 ---
 
-## 📝 开发插件
+## 版本历史
 
-### WebView 插件示例
+| 版本 | 日期 | 内容 |
+|---|---|---|
+| v0.1.0 | 2026-03 | 宿主框架 + 5 项能力 + 插件引擎 |
+| v0.2.0 | 2026-06 | 12 项能力 + 16 插件 + 3 运行时 + 内置 IDE + 30 测试 |
+| v0.5.0-rc.1 | 2026-07 | 统一命令中心 + Long Design System + 16 插件 UI 迁移 + 质量与发布基线 |
+| v1.8.0 | 2026-07 | 27 个宿主能力接口 + 21 个内置插件 |
+| v1.9.0 | 2026-07 | 合并交互平台、超级面板、可信插件市场与 25 插件发布基线 |
 
-```javascript
-// manifest.json
-{
-  "id": "com.example.myplugin",
-  "name": "我的插件",
-  "entry_point": "index.html",
-  "runtime": "webview",
-  "capabilities": ["system.clipboard"]
-}
-```
+## 路线图
 
-```html
-<!-- index.html -->
-<!DOCTYPE html>
-<html>
-<body>
-  <h1>我的插件</h1>
-  <button onclick="copyText()">复制文本</button>
-  
-  <script>
-    async function copyText() {
-      await window.hostApi.clipboard.setText('Hello World');
-    }
-  </script>
-</body>
-</html>
-```
+### 已完成
+- [x] 插件引擎（扫描/加载/热重载/Web 能力边界与本地高信任提示）
+- [x] 三种运行时（DLL / .csx 脚本 / WebView2 HTML/JS）
+- [x] 27 个宿主能力接口
+- [x] 25 个互不重复的内置插件
+- [x] 内置插件开发 IDE
+- [x] 插件脚手架 + 5 种模板
+- [x] .lpak 打包分发
+- [x] 215 个自动化测试
+- [x] 插件开发指南 + 内置文档浏览器
 
-### DLL 插件示例
+### 进行中 / 预留
+- [x] v1.9 统一上下文快照（文本/URL/文件/文件夹/Explorer 选区）
+- [x] v0.6 图片上下文与动态搜索基础设施（统一结果、超时、去重、增量刷新）
+- [x] v0.6 快捷启动器真实动态数据源与二次搜索闭环
+- [x] v0.6 固定、最近使用、本地智能排序与隐私清除入口
+- [x] v0.6 首批结果性能复核与最终验收
+- [x] v0.7 第一批声明式插件生命周期与兼容状态机
+- [x] v0.7 第二批 Long 超级面板外壳与共享搜索闭环
+- [x] v0.7 第三批智能/固定/最近分组、滚轮切组与拖拽排序
+- [x] v0.7 第四批自定义文件夹分组、组间移动与插件窗口资源释放
+- [x] v0.7 第五批嵌入/分离窗口会话、统一返回与安全鼠标手势
+- [x] v1.9 Long 超级面板与完整插件生命周期
+- [x] v1.9 Long 原生插件市场核心功能与可信分发链
+- [ ] v1.9 真实 Registry/CDN 生产演练与正式凭据签核
+- [ ] Win11 Sparse Package 一级右键菜单（appxmanifest 已预留）
+- [ ] CI/CD（workflow 已就绪，待 Token 权限修复）
+- [ ] 国际化（zh-CN / en-US 已完成，待 UI 集成）
+- [x] 主题切换（Dark / Light / System）
 
-```csharp
-public class MyPlugin : IPlugin
-{
-    public void Initialize(IHostApi hostApi)
-    {
-        hostApi.Hotkey.Register("Ctrl+Shift+M", OnHotkeyPressed);
-    }
-    
-    private void OnHotkeyPressed()
-    {
-        // 插件逻辑
-    }
-}
-```
-
-更多示例请查看 [插件开发指南](docs/插件开发指南.md)
+后续交互平台路线见 [`docs/Long_交互平台演进路线_v0.6-v0.8.md`](docs/Long_交互平台演进路线_v0.6-v0.8.md)。Long 不计划兼容 uTools 插件；两者仅在统一入口、上下文匹配等产品交互层面相互参考。
 
 ---
 
-## 📊 版本历史
+## 许可证
 
-### v1.8.0 (2026-07-16)
-- ✨ 新增壁纸管理能力
-- ✨ 新增屏幕亮度控制
-- ✨ 新增网络流量监控
-- 🐛 修复批处理文件编码问题
-
-### v1.7.0 (2026-07-16)
-- ✨ 新增电源管理能力
-- ✨ 新增主题管理能力
-
-### v1.6.1 (2026-07-16)
-- ✨ 新增 8 项底层能力
-- ✨ 新增 5 个实用插件
-- ✨ 新增自动化脚本系统
-- 📝 美化 README 文档
-
-[查看完整更新日志](docs/)
+MIT License
 
 ---
 
-## 🤝 贡献指南
+## 致谢
 
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
-
----
-
-## 📄 开源协议
-
-本项目采用 [MIT License](LICENSE) 开源协议。
-
----
-
-## 🙏 致谢
-
-- [WPF UI](https://github.com/lepoco/wpfui) - 现代化 WPF 控件库
-- [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) - Edge Chromium 内核
-- [Serilog](https://serilog.net/) - 结构化日志库
-
----
-
-## 📧 联系方式
-
-- **作者**: Kiro
-- **项目地址**: https://github.com/Longyuyeee/Long_BetterWindows
-- **问题反馈**: [GitHub Issues](https://github.com/Longyuyeee/Long_BetterWindows/issues)
-
----
-
-<div align="center">
-
-**⭐ 如果这个项目对你有帮助，请给一个 Star 支持一下！⭐**
-
-Made with ❤️ by Kiro
-
-</div>
+Long窗口 的统一入口与插件交互参考 uTools；视觉系统与实现为 Long 自有设计。

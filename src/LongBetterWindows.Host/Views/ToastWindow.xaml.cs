@@ -15,10 +15,10 @@ namespace LongBetterWindows.Host.Views
             => ShowInternal(message, null);
 
         public static void ShowSuccess(string message)
-            => ShowInternal(message, "SuccessGreenBrush");
+            => ShowInternal(message, "Long.Brush.State.Success");
 
         public static void ShowError(string message)
-            => ShowInternal(message, "DangerRedBrush");
+            => ShowInternal(message, "Long.Brush.State.Danger");
 
         private static void ShowInternal(string message, string? accentKey)
         {
@@ -33,11 +33,14 @@ namespace LongBetterWindows.Host.Views
                     Top = workArea.Bottom - 80,
                 };
 
-                // 根据类型设置背景色
                 if (accentKey != null)
                 {
                     var brush = Application.Current.TryFindResource(accentKey) as System.Windows.Media.Brush;
-                    if (brush != null) window.ToastBorder.Background = brush;
+                    if (brush != null)
+                    {
+                        window.AccentBar.Background = brush;
+                        window.AccentBar.Visibility = Visibility.Visible;
+                    }
                 }
 
                 window.MessageText.Text = message;
@@ -49,7 +52,13 @@ namespace LongBetterWindows.Host.Views
                     window.Top = workArea.Bottom - window.ActualHeight - 20;
                 };
 
-                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(250))
+                var normalDuration = Application.Current.Resources["Long.Motion.Normal"] is Duration token
+                    ? token.TimeSpan
+                    : TimeSpan.FromMilliseconds(180);
+                if (normalDuration == TimeSpan.Zero)
+                    window.Opacity = 1;
+
+                var fadeIn = new DoubleAnimation(0, 1, normalDuration)
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 };
@@ -59,7 +68,7 @@ namespace LongBetterWindows.Host.Views
                 timer.Tick += (_, _) =>
                 {
                     timer.Stop();
-                    var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
+                    var fadeOut = new DoubleAnimation(1, 0, normalDuration);
                     fadeOut.Completed += (_, _) => window.Close();
                     window.BeginAnimation(OpacityProperty, fadeOut);
                 };

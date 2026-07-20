@@ -1,40 +1,138 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>文本对比</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,system-ui,sans-serif;background:#f5f5f7;color:#1d1d1f;padding:20px}
-h2{font-size:15px;margin-bottom:8px;color:#007AFF}
-label{font-size:12px;color:#888;margin-bottom:4px;display:block}
-textarea{width:100%;height:100px;border:1px solid #e0e0e0;border-radius:8px;padding:10px;font-size:12px;font-family:monospace;line-height:1.5;resize:vertical;margin-bottom:10px}
-textarea:focus{outline:none;border-color:#007AFF}
-.btn-row{display:flex;gap:8px;margin-bottom:10px}
-button{padding:6px 14px;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer}
-.btn-primary{background:#007AFF;color:#fff}.btn-primary:hover{background:#0062CC}
-.btn-secondary{background:#f0f0f0;color:#333}.btn-secondary:hover{background:#e0e0e0}
-.result{font-size:12px;font-family:monospace;line-height:1.6;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px;max-height:200px;overflow:auto;white-space:pre-wrap}
-.add{background:#dcfce7;color:#166534}.del{background:#fecaca;color:#991b1b}.same{color:#888}
-</style></head><body>
-<h2>文本对比 (Diff)</h2>
-<label>原始文本</label><textarea id="textA" placeholder="原始文本..."></textarea>
-<label>修改后文本</label><textarea id="textB" placeholder="修改后文本..."></textarea>
-<div class="btn-row">
-  <button class="btn-primary" onclick="diff()">对比差异</button>
-  <button class="btn-secondary" onclick="pasteA()">粘贴原始</button>
-  <button class="btn-secondary" onclick="pasteB()">粘贴修改</button>
-</div>
-<div class="result" id="diffResult"></div>
-<script>
-function diff(){
-  var a=document.getElementById('textA').value.split('\n');
-  var b=document.getElementById('textB').value.split('\n');
-  var html='';var max=Math.max(a.length,b.length);
-  for(var i=0;i<max;i++){
-    var la=a[i]||'',lb=b[i]||'';
-    if(la===lb)html+='<span class="same">  '+esc(la)+'</span>\n';
-    else{html+='<span class="del">- '+esc(la)+'</span>\n<span class="add">+ '+esc(lb)+'</span>\n';}
-  }
-  document.getElementById('diffResult').innerHTML=html||'无差异';
-}
-async function pasteA(){var r=await long.clipboard.getText();if(r.success)document.getElementById('textA').value=r.data}
-async function pasteB(){var r=await long.clipboard.getText();if(r.success)document.getElementById('textB').value=r.data}
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>文本对比</title>
+</head>
+<body>
+  <main class="long-page">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">TEXT DIFF</div>
+        <h1 class="long-page-title">文本对比</h1>
+        <p class="long-page-description">按行对齐新增、删除与未变内容，结果完全在本地计算。</p>
+      </div>
+      <span class="long-badge" id="summary">等待对比</span>
+    </header>
+
+    <section class="long-grid" aria-label="待对比文本">
+      <div class="long-card long-field">
+        <label class="long-field-label" for="textA">原始文本</label>
+        <textarea class="long-editor" id="textA" placeholder="粘贴原始版本…" autofocus></textarea>
+        <button class="long-button long-button--secondary btn-secondary" id="pasteAButton" type="button">粘贴到原始文本</button>
+      </div>
+      <div class="long-card long-field">
+        <label class="long-field-label" for="textB">修改后文本</label>
+        <textarea class="long-editor" id="textB" placeholder="粘贴修改后的版本…"></textarea>
+        <button class="long-button long-button--secondary btn-secondary" id="pasteBButton" type="button">粘贴到修改文本</button>
+      </div>
+    </section>
+
+    <div class="long-toolbar long-toolbar--spaced">
+      <button class="long-button long-button--primary btn-primary" id="compareButton" type="button">对比差异</button>
+      <button class="long-button long-button--secondary btn-secondary" id="swapButton" type="button">交换两侧</button>
+      <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button">清空</button>
+      <span class="long-toolbar__spacer"></span>
+      <span class="long-kbd">Ctrl Enter</span>
+    </div>
+
+    <section class="long-card long-stack long-toolbar--spaced" aria-labelledby="resultTitle">
+      <div class="long-toolbar">
+        <h2 class="long-field-label" id="resultTitle">对比结果</h2>
+        <span class="long-toolbar__spacer"></span>
+        <button class="long-button long-button--small" id="copyButton" type="button" disabled>复制 Diff</button>
+      </div>
+      <div class="long-diff" id="diffResult" role="region" aria-live="polite"></div>
+      <div class="long-status" id="status" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script>
+    const textA = document.getElementById('textA');
+    const textB = document.getElementById('textB');
+    const result = document.getElementById('diffResult');
+    const status = document.getElementById('status');
+    const copyButton = document.getElementById('copyButton');
+    let diffText = '';
+
+    function setStatus(message, kind) {
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      window.LongUI?.announce(message);
+    }
+
+    function compare() {
+      const left = textA.value.split('\n');
+      const right = textB.value.split('\n');
+      if (left.length * right.length > 160000) {
+        setStatus('文本行数过多，请将两侧控制在约 400 行以内', 'warning');
+        return;
+      }
+      const operations = buildLineDiff(left, right);
+      result.replaceChildren();
+      let added = 0, removed = 0;
+      diffText = operations.map(function (operation) {
+        const line = document.createElement('span');
+        line.className = 'long-diff-line long-diff-line--' + operation.kind;
+        const prefix = operation.kind === 'add' ? '+ ' : operation.kind === 'delete' ? '- ' : '  ';
+        line.textContent = prefix + operation.text;
+        result.appendChild(line);
+        if (operation.kind === 'add') added++;
+        if (operation.kind === 'delete') removed++;
+        return prefix + operation.text;
+      }).join('\n');
+      document.getElementById('summary').textContent = '+' + added + ' / −' + removed;
+      copyButton.disabled = operations.length === 0;
+      setStatus(added || removed ? '对比完成' : '两侧文本没有差异', 'success');
+    }
+
+    function buildLineDiff(left, right) {
+      const rows = left.length + 1, columns = right.length + 1;
+      const table = Array.from({ length: rows }, function () { return new Uint16Array(columns); });
+      for (let i = left.length - 1; i >= 0; i--)
+        for (let j = right.length - 1; j >= 0; j--)
+          table[i][j] = left[i] === right[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+      const operations = [];
+      let i = 0, j = 0;
+      while (i < left.length && j < right.length) {
+        if (left[i] === right[j]) { operations.push({ kind: 'same', text: left[i] }); i++; j++; }
+        else if (table[i + 1][j] >= table[i][j + 1]) { operations.push({ kind: 'delete', text: left[i++] }); }
+        else { operations.push({ kind: 'add', text: right[j++] }); }
+      }
+      while (i < left.length) operations.push({ kind: 'delete', text: left[i++] });
+      while (j < right.length) operations.push({ kind: 'add', text: right[j++] });
+      return operations;
+    }
+
+    async function paste(target) {
+      try {
+        const response = await long.clipboard.getText();
+        if (response.success && response.data) { target.value = response.data; target.focus(); }
+        else setStatus('剪贴板中没有文本', 'warning');
+      } catch (_) { setStatus('无法读取剪贴板', 'danger'); }
+    }
+
+    async function copyDiff() {
+      if (!diffText) return;
+      try { await long.clipboard.setText(diffText); setStatus('Diff 已复制', 'success'); }
+      catch (_) { setStatus('复制失败', 'danger'); }
+    }
+
+    document.getElementById('compareButton').addEventListener('click', compare);
+    document.getElementById('pasteAButton').addEventListener('click', function () { paste(textA); });
+    document.getElementById('pasteBButton').addEventListener('click', function () { paste(textB); });
+    document.getElementById('copyButton').addEventListener('click', copyDiff);
+    document.getElementById('swapButton').addEventListener('click', function () { const value = textA.value; textA.value = textB.value; textB.value = value; compare(); });
+    document.getElementById('clearButton').addEventListener('click', function () { textA.value = ''; textB.value = ''; result.replaceChildren(); diffText = ''; copyButton.disabled = true; document.getElementById('summary').textContent = '等待对比'; textA.focus(); setStatus(''); });
+    document.addEventListener('keydown', function (event) {
+      if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); compare(); }
+    });
+    window.LongUI?.onCommand(function (command) {
+      const text = window.LongUI.commandText(command);
+      if (text) textA.value = text;
+      textB.focus();
+    });
+  </script>
+</body>
+</html>

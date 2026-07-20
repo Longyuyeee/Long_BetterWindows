@@ -1,19 +1,25 @@
 using System.Windows;
 using System.Windows.Controls;
+using LongBetterWindows.Host.Capabilities;
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using Serilog;
 
 namespace MacroPlugin;
 
-public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
+public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginCommandHandler
 {
     private IHostApi? _host;
     private MacroEngine? _engine;
     private MacroOverlay? _overlay;
+    private readonly List<string> _registeredHotkeys = new();
+    private string _recordHotkey = "F6";
+    private string _playHotkey = "F7";
+    private string _loopHotkey = "F8";
 
     public string Id => "com.long.macro";
     public string Name => "宏录制器";
-    public string Version => "1.0.0";
+    public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public Task<bool> InitializeAsync(IHostApi host)
@@ -38,35 +44,55 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
     {
         var hotKey = _host!.HotKey!;
 
-        var r1 = await hotKey.RegisterAsync("F6", () => ToggleRecording());
-        var r2 = await hotKey.RegisterAsync("F7", async () => await PlayOnce());
-        var r3 = await hotKey.RegisterAsync("F8", () => ToggleLoopPlay());
-
-        if (!r1.IsSuccess || !r2.IsSuccess || !r3.IsSuccess)
-        {
-            Log.Error("[Macro] 热键注册失败");
-            State = PluginState.Error;
-            return false;
-        }
+        _recordHotkey = await RegisterWithFallbackAsync(hotKey, "F6", "Ctrl+Alt+F6", ToggleRecording);
+        _playHotkey = await RegisterWithFallbackAsync(hotKey, "F7", "Ctrl+Alt+F7", () => _ = PlayOnce());
+        _loopHotkey = await RegisterWithFallbackAsync(hotKey, "F8", "Ctrl+Alt+F8", ToggleLoopPlay);
 
         State = PluginState.Running;
-        Log.Information("[Macro] 已启动: F6录制 F7播放 F8循环");
+        Log.Information("[Macro] 已启动: {Record}录制 {Play}播放 {Loop}循环",
+            _recordHotkey, _playHotkey, _loopHotkey);
         return true;
+    }
+
+    private async Task<string> RegisterWithFallbackAsync(
+        IHotKeyService hotKey,
+        string preferred,
+        string fallback,
+        Action callback)
+    {
+        var result = await hotKey.RegisterAsync(preferred, callback);
+        if (result.IsSuccess)
+        {
+            _registeredHotkeys.Add(preferred);
+            return preferred;
+        }
+
+        Log.Warning("[Macro] 热键 {Hotkey} 冲突，尝试 {Fallback}", preferred, fallback);
+        result = await hotKey.RegisterAsync(fallback, callback);
+        if (result.IsSuccess)
+        {
+            _registeredHotkeys.Add(fallback);
+            return fallback;
+        }
+
+        Log.Warning("[Macro] 热键 {Preferred}/{Fallback} 均不可用，功能仍可从命令中心执行",
+            preferred, fallback);
+        return "命令中心";
     }
 
     public async Task<bool> StopAsync()
     {
         var hotKey = _host!.HotKey!;
-        await hotKey.UnregisterAsync("F6");
-        await hotKey.UnregisterAsync("F7");
-        await hotKey.UnregisterAsync("F8");
+        foreach (var hotkey in _registeredHotkeys)
+            await hotKey.UnregisterAsync(hotkey);
+        _registeredHotkeys.Clear();
 
         _engine?.StopPlay();
         _engine?.StopRecording();
         _engine?.Dispose();
 
         Application.Current.Dispatcher.Invoke(() => _overlay?.Close());
-        State = PluginState.Disabled;
+        State = PluginState.Stopped;
         return true;
     }
 
@@ -162,9 +188,9 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
     public FrameworkElement CreateSettingsUI()
     {
         var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("录制", Id, "F6", _ => { }));
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("播放单次", Id, "F7", _ => { }));
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("循环播放", Id, "F8", _ => { }));
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("录制", Id, _recordHotkey, _ => { }));
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("播放单次", Id, _playHotkey, _ => { }));
+        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("循环播放", Id, _loopHotkey, _ => { }));
         return panel;
     }
 
@@ -172,5 +198,26 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI
     {
         EnsureOverlay();
         if (_overlay != null) _overlay.SetIdle();
+    }
+
+    public async Task<PluginCommandResult> ExecuteCommandAsync(
+        PluginCommandInvocation invocation,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        switch (invocation.CommandId)
+        {
+            case "macro.record-toggle":
+                ToggleRecording();
+                return PluginCommandResult.Success("宏录制状态已切换");
+            case "macro.play-once":
+                await PlayOnce();
+                return PluginCommandResult.Success("宏播放已执行");
+            case "macro.loop-toggle":
+                ToggleLoopPlay();
+                return PluginCommandResult.Success("循环播放状态已切换");
+            default:
+                return PluginCommandResult.Failure("未知宏命令");
+        }
     }
 }

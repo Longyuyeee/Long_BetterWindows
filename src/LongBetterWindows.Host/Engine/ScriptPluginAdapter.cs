@@ -67,7 +67,7 @@ namespace LongBetterWindows.Host.Engine
                 }
             }
 
-            State = PluginState.Disabled;
+            State = PluginState.Stopped;
             Log.Information("[Script:{Id}] 已停止", Id);
             return true;
         }

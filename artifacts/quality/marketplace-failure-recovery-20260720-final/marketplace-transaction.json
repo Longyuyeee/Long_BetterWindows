@@ -1,0 +1,22 @@
+﻿{
+    "schema_version":  1,
+    "generated_at":  "2026-07-19T16:29:40.9100221+00:00",
+    "classification":  "isolated_marketplace_failure_recovery_ui_transaction",
+    "plugin_id":  "dev.long.ui-transaction",
+    "isolation_root_removed":  true,
+    "release_plugins_fingerprint_before":  "FF1247F938D03B0DC94E3655F7B78A471910723781D5A77E85E19575E9BEAE1B",
+    "release_plugins_fingerprint_after":  "FF1247F938D03B0DC94E3655F7B78A471910723781D5A77E85E19575E9BEAE1B",
+    "release_plugins_unchanged":  true,
+    "signed_trust_confirmed":  true,
+    "install_v1":  true,
+    "rejected_hash_mismatch":  true,
+    "rejected_forged_signature":  true,
+    "old_version_preserved_after_rejections":  true,
+    "upgrade_v2":  true,
+    "rollback_v1":  true,
+    "uninstall":  true,
+    "startup_recovered_interrupted_upgrade":  true,
+    "passed":  true,
+    "error":  null,
+    "failed_stage":  null
+}

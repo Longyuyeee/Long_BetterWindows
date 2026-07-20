@@ -1,0 +1,19 @@
+﻿{
+    "schema_version":  1,
+    "generated_at":  "2026-07-19T16:36:39.5099738+00:00",
+    "classification":  "marketplace_network_resilience_gate",
+    "tests_total":  11,
+    "tests_passed":  11,
+    "transient_retry":  true,
+    "stale_partial_cleanup":  true,
+    "concurrent_download_coalescing":  true,
+    "concurrent_install_serialization":  true,
+    "bounded_timeout":  true,
+    "offline_catalog_fallback":  true,
+    "invalid_hash_cleanup":  true,
+    "interrupted_transaction_recovery":  true,
+    "release_plugins_fingerprint_before":  "2859F19C933C1CEC83808C6845F36101744D3D9B61CBCAA0FCD2A85528078637",
+    "release_plugins_fingerprint_after":  "2859F19C933C1CEC83808C6845F36101744D3D9B61CBCAA0FCD2A85528078637",
+    "release_plugins_unchanged":  true,
+    "passed":  true
+}

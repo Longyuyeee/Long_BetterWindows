@@ -1,0 +1,47 @@
+<Window x:Class="WindowManagerPlugin.WindowManagerGuide"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="窗口管理" Width="560" Height="590" SizeToContent="Manual"
+        Style="{StaticResource LongDialog}" WindowStartupLocation="CenterScreen">
+    <Border Style="{StaticResource LongCard}" Padding="24">
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid>
+                <StackPanel>
+                    <TextBlock Text="窗口管理" FontSize="24" FontWeight="SemiBold" />
+                    <TextBlock Text="用统一指令或快捷键整理当前窗口" Margin="0,6,0,0"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                </StackPanel>
+                <Button HorizontalAlignment="Right" VerticalAlignment="Top" Content="×"
+                        Style="{StaticResource LongIconButton}" Click="Close_Click"
+                        AutomationProperties.Name="关闭窗口管理指南" />
+            </Grid>
+            <ScrollViewer Grid.Row="1" Margin="0,22,0,18" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="常用操作" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Accent.Primary}" />
+                    <UniformGrid Columns="2" Margin="0,8,0,18">
+                        <Border Style="{StaticResource LongCard}" Margin="0,0,6,6"><StackPanel><TextBlock Text="切换置顶" FontWeight="SemiBold"/><TextBlock Text="Ctrl + Alt + T" Margin="0,6,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel></Border>
+                        <Border Style="{StaticResource LongCard}" Margin="6,0,0,6"><StackPanel><TextBlock Text="最大化" FontWeight="SemiBold"/><TextBlock Text="Ctrl + Alt + ↑" Margin="0,6,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel></Border>
+                    </UniformGrid>
+                    <TextBlock Text="半屏与分区" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Accent.Primary}" />
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="←  左半屏" Margin="0,4"/><TextBlock Text="→  右半屏" Margin="0,4"/>
+                            <TextBlock Text="↓  下半屏" Margin="0,4"/><TextBlock Text="1  左上四分屏" Margin="0,4"/>
+                            <TextBlock Text="3  左下四分屏" Margin="0,4"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="2  右上四分屏" Margin="0,4"/><TextBlock Text="4  右下四分屏" Margin="0,4"/>
+                            <TextBlock Text="Shift + ←  左侧 ⅓" Margin="0,4"/><TextBlock Text="Shift + →  右侧 ⅔" Margin="0,4"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+            <Border Grid.Row="2" Background="{DynamicResource Long.Brush.Accent.Soft}" CornerRadius="8" Padding="12,9">
+                <TextBlock Text="提示：所有操作也可以直接在命令中心搜索“窗口”。"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+            </Border>
+        </Grid>
+    </Border>
+</Window>

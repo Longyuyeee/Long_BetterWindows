@@ -1,85 +1,97 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- ============================================ -->
-    <!-- 色彩系统 — Apple HIG-inspired semantic colors -->
-    <!-- ============================================ -->
+    <!-- Long Design System — semantic palette. Active values default to dark mode. -->
 
-    <!-- ▸ 强调色 -->
-    <Color x:Key="AccentBlueColor">#007AFF</Color>
-    <SolidColorBrush x:Key="AccentBlueBrush" Color="#007AFF" />
-    <Color x:Key="AccentBlueHoverColor">#0062CC</Color>
-    <SolidColorBrush x:Key="AccentBlueHoverBrush" Color="#0062CC" />
-    <Color x:Key="AccentBluePressedColor">#0055AA</Color>
-    <SolidColorBrush x:Key="AccentBluePressedBrush" Color="#0055AA" />
+    <!-- Brand primitives -->
+    <Color x:Key="Long.Color.Brand.Violet">#7059F5</Color>
+    <Color x:Key="Long.Color.Brand.VioletHover">#765EE8</Color>
+    <Color x:Key="Long.Color.Brand.VioletPressed">#6248DE</Color>
+    <Color x:Key="Long.Color.Brand.Cyan">#076F92</Color>
+    <Color x:Key="Long.Color.Brand.White">#FFFFFF</Color>
 
-    <!-- ▸ 语义色 -->
-    <Color x:Key="SuccessGreenColor">#34C759</Color>
-    <SolidColorBrush x:Key="SuccessGreenBrush" Color="#34C759" />
-    <Color x:Key="SuccessGreenHoverColor">#2DAF4A</Color>
-    <SolidColorBrush x:Key="SuccessGreenHoverBrush" Color="#2DAF4A" />
+    <!-- Active semantic colors: updated atomically by App.UpdateThemeResources. -->
+    <Color x:Key="Long.Color.Background.Base">#0B0D12</Color>
+    <Color x:Key="Long.Color.Background.Raised">#11151D</Color>
+    <Color x:Key="Long.Color.Surface.Card">#171C27</Color>
+    <Color x:Key="Long.Color.Surface.Hover">#202838</Color>
+    <Color x:Key="Long.Color.Surface.Pressed">#283247</Color>
+    <Color x:Key="Long.Color.Surface.Overlay">#F2131721</Color>
+    <Color x:Key="Long.Color.Stroke.Default">#2A3242</Color>
+    <Color x:Key="Long.Color.Stroke.Strong">#465269</Color>
+    <Color x:Key="Long.Color.Text.Primary">#F4F6FB</Color>
+    <Color x:Key="Long.Color.Text.Secondary">#B2BACB</Color>
+    <Color x:Key="Long.Color.Text.Muted">#7C879E</Color>
+    <Color x:Key="Long.Color.Accent.Primary">#7059F5</Color>
+    <Color x:Key="Long.Color.Accent.Hover">#765EE8</Color>
+    <Color x:Key="Long.Color.Accent.Pressed">#6248DE</Color>
+    <Color x:Key="Long.Color.Accent.Soft">#338B78FF</Color>
+    <Color x:Key="Long.Color.Focus">#785CC8FF</Color>
+    <Color x:Key="Long.Color.State.Success">#47D18C</Color>
+    <Color x:Key="Long.Color.State.Warning">#FFB84D</Color>
+    <Color x:Key="Long.Color.State.Danger">#FF647C</Color>
+    <Color x:Key="Long.Color.ScrollThumb">#59657A</Color>
+    <Color x:Key="Long.Color.ScrollThumbHover">#8290A8</Color>
 
-    <Color x:Key="DangerRedColor">#FF3B30</Color>
-    <SolidColorBrush x:Key="DangerRedBrush" Color="#FF3B30" />
-    <Color x:Key="DangerRedHoverColor">#E0352B</Color>
-    <SolidColorBrush x:Key="DangerRedHoverBrush" Color="#E0352B" />
+    <!-- Semantic brushes -->
+    <SolidColorBrush x:Key="Long.Brush.Background.Base" Color="{DynamicResource Long.Color.Background.Base}" />
+    <SolidColorBrush x:Key="Long.Brush.Background.Raised" Color="{DynamicResource Long.Color.Background.Raised}" />
+    <SolidColorBrush x:Key="Long.Brush.Surface.Card" Color="{DynamicResource Long.Color.Surface.Card}" />
+    <SolidColorBrush x:Key="Long.Brush.Surface.Hover" Color="{DynamicResource Long.Color.Surface.Hover}" />
+    <SolidColorBrush x:Key="Long.Brush.Surface.Pressed" Color="{DynamicResource Long.Color.Surface.Pressed}" />
+    <SolidColorBrush x:Key="Long.Brush.Surface.Overlay" Color="{DynamicResource Long.Color.Surface.Overlay}" />
+    <SolidColorBrush x:Key="Long.Brush.Stroke.Default" Color="{DynamicResource Long.Color.Stroke.Default}" />
+    <SolidColorBrush x:Key="Long.Brush.Stroke.Strong" Color="{DynamicResource Long.Color.Stroke.Strong}" />
+    <SolidColorBrush x:Key="Long.Brush.Text.Primary" Color="{DynamicResource Long.Color.Text.Primary}" />
+    <SolidColorBrush x:Key="Long.Brush.Text.Secondary" Color="{DynamicResource Long.Color.Text.Secondary}" />
+    <SolidColorBrush x:Key="Long.Brush.Text.Muted" Color="{DynamicResource Long.Color.Text.Muted}" />
+    <SolidColorBrush x:Key="Long.Brush.Accent.Primary" Color="{DynamicResource Long.Color.Accent.Primary}" />
+    <SolidColorBrush x:Key="Long.Brush.Accent.Hover" Color="{DynamicResource Long.Color.Accent.Hover}" />
+    <SolidColorBrush x:Key="Long.Brush.Accent.Pressed" Color="{DynamicResource Long.Color.Accent.Pressed}" />
+    <SolidColorBrush x:Key="Long.Brush.Accent.Soft" Color="{DynamicResource Long.Color.Accent.Soft}" />
+    <SolidColorBrush x:Key="Long.Brush.Focus" Color="{DynamicResource Long.Color.Focus}" />
+    <SolidColorBrush x:Key="Long.Brush.State.Success" Color="{DynamicResource Long.Color.State.Success}" />
+    <SolidColorBrush x:Key="Long.Brush.State.Warning" Color="{DynamicResource Long.Color.State.Warning}" />
+    <SolidColorBrush x:Key="Long.Brush.State.Danger" Color="{DynamicResource Long.Color.State.Danger}" />
+    <SolidColorBrush x:Key="Long.Brush.ScrollThumb" Color="{DynamicResource Long.Color.ScrollThumb}" />
+    <SolidColorBrush x:Key="Long.Brush.ScrollThumbHover" Color="{DynamicResource Long.Color.ScrollThumbHover}" />
+    <SolidColorBrush x:Key="Long.Brush.Text.OnAccent" Color="{StaticResource Long.Color.Brand.White}" />
+    <SolidColorBrush x:Key="Long.Brush.Text.OnAccentMuted" Color="#E9E5FF" />
+    <SolidColorBrush x:Key="Long.Brush.Surface.OnAccent" Color="#28FFFFFF" />
+    <SolidColorBrush x:Key="Long.Brush.Stroke.OnAccent" Color="#40FFFFFF" />
 
-    <!-- ▸ 表面色 (暗色主题) -->
-    <Color x:Key="SurfaceBackgroundColor">#1E1F22</Color>
-    <SolidColorBrush x:Key="SurfaceBackgroundBrush" Color="#1E1F22" />
+    <LinearGradientBrush x:Key="Long.Brush.Accent.Gradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{DynamicResource Long.Color.Accent.Primary}" Offset="0" />
+        <GradientStop Color="{StaticResource Long.Color.Brand.Cyan}" Offset="1" />
+    </LinearGradientBrush>
 
-    <Color x:Key="CardBackgroundColor">#2D2D30</Color>
-    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#2D2D30" />
-    <Color x:Key="CardHoverColor">#353538</Color>
-    <SolidColorBrush x:Key="CardHoverBrush" Color="#353538" />
+    <!-- Legacy aliases retained until all existing views migrate. -->
+    <SolidColorBrush x:Key="AccentBlueBrush" Color="{DynamicResource Long.Color.Accent.Primary}" />
+    <SolidColorBrush x:Key="AccentBlueHoverBrush" Color="{DynamicResource Long.Color.Accent.Hover}" />
+    <SolidColorBrush x:Key="AccentBluePressedBrush" Color="{DynamicResource Long.Color.Accent.Pressed}" />
+    <SolidColorBrush x:Key="SuccessGreenBrush" Color="{DynamicResource Long.Color.State.Success}" />
+    <SolidColorBrush x:Key="SuccessGreenHoverBrush" Color="{DynamicResource Long.Color.State.Success}" />
+    <SolidColorBrush x:Key="DangerRedBrush" Color="{DynamicResource Long.Color.State.Danger}" />
+    <SolidColorBrush x:Key="DangerRedHoverBrush" Color="{DynamicResource Long.Color.State.Danger}" />
+    <SolidColorBrush x:Key="SurfaceBackgroundBrush" Color="{DynamicResource Long.Color.Background.Base}" />
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="{DynamicResource Long.Color.Surface.Card}" />
+    <SolidColorBrush x:Key="CardHoverBrush" Color="{DynamicResource Long.Color.Surface.Hover}" />
+    <SolidColorBrush x:Key="TitleBarBrush" Color="{DynamicResource Long.Color.Background.Raised}" />
+    <SolidColorBrush x:Key="SecondaryButtonBrush" Color="{DynamicResource Long.Color.Surface.Card}" />
+    <SolidColorBrush x:Key="SecondaryButtonHoverBrush" Color="{DynamicResource Long.Color.Surface.Hover}" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource Long.Color.Text.Primary}" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource Long.Color.Text.Secondary}" />
+    <SolidColorBrush x:Key="TextMutedBrush" Color="{DynamicResource Long.Color.Text.Muted}" />
+    <SolidColorBrush x:Key="TextDimBrush" Color="{DynamicResource Long.Color.Text.Muted}" />
+    <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource Long.Color.Brand.White}" />
+    <SolidColorBrush x:Key="DividerBrush" Color="{DynamicResource Long.Color.Stroke.Default}" />
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="{DynamicResource Long.Color.ScrollThumb}" />
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="{DynamicResource Long.Color.ScrollThumbHover}" />
+    <SolidColorBrush x:Key="OverlayDarkBrush" Color="#A6000000" />
 
-    <Color x:Key="TitleBarColor">#2D2D30</Color>
-    <SolidColorBrush x:Key="TitleBarBrush" Color="#2D2D30" />
-
-    <!-- ▸ 按钮色 -->
-    <Color x:Key="SecondaryButtonColor">#3A3A3D</Color>
-    <SolidColorBrush x:Key="SecondaryButtonBrush" Color="#3A3A3D" />
-    <Color x:Key="SecondaryButtonHoverColor">#4A4A4D</Color>
-    <SolidColorBrush x:Key="SecondaryButtonHoverBrush" Color="#4A4A4D" />
-
-    <!-- ▸ 文字色 (暗色主题) -->
-    <Color x:Key="TextPrimaryColor">#E8E8E8</Color>
-    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#E8E8E8" />
-
-    <Color x:Key="TextSecondaryColor">#999999</Color>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#999999" />
-
-    <Color x:Key="TextMutedColor">#888888</Color>
-    <SolidColorBrush x:Key="TextMutedBrush" Color="#888888" />
-
-    <Color x:Key="TextDimColor">#777777</Color>
-    <SolidColorBrush x:Key="TextDimBrush" Color="#777777" />
-
-    <Color x:Key="WhiteColor">#FFFFFF</Color>
-    <SolidColorBrush x:Key="WhiteBrush" Color="#FFFFFF" />
-
-    <!-- ▸ 分隔线 / 边框 -->
-    <Color x:Key="DividerColor">#3A3A3D</Color>
-    <SolidColorBrush x:Key="DividerBrush" Color="#3A3A3D" />
-
-    <!-- ▸ 滚动条 -->
-    <Color x:Key="ScrollThumbColor">#555555</Color>
-    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#555555" />
-    <Color x:Key="ScrollThumbHoverColor">#777777</Color>
-    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#777777" />
-
-    <!-- ▸ 半透覆盖层 -->
-    <Color x:Key="OverlayDarkColor">#80000000</Color>
-    <SolidColorBrush x:Key="OverlayDarkBrush" Color="#80000000" />
-
-    <!-- ▸ 亮色主题备用色 (ThemeToggle 切换时使用) -->
-    <Color x:Key="LightSurfaceColor">#F5F5F7</Color>
-    <SolidColorBrush x:Key="LightSurfaceBrush" Color="#F5F5F7" />
-    <Color x:Key="LightCardColor">#FFFFFF</Color>
+    <!-- Compatibility values referenced by older theme code. -->
+    <SolidColorBrush x:Key="LightSurfaceBrush" Color="#F4F6FA" />
     <SolidColorBrush x:Key="LightCardBrush" Color="#FFFFFF" />
-    <Color x:Key="LightTextPrimaryColor">#1D1D1F</Color>
-    <SolidColorBrush x:Key="LightTextPrimaryBrush" Color="#1D1D1F" />
-    <Color x:Key="LightTextSecondaryColor">#86868B</Color>
-    <SolidColorBrush x:Key="LightTextSecondaryBrush" Color="#86868B" />
-
+    <SolidColorBrush x:Key="LightTextPrimaryBrush" Color="#171A22" />
+    <SolidColorBrush x:Key="LightTextSecondaryBrush" Color="#5E687B" />
 </ResourceDictionary>

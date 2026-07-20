@@ -42,7 +42,7 @@ public class EmptyPluginImpl : ILongPlugin
     // 释放所有资源：注销热键、停止定时器、保存状态等。
     public Task<bool> StopAsync()
     {
-        State = PluginState.Disabled;
+        State = PluginState.Stopped;
         Log.Information("[EmptyPlugin] 已停止");
         return Task.FromResult(true);
     }

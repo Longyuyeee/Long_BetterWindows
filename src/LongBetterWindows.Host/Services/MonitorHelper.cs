@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Media;
 
 namespace LongBetterWindows.Host.Services
 {
@@ -34,6 +35,22 @@ namespace LongBetterWindows.Host.Services
             GetMonitorInfoW(hMonitor, ref mi);
             return new Rect(mi.rcWork.Left, mi.rcWork.Top,
                 mi.rcWork.Right - mi.rcWork.Left, mi.rcWork.Bottom - mi.rcWork.Top);
+        }
+
+        public static (Point Cursor, Rect WorkArea) GetCursorPlacement(Visual visual)
+        {
+            ArgumentNullException.ThrowIfNull(visual);
+            GetCursorPos(out var cursor);
+            var physicalWorkArea = GetCursorWorkArea();
+            var source = PresentationSource.FromVisual(visual);
+            var transform = source?.CompositionTarget?.TransformFromDevice
+                ?? Matrix.Identity;
+            var logicalCursor = transform.Transform(new Point(cursor.X, cursor.Y));
+            var logicalTopLeft = transform.Transform(physicalWorkArea.TopLeft);
+            var logicalBottomRight = transform.Transform(physicalWorkArea.BottomRight);
+            return (
+                logicalCursor,
+                new Rect(logicalTopLeft, logicalBottomRight));
         }
     }
 }

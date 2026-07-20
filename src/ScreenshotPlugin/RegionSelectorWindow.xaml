@@ -1,0 +1,29 @@
+<Window x:Class="ScreenshotPlugin.RegionSelectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="{DynamicResource OverlayDarkBrush}"
+        Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize" Cursor="Cross"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Canvas x:Name="SelectionCanvas"
+            AutomationProperties.Name="截图区域选择器"
+            MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
+            MouseMove="Canvas_MouseMove"
+            MouseLeftButtonUp="Canvas_MouseLeftButtonUp">
+        <Border x:Name="InstructionCard" Canvas.Left="24" Canvas.Top="24"
+                Style="{StaticResource LongToast}" Padding="14,10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="拖拽选择截图区域" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                <TextBlock Text="  ·  ESC 取消" Margin="8,0,0,0"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+            </StackPanel>
+        </Border>
+        <Rectangle x:Name="SelectionRectangle" Visibility="Collapsed"
+                   Stroke="{DynamicResource Long.Brush.Accent.Primary}" StrokeThickness="2"
+                   Fill="{DynamicResource Long.Brush.Accent.Soft}" />
+        <Border x:Name="SizeBadge" Visibility="Collapsed"
+                Style="{StaticResource LongBadge}" Padding="8,4">
+            <TextBlock x:Name="SizeText" Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+        </Border>
+    </Canvas>
+</Window>

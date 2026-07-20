@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>正则测试器</title></head>
+<body>
+  <main class="long-page">
+    <header class="long-page-header"><div><div class="long-eyebrow">DEVELOPER TOOL</div><h1 class="long-page-title">正则测试器</h1><p class="long-page-description">使用 JavaScript 正则语法检查文本，展示匹配内容、位置和捕获组。</p></div><span class="long-badge" id="count">0 个匹配</span></header>
+    <section class="long-stack" aria-label="正则表达式测试器">
+      <div class="long-grid"><div class="long-card long-field"><label class="long-field-label" for="pattern">表达式</label><input class="long-input" id="pattern" placeholder="例如 (Long)\\s+(Window)" autofocus></div><div class="long-card long-field"><label class="long-field-label" for="flags">标志</label><input class="long-input" id="flags" value="gi" aria-describedby="flagHelp"><span class="long-muted" id="flagHelp">常用：g 全局、i 忽略大小写、m 多行</span></div></div>
+      <div class="long-card long-field"><label class="long-field-label" for="input">测试文本</label><textarea class="long-editor" id="input" placeholder="输入需要匹配的文本…"></textarea></div>
+      <div class="long-toolbar"><button class="long-button long-button--primary btn-primary" id="testButton" type="button">开始匹配</button><button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button">粘贴文本</button><span class="long-toolbar__spacer"></span><span class="long-kbd">Ctrl Enter</span></div>
+      <div class="long-card"><div class="long-field-label">匹配结果</div><div class="long-list" id="matches"><div class="long-empty">输入表达式和测试文本后开始匹配</div></div></div>
+      <div id="status" class="long-status" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+  <script>
+    const pattern = document.getElementById('pattern'); const flags = document.getElementById('flags'); const input = document.getElementById('input'); const matches = document.getElementById('matches'); const count = document.getElementById('count'); const status = document.getElementById('status');
+    function test() { matches.textContent = ''; try { const normalizedFlags = flags.value.includes('g') ? flags.value : flags.value + 'g'; const expression = new RegExp(pattern.value, normalizedFlags); const found = Array.from(input.value.matchAll(expression)).slice(0, 200); count.textContent = found.length + ' 个匹配'; if (!found.length) matches.innerHTML = '<div class="long-empty">没有找到匹配内容</div>'; found.forEach(function (match, index) { const row = document.createElement('div'); row.className = 'long-list-item'; const content = document.createElement('div'); content.className = 'long-list-item__content'; content.textContent = (index + 1) + '. ' + match[0]; const meta = document.createElement('div'); meta.className = 'long-list-item__meta'; meta.textContent = '位置 ' + match.index + (match.length > 1 ? ' · 捕获组 ' + (match.length - 1) : ''); row.append(content, meta); matches.appendChild(row); }); status.textContent = found.length ? '匹配完成' : '表达式有效，但没有匹配'; status.className = 'long-status long-status--success'; window.LongUI?.announce(status.textContent); } catch (error) { count.textContent = '表达式错误'; status.textContent = error.message; status.className = 'long-status long-status--danger'; } }
+    async function paste() { try { const value = await long.clipboard.getText(); if (value.success) input.value = value.data || ''; } catch (_) { status.textContent = '无法读取剪贴板'; } }
+    document.getElementById('testButton').addEventListener('click', test); document.getElementById('pasteButton').addEventListener('click', paste);
+    document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); test(); } });
+    window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) input.value = text; pattern.focus(); });
+  </script>
+</body>
+</html>

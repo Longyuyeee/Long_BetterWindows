@@ -1,0 +1,151 @@
+{
+  "SchemaVersion": 1,
+  "Source": "local_package",
+  "GeneratedAt": "2026-07-19T00:00:00+08:00",
+  "Entries": [
+    {
+      "Id": "com.long.clipboard-tool",
+      "Name": "剪贴板工具箱",
+      "Summary": "整理、搜索并快速复用最近复制的内容",
+      "Description": "本地优先的剪贴板工作台。历史内容保存在设备本地，并通过 Long 能力边界访问系统剪贴板。",
+      "Publisher": "Long Labs",
+      "Category": "效率工具",
+      "Tags": ["剪贴板", "历史", "文本"],
+      "Versions": [{
+        "Version": "1.1.0",
+        "PublishedAt": "2026-07-18T00:00:00+08:00",
+        "ReleaseNotes": "迁移至统一 Long UI Kit，并接入嵌入式插件会话。",
+        "Capabilities": ["system.clipboard", "storage.local"],
+        "MinHostVersion": "0.5.0",
+        "MinApiVersion": "1.0.0",
+        "MinUiKitVersion": "1.0.0"
+      }]
+    },
+    {
+      "Id": "com.long.translate",
+      "Name": "翻译工具",
+      "Summary": "从选中文本或剪贴板开始一次轻盈的翻译",
+      "Description": "复用统一上下文快照，支持命令中心、超级面板与独立窗口工作流。网络访问会在安装前明确展示。",
+      "Publisher": "Long Labs",
+      "Category": "文本处理",
+      "Tags": ["翻译", "文本", "网络"],
+      "Versions": [{
+        "Version": "1.1.0",
+        "PublishedAt": "2026-07-18T00:00:00+08:00",
+        "ReleaseNotes": "升级二次搜索和窗口生命周期体验。",
+        "Capabilities": ["system.clipboard", "network.http"],
+        "MinHostVersion": "0.5.0",
+        "MinApiVersion": "1.0.0",
+        "MinUiKitVersion": "1.0.0"
+      }]
+    },
+    {
+      "Id": "com.long.file-renamer",
+      "Name": "批量重命名",
+      "Summary": "基于 Explorer 选区预览并执行批量改名",
+      "Description": "先预览、后执行的文件工作流。只接收用户明确选中的文件，并通过受控 file.ops 能力完成操作。",
+      "Publisher": "Long Labs",
+      "Category": "文件管理",
+      "Tags": ["文件", "重命名", "Explorer"],
+      "Versions": [{
+        "Version": "1.1.0",
+        "PublishedAt": "2026-07-18T00:00:00+08:00",
+        "ReleaseNotes": "统一宽屏布局与 Explorer 多选上下文。",
+        "Capabilities": ["shell.selection", "file.ops"],
+        "MinHostVersion": "0.5.0",
+        "MinApiVersion": "1.0.0",
+        "MinUiKitVersion": "1.0.0"
+      }]
+    },
+    {
+      "Id": "com.long.color-picker",
+      "Name": "颜色拾取器",
+      "Summary": "从屏幕捕获颜色并复制多种色值",
+      "Description": "原生 Windows 取色体验，提供清晰的高信任提示和系统热键声明。",
+      "Publisher": "Long Labs",
+      "Category": "设计工具",
+      "Tags": ["颜色", "取色", "设计"],
+      "Versions": [{
+        "Version": "1.1.0",
+        "PublishedAt": "2026-07-18T00:00:00+08:00",
+        "ReleaseNotes": "重构原生取色窗口和设计令牌。",
+        "Capabilities": ["system.hotkey", "system.clipboard"],
+        "MinHostVersion": "0.5.0",
+        "MinApiVersion": "1.0.0",
+        "MinUiKitVersion": "1.0.0"
+      }]
+    },
+    {
+      "Id": "com.long.markdown-preview",
+      "Name": "Markdown 预览",
+      "Summary": "在宽屏沉浸界面中即时预览 Markdown",
+      "Description": "适合从选中文本或剪贴板快速进入的轻量预览工具，界面遵循 Long 扁平化动效规范。",
+      "Publisher": "Long Labs",
+      "Category": "文本处理",
+      "Tags": ["Markdown", "预览", "写作"],
+      "Versions": [{
+        "Version": "1.1.0",
+        "PublishedAt": "2026-07-18T00:00:00+08:00",
+        "ReleaseNotes": "完成统一插件 UI 迁移。",
+        "Capabilities": ["system.clipboard"],
+        "MinHostVersion": "0.5.0",
+        "MinApiVersion": "1.0.0",
+        "MinUiKitVersion": "1.0.0"
+      }]
+    },
+    {
+      "Id": "com.long.quick-note",
+      "Name": "快速便签",
+      "Summary": "捕捉稍纵即逝的想法，并安全保存在本地",
+      "Description": "支持本地存储和系统通知的快速记录插件，不依赖账号与云同步。",
+      "Publisher": "Long Labs",
+      "Category": "效率工具",
+      "Tags": ["便签", "笔记", "本地"],
+      "Versions": [{
+        "Version": "1.1.0",
+        "PublishedAt": "2026-07-18T00:00:00+08:00",
+        "ReleaseNotes": "接入嵌入式会话和安全关闭策略。",
+        "Capabilities": ["storage.local", "system.notification"],
+        "MinHostVersion": "0.5.0",
+        "MinApiVersion": "1.0.0",
+        "MinUiKitVersion": "1.0.0"
+      }]
+    },
+    {
+      "Id": "com.long.window-manager",
+      "Name": "窗口管理",
+      "Summary": "用命令和热键快速编排当前 Windows 窗口",
+      "Description": "Long 的原生窗口布局能力，支持半屏、四分屏、三分屏、最大化和置顶等高频操作。",
+      "Publisher": "Long Labs",
+      "Category": "系统增强",
+      "Tags": ["窗口", "布局", "热键"],
+      "Versions": [{
+        "Version": "2.1.0",
+        "PublishedAt": "2026-07-18T00:00:00+08:00",
+        "ReleaseNotes": "新增完整布局命令集与窗口指南。",
+        "Capabilities": ["system.hotkey"],
+        "MinHostVersion": "0.5.0",
+        "MinApiVersion": "1.0.0",
+        "MinUiKitVersion": "1.0.0"
+      }]
+    },
+    {
+      "Id": "com.long.screenshot",
+      "Name": "截图工具",
+      "Summary": "全屏或区域截图，并快速进入下一步工作流",
+      "Description": "原生区域选择器与屏幕捕获能力，安装时会显示原生插件高信任警告。",
+      "Publisher": "Long Labs",
+      "Category": "系统增强",
+      "Tags": ["截图", "区域", "屏幕"],
+      "Versions": [{
+        "Version": "1.1.0",
+        "PublishedAt": "2026-07-18T00:00:00+08:00",
+        "ReleaseNotes": "新增区域截图和统一视觉反馈。",
+        "Capabilities": ["system.hotkey", "system.screenshot", "system.clipboard"],
+        "MinHostVersion": "0.5.0",
+        "MinApiVersion": "1.0.0",
+        "MinUiKitVersion": "1.0.0"
+      }]
+    }
+  ]
+}

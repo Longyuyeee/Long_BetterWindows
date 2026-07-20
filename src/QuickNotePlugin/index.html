@@ -1,123 +1,158 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>快速便签</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,system-ui,sans-serif;background:#FFFBEB;color:#1d1d1f;padding:16px;min-height:100vh}
-h2{font-size:14px;color:#B45309;margin-bottom:12px}
-textarea{width:100%;height:200px;border:1px solid #FDE68A;border-radius:10px;padding:12px;
-  font-size:14px;resize:vertical;font-family:inherit;line-height:1.6;background:#FFFDEF}
-textarea:focus{outline:none;border-color:#F59E0B}
-.btn-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-button{padding:8px 16px;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
-.btn-primary{background:#F59E0B;color:#fff}.btn-primary:hover{background:#D97706}
-.btn-secondary{background:#FEF3C7;color:#92400E}.btn-secondary:hover{background:#FDE68A}
-.note-list{margin-top:16px}
-.note-item{background:#fff;border:1px solid #FDE68A;border-radius:8px;padding:12px;margin-bottom:8px;
-  cursor:pointer;transition:all .15s;display:flex;justify-content:space-between;align-items:flex-start}
-.note-item:hover{border-color:#F59E0B}
-.note-text{flex:1;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
-.note-meta{font-size:10px;color:#aaa;margin-left:12px;white-space:nowrap}
-.status{font-size:11px;color:#34C759;margin-top:8px;display:none}.status.show{display:block}
-.empty{text-align:center;color:#aaa;font-size:12px;padding:24px}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>快速便签</title>
 </head>
 <body>
-<h2>快速便签</h2>
-<textarea id="noteInput" placeholder="写点什么..."></textarea>
-<div class="btn-row">
-  <button class="btn-primary" onclick="saveNote()">保存便签</button>
-  <button class="btn-secondary" onclick="clearNote()">清空</button>
-  <button class="btn-secondary" onclick="togglePreview()" id="previewBtn">预览</button>
-</div>
-<div id="previewArea" style="display:none;background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:12px;margin-top:8px;max-height:200px;overflow:auto;font-size:13px;line-height:1.8"></div>
-<div class="status" id="saveStatus"></div>
+  <main class="long-page">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">QUICK CAPTURE</div>
+        <h1 class="long-page-title">快速便签</h1>
+        <p class="long-page-description">随手记录想法，便签仅保存在本机插件存储中。</p>
+      </div>
+      <span class="long-badge" id="countBadge">0 条便签</span>
+    </header>
 
-<div class="note-list">
-  <h2>历史便签</h2>
-  <div id="noteList"></div>
-</div>
+    <section class="long-stack">
+      <div class="long-card long-field">
+        <label class="long-field-label" for="noteInput">新便签</label>
+        <textarea class="long-editor" id="noteInput" placeholder="写点什么，支持简单 Markdown…" autofocus></textarea>
+        <div class="long-toolbar">
+          <button class="long-button long-button--primary btn-primary" id="saveButton" type="button">保存便签</button>
+          <button class="long-button long-button--secondary btn-secondary" id="previewButton" type="button">预览</button>
+          <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button">清空</button>
+          <span class="long-toolbar__spacer"></span>
+          <span class="long-kbd">Ctrl Enter</span>
+        </div>
+        <div class="long-preview" id="preview" hidden></div>
+        <div class="long-status" id="status" role="status" aria-live="polite"></div>
+      </div>
 
-<script>
-var notes = [];
+      <section class="long-card long-stack" aria-labelledby="historyTitle">
+        <div class="long-toolbar">
+          <h2 class="long-page-title" id="historyTitle">历史便签</h2>
+          <span class="long-toolbar__spacer"></span>
+          <span class="long-secondary">最多保留 30 条</span>
+        </div>
+        <div class="long-list" id="noteList"></div>
+        <div class="long-empty" id="emptyState">还没有便签</div>
+      </section>
+    </section>
+  </main>
 
-async function init() {
-  try {
-    var r = await long.storage.get('quick_notes');
-    if (r.success && r.data) { notes = JSON.parse(r.data); }
-  } catch(e) {}
-  renderNotes();
-}
+  <script>
+    const input = document.getElementById('noteInput');
+    const preview = document.getElementById('preview');
+    const status = document.getElementById('status');
+    const list = document.getElementById('noteList');
+    const empty = document.getElementById('emptyState');
+    let notes = [];
 
-function saveNote() {
-  var text = document.getElementById('noteInput').value.trim();
-  if (!text) return;
-  notes.unshift({ text: text, time: Date.now() });
-  if (notes.length > 30) notes = notes.slice(0, 30);
-  document.getElementById('noteInput').value = '';
-  persist();
-  renderNotes();
-  showStatus('已保存 (' + text.length + ' 字符)');
-}
+    async function initialize() {
+      try {
+        const result = await long.storage.get('quick_notes');
+        if (result.success && result.data) notes = JSON.parse(result.data);
+      } catch (_) { setStatus('历史便签读取失败', 'danger'); }
+      renderNotes();
+    }
 
-function togglePreview(){
-  var area=document.getElementById('previewArea');
-  var btn=document.getElementById('previewBtn');
-  if(area.style.display==='none'){
-    var md=document.getElementById('noteInput').value;
-    area.innerHTML=md
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/^### (.+)$/gm,'<h3>$1</h3>')
-      .replace(/^## (.+)$/gm,'<h2>$1</h2>')
-      .replace(/^# (.+)$/gm,'<h1>$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g,'<em>$1</em>')
-      .replace(/`([^`]+)`/g,'<code>$1</code>')
-      .replace(/\n\n/g,'<br><br>');
-    area.style.display='block';btn.textContent='编辑';
-  }else{area.style.display='none';btn.textContent='预览';}
-}
-function clearNote() { document.getElementById('noteInput').value = ''; }
+    async function persist() {
+      try { await long.storage.set('quick_notes', JSON.stringify(notes)); }
+      catch (_) { setStatus('便签保存失败', 'danger'); }
+    }
 
-function deleteNote(i) {
-  notes.splice(i, 1); persist(); renderNotes();
-}
+    function setStatus(message, kind) {
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      window.LongUI?.announce(message);
+    }
 
-async function persist() {
-  try { await long.storage.set('quick_notes', JSON.stringify(notes)); } catch(e) {}
-}
+    async function saveNote() {
+      const text = input.value.trim();
+      if (!text) { setStatus('请输入便签内容', 'warning'); input.focus(); return; }
+      notes.unshift({ text: text, time: Date.now() });
+      notes = notes.slice(0, 30);
+      input.value = '';
+      preview.hidden = true;
+      await persist();
+      renderNotes();
+      setStatus('便签已保存 · ' + text.length + ' 字符', 'success');
+    }
 
-function renderNotes() {
-  var h = '';
-  notes.forEach(function(n, i) {
-    var ago = Math.floor((Date.now() - n.time) / 1000);
-    var timeStr = ago < 60 ? ago+'s' : ago < 3600 ? Math.floor(ago/60)+'m' : Math.floor(ago/3600)+'h';
-    var preview = n.text.length > 100 ? n.text.substring(0,100)+'...' : n.text;
-    h += '<div class="note-item" onclick="editNote('+i+')">' +
-      '<span class="note-text">'+esc(preview)+'</span>' +
-      '<span class="note-meta">'+timeStr+'<br/><button class="btn-secondary" style="margin-top:4px;font-size:10px;padding:2px 8px" onclick="event.stopPropagation();deleteNote('+i+')">删除</button></span>' +
-      '</div>';
-  });
-  document.getElementById('noteList').innerHTML = h || '<div class="empty">暂无便签</div>';
-}
+    function renderPreview() {
+      if (!preview.hidden) { preview.hidden = true; return; }
+      const safe = escapeHtml(input.value)
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>');
+      preview.innerHTML = safe || '没有可预览的内容';
+      preview.hidden = false;
+    }
 
-function editNote(i) {
-  document.getElementById('noteInput').value = notes[i].text;
-  notes.splice(i, 1); persist(); renderNotes();
-}
+    function renderNotes() {
+      list.replaceChildren();
+      empty.hidden = notes.length > 0;
+      document.getElementById('countBadge').textContent = notes.length + ' 条便签';
+      notes.forEach(function (note, index) {
+        const item = document.createElement('article');
+        item.className = 'long-list-item';
+        const content = document.createElement('button');
+        content.type = 'button';
+        content.className = 'long-list-item__content';
+        content.textContent = note.text.length > 180 ? note.text.slice(0, 180) + '…' : note.text;
+        content.addEventListener('click', function () {
+          input.value = note.text;
+          input.focus();
+          setStatus('便签已载入编辑区', 'success');
+        });
+        const meta = document.createElement('div');
+        meta.className = 'long-list-item__meta long-stack';
+        const time = document.createElement('time');
+        time.textContent = relativeTime(note.time);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'long-button long-button--small';
+        remove.textContent = '删除';
+        remove.setAttribute('aria-label', '删除此便签');
+        remove.addEventListener('click', async function () {
+          notes.splice(index, 1); await persist(); renderNotes(); setStatus('便签已删除', 'success');
+        });
+        meta.append(time, remove);
+        item.append(content, meta);
+        list.appendChild(item);
+      });
+    }
 
-function showStatus(msg) {
-  var el = document.getElementById('saveStatus');
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(function() { el.classList.remove('show'); }, 2500);
-}
+    function relativeTime(value) {
+      const seconds = Math.max(0, Math.floor((Date.now() - value) / 1000));
+      if (seconds < 60) return '刚刚';
+      if (seconds < 3600) return Math.floor(seconds / 60) + ' 分钟前';
+      if (seconds < 86400) return Math.floor(seconds / 3600) + ' 小时前';
+      return Math.floor(seconds / 86400) + ' 天前';
+    }
 
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function escapeHtml(value) {
+      return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
 
-init();
-</script>
+    document.getElementById('saveButton').addEventListener('click', saveNote);
+    document.getElementById('previewButton').addEventListener('click', renderPreview);
+    document.getElementById('clearButton').addEventListener('click', function () { input.value = ''; preview.hidden = true; input.focus(); });
+    document.addEventListener('keydown', function (event) {
+      if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); saveNote(); }
+    });
+    window.LongUI?.onCommand(function (command) {
+      const text = window.LongUI.commandText(command);
+      if (text) input.value = text;
+      input.focus();
+    });
+    initialize();
+  </script>
 </body>
 </html>

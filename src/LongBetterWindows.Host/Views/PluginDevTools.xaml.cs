@@ -234,8 +234,9 @@ namespace LongBetterWindows.Host.Views
             {
                 File.WriteAllText(Path.Combine(pluginDir, "manifest.json"),
                     $"{{\n  \"id\": \"{id}\",\n  \"version\": \"1.0.0\",\n  \"name\": \"{name}\",\n  \"entry_point\": \"index.html\",\n  \"runtime\": \"webview\",\n  \"capabilities\": [{capsJson}]\n}}\n");
-                File.WriteAllText(Path.Combine(pluginDir, "index.html"),
-                    "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>" + name + "</title>\n  <style>\n    * { margin: 0; padding: 0; box-sizing: border-box; }\n    body { font-family: -apple-system, 'Segoe UI', sans-serif; padding: 24px; background: #1E1F22; color: #E8E8E8; }\n    button { padding: 8px 16px; border: none; border-radius: 6px; background: #007AFF; color: #fff; cursor: pointer; font-size: 13px; }\n    button:hover { background: #0062CC; }\n  </style>\n</head>\n<body>\n  <h2 style=\"margin-bottom:12px\">" + name + "</h2>\n  <p style=\"color:#999;margin-bottom:16px\">插件已就绪，开始编写你的逻辑吧。</p>\n  <button onclick=\"long.ui.showToast('Hello from " + name + "')\">测试 Toast</button>\n  <script>\n    console.log('Plugin loaded:', long);\n  </script>\n</body>\n</html>\n");
+                File.WriteAllText(
+                    Path.Combine(pluginDir, "index.html"),
+                    BuildWebPluginTemplate(name));
             }
             else if (template == "dll" || template == "dotnet")
             {
@@ -245,7 +246,7 @@ namespace LongBetterWindows.Host.Views
                 File.WriteAllText(Path.Combine(pluginDir, safeName + ".csproj"),
                     "<Project Sdk=\"Microsoft.NET.Sdk\">\n\n  <PropertyGroup>\n    <OutputType>Library</OutputType>\n    <TargetFramework>net8.0-windows</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n    <UseWPF>true</UseWPF>\n  </PropertyGroup>\n\n  <ItemGroup>\n    <Reference Include=\"LongBetterWindows.Host\">\n      <HintPath>..\\LongBetterWindows.Host\\bin\\Debug\\net8.0-windows\\LongBetterWindows.Host.dll</HintPath>\n    </Reference>\n  </ItemGroup>\n\n</Project>\n");
                 File.WriteAllText(Path.Combine(pluginDir, safeName + "Impl.cs"),
-                    "using LongBetterWindows.Host.Core;\n\nnamespace " + safeDir + "\n{\n    public class " + safeName + "Impl : ILongPlugin\n    {\n        public string Id => \"" + id + "\";\n        public string Name => \"" + name + "\";\n        public string Version => \"" + "1.0.0" + "\";\n        public PluginState State { get; private set; }\n\n        private IHostApi? _host;\n\n        public async Task<bool> InitializeAsync(IHostApi host)\n        {\n            _host = host;\n            State = PluginState.Loaded;\n            return true;\n        }\n\n        public async Task<bool> StartAsync()\n        {\n            State = PluginState.Running;\n            // TODO: 插件启动逻辑\n            return true;\n        }\n\n        public async Task<bool> StopAsync()\n        {\n            State = PluginState.Disabled;\n            // TODO: 清理逻辑\n            return true;\n        }\n    }\n}\n");
+                    "using LongBetterWindows.Host.Core;\n\nnamespace " + safeDir + "\n{\n    public class " + safeName + "Impl : ILongPlugin\n    {\n        public string Id => \"" + id + "\";\n        public string Name => \"" + name + "\";\n        public string Version => \"" + "1.0.0" + "\";\n        public PluginState State { get; private set; }\n\n        private IHostApi? _host;\n\n        public async Task<bool> InitializeAsync(IHostApi host)\n        {\n            _host = host;\n            State = PluginState.Loaded;\n            return true;\n        }\n\n        public async Task<bool> StartAsync()\n        {\n            State = PluginState.Running;\n            // TODO: 插件启动逻辑\n            return true;\n        }\n\n        public async Task<bool> StopAsync()\n        {\n            State = PluginState.Stopped;\n            // TODO: 清理逻辑\n            return true;\n        }\n    }\n}\n");
             }
             else // script
             {
@@ -277,6 +278,65 @@ namespace LongBetterWindows.Host.Views
                 })
                 .ToList();
             SendJs("capabilitiesListed", caps);
+        }
+
+        public static string BuildWebPluginTemplate(string name)
+        {
+            var safeTitle = System.Net.WebUtility.HtmlEncode(name);
+            var safeJsName = JsonSerializer.Serialize(name);
+            return $$"""
+                <!DOCTYPE html>
+                <html lang="zh-CN">
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <title>{{safeTitle}}</title>
+                </head>
+                <body>
+                  <main class="long-page long-stack">
+                    <header class="long-page-header">
+                      <div>
+                        <div class="long-eyebrow">LONG PLUGIN</div>
+                        <h1 class="long-page-title">{{safeTitle}}</h1>
+                        <p class="long-page-description">插件已就绪。界面会自动继承 Long 主题、动效和无障碍状态。</p>
+                      </div>
+                    </header>
+                    <section class="long-card long-stack" aria-labelledby="welcome-title">
+                      <div>
+                        <h2 id="welcome-title">开始创作</h2>
+                        <p class="long-secondary">使用 Long Web UI Kit 组件，并通过 long.* API 调用宿主能力。</p>
+                      </div>
+                      <div class="long-toolbar">
+                        <button class="long-button--primary" id="helloButton">测试 Toast</button>
+                        <span class="long-badge">UI Kit 1.0</span>
+                      </div>
+                      <div class="long-status" id="status" role="status" aria-live="polite"></div>
+                    </section>
+                  </main>
+                  <script>
+                    const pluginName = {{safeJsName}};
+                    document.getElementById('helloButton').addEventListener('click', async () => {
+                      await long.ui.showToast(`Hello from ${pluginName}`);
+                      document.getElementById('status').textContent = 'Toast 已发送';
+                    });
+                  </script>
+                </body>
+                </html>
+                """;
+        }
+
+        private static string? FindSrcDir()
+        {
+            var dir = AppContext.BaseDirectory;
+            for (int i = 0; i < 6; i++)
+            {
+                var src = Path.Combine(dir, "src");
+                if (Directory.Exists(src)) return src;
+                var parent = Directory.GetParent(dir);
+                if (parent == null) break;
+                dir = parent.FullName;
+            }
+            return null;
         }
 
         private bool TryResolvePluginPath(string path, out string safePath)

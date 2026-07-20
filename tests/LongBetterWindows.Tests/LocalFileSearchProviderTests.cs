@@ -1,0 +1,65 @@
+using System.IO;
+using LongBetterWindows.Host.Interaction;
+using LongBetterWindows.Host.Views;
+
+namespace LongBetterWindows.Tests;
+
+public sealed class LocalFileSearchProviderTests : IDisposable
+{
+    private readonly string _root = Path.Combine(
+        Path.GetTempPath(), $"long-local-search-{Guid.NewGuid():N}");
+
+    public LocalFileSearchProviderTests()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "deep", "workspace"));
+        File.WriteAllText(
+            Path.Combine(_root, "deep", "workspace", "project-needle.txt"),
+            "content");
+    }
+
+    [Fact]
+    public async Task SearchAsync_FindsNestedFilesAndProvidesSecondaryActions()
+    {
+        var provider = new LocalFileSearchProvider(new[] { _root });
+
+        var results = await provider.SearchAsync(new SearchRequest(
+            "needle", ContextSnapshot.Empty, MaxResults: 10));
+
+        var result = Assert.Single(results);
+        Assert.Equal(SearchActionKind.OpenPath, result.PrimaryAction.Kind);
+        Assert.Equal(
+            new[] { SearchActionKind.OpenContainingFolder, SearchActionKind.CopyText },
+            result.SecondaryActions.Select(action => action.Kind));
+        Assert.True(result.HasSecondaryActions);
+        Assert.DoesNotContain(_root, result.Id, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SearchAsync_ShortQueryDoesNotReturnResults()
+    {
+        var provider = new LocalFileSearchProvider(new[] { _root });
+
+        var results = await provider.SearchAsync(new SearchRequest(
+            "n", ContextSnapshot.Empty, MaxResults: 10));
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void WebPluginTemplate_UsesLongUiKitAndEscapesPluginName()
+    {
+        var html = PluginDevTools.BuildWebPluginTemplate("<Demo>\" Plugin");
+
+        Assert.Contains("long-page", html);
+        Assert.Contains("long-card", html);
+        Assert.Contains("long-button--primary", html);
+        Assert.Contains("&lt;Demo&gt;&quot; Plugin", html);
+        Assert.DoesNotContain("#007AFF", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("#1E1F22", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_root, true); } catch { }
+    }
+}

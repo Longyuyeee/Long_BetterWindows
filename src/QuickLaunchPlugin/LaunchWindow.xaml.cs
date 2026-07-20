@@ -6,14 +6,13 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using Wpf.Ui.Appearance;
 
 namespace QuickLaunchPlugin;
 
 public partial class LaunchWindow : Window
 {
     private readonly List<SmartEntry> _apps = new();
-    private Action<string?>? _onSelect;
+    private Action<SmartEntry?>? _onSelect;
 
     public LaunchWindow()
     {
@@ -21,56 +20,75 @@ public partial class LaunchWindow : Window
         LoadApps();
     }
 
-    public static void Show(Action<string?> onSelect)
+    public static void Show(Action<SmartEntry?> onSelect, string? initialQuery = null)
     {
         var area = LongBetterWindows.Host.Services.MonitorHelper.GetCursorWorkArea();
         var window = new LaunchWindow
         {
             _onSelect = onSelect,
-            Left = area.Left + (area.Width - 440) / 2,
+            Left = area.Left + (area.Width - 640) / 2,
             Top = area.Top + area.Height * 0.25,
         };
         window.Show();
+        if (!string.IsNullOrWhiteSpace(initialQuery))
+            window.SearchBox.Text = initialQuery;
         window.SearchBox.Focus();
+        window.SearchBox.CaretIndex = window.SearchBox.Text.Length;
     }
 
     private static List<SmartEntry>? _cachedApps;
+    private static readonly object AppCacheLock = new();
 
     private void LoadApps()
     {
-        if (_cachedApps != null)
-        {
-            _apps.AddRange(_cachedApps);
-            return;
-        }
+        _apps.AddRange(GetApplications());
+    }
 
-        var paths = new[]
+    internal static IReadOnlyList<SmartEntry> GetApplications()
+    {
+        lock (AppCacheLock)
         {
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
-            Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
-        };
+            if (_cachedApps != null)
+                return _cachedApps;
 
-        foreach (var startMenu in paths)
-        {
-            if (!Directory.Exists(startMenu)) continue;
-            foreach (var lnk in Directory.GetFiles(startMenu, "*.lnk", SearchOption.AllDirectories))
+            var apps = new List<SmartEntry>();
+            var paths = new[]
             {
-                try
-                {
-                    _apps.Add(new SmartEntry
-                    {
-                        Name = Path.GetFileNameWithoutExtension(lnk),
-                        Path = lnk,
-                        Icon = "📦",
-                        Category = "应用",
-                    });
-                }
-                catch { }
-            }
-        }
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
+                Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
+            };
 
-        _apps.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-        _cachedApps = new List<SmartEntry>(_apps);
+            foreach (var startMenu in paths)
+            {
+                if (!Directory.Exists(startMenu)) continue;
+                var enumeration = new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true,
+                    AttributesToSkip = FileAttributes.System,
+                };
+                foreach (var lnk in Directory.EnumerateFiles(
+                             startMenu, "*.lnk", enumeration))
+                {
+                    try
+                    {
+                        apps.Add(new SmartEntry
+                        {
+                            Name = Path.GetFileNameWithoutExtension(lnk),
+                            Path = lnk,
+                            Icon = "📦",
+                            Category = "应用",
+                        });
+                    }
+                    catch { }
+                }
+            }
+
+            apps.Sort((a, b) => string.Compare(
+                a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+            _cachedApps = apps;
+            return _cachedApps;
+        }
     }
 
     private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
@@ -80,7 +98,7 @@ public partial class LaunchWindow : Window
         if (string.IsNullOrEmpty(query))
         {
             ResultsList.Visibility = Visibility.Collapsed;
-            HintText.Text = "搜索应用...";
+            HintText.Text = "输入应用、文件、链接或算式";
             return;
         }
 
@@ -179,15 +197,29 @@ public partial class LaunchWindow : Window
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
         };
 
+        var remaining = 8;
+        var enumeration = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint,
+        };
         foreach (var dir in dirs)
         {
+            if (remaining <= 0) yield break;
             if (!Directory.Exists(dir)) continue;
             IEnumerable<string> files;
-            try { files = Directory.GetFiles(dir, "*" + query + "*", SearchOption.TopDirectoryOnly); }
+            try
+            {
+                files = Directory.EnumerateFiles(dir, "*", enumeration)
+                    .Where(path => Path.GetFileName(path).Contains(
+                        query, StringComparison.OrdinalIgnoreCase));
+            }
             catch { continue; }
 
-            foreach (var f in files.Take(8))
+            foreach (var f in files.Take(remaining))
             {
+                remaining--;
                 var name = Path.GetFileName(f);
                 var ext = Path.GetExtension(f).ToLower();
                 var icon = ext switch
@@ -211,8 +243,16 @@ public partial class LaunchWindow : Window
         foreach (var dir in dirs)
         {
             if (!Directory.Exists(dir)) continue;
-            string[] files;
-            try { files = Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories); }
+            IEnumerable<string> files;
+            try
+            {
+                files = Directory.EnumerateFiles(dir, "*", new EnumerationOptions
+                {
+                    RecurseSubdirectories = true,
+                    IgnoreInaccessible = true,
+                    AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint,
+                });
+            }
             catch { continue; }
 
             foreach (var f in files.Take(200))
@@ -296,32 +336,28 @@ public partial class LaunchWindow : Window
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        // 根据主题适配颜色
-        var isDark = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme()
-            == Wpf.Ui.Appearance.ApplicationTheme.Dark;
-        MainBorder.Background = isDark
-            ? new SolidColorBrush(Color.FromRgb(0x1E, 0x1F, 0x22))
-            : new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF7));
-        SearchBox.Foreground = isDark
-            ? new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8))
-            : new SolidColorBrush(Color.FromRgb(0x1D, 0x1D, 0x1F));
+        var duration = Application.Current.Resources["Long.Motion.Normal"] is Duration token
+            ? token.TimeSpan
+            : TimeSpan.FromMilliseconds(180);
+        Opacity = duration == TimeSpan.Zero ? 1 : 0;
+        var translate = new TranslateTransform(0, duration == TimeSpan.Zero ? 0 : -8);
+        MainBorder.RenderTransform = translate;
+        if (duration == TimeSpan.Zero) return;
 
-        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150))
+        var fadeIn = new DoubleAnimation(0, 1, duration)
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         BeginAnimation(OpacityProperty, fadeIn);
+        translate.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, duration)
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        });
     }
 
     private void SelectEntry(SmartEntry entry)
     {
-        if (entry.Category == "计算")
-        {
-            // 复制计算结果到剪贴板
-            try { System.Windows.Clipboard.SetText(entry.Path!); } catch { }
-        }
-
-        _onSelect?.Invoke(entry.Path);
+        _onSelect?.Invoke(entry);
         Close();
     }
 }

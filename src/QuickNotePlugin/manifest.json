@@ -1,15 +1,29 @@
 {
   "id": "com.long.quick-note",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "快速便签",
   "author": "Long",
   "entry_point": "index.html",
   "runtime": "webview",
-  "capabilities": [
-    "storage.local",
-    "system.notification"
+  "capabilities": ["storage.local", "system.notification"],
+  "commands": [
+    {
+      "id": "note.new",
+      "title": "新建快速便签",
+      "description": "记录文本或将剪贴板内容放入便签编辑区",
+      "aliases": ["便签", "笔记", "note", "quick note", "bianqian"],
+      "accepted_inputs": ["text", "clipboard"],
+      "view_mode": "document",
+      "keep_alive": true,
+      "priority": 22
+    }
   ],
-  "default_settings": {
-    "auto_start": true
-  }
+  "window": {
+    "mode": "standard",
+    "preferred_width": 760,
+    "preferred_height": 760,
+    "min_width": 600,
+    "min_height": 560
+  },
+  "default_settings": {"auto_start": true}
 }

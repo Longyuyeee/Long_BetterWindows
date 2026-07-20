@@ -28,7 +28,7 @@ namespace LongBetterWindows.Host.Services
             {
                 Timeout = TimeSpan.FromSeconds(30),
             };
-            _client.DefaultRequestHeaders.Add("User-Agent", "LongBetterWindows/0.2");
+            _client.DefaultRequestHeaders.Add("User-Agent", $"LongBetterWindows/{App.ProductVersion}");
         }
 
         public async Task<HostApiResponse<string>> GetAsync(string url, Dictionary<string, string>? headers = null)
