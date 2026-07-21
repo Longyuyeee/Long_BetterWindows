@@ -24,6 +24,7 @@ $releaseRoot = Join-Path $releaseBase "v$Version"
 $expectedPluginCount = 25
 $expectedCommandCount = 42
 $smokeCommandKey = 'com.long.base64:base64.encode'
+$smokeTimeoutMilliseconds = 60_000
 
 function Get-ProductWebViewProcessIds {
     return @(
@@ -130,26 +131,30 @@ try {
         Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\安装升级与卸载.md') -Destination $publishDirectory
         Copy-Item -LiteralPath (Join-Path $repoRoot 'CHANGELOG.md') -Destination $publishDirectory
 
+        $smokeStopwatch = [Diagnostics.Stopwatch]::StartNew()
         $process = Start-Process -FilePath $hostExecutable `
             -ArgumentList @('--theme', 'dark', '--quality-idle-ms', '1200') `
             -WorkingDirectory $smokeDirectory -PassThru
-        if (-not $process.WaitForExit(20000)) {
+        if (-not $process.WaitForExit($smokeTimeoutMilliseconds)) {
             Stop-Process -Id $process.Id -Force
             throw "$($variant.Name) 冒烟测试超时。"
         }
+        $smokeStopwatch.Stop()
         if ($process.ExitCode -ne 0) { throw "$($variant.Name) 冒烟测试退出码为 $($process.ExitCode)。" }
 
         $webViewBefore = Get-ProductWebViewProcessIds
+        $commandStopwatch = [Diagnostics.Stopwatch]::StartNew()
         $commandProcess = Start-Process -FilePath $hostExecutable `
             -ArgumentList @(
                 '--run-command', $smokeCommandKey,
                 '--command-text', 'release-smoke',
                 '--exit-after-command') `
             -WorkingDirectory $smokeDirectory -PassThru
-        if (-not $commandProcess.WaitForExit(30000)) {
+        if (-not $commandProcess.WaitForExit($smokeTimeoutMilliseconds)) {
             Stop-Process -Id $commandProcess.Id -Force
             throw "$($variant.Name) 真实命令冒烟测试超时。"
         }
+        $commandStopwatch.Stop()
         if ($commandProcess.ExitCode -ne 0) {
             throw "$($variant.Name) 真实命令冒烟测试退出码为 $($commandProcess.ExitCode)。"
         }
@@ -178,8 +183,10 @@ try {
             manifests = $manifestCount
             unique_plugin_ids = $uniquePluginIdCount
             commands = $commandCount
+            startup_smoke_elapsed_ms = [math]::Round($smokeStopwatch.Elapsed.TotalMilliseconds)
             command_smoke = $smokeCommandKey
             command_smoke_exit_code = $commandProcess.ExitCode
+            command_smoke_elapsed_ms = [math]::Round($commandStopwatch.Elapsed.TotalMilliseconds)
             added_webview_processes = $addedWebViewProcessIds.Count
         }
     }

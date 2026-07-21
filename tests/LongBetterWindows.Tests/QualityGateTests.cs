@@ -623,7 +623,7 @@ public class QualityGateTests
         Assert.Contains("source_dirty", release);
         Assert.Contains("release_eligible", release);
         Assert.Contains("Get-FileHash", release);
-        Assert.Contains("WaitForExit(20000)", release);
+        Assert.Contains("WaitForExit($smokeTimeoutMilliseconds)", release);
         Assert.Contains("pluginCount -ne $expectedPluginCount", release);
     }
 
@@ -759,6 +759,9 @@ public class QualityGateTests
         Assert.Contains("$uniquePluginIdCount", release);
         Assert.Contains("$commandCount -ne $expectedCommandCount", release);
         Assert.Contains("com.long.base64:base64.encode", release);
+        Assert.Contains("$smokeTimeoutMilliseconds = 60_000", release);
+        Assert.Contains("startup_smoke_elapsed_ms", release);
+        Assert.Contains("command_smoke_elapsed_ms", release);
         Assert.Contains("Get-ProductWebViewProcessIds", release);
         Assert.Contains("$addedWebViewProcessIds.Count -gt 0", release);
         Assert.Contains("Wait-ForNoAddedProductWebViewProcesses", release);
