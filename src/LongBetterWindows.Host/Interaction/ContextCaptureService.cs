@@ -34,9 +34,11 @@ namespace LongBetterWindows.Host.Interaction
             timeout.CancelAfter(_providerTimeout);
             try
             {
-                var capture = Task.Run(
+                var capture = Task.Factory.StartNew(
                     () => provider.CaptureAsync(request, timeout.Token),
-                    timeout.Token);
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach | TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default).Unwrap();
                 return await capture
                     .WaitAsync(timeout.Token);
             }
