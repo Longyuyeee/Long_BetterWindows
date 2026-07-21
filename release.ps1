@@ -24,7 +24,7 @@ $releaseRoot = Join-Path $releaseBase "v$Version"
 $expectedPluginCount = 25
 $expectedCommandCount = 42
 $smokeCommandKey = 'com.long.base64:base64.encode'
-$smokeTimeoutMilliseconds = 60_000
+$smokeTimeoutMilliseconds = 60000
 
 function Get-ProductWebViewProcessIds {
     return @(
