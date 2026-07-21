@@ -35,6 +35,20 @@ function Get-ProductWebViewProcessIds {
     )
 }
 
+function Wait-ForNoAddedProductWebViewProcesses(
+    [int[]] $BaselineProcessIds,
+    [int] $TimeoutSeconds = 15
+) {
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $current = Get-ProductWebViewProcessIds
+        $added = @($current | Where-Object { $_ -notin $BaselineProcessIds })
+        if ($added.Count -eq 0) { return @() }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $deadline)
+    return $added
+}
+
 if (-not (Test-Path -LiteralPath $dotnet)) {
     $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
     if ($null -eq $dotnetCommand) { throw '未找到 dotnet CLI。发布需要 .NET SDK。' }
@@ -139,9 +153,8 @@ try {
         if ($commandProcess.ExitCode -ne 0) {
             throw "$($variant.Name) 真实命令冒烟测试退出码为 $($commandProcess.ExitCode)。"
         }
-        Start-Sleep -Milliseconds 1500
-        $webViewAfter = Get-ProductWebViewProcessIds
-        $addedWebViewProcessIds = @($webViewAfter | Where-Object { $_ -notin $webViewBefore })
+        $addedWebViewProcessIds = @(
+            Wait-ForNoAddedProductWebViewProcesses -BaselineProcessIds $webViewBefore)
         if ($addedWebViewProcessIds.Count -gt 0) {
             throw "$($variant.Name) 真实命令退出后残留 WebView2 进程：$($addedWebViewProcessIds -join ', ')"
         }

@@ -761,6 +761,8 @@ public class QualityGateTests
         Assert.Contains("com.long.base64:base64.encode", release);
         Assert.Contains("Get-ProductWebViewProcessIds", release);
         Assert.Contains("$addedWebViewProcessIds.Count -gt 0", release);
+        Assert.Contains("Wait-ForNoAddedProductWebViewProcesses", release);
+        Assert.Contains("[int] $TimeoutSeconds = 15", release);
         Assert.Contains("command_smoke_exit_code", release);
     }
 
