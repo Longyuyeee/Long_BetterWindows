@@ -7,6 +7,7 @@ using LongBetterWindows.Host.Interaction;
 
 namespace LongBetterWindows.Tests;
 
+[Collection(PerformanceSensitiveCollection.Name)]
 public class ContextCaptureTests
 {
     [Fact]
