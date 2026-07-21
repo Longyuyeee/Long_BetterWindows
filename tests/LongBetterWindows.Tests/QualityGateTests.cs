@@ -766,6 +766,8 @@ public class QualityGateTests
         Assert.Contains("$addedWebViewProcessIds.Count -gt 0", release);
         Assert.Contains("Wait-ForNoAddedProductWebViewProcesses", release);
         Assert.Contains("[int] $TimeoutSeconds = 15", release);
+        Assert.Contains("$webViewCleanupTimeoutSeconds = 45", release);
+        Assert.Contains("webview_cleanup_elapsed_ms", release);
         Assert.Contains("command_smoke_exit_code", release);
     }
 

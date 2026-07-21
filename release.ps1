@@ -25,6 +25,7 @@ $expectedPluginCount = 25
 $expectedCommandCount = 42
 $smokeCommandKey = 'com.long.base64:base64.encode'
 $smokeTimeoutMilliseconds = 60000
+$webViewCleanupTimeoutSeconds = 45
 
 function Get-ProductWebViewProcessIds {
     return @(
@@ -158,8 +159,12 @@ try {
         if ($commandProcess.ExitCode -ne 0) {
             throw "$($variant.Name) 真实命令冒烟测试退出码为 $($commandProcess.ExitCode)。"
         }
+        $webViewCleanupStopwatch = [Diagnostics.Stopwatch]::StartNew()
         $addedWebViewProcessIds = @(
-            Wait-ForNoAddedProductWebViewProcesses -BaselineProcessIds $webViewBefore)
+            Wait-ForNoAddedProductWebViewProcesses `
+                -BaselineProcessIds $webViewBefore `
+                -TimeoutSeconds $webViewCleanupTimeoutSeconds)
+        $webViewCleanupStopwatch.Stop()
         if ($addedWebViewProcessIds.Count -gt 0) {
             throw "$($variant.Name) 真实命令退出后残留 WebView2 进程：$($addedWebViewProcessIds -join ', ')"
         }
@@ -187,6 +192,7 @@ try {
             command_smoke = $smokeCommandKey
             command_smoke_exit_code = $commandProcess.ExitCode
             command_smoke_elapsed_ms = [math]::Round($commandStopwatch.Elapsed.TotalMilliseconds)
+            webview_cleanup_elapsed_ms = [math]::Round($webViewCleanupStopwatch.Elapsed.TotalMilliseconds)
             added_webview_processes = $addedWebViewProcessIds.Count
         }
     }
