@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -126,6 +127,40 @@ namespace LongBetterWindows.Host.Views
             RaiseInvocationChanged();
         }
 
+        private void AddArgument_Click(object sender, RoutedEventArgs e)
+        {
+            if (Editor is null || !Editor.AddArgument()) return;
+            RaiseInvocationChanged();
+        }
+
+        private void RemoveArgument_Click(object sender, RoutedEventArgs e)
+        {
+            if (Editor is null
+                || sender is not Button { Tag: WorkflowArgumentEditorItem argument }
+                || !Editor.RemoveArgument(argument)) return;
+            RaiseInvocationChanged();
+        }
+
+        private void ArgumentKey_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_rendering
+                || Editor is null
+                || sender is not TextBox { DataContext: WorkflowArgumentEditorItem argument } textBox) return;
+            argument.Key = textBox.Text;
+            Editor.RefreshArgumentValidation();
+            RaiseInvocationChanged();
+        }
+
+        private void ArgumentValue_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_rendering
+                || Editor is null
+                || sender is not TextBox { DataContext: WorkflowArgumentEditorItem argument } textBox) return;
+            argument.Value = textBox.Text;
+            Editor.RefreshArgumentValidation();
+            RaiseInvocationChanged();
+        }
+
         private void RaiseInvocationChanged()
             => InvocationChanged?.Invoke(this, EventArgs.Empty);
 
@@ -147,12 +182,13 @@ namespace LongBetterWindows.Host.Views
         private string _text = string.Empty;
         private IReadOnlyList<string> _paths = Array.Empty<string>();
         private byte[]? _imagePng;
+        private string? _argumentError;
 
         public required string StepId { get; init; }
         public WorkflowCommandRole Role { get; init; }
         public required string RoleLabel { get; init; }
         public required IReadOnlyList<WorkflowInputTypeOption> InputOptions { get; init; }
-        public required IReadOnlyDictionary<string, string> Arguments { get; init; }
+        public ObservableCollection<WorkflowArgumentEditorItem> Arguments { get; } = new();
 
         public AcceptedInputType InputType
         {
@@ -206,19 +242,102 @@ namespace LongBetterWindows.Host.Views
         public bool HasPaths => Paths.Count > 0;
         public bool HasImage => ImagePng is { Length: > 0 };
         public string ImageSummary => HasImage ? $"已载入 {ImagePng!.Length:N0} 字节" : "尚未选择图片";
+        public string ArgumentSummary => Arguments.Count == 0 ? "高级参数" : $"高级参数 · {Arguments.Count}";
+        public string? ArgumentError
+        {
+            get => _argumentError;
+            private set
+            {
+                if (!SetField(ref _argumentError, value)) return;
+                OnPropertyChanged(nameof(HasArgumentError));
+            }
+        }
+        public bool HasArgumentError => ArgumentError is not null;
+        public bool CanAddArgument => Arguments.Count < 64;
+
+        public void LoadArguments(IReadOnlyDictionary<string, string> arguments)
+        {
+            Arguments.Clear();
+            foreach (var argument in arguments.OrderBy(item => item.Key, StringComparer.Ordinal))
+                Arguments.Add(new WorkflowArgumentEditorItem(argument.Key, argument.Value));
+            RefreshArgumentValidation();
+            NotifyArgumentCollectionChanged();
+        }
+
+        public bool AddArgument()
+        {
+            if (!CanAddArgument) return false;
+            var used = Arguments.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+            var key = "argument";
+            for (var number = 2; used.Contains(key); number++) key = $"argument-{number}";
+            Arguments.Add(new WorkflowArgumentEditorItem(key, string.Empty));
+            RefreshArgumentValidation();
+            NotifyArgumentCollectionChanged();
+            return true;
+        }
+
+        public bool RemoveArgument(WorkflowArgumentEditorItem argument)
+        {
+            var removed = Arguments.Remove(argument);
+            if (!removed) return false;
+            RefreshArgumentValidation();
+            NotifyArgumentCollectionChanged();
+            return true;
+        }
+
+        public bool TryBuildArguments(out IReadOnlyDictionary<string, string> arguments)
+        {
+            RefreshArgumentValidation();
+            if (ArgumentError is not null)
+            {
+                arguments = new Dictionary<string, string>();
+                return false;
+            }
+            arguments = Arguments.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+            return true;
+        }
+
+        public void RefreshArgumentValidation()
+        {
+            if (Arguments.Any(item => string.IsNullOrWhiteSpace(item.Key)))
+                ArgumentError = "参数键不能为空。";
+            else if (Arguments.GroupBy(item => item.Key, StringComparer.Ordinal).Any(group => group.Count() > 1))
+                ArgumentError = "参数键不能重复。";
+            else
+                ArgumentError = null;
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        private void SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)
+        private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)
         {
-            if (EqualityComparer<T>.Default.Equals(field, value)) return;
+            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
             field = value;
             OnPropertyChanged(name);
+            return true;
         }
 
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private void NotifyArgumentCollectionChanged()
+        {
+            OnPropertyChanged(nameof(ArgumentSummary));
+            OnPropertyChanged(nameof(CanAddArgument));
+        }
     }
 
     public sealed record WorkflowInputTypeOption(AcceptedInputType Value, string Label);
+
+    public sealed class WorkflowArgumentEditorItem
+    {
+        public WorkflowArgumentEditorItem(string key, string value)
+        {
+            Key = key;
+            Value = value;
+        }
+
+        public string Key { get; set; }
+        public string Value { get; set; }
+    }
 }

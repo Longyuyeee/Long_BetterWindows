@@ -519,6 +519,8 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml");
         var invocationEditor = Read(
             "src", "LongBetterWindows.Host", "Views", "WorkflowInvocationEditorControl.xaml.cs");
+        var invocationEditorXaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "WorkflowInvocationEditorControl.xaml");
         var session = Read(
             "src", "LongBetterWindows.Host", "Interaction", "CommandWorkflowEditorSession.cs");
 
@@ -546,6 +548,8 @@ public class QualityGateTests
         Assert.DoesNotContain("OpenFolderDialog", view);
         Assert.Contains("OpenFolderDialog", invocationEditor);
         Assert.Contains("MaximumImageBytes", invocationEditor);
+        Assert.Contains("AutomationProperties.Name=\"参数键\"", invocationEditorXaml);
+        Assert.Contains("AutomationProperties.Name=\"添加命令参数\"", invocationEditorXaml);
         Assert.Contains("AutomationProperties.Name=\"保存组合动作\"", xaml);
         Assert.Contains("CommandWorkflowPlanner", session);
         Assert.Contains("ExpectedExistingDefinitionSha256", Read(

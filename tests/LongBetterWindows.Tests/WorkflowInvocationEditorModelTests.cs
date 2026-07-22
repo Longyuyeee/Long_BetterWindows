@@ -35,6 +35,40 @@ public sealed class WorkflowInvocationEditorModelTests
         Assert.Contains("128", model.ImageSummary);
     }
 
+    [Fact]
+    public void Arguments_AreStructuredSortedAndRejectDuplicateKeys()
+    {
+        var model = Model();
+        model.LoadArguments(new Dictionary<string, string>
+        {
+            ["z"] = "last",
+            ["a"] = "first",
+        });
+
+        Assert.Equal(new[] { "a", "z" }, model.Arguments.Select(item => item.Key));
+        model.Arguments[1].Key = "a";
+        model.RefreshArgumentValidation();
+
+        Assert.True(model.HasArgumentError);
+        Assert.False(model.TryBuildArguments(out _));
+
+        model.Arguments[1].Key = "z";
+        Assert.True(model.TryBuildArguments(out var arguments));
+        Assert.Equal("last", arguments["z"]);
+    }
+
+    [Fact]
+    public void AddArgument_CreatesUniqueKeysAndHonorsMaximum()
+    {
+        var model = Model();
+
+        for (var index = 0; index < 64; index++) Assert.True(model.AddArgument());
+
+        Assert.False(model.AddArgument());
+        Assert.False(model.CanAddArgument);
+        Assert.Equal(64, model.Arguments.Select(item => item.Key).Distinct().Count());
+    }
+
     private static WorkflowInvocationEditorModel Model()
         => new()
         {
@@ -46,6 +80,5 @@ public sealed class WorkflowInvocationEditorModelTests
                 new WorkflowInputTypeOption(AcceptedInputType.None, "无输入"),
                 new WorkflowInputTypeOption(AcceptedInputType.Files, "多个文件"),
             ],
-            Arguments = new Dictionary<string, string>(),
         };
 }

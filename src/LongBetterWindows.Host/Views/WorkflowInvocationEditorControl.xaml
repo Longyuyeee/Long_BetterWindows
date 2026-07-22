@@ -45,5 +45,41 @@
                     IsEnabled="{Binding HasImage}" Click="ClearImage_Click"
                     automation:AutomationProperties.Name="清除命令图片" />
         </Grid>
+        <Expander Margin="100,8,0,0" IsExpanded="False">
+            <Expander.Header>
+                <TextBlock Text="{Binding ArgumentSummary}" FontSize="11"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+            </Expander.Header>
+            <StackPanel Margin="0,7,0,0">
+                <ItemsControl ItemsSource="{Binding Arguments}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="0.9*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBox Style="{StaticResource LongTextBox}" Text="{Binding Key}" MaxLength="128"
+                                         TextChanged="ArgumentKey_TextChanged"
+                                         automation:AutomationProperties.Name="参数键" />
+                                <TextBox Grid.Column="2" Style="{StaticResource LongTextBox}" Text="{Binding Value}" MaxLength="65536"
+                                         TextChanged="ArgumentValue_TextChanged"
+                                         automation:AutomationProperties.Name="参数值" />
+                                <Button Grid.Column="3" Style="{StaticResource LongIconButton}" Margin="7,0,0,0"
+                                        Tag="{Binding}" Click="RemoveArgument_Click" ToolTip="删除参数"
+                                        automation:AutomationProperties.Name="删除命令参数">
+                                    <Path Data="{StaticResource Long.Icon.Delete}" Style="{StaticResource LongIcon}" Width="15" Height="15" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding ArgumentError}" Margin="2,0,0,6" TextWrapping="Wrap" FontSize="10"
+                           Foreground="{DynamicResource Long.Brush.State.Danger}"
+                           Visibility="{Binding HasArgumentError, Converter={StaticResource BooleanToVisibility}}" />
+                <Button Style="{StaticResource LongIconButton}" HorizontalAlignment="Left"
+                        IsEnabled="{Binding CanAddArgument}" Click="AddArgument_Click" ToolTip="添加参数"
+                        automation:AutomationProperties.Name="添加命令参数">
+                    <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="15" Height="15" />
+                </Button>
+            </StackPanel>
+        </Expander>
     </StackPanel>
 </UserControl>

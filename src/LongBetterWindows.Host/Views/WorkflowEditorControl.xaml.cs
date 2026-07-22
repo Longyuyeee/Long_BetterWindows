@@ -259,11 +259,13 @@ namespace LongBetterWindows.Host.Views
         private void InvocationEditor_Changed(object? sender, EventArgs e)
         {
             if (_rendering
-                || sender is not WorkflowInvocationEditorControl { Editor: { } item }
-                || !ApplyInvocation(item)) return;
+                || sender is not WorkflowInvocationEditorControl { Editor: { } item }) return;
             InvalidateExecutionReview();
-            SensitiveInputCheckBox.Visibility = CommandWorkflowDocumentCodec.ContainsSensitiveInputs(
-                _session.State.Draft!) ? Visibility.Visible : Visibility.Collapsed;
+            if (ApplyInvocation(item))
+            {
+                SensitiveInputCheckBox.Visibility = CommandWorkflowDocumentCodec.ContainsSensitiveInputs(
+                    _session.State.Draft!) ? Visibility.Visible : Visibility.Collapsed;
+            }
             RenderStatus();
         }
 
@@ -565,7 +567,7 @@ namespace LongBetterWindows.Host.Views
                 .Distinct()
                 .Select(type => new WorkflowInputTypeOption(type, InputTypeLabel(type)))
                 .ToList();
-            return new WorkflowInvocationEditorModel
+            var editor = new WorkflowInvocationEditorModel
             {
                 StepId = stepId,
                 Role = role,
@@ -575,31 +577,44 @@ namespace LongBetterWindows.Host.Views
                 Text = invocation.Text ?? string.Empty,
                 Paths = invocation.Paths.ToArray(),
                 ImagePng = invocation.ImagePng?.ToArray(),
-                Arguments = new Dictionary<string, string>(invocation.Arguments, StringComparer.Ordinal),
             };
+            editor.LoadArguments(invocation.Arguments);
+            return editor;
         }
 
         private bool ApplyInvocation(WorkflowInvocationEditorModel item)
-            => _session.UpdateInvocation(
+        {
+            if (!item.TryBuildArguments(out var arguments)) return false;
+            return _session.UpdateInvocation(
                 item.StepId,
                 item.Role,
                 item.InputType,
                 item.Text,
                 item.Paths,
                 item.ImagePng,
-                item.Arguments);
+                arguments);
+        }
 
         private void RenderStatus()
         {
             var state = _session.State;
+            var hasInvalidArguments = HasInvalidInvocationArguments();
             EditorDirtyText.Text = state.ExistingDefinitionSha256 is null
                 ? "尚未保存"
                 : state.IsDirty ? "有未保存的更改" : "已保存到本机";
-            SaveWorkflowButton.IsEnabled = state.CanSave && state.IsDirty;
+            SaveWorkflowButton.IsEnabled = state.CanSave && state.IsDirty && !hasInvalidArguments;
             PrepareRunButton.IsEnabled = state.Preflight?.IsValid == true
                 && state.ExistingDefinitionSha256 is not null
                 && !state.IsDirty
+                && !hasInvalidArguments
                 && !_runSession.IsRunning;
+            if (hasInvalidArguments)
+            {
+                PreflightTitle.Text = "参数需要修正";
+                PreflightTitle.Foreground = (System.Windows.Media.Brush)FindResource("Long.Brush.State.Danger");
+                PreflightDetail.Text = "参数键不能为空或重复；修正后才能保存或执行。";
+                return;
+            }
             if (state.Preflight?.IsValid == true)
             {
                 PreflightTitle.Text = "预检通过";
@@ -616,6 +631,11 @@ namespace LongBetterWindows.Host.Views
                     ?? string.Join(Environment.NewLine, state.Preflight?.Issues ?? Array.Empty<string>());
             }
         }
+
+        private bool HasInvalidInvocationArguments()
+            => StepsList.ItemsSource is IEnumerable<StepEditorItem> steps
+                && steps.Any(step => step.PrimaryInput.HasArgumentError
+                    || (step.HasCompensation && step.CompensationInput.HasArgumentError));
 
         private void SetListStatus(string text, bool isError)
         {
