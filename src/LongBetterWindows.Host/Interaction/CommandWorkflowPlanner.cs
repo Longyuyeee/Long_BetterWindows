@@ -33,6 +33,7 @@ namespace LongBetterWindows.Host.Interaction
                 issues.Add($"Workflow must contain between 1 and {MaximumStepCount} steps.");
 
             var stepIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var precedingStepIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var step in workflow.Steps)
             {
                 if (!IsValidIdentifier(step.Id))
@@ -40,15 +41,32 @@ namespace LongBetterWindows.Host.Interaction
                 else if (!stepIds.Add(step.Id))
                     issues.Add($"Workflow step id is duplicated: {step.Id}");
 
-                ValidateCommand(step.Id, "command", step.Command, issues, pluginIds);
+                ValidateCommand(
+                    step.Id,
+                    "command",
+                    step.Command,
+                    precedingStepIds,
+                    issues,
+                    pluginIds);
+                var compensationSources = new HashSet<string>(
+                    precedingStepIds,
+                    StringComparer.OrdinalIgnoreCase);
+                compensationSources.Add(step.Id);
                 if (step.Compensation is not null)
-                    ValidateCommand(step.Id, "compensation", step.Compensation, issues, pluginIds);
+                    ValidateCommand(
+                        step.Id,
+                        "compensation",
+                        step.Compensation,
+                        compensationSources,
+                        issues,
+                        pluginIds);
                 if (workflow.FailureMode == WorkflowFailureMode.Compensate
                     && step.Effect == WorkflowStepEffect.Mutating
                     && step.Compensation is null)
                 {
                     issues.Add($"Mutating workflow step requires compensation: {step.Id}");
                 }
+                precedingStepIds.Add(step.Id);
             }
 
             var permissions = new List<WorkflowPermissionRequirement>();
@@ -82,6 +100,7 @@ namespace LongBetterWindows.Host.Interaction
             string stepId,
             string role,
             WorkflowCommand? command,
+            ISet<string> availableSourceSteps,
             ICollection<string> issues,
             ISet<string> pluginIds)
         {
@@ -117,6 +136,54 @@ namespace LongBetterWindows.Host.Interaction
             if (!descriptor.Command.AcceptedInputs.Contains(invocation.InputType))
             {
                 issues.Add($"Workflow step {role} input type is not accepted: {stepId}");
+            }
+            ValidateBindings(stepId, role, command.Bindings, availableSourceSteps, issues);
+        }
+
+        private static void ValidateBindings(
+            string stepId,
+            string role,
+            IReadOnlyList<WorkflowValueBinding>? bindings,
+            ISet<string> availableSourceSteps,
+            ICollection<string> issues)
+        {
+            bindings ??= Array.Empty<WorkflowValueBinding>();
+            if (bindings.Count > 64)
+            {
+                issues.Add($"Workflow step {role} has more than 64 bindings: {stepId}");
+                return;
+            }
+            var textTargets = 0;
+            var argumentTargets = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var binding in bindings)
+            {
+                if (!availableSourceSteps.Contains(binding.SourceStepId))
+                    issues.Add($"Workflow step {role} binding source must already be available: {stepId}");
+                if (!IsValidIdentifier(binding.OutputKey))
+                    issues.Add($"Workflow step {role} binding output key is invalid: {stepId}");
+                if (!Enum.IsDefined(binding.Target))
+                {
+                    issues.Add($"Workflow step {role} binding target is invalid: {stepId}");
+                    continue;
+                }
+                if (binding.Target == WorkflowBindingTarget.Text && ++textTargets > 1)
+                    issues.Add($"Workflow step {role} has duplicate text bindings: {stepId}");
+                if (binding.Target == WorkflowBindingTarget.Argument)
+                {
+                    if (string.IsNullOrWhiteSpace(binding.ArgumentKey)
+                        || binding.ArgumentKey.Length > 128)
+                    {
+                        issues.Add($"Workflow step {role} binding argument key is invalid: {stepId}");
+                    }
+                    else if (!argumentTargets.Add(binding.ArgumentKey))
+                    {
+                        issues.Add($"Workflow step {role} has duplicate argument bindings: {stepId}");
+                    }
+                }
+                else if (binding.ArgumentKey is not null)
+                {
+                    issues.Add($"Workflow step {role} non-argument binding has an argument key: {stepId}");
+                }
             }
         }
 
@@ -185,6 +252,15 @@ namespace LongBetterWindows.Host.Interaction
             {
                 WriteField(writer, argument.Key);
                 WriteField(writer, argument.Value);
+            }
+            var bindings = command.Bindings ?? Array.Empty<WorkflowValueBinding>();
+            writer.Write(bindings.Count);
+            foreach (var binding in bindings)
+            {
+                WriteField(writer, binding.SourceStepId);
+                WriteField(writer, binding.OutputKey);
+                writer.Write((int)binding.Target);
+                WriteField(writer, binding.ArgumentKey ?? string.Empty);
             }
         }
 

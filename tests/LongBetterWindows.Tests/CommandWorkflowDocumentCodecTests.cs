@@ -43,6 +43,24 @@ public class CommandWorkflowDocumentCodecTests
     }
 
     [Fact]
+    public void Deserialize_V2Document_MigratesWithOriginalSourceAndEmptyBindings()
+    {
+        var json = CommandWorkflowDocumentCodec.Serialize(
+            Workflow("workflow.v2"),
+            new WorkflowDocumentSource(WorkflowDocumentSourceKind.LocalManaged, "local-user"));
+        var root = JsonNode.Parse(json)!.AsObject();
+        root["schema_version"] = 2;
+        root["workflow"]!["steps"]![0]!["command"]!.AsObject().Remove("bindings");
+
+        var result = CommandWorkflowDocumentCodec.Deserialize(root.ToJsonString(), isManagedFile: true);
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(2, result.MigratedFromSchemaVersion);
+        Assert.Equal(WorkflowDocumentTrustLevel.LocalManaged, result.TrustLevel);
+        Assert.Empty(result.Workflow!.Steps[0].Command!.Bindings!);
+    }
+
+    [Fact]
     public void Deserialize_ExternalFileCannotClaimLocalManagedTrust()
     {
         var json = CommandWorkflowDocumentCodec.Serialize(
@@ -133,7 +151,7 @@ public class CommandWorkflowDocumentCodecTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(3)]
+    [InlineData(4)]
     public void Deserialize_UnsupportedSchema_IsRejected(int schemaVersion)
     {
         var json = $"{{\"schema_version\":{schemaVersion},\"workflow\":{{}}}}";
@@ -180,6 +198,44 @@ public class CommandWorkflowDocumentCodecTests
 
         Assert.False(result.IsSuccess);
         Assert.Contains("compensation is incomplete", result.Error);
+    }
+
+    [Fact]
+    public void SerializeAndDeserialize_BindingsRoundTripAndAffectDefinitionHash()
+    {
+        var original = Workflow("workflow.bindings") with
+        {
+            Steps =
+            [
+                Step("source"),
+                Step("target") with
+                {
+                    Command = new WorkflowCommand(
+                        "plugin:command",
+                        new PluginCommandInvocation { CommandId = "command" },
+                        [new WorkflowValueBinding(
+                            "source",
+                            "selected-path",
+                            WorkflowBindingTarget.Path)]),
+                },
+            ],
+        };
+        var withoutBinding = original with
+        {
+            Steps = [original.Steps[0], Step("target")],
+        };
+        var json = CommandWorkflowDocumentCodec.Serialize(
+            original,
+            new WorkflowDocumentSource(WorkflowDocumentSourceKind.Imported, "test"));
+
+        var result = CommandWorkflowDocumentCodec.Deserialize(json, false);
+
+        Assert.True(result.IsSuccess, result.Error);
+        var binding = Assert.Single(result.Workflow!.Steps[1].Command!.Bindings!);
+        Assert.Equal("source", binding.SourceStepId);
+        Assert.NotEqual(
+            CommandWorkflowDocumentCodec.ComputeDefinitionSha256(original),
+            CommandWorkflowDocumentCodec.ComputeDefinitionSha256(withoutBinding));
     }
 
     private static CommandWorkflowDefinition Workflow(

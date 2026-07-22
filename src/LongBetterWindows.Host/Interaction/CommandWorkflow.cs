@@ -14,9 +14,23 @@ namespace LongBetterWindows.Host.Interaction
         Mutating,
     }
 
+    public enum WorkflowBindingTarget
+    {
+        Text,
+        Path,
+        Argument,
+    }
+
+    public sealed record WorkflowValueBinding(
+        string SourceStepId,
+        string OutputKey,
+        WorkflowBindingTarget Target,
+        string? ArgumentKey = null);
+
     public sealed record WorkflowCommand(
         string CommandKey,
-        PluginCommandInvocation? Invocation);
+        PluginCommandInvocation? Invocation,
+        IReadOnlyList<WorkflowValueBinding>? Bindings = null);
 
     public sealed record CommandWorkflowStep(
         string Id,

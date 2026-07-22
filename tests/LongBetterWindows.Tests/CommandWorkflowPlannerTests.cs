@@ -166,6 +166,70 @@ public class CommandWorkflowPlannerTests
         Assert.NotEqual(original.Fingerprint, upgraded.Fingerprint);
     }
 
+    [Fact]
+    public void Preflight_ValidPriorStepBindingChangesFingerprint()
+    {
+        var registry = CreateRegistry();
+        var original = Workflow();
+        var bound = original with
+        {
+            Steps =
+            [
+                original.Steps[0],
+                original.Steps[1] with
+                {
+                    Command = original.Steps[1].Command! with
+                    {
+                        Bindings =
+                        [
+                            new WorkflowValueBinding(
+                                "inspect",
+                                "selected-path",
+                                WorkflowBindingTarget.Path),
+                        ],
+                    },
+                },
+            ],
+        };
+
+        var unboundResult = new CommandWorkflowPlanner(registry).Preflight(original);
+        var boundResult = new CommandWorkflowPlanner(registry).Preflight(bound);
+
+        Assert.True(boundResult.IsValid, string.Join(Environment.NewLine, boundResult.Issues));
+        Assert.NotEqual(unboundResult.Fingerprint, boundResult.Fingerprint);
+    }
+
+    [Fact]
+    public void Preflight_FutureStepAndDuplicateTargetBindingsAreRejected()
+    {
+        var registry = CreateRegistry();
+        var original = Workflow();
+        var workflow = original with
+        {
+            Steps =
+            [
+                original.Steps[0] with
+                {
+                    Command = original.Steps[0].Command! with
+                    {
+                        Bindings =
+                        [
+                            new WorkflowValueBinding("rename", "one", WorkflowBindingTarget.Text),
+                            new WorkflowValueBinding("rename", "two", WorkflowBindingTarget.Text),
+                        ],
+                    },
+                },
+                original.Steps[1],
+            ],
+        };
+
+        var result = new CommandWorkflowPlanner(registry).Preflight(workflow);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Contains("already be available"));
+        Assert.Contains(result.Issues, issue => issue.Contains("duplicate text bindings"));
+    }
+
     private static CommandWorkflowDefinition Workflow(
         IReadOnlyDictionary<string, string>? arguments = null)
         => new(

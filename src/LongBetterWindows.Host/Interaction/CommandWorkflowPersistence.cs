@@ -72,7 +72,7 @@ namespace LongBetterWindows.Host.Interaction
 
     public static class CommandWorkflowDocumentCodec
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
         public const int MaximumImageBytes = 2 * 1024 * 1024;
 
         private static readonly JsonSerializerOptions CompactJson = CreateOptions(writeIndented: false);
@@ -114,6 +114,17 @@ namespace LongBetterWindows.Host.Interaction
                 if (schemaVersion == CurrentSchemaVersion)
                 {
                     envelope = JsonSerializer.Deserialize<WorkflowDocumentEnvelope>(json, CompactJson);
+                }
+                else if (schemaVersion == 2)
+                {
+                    var previous = JsonSerializer.Deserialize<WorkflowDocumentEnvelope>(json, CompactJson);
+                    envelope = previous?.Workflow is null || previous.Source is null
+                        ? null
+                        : new WorkflowDocumentEnvelope(
+                            CurrentSchemaVersion,
+                            previous.Source,
+                            previous.Workflow);
+                    migratedFrom = 2;
                 }
                 else if (schemaVersion == 1)
                 {
@@ -218,7 +229,14 @@ namespace LongBetterWindows.Host.Interaction
                         Paths = invocation.Paths?.ToArray() ?? Array.Empty<string>(),
                         ImagePng = invocation.ImagePng?.ToArray(),
                         Arguments = NormalizeArguments(invocation.Arguments),
-                    });
+                    },
+                (command.Bindings ?? Array.Empty<WorkflowValueBinding>())
+                    .Select(binding => new WorkflowValueBinding(
+                        binding.SourceStepId?.Trim() ?? string.Empty,
+                        binding.OutputKey?.Trim() ?? string.Empty,
+                        binding.Target,
+                        binding.ArgumentKey?.Trim()))
+                    .ToList());
         }
 
         private static IReadOnlyDictionary<string, string> NormalizeArguments(
@@ -297,6 +315,18 @@ namespace LongBetterWindows.Host.Interaction
                     || argument.Value.Length > 65536) ?? false))
             {
                 return $"Workflow step {role} arguments are invalid: {stepId}";
+            }
+            var bindings = command.Bindings ?? Array.Empty<WorkflowValueBinding>();
+            if (bindings.Count > 64
+                || bindings.Any(binding =>
+                    string.IsNullOrWhiteSpace(binding.SourceStepId)
+                    || binding.SourceStepId.Length > 64
+                    || string.IsNullOrWhiteSpace(binding.OutputKey)
+                    || binding.OutputKey.Length > 64
+                    || !Enum.IsDefined(binding.Target)
+                    || (binding.ArgumentKey?.Length ?? 0) > 128))
+            {
+                return $"Workflow step {role} bindings are invalid: {stepId}";
             }
             return null;
         }

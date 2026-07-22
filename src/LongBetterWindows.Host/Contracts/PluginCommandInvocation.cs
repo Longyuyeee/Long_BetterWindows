@@ -2,6 +2,16 @@ using System.Text.Json.Serialization;
 
 namespace LongBetterWindows.Host.Contracts
 {
+    public enum PluginCommandOutputType
+    {
+        Text,
+        Path,
+    }
+
+    public sealed record PluginCommandOutput(
+        PluginCommandOutputType Type,
+        string Value);
+
     /// <summary>宿主传给插件命令的标准化输入。</summary>
     public sealed class PluginCommandInvocation
     {
@@ -33,15 +43,21 @@ namespace LongBetterWindows.Host.Contracts
         public bool IsSuccess { get; init; }
         public string? Message { get; init; }
         public bool KeepPaletteOpen { get; init; }
+        public IReadOnlyDictionary<string, PluginCommandOutput> Outputs { get; init; } =
+            new Dictionary<string, PluginCommandOutput>();
 
         public static PluginCommandResult Success(
             string? message = null,
-            bool keepPaletteOpen = false)
+            bool keepPaletteOpen = false,
+            IReadOnlyDictionary<string, PluginCommandOutput>? outputs = null)
             => new()
             {
                 IsSuccess = true,
                 Message = message,
                 KeepPaletteOpen = keepPaletteOpen,
+                Outputs = outputs is null
+                    ? new Dictionary<string, PluginCommandOutput>()
+                    : new Dictionary<string, PluginCommandOutput>(outputs, StringComparer.Ordinal),
             };
 
         public static PluginCommandResult Failure(string message)
