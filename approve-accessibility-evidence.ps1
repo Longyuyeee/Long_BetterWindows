@@ -5,6 +5,7 @@
 #>
 param(
     [Parameter(Mandatory=$true)] [string] $EvidenceDirectory,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)]
     [ValidateSet('high_contrast','reduced_motion','combined')] [string] $ConfirmProfile,
     [Parameter(Mandatory=$true)] [string] $Reviewer,
@@ -24,12 +25,19 @@ if (-not $ConfirmKeyboardNavigation -or -not $ConfirmFocusVisibility -or -not $C
     throw 'Keyboard navigation, focus visibility and motion behavior confirmations are required.'
 }
 
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
 $root = [IO.Path]::GetFullPath($EvidenceDirectory)
 $manifestPath = Join-Path $root 'accessibility-evidence.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Evidence manifest was not found: $manifestPath" }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.classification -ne 'physical_accessibility_evidence') {
     throw "Unexpected evidence classification: $($manifest.classification)"
+}
+if ([string]$manifest.source_commit -ne $expectedCommit) {
+    throw 'Accessibility evidence source commit does not match ExpectedSourceCommit.'
 }
 if (-not [bool]$manifest.automated_checks_passed) { throw 'Automated accessibility checks did not pass.' }
 if ([string]$manifest.expected_profile -ne $ConfirmProfile) {

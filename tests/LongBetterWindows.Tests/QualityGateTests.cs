@@ -252,11 +252,16 @@ public class QualityGateTests
         var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
 
         Assert.Contains("ConfirmCleanUserEnvironment", capture);
+        Assert.Contains("ExpectedSourceCommit", capture);
+        Assert.Contains("Release manifest source commit does not match ExpectedSourceCommit", capture);
+        Assert.Contains("source_commit = $expectedCommit", capture);
         Assert.Contains("Release ZIP hash does not match", capture);
         Assert.Contains("Start capture before the first launch", capture);
         Assert.Contains("-ReleaseDirectory $installRoot", capture);
         Assert.Contains("clean_windows_release_evidence", capture);
         Assert.Contains("ConfirmTrayIcon", approve);
+        Assert.Contains("ExpectedSourceCommit", approve);
+        Assert.Contains("Clean-environment evidence source commit does not match ExpectedSourceCommit", approve);
         Assert.Contains("ConfirmGlobalHotkey", approve);
         Assert.Contains("ConfirmWebViewRuntime", approve);
         Assert.Contains("ConfirmParallelUpgradeDataPreserved", approve);
@@ -268,6 +273,11 @@ public class QualityGateTests
         Assert.Contains("signed, release-eligible package", verify);
         Assert.Contains("Manual lifecycle checklist is incomplete", verify);
         Assert.Contains("approved_clean_windows_release_gate", verify);
+        Assert.Contains("ExpectedSourceCommit", verify);
+        Assert.Contains("Clean-environment evidence source commit does not match ExpectedSourceCommit", verify);
+        Assert.Contains("source_commit = $expectedCommit", verify);
+        Assert.Contains("Captured release manifest source commit does not match ExpectedSourceCommit", verify);
+        Assert.Contains("package identity does not match the captured release manifest", verify);
         Assert.Contains("ReleaseDirectory", desktopSmoke);
         Assert.Contains("Plugins directory was not found", desktopSmoke);
     }
@@ -322,6 +332,25 @@ public class QualityGateTests
         Assert.Contains("physical_device_matrix_required", matrix);
         Assert.Contains("high_contrast = $metadata.high_contrast", matrix);
         Assert.Contains("reduced_motion = $metadata.reduced_motion", matrix);
+    }
+
+    [Fact]
+    public void PhysicalAccessibilityEvidence_BindsEveryProfileToOneCleanSourceCommit()
+    {
+        var capture = Read("capture-accessibility-evidence.ps1");
+        var approve = Read("approve-accessibility-evidence.ps1");
+        var verify = Read("verify-accessibility-matrix.ps1");
+
+        Assert.Contains("ExpectedSourceCommit", capture);
+        Assert.Contains("Repository HEAD does not match ExpectedSourceCommit", capture);
+        Assert.Contains("requires a clean tracked source tree", capture);
+        Assert.Contains("must rebuild the expected source commit", capture);
+        Assert.Contains("source_commit = $expectedCommit", capture);
+        Assert.Contains("ExpectedSourceCommit", approve);
+        Assert.Contains("Accessibility evidence source commit does not match ExpectedSourceCommit", approve);
+        Assert.Contains("ExpectedSourceCommit", verify);
+        Assert.Contains("Accessibility evidence source commit does not match ExpectedSourceCommit", verify);
+        Assert.Contains("source_commit = $expectedCommit", verify);
     }
 
     [Fact]

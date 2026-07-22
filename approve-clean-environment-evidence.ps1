@@ -2,6 +2,7 @@
 <# .SYNOPSIS Approve interactive install, upgrade, rollback and uninstall evidence. #>
 param(
     [Parameter(Mandatory=$true)] [string] $EvidenceDirectory,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)] [string] $Reviewer,
     [Parameter(Mandatory=$true)] [string] $ReviewNotes,
     [Parameter(Mandatory=$true)] [switch] $ConfirmFirstStart,
@@ -25,11 +26,18 @@ $required = @(
 )
 if ($required -contains $false) { throw 'Every clean-environment lifecycle confirmation is required.' }
 
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
 $root = [IO.Path]::GetFullPath($EvidenceDirectory)
 $manifestPath = Join-Path $root 'clean-environment-evidence.json'
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "Evidence manifest was not found: $manifestPath" }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.classification -ne 'clean_windows_release_evidence') { throw 'Unexpected evidence classification.' }
+if ([string]$manifest.release.source_commit -ne $expectedCommit) {
+    throw 'Clean-environment evidence source commit does not match ExpectedSourceCommit.'
+}
 if (-not [bool]$manifest.environment.operator_asserted_clean_user) { throw 'The operator did not assert a clean Windows user.' }
 if (-not [bool]$manifest.automated_checks.passed) { throw 'Automated release checks did not pass.' }
 if ($Reviewer.Trim() -eq [string]$manifest.environment.user) {

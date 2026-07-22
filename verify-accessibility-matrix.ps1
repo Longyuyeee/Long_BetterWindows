@@ -5,10 +5,15 @@
 #>
 param(
     [Parameter(Mandatory=$true)] [string[]] $EvidenceDirectories,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [string] $OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
 $requiredProfiles = @('high_contrast','reduced_motion','combined')
 $results = @()
 $screenReaderApprovalCount = 0
@@ -19,6 +24,9 @@ foreach ($directory in $EvidenceDirectories) {
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($manifest.classification -ne 'physical_accessibility_evidence') {
         throw "Unexpected evidence classification: $manifestPath"
+    }
+    if ([string]$manifest.source_commit -ne $expectedCommit) {
+        throw "Accessibility evidence source commit does not match ExpectedSourceCommit: $manifestPath"
     }
     $profile = [string]$manifest.expected_profile
     if ($profile -notin $requiredProfiles) { throw "Unsupported accessibility profile: $profile" }
@@ -57,6 +65,7 @@ foreach ($directory in $EvidenceDirectories) {
     }
     $results += [ordered]@{
         profile = $profile
+        source_commit = $expectedCommit
         reviewer = $manifest.human_review.reviewer
         reviewed_at = $manifest.human_review.reviewed_at
         screen_reader = $readerName
@@ -77,6 +86,7 @@ $summary = [ordered]@{
     schema_version = 1
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_physical_accessibility_matrix'
+    source_commit = $expectedCommit
     required_profiles = $requiredProfiles
     screen_reader_approval_count = $screenReaderApprovalCount
     passed = $true

@@ -9,6 +9,7 @@
 param(
     [Parameter(Mandatory=$true)] [string] $ReleaseZip,
     [Parameter(Mandatory=$true)] [string] $ReleaseManifest,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [Parameter(Mandatory=$true)] [string] $EnvironmentLabel,
     [switch] $ConfirmCleanUserEnvironment,
@@ -16,6 +17,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
 if (-not $ConfirmCleanUserEnvironment) {
     throw 'ConfirmCleanUserEnvironment is required and must only be used in a new Windows user or disposable VM.'
 }
@@ -39,6 +44,9 @@ if (Get-Process -Name 'LongBetterWindows.Host' -ErrorAction SilentlyContinue) {
 }
 
 $release = Get-Content -LiteralPath $releaseManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ([string]$release.commit -ne $expectedCommit) {
+    throw 'Release manifest source commit does not match ExpectedSourceCommit.'
+}
 $zipName = [IO.Path]::GetFileName($zipPath)
 $package = @($release.packages | Where-Object { $_.file -eq $zipName })
 if ($package.Count -ne 1) { throw "Release manifest does not identify exactly one package named $zipName." }
@@ -104,6 +112,7 @@ $manifest = [ordered]@{
     }
     release = [ordered]@{
         version = [string]$release.version
+        source_commit = $expectedCommit
         package_file = $zipName
         package_kind = [string]$package[0].kind
         package_sha256 = $actualZipHash

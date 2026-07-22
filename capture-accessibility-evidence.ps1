@@ -9,12 +9,24 @@ param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [Parameter(Mandatory=$true)]
     [ValidateSet('high_contrast','reduced_motion','combined')] [string] $ExpectedProfile,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [ValidateSet('None','Narrator','NVDA')] [string] $ScreenReader = 'None',
     [switch] $NoBuild
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
+$actualCommit = (& git -C $repoRoot rev-parse HEAD).Trim().ToLowerInvariant()
+if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $expectedCommit) {
+    throw 'Repository HEAD does not match ExpectedSourceCommit.'
+}
+& git -C $repoRoot diff --quiet HEAD --
+if ($LASTEXITCODE -ne 0) { throw 'Accessibility evidence requires a clean tracked source tree.' }
+if ($NoBuild) { throw 'Formal accessibility evidence must rebuild the expected source commit.' }
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $outputRoot) {
     throw "Accessibility evidence output already exists: $outputRoot"
@@ -50,7 +62,6 @@ if ($null -ne $readerProcessName) {
 $smokeRoot = Join-Path $outputRoot 'desktop-ui-smoke'
 $smokeScript = Join-Path $repoRoot 'run-desktop-ui-smoke.ps1'
 $smokeParameters = @{ OutputDirectory = $smokeRoot }
-if ($NoBuild) { $smokeParameters.NoBuild = $true }
 $smokeOutput = & $smokeScript @smokeParameters
 $smokeOutput | ForEach-Object { Write-Host $_ }
 
@@ -67,6 +78,7 @@ $manifest = [ordered]@{
     schema_version = 1
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'physical_accessibility_evidence'
+    source_commit = $expectedCommit
     expected_profile = $ExpectedProfile
     automated_checks_passed = $true
     windows_settings = [ordered]@{
