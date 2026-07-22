@@ -297,6 +297,26 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void ReleaseDownloadEvidence_VerifiesManifestHashAndInternetOriginWithoutLaunchingPackage()
+    {
+        var capture = Read("capture-release-download-evidence.ps1");
+
+        Assert.Contains("ExpectedSourceCommit", capture);
+        Assert.Contains("ExpectedDistributionChannel", capture);
+        Assert.Contains("Get-FileHash", capture);
+        Assert.Contains("Zone.Identifier", capture);
+        Assert.Contains("ZoneId=3", capture);
+        Assert.Contains("AllowedDownloadHosts", capture);
+        Assert.Contains("Download evidence output already exists", capture);
+        Assert.Contains("query_parameters_recorded = $false", capture);
+        Assert.Contains("verified_release_download_provenance", capture);
+        Assert.Contains("smartscreen_observed = $false", capture);
+        Assert.Contains("first_launch_observed = $false", capture);
+        Assert.DoesNotContain("Start-Process", capture);
+        Assert.DoesNotContain("Expand-Archive", capture);
+    }
+
+    [Fact]
     public void WindowsCodeSigning_UsesProtectedCertificateStoreTimestampAndIndependentZipVerification()
     {
         var sign = Read("sign-release.ps1");

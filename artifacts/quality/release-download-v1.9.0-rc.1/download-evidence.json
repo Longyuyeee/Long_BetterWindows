@@ -1,0 +1,40 @@
+﻿{
+    "schema_version":  1,
+    "captured_at":  "2026-07-22T02:57:11.9824839+00:00",
+    "classification":  "verified_release_download_provenance",
+    "passed":  true,
+    "release":  {
+                    "version":  "1.9.0",
+                    "source_commit":  "d3cd956c1a29a5ddc9b8f40031c3e6abdcbf93b4",
+                    "distribution_channel":  "unsigned",
+                    "signed":  false,
+                    "release_eligible":  true
+                },
+    "package":  {
+                    "file":  "LongBetterWindows-v1.9.0-win-x64-self-contained.zip",
+                    "kind":  "self-contained",
+                    "bytes":  80569737,
+                    "sha256":  "78f1f925e0cf1943d554e0c8393699690c7182f7447fca5f0130c2a42f3d2be4"
+                },
+    "windows_origin":  {
+                           "zone_id":  3,
+                           "host":  {
+                                        "scheme":  "https",
+                                        "host":  "release-assets.githubusercontent.com",
+                                        "path":  "/github-production-release-asset/1264931952/b6e04fc8-8dd6-48c5-9cb6-1f787b3f82e9"
+                                    },
+                           "referrer":  null,
+                           "zone_identifier_sha256":  "7ca5c1ca8ea715211a452a4513c69b0fa6dd34e0b1182330493040f1f41c7a71",
+                           "query_parameters_recorded":  false
+                       },
+    "human_review":  {
+                         "status":  "pending",
+                         "checklist":  {
+                                           "extraction_completed":  false,
+                                           "extracted_executable_origin_checked":  false,
+                                           "smartscreen_observed":  false,
+                                           "antivirus_observed":  false,
+                                           "first_launch_observed":  false
+                                       }
+                     }
+}
