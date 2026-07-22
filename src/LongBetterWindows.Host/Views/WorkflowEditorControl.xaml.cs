@@ -256,94 +256,15 @@ namespace LongBetterWindows.Host.Views
         private void StepCompensation_SelectionChanged(object sender, SelectionChangedEventArgs e)
             => UpdateStep(sender);
 
-        private void InvocationInputType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void InvocationEditor_Changed(object? sender, EventArgs e)
         {
             if (_rendering
-                || sender is not ComboBox { DataContext: InvocationEditorItem item } combo
-                || combo.SelectedValue is not AcceptedInputType inputType) return;
-            item.InputType = inputType;
-            if (ApplyInvocation(item)) RenderEditor();
-        }
-
-        private void InvocationText_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (_rendering || sender is not TextBox { DataContext: InvocationEditorItem item } textBox) return;
-            item.Text = textBox.Text;
-            if (!ApplyInvocation(item)) return;
+                || sender is not WorkflowInvocationEditorControl { Editor: { } item }
+                || !ApplyInvocation(item)) return;
             InvalidateExecutionReview();
             SensitiveInputCheckBox.Visibility = CommandWorkflowDocumentCodec.ContainsSensitiveInputs(
                 _session.State.Draft!) ? Visibility.Visible : Visibility.Collapsed;
             RenderStatus();
-        }
-
-        private void PickInvocationPaths_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button { Tag: InvocationEditorItem item }) return;
-            IReadOnlyList<string>? paths;
-            if (item.InputType == AcceptedInputType.Folder)
-            {
-                var dialog = new OpenFolderDialog
-                {
-                    Title = "选择命令文件夹",
-                    Multiselect = false,
-                };
-                paths = dialog.ShowDialog() == true ? [dialog.FolderName] : null;
-            }
-            else
-            {
-                var dialog = new OpenFileDialog
-                {
-                    Title = "选择命令文件",
-                    CheckFileExists = true,
-                    Multiselect = item.InputType is AcceptedInputType.Files
-                        or AcceptedInputType.ExplorerSelection,
-                };
-                paths = dialog.ShowDialog() == true ? dialog.FileNames : null;
-            }
-            if (paths is null) return;
-            item.Paths = paths;
-            if (ApplyInvocation(item)) RenderEditor();
-        }
-
-        private void ClearInvocationPaths_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button { Tag: InvocationEditorItem item }) return;
-            item.Paths = Array.Empty<string>();
-            if (ApplyInvocation(item)) RenderEditor();
-        }
-
-        private void PickInvocationImage_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button { Tag: InvocationEditorItem item }) return;
-            var dialog = new OpenFileDialog
-            {
-                Title = "选择 PNG 图片",
-                Filter = "PNG 图片 (*.png)|*.png",
-                CheckFileExists = true,
-                Multiselect = false,
-            };
-            if (dialog.ShowDialog() != true) return;
-            try
-            {
-                var file = new FileInfo(dialog.FileName);
-                if (file.Length > CommandWorkflowDocumentCodec.MaximumImageBytes)
-                    throw new InvalidOperationException("PNG 图片不能超过 2 MB。");
-                var bytes = File.ReadAllBytes(dialog.FileName);
-                if (!IsPng(bytes)) throw new InvalidOperationException("选择的文件不是有效的 PNG 图片。");
-                item.ImagePng = bytes;
-                if (ApplyInvocation(item)) RenderEditor();
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
-            {
-                MessageBox.Show(ex.Message, "命令图片", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        }
-
-        private void ClearInvocationImage_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button { Tag: InvocationEditorItem item }) return;
-            item.ImagePng = null;
-            if (ApplyInvocation(item)) RenderEditor();
         }
 
         private void UpdateStep(object sender)
@@ -632,7 +553,7 @@ namespace LongBetterWindows.Host.Views
             CompactNewButton.IsEnabled = !active;
         }
 
-        private InvocationEditorItem CreateInvocationEditor(
+        private WorkflowInvocationEditorModel CreateInvocationEditor(
             string stepId,
             WorkflowCommandRole role,
             string roleLabel,
@@ -642,9 +563,9 @@ namespace LongBetterWindows.Host.Views
             var descriptor = command is null ? null : _plugins.Commands.Get(command.CommandKey);
             var options = (descriptor?.Command.AcceptedInputs ?? [AcceptedInputType.None])
                 .Distinct()
-                .Select(type => new EnumOption<AcceptedInputType>(type, InputTypeLabel(type)))
+                .Select(type => new WorkflowInputTypeOption(type, InputTypeLabel(type)))
                 .ToList();
-            return new InvocationEditorItem
+            return new WorkflowInvocationEditorModel
             {
                 StepId = stepId,
                 Role = role,
@@ -658,7 +579,7 @@ namespace LongBetterWindows.Host.Views
             };
         }
 
-        private bool ApplyInvocation(InvocationEditorItem item)
+        private bool ApplyInvocation(WorkflowInvocationEditorModel item)
             => _session.UpdateInvocation(
                 item.StepId,
                 item.Role,
@@ -769,17 +690,6 @@ namespace LongBetterWindows.Host.Views
                 _ => "资源管理器选区",
             };
 
-        private static bool IsPng(byte[] bytes)
-            => bytes.Length >= 8
-                && bytes[0] == 0x89
-                && bytes[1] == 0x50
-                && bytes[2] == 0x4e
-                && bytes[3] == 0x47
-                && bytes[4] == 0x0d
-                && bytes[5] == 0x0a
-                && bytes[6] == 0x1a
-                && bytes[7] == 0x0a;
-
         private static string EventLabel(WorkflowExecutionEventKind kind)
             => kind switch
             {
@@ -834,30 +744,8 @@ namespace LongBetterWindows.Host.Views
             public required IReadOnlyList<CommandOption> CommandOptions { get; init; }
             public required IReadOnlyList<CommandOption> CompensationOptions { get; init; }
             public required IReadOnlyList<EnumOption<WorkflowStepEffect>> EffectOptions { get; init; }
-            public required InvocationEditorItem PrimaryInput { get; init; }
-            public required InvocationEditorItem CompensationInput { get; init; }
-        }
-
-        private sealed class InvocationEditorItem
-        {
-            public required string StepId { get; init; }
-            public WorkflowCommandRole Role { get; init; }
-            public required string RoleLabel { get; init; }
-            public AcceptedInputType InputType { get; set; }
-            public required IReadOnlyList<EnumOption<AcceptedInputType>> InputOptions { get; init; }
-            public required string Text { get; set; }
-            public required IReadOnlyList<string> Paths { get; set; }
-            public byte[]? ImagePng { get; set; }
-            public required IReadOnlyDictionary<string, string> Arguments { get; init; }
-            public bool ShowText => InputType is not (AcceptedInputType.None or AcceptedInputType.Image);
-            public bool ShowPaths => InputType is AcceptedInputType.File
-                or AcceptedInputType.Files
-                or AcceptedInputType.Folder
-                or AcceptedInputType.ExplorerSelection;
-            public bool ShowImage => InputType == AcceptedInputType.Image;
-            public bool HasPaths => Paths.Count > 0;
-            public bool HasImage => ImagePng is { Length: > 0 };
-            public string ImageSummary => HasImage ? $"已载入 {ImagePng!.Length:N0} 字节" : "尚未选择图片";
+            public required WorkflowInvocationEditorModel PrimaryInput { get; init; }
+            public required WorkflowInvocationEditorModel CompensationInput { get; init; }
         }
     }
 }

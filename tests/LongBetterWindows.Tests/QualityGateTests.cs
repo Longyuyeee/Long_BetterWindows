@@ -517,6 +517,8 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml.cs");
         var xaml = Read(
             "src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml");
+        var invocationEditor = Read(
+            "src", "LongBetterWindows.Host", "Views", "WorkflowInvocationEditorControl.xaml.cs");
         var session = Read(
             "src", "LongBetterWindows.Host", "Interaction", "CommandWorkflowEditorSession.cs");
 
@@ -535,12 +537,15 @@ public class QualityGateTests
         Assert.Contains("_reports.ListAsync", view);
         Assert.Contains("ApplyResponsiveLayout", view);
         Assert.Contains("CompactWorkflowCombo", xaml);
-        Assert.Contains("WorkflowInvocationEditorTemplate", xaml);
+        Assert.Contains("WorkflowInvocationEditorControl", xaml);
         Assert.Contains("AutomationProperties.Name=\"导入外部工作流\"", xaml);
         Assert.Contains("AutomationProperties.Name=\"采用导入工作流为草稿\"", xaml);
         Assert.Contains("AutomationProperties.Name=\"确认并执行组合动作\"", xaml);
         Assert.Contains("ReportTimeline", xaml);
         Assert.DoesNotContain("File.WriteAllText", view);
+        Assert.DoesNotContain("OpenFolderDialog", view);
+        Assert.Contains("OpenFolderDialog", invocationEditor);
+        Assert.Contains("MaximumImageBytes", invocationEditor);
         Assert.Contains("AutomationProperties.Name=\"保存组合动作\"", xaml);
         Assert.Contains("CommandWorkflowPlanner", session);
         Assert.Contains("ExpectedExistingDefinitionSha256", Read(
