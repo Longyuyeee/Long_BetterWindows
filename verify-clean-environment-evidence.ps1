@@ -3,6 +3,8 @@
 param(
     [Parameter(Mandatory=$true)] [string] $EvidenceDirectory,
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
+    [Parameter(Mandatory=$true)]
+    [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
     [string] $OutputPath
 )
 
@@ -19,14 +21,19 @@ if ($manifest.classification -ne 'clean_windows_release_evidence') { throw 'Unex
 if ([string]$manifest.release.source_commit -ne $expectedCommit) {
     throw 'Clean-environment evidence source commit does not match ExpectedSourceCommit.'
 }
+if ([string]$manifest.release.distribution_channel -ne $ExpectedDistributionChannel) {
+    throw 'Clean-environment evidence distribution channel does not match ExpectedDistributionChannel.'
+}
 if (-not [bool]$manifest.environment.operator_asserted_clean_user -or -not [bool]$manifest.environment.interactive) {
     throw 'Evidence was not captured in an asserted clean interactive Windows user environment.'
 }
 if (-not [bool]$manifest.automated_checks.passed -or $manifest.human_review.status -ne 'approved') {
     throw 'Clean-environment evidence is not fully approved.'
 }
-if (-not [bool]$manifest.release.signed -or -not [bool]$manifest.release.release_eligible) {
-    throw 'Formal clean-environment release evidence requires a signed, release-eligible package.'
+if (-not [bool]$manifest.release.release_eligible -or
+    ($ExpectedDistributionChannel -eq 'signed' -and -not [bool]$manifest.release.signed) -or
+    ($ExpectedDistributionChannel -eq 'unsigned' -and [bool]$manifest.release.signed)) {
+    throw 'Clean-environment release state does not match the expected eligible distribution channel.'
 }
 if ([string]::IsNullOrWhiteSpace([string]$manifest.human_review.reviewer)) { throw 'Human reviewer is missing.' }
 foreach ($property in $manifest.human_review.checklist.psobject.Properties) {
@@ -49,8 +56,11 @@ $capturedRelease = Get-Content -LiteralPath (Join-Path $root ([string]$manifest.
 if ([string]$capturedRelease.commit -ne $expectedCommit) {
     throw 'Captured release manifest source commit does not match ExpectedSourceCommit.'
 }
-if (-not [bool]$capturedRelease.signed -or -not [bool]$capturedRelease.release_eligible) {
-    throw 'Captured release manifest is not signed and release-eligible.'
+if ([string]$capturedRelease.distribution_channel -ne $ExpectedDistributionChannel -or
+    -not [bool]$capturedRelease.release_eligible -or
+    ($ExpectedDistributionChannel -eq 'signed' -and -not [bool]$capturedRelease.signed) -or
+    ($ExpectedDistributionChannel -eq 'unsigned' -and [bool]$capturedRelease.signed)) {
+    throw 'Captured release manifest does not match the expected eligible distribution channel.'
 }
 $capturedPackage = @($capturedRelease.packages | Where-Object { $_.file -eq [string]$manifest.release.package_file })
 if ($capturedPackage.Count -ne 1 -or [string]$capturedPackage[0].sha256 -ne [string]$manifest.release.package_sha256) {
@@ -64,6 +74,8 @@ $summary = [ordered]@{
     passed = $true
     version = [string]$manifest.release.version
     source_commit = $expectedCommit
+    distribution_channel = $ExpectedDistributionChannel
+    signed = [bool]$manifest.release.signed
     package_sha256 = [string]$manifest.release.package_sha256
     environment_label = [string]$manifest.environment.label
     reviewer = [string]$manifest.human_review.reviewer

@@ -35,6 +35,8 @@ Long窗口 是一个运行在 Windows 原生系统之上的轻量级效率工具
 
 推荐普通用户下载 `self-contained` 自包含便携包。安装、升级、卸载和校验方法见 [`docs/安装升级与卸载.md`](docs/安装升级与卸载.md)。
 
+Windows 包采用公开的未签名分发通道；首次下载或启动时可能出现“未知发布者”或 SmartScreen 提示。请只从本仓库 Release 下载，并在运行前按发布页提供的 `SHA256SUMS.txt` 校验文件。Windows Authenticode 签名保留为未来可选增强，不作为当前发布阻塞项。
+
 ### 开发环境要求
 
 - .NET 8 SDK 或更高版本

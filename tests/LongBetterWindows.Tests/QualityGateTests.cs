@@ -263,6 +263,8 @@ public class QualityGateTests
 
         Assert.Contains("ConfirmCleanUserEnvironment", capture);
         Assert.Contains("ExpectedSourceCommit", capture);
+        Assert.Contains("ExpectedDistributionChannel", capture);
+        Assert.Contains("Release signature state does not match its distribution channel", capture);
         Assert.Contains("Release manifest source commit does not match ExpectedSourceCommit", capture);
         Assert.Contains("source_commit = $expectedCommit", capture);
         Assert.Contains("Release ZIP hash does not match", capture);
@@ -271,6 +273,7 @@ public class QualityGateTests
         Assert.Contains("clean_windows_release_evidence", capture);
         Assert.Contains("ConfirmTrayIcon", approve);
         Assert.Contains("ExpectedSourceCommit", approve);
+        Assert.Contains("ExpectedDistributionChannel", approve);
         Assert.Contains("Clean-environment evidence source commit does not match ExpectedSourceCommit", approve);
         Assert.Contains("ConfirmGlobalHotkey", approve);
         Assert.Contains("ConfirmWebViewRuntime", approve);
@@ -280,7 +283,8 @@ public class QualityGateTests
         Assert.Contains("Reviewer must differ", approve);
         Assert.Contains("evidence changed after capture", approve, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("human_review.status -ne 'approved'", verify);
-        Assert.Contains("signed, release-eligible package", verify);
+        Assert.Contains("ExpectedDistributionChannel", verify);
+        Assert.Contains("expected eligible distribution channel", verify);
         Assert.Contains("Manual lifecycle checklist is incomplete", verify);
         Assert.Contains("approved_clean_windows_release_gate", verify);
         Assert.Contains("ExpectedSourceCommit", verify);
@@ -668,6 +672,9 @@ public class QualityGateTests
         Assert.Contains("release-manifest.json", release);
         Assert.Contains("source_dirty", release);
         Assert.Contains("release_eligible", release);
+        Assert.Contains("distribution_channel = 'unsigned'", release);
+        Assert.Contains("publisher_identity = 'unverified'", release);
+        Assert.Contains("release_eligible = -not $sourceDirty", release);
         Assert.Contains("Get-FileHash", release);
         Assert.Contains("[IO.Compression.ZipArchiveMode]::Create", release);
         Assert.Contains("Add-Type -AssemblyName System.IO.Compression", release);

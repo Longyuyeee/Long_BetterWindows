@@ -1,7 +1,9 @@
 # Long窗口 Windows 代码签名发布
 
 > 适用版本：v1.9.0 及以后
-> 目标：只允许由干净源码提交构建、使用正式代码签名证书并带 RFC 3161 时间戳的候选进入外部发布验收。
+> 目标：提供可选的 Authenticode 增强通道；当前公开 `unsigned` 通道不依赖本流程。
+
+v1.9 当前选择未签名分发。`release.ps1` 会生成 `distribution_channel=unsigned`、`publisher_identity=unverified`、`signed=false` 的候选，并在源码干净且全部工程门禁通过时写入 `release_eligible=true`。本页仅在未来决定升级为 `signed` 通道时使用。
 
 ## 1. 安全边界
 

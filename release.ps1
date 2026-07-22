@@ -248,8 +248,11 @@ try {
         commit = (git rev-parse HEAD 2>$null)
         source_dirty = $sourceDirty
         packages = $packages
+        distribution_channel = 'unsigned'
+        publisher_identity = 'unverified'
+        security_notice = 'Windows publisher identity is not verified; validate the SHA-256 checksums before running.'
         signed = $false
-        release_eligible = $false
+        release_eligible = -not $sourceDirty
     }
     $manifest | ConvertTo-Json -Depth 5 | Set-Content `
         -LiteralPath (Join-Path $releaseRoot 'release-manifest.json') -Encoding UTF8

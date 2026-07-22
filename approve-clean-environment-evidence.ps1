@@ -3,6 +3,8 @@
 param(
     [Parameter(Mandatory=$true)] [string] $EvidenceDirectory,
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
+    [Parameter(Mandatory=$true)]
+    [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
     [Parameter(Mandatory=$true)] [string] $Reviewer,
     [Parameter(Mandatory=$true)] [string] $ReviewNotes,
     [Parameter(Mandatory=$true)] [switch] $ConfirmFirstStart,
@@ -37,6 +39,9 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | Convert
 if ($manifest.classification -ne 'clean_windows_release_evidence') { throw 'Unexpected evidence classification.' }
 if ([string]$manifest.release.source_commit -ne $expectedCommit) {
     throw 'Clean-environment evidence source commit does not match ExpectedSourceCommit.'
+}
+if ([string]$manifest.release.distribution_channel -ne $ExpectedDistributionChannel) {
+    throw 'Clean-environment evidence distribution channel does not match ExpectedDistributionChannel.'
 }
 if (-not [bool]$manifest.environment.operator_asserted_clean_user) { throw 'The operator did not assert a clean Windows user.' }
 if (-not [bool]$manifest.automated_checks.passed) { throw 'Automated release checks did not pass.' }

@@ -127,6 +127,9 @@ try {
         $signedPackages += $package
     }
     $manifest.packages = $signedPackages
+    $manifest.distribution_channel = 'signed'
+    $manifest.publisher_identity = 'authenticode'
+    $manifest.security_notice = $null
     $manifest.signed = $true
     $manifest.release_eligible = $true
     $manifest | Add-Member -NotePropertyName signing -NotePropertyValue ([ordered]@{

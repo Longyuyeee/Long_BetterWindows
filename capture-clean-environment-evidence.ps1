@@ -10,6 +10,8 @@ param(
     [Parameter(Mandatory=$true)] [string] $ReleaseZip,
     [Parameter(Mandatory=$true)] [string] $ReleaseManifest,
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
+    [Parameter(Mandatory=$true)]
+    [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [Parameter(Mandatory=$true)] [string] $EnvironmentLabel,
     [switch] $ConfirmCleanUserEnvironment,
@@ -46,6 +48,16 @@ if (Get-Process -Name 'LongBetterWindows.Host' -ErrorAction SilentlyContinue) {
 $release = Get-Content -LiteralPath $releaseManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ([string]$release.commit -ne $expectedCommit) {
     throw 'Release manifest source commit does not match ExpectedSourceCommit.'
+}
+if ([string]$release.distribution_channel -ne $ExpectedDistributionChannel) {
+    throw 'Release manifest distribution channel does not match ExpectedDistributionChannel.'
+}
+if (-not [bool]$release.release_eligible) {
+    throw 'Release manifest is not eligible for its declared distribution channel.'
+}
+if (($ExpectedDistributionChannel -eq 'signed' -and -not [bool]$release.signed) -or
+    ($ExpectedDistributionChannel -eq 'unsigned' -and [bool]$release.signed)) {
+    throw 'Release signature state does not match its distribution channel.'
 }
 $zipName = [IO.Path]::GetFileName($zipPath)
 $package = @($release.packages | Where-Object { $_.file -eq $zipName })
@@ -113,6 +125,7 @@ $manifest = [ordered]@{
     release = [ordered]@{
         version = [string]$release.version
         source_commit = $expectedCommit
+        distribution_channel = $ExpectedDistributionChannel
         package_file = $zipName
         package_kind = [string]$package[0].kind
         package_sha256 = $actualZipHash
