@@ -32,8 +32,9 @@ public class SuperPanelSearchSessionTests
     [Fact]
     public async Task NewCapture_SupersedesSlowerPreviousCapture()
     {
+        var provider = new DelayedContextProvider();
         var capture = new ContextCaptureService(
-            [new DelayedContextProvider()],
+            [provider],
             TimeSpan.FromSeconds(2));
         using var session = CreateSession(capture, new RecordingSearchProvider());
         var capturedIds = new List<string>();
@@ -45,7 +46,7 @@ public class SuperPanelSearchSessionTests
 
         var first = session.StartCaptureAsync(
             new ContextCaptureRequest((IntPtr)1, DateTimeOffset.UtcNow));
-        await Task.Delay(20);
+        await provider.FirstCaptureStarted.Task;
         var second = session.StartCaptureAsync(
             new ContextCaptureRequest((IntPtr)2, DateTimeOffset.UtcNow));
         await Task.WhenAll(first, second);
@@ -129,13 +130,18 @@ public class SuperPanelSearchSessionTests
     {
         public string Id => "delayed";
         public int Priority => 1;
+        public TaskCompletionSource FirstCaptureStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async Task<IReadOnlyList<ContextItem>> CaptureAsync(
             ContextCaptureRequest request,
             CancellationToken cancellationToken = default)
         {
             if (request.ForegroundWindowHandle == (IntPtr)1)
-                await Task.Delay(250, cancellationToken);
+            {
+                FirstCaptureStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
             return Snapshot($"context.{request.ForegroundWindowHandle}").Items;
         }
     }
