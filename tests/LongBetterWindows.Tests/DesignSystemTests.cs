@@ -377,6 +377,26 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public async Task UuidCommand_DeclaresAndReturnsParameterizedTextResult()
+    {
+        var root = FindRepositoryRoot();
+        var pluginDirectory = Path.Combine(root, "src", "UuidGenerator");
+        var result = await ManifestReader.ReadAsync(pluginDirectory);
+        var page = File.ReadAllText(Path.Combine(pluginDirectory, "index.html"));
+
+        Assert.True(result.IsSuccess, result.Error);
+        var command = Assert.Single(result.Manifest!.Commands);
+        var output = Assert.Single(command.Outputs);
+        Assert.Equal("result", output.Key);
+        Assert.Equal(PluginCommandOutputType.Text, output.Type);
+        Assert.Contains("outputs: { result: { type: 'text', value: output.value } }", page);
+        Assert.Contains("Number.parseInt(args.amount, 10)", page);
+        Assert.Contains("args.uppercase === 'true'", page);
+        Assert.Contains("args.compact === 'true'", page);
+        Assert.Contains("applyCommandOptions(command); return generate();", page);
+    }
+
+    [Fact]
     public void WebRuntime_UsesPluginPermissionContextAndLowercaseResponseContract()
     {
         var root = FindRepositoryRoot();

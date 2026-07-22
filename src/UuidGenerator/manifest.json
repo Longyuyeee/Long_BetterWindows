@@ -13,6 +13,13 @@
       "description": "使用安全随机源批量生成 UUID v4",
       "aliases": ["uuid", "guid", "唯一标识", "weiyibiaoshi"],
       "accepted_inputs": ["none"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "生成的 UUID 列表，每行一个"
+        }
+      ],
       "view_mode": "form",
       "priority": 12
     }
