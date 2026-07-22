@@ -1,0 +1,103 @@
+{
+  "schema_version": 3,
+  "source": {
+    "kind": "imported",
+    "source_id": "long.examples.workflow.json-url-roundtrip"
+  },
+  "workflow": {
+    "id": "workflow.example.json-url-roundtrip",
+    "name": "JSON 与 URL 四步往返",
+    "failure_mode": "stop",
+    "steps": [
+      {
+        "id": "minify-json",
+        "effect": "read_only",
+        "command": {
+          "command_key": "com.long.json-formatter:json.minify",
+          "invocation": {
+            "command_id": "json.minify",
+            "input_type": "text",
+            "text": "{\n  \"product\": \"Long BetterWindows\",\n  \"workflow\": true\n}",
+            "paths": [],
+            "image_png": null,
+            "arguments": {}
+          },
+          "bindings": []
+        },
+        "compensation": null
+      },
+      {
+        "id": "encode-url",
+        "effect": "read_only",
+        "command": {
+          "command_key": "com.long.url-toolkit:url.encode",
+          "invocation": {
+            "command_id": "url.encode",
+            "input_type": "text",
+            "text": null,
+            "paths": [],
+            "image_png": null,
+            "arguments": {}
+          },
+          "bindings": [
+            {
+              "source_step_id": "minify-json",
+              "output_key": "result",
+              "target": "text",
+              "argument_key": null
+            }
+          ]
+        },
+        "compensation": null
+      },
+      {
+        "id": "decode-url",
+        "effect": "read_only",
+        "command": {
+          "command_key": "com.long.url-toolkit:url.decode",
+          "invocation": {
+            "command_id": "url.decode",
+            "input_type": "text",
+            "text": null,
+            "paths": [],
+            "image_png": null,
+            "arguments": {}
+          },
+          "bindings": [
+            {
+              "source_step_id": "encode-url",
+              "output_key": "result",
+              "target": "text",
+              "argument_key": null
+            }
+          ]
+        },
+        "compensation": null
+      },
+      {
+        "id": "format-json",
+        "effect": "read_only",
+        "command": {
+          "command_key": "com.long.json-formatter:json.format",
+          "invocation": {
+            "command_id": "json.format",
+            "input_type": "text",
+            "text": null,
+            "paths": [],
+            "image_png": null,
+            "arguments": {}
+          },
+          "bindings": [
+            {
+              "source_step_id": "decode-url",
+              "output_key": "result",
+              "target": "text",
+              "argument_key": null
+            }
+          ]
+        },
+        "compensation": null
+      }
+    ]
+  }
+}

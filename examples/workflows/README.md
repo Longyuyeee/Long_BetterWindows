@@ -10,3 +10,14 @@
 2. `base64.decode` 将前一步 `result` 绑定到自身文本输入。
 
 固定文本属于持久化输入，首次保存时 Tool Center 会要求确认。执行报告不会保存运行时输出值。
+
+## JSON 与 URL 四步往返
+
+`json-url-roundtrip.workflow.json` 演示跨插件 Text 输出链：
+
+1. `json.minify` 压缩固定 JSON。
+2. `url.encode` 绑定并编码压缩结果。
+3. `url.decode` 绑定并还原 URL 编码结果。
+4. `json.format` 绑定并重新格式化 JSON。
+
+每一步只引用已经成功的前序步骤，任一步失败都会停止后续执行。
