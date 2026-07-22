@@ -182,6 +182,160 @@ public class CommandWorkflowExecutorTests
         Assert.Equal(new[] { "workflow:write-one", "workflow:write-two" }, runner.Calls);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ResolvesPriorStepOutputIntoTargetInvocation()
+    {
+        var registry = CreateRegistry();
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.binding",
+            "Binding workflow",
+            WorkflowFailureMode.Stop,
+            [
+                new CommandWorkflowStep(
+                    "source",
+                    WorkflowStepEffect.ReadOnly,
+                    Command("write-one")),
+                new CommandWorkflowStep(
+                    "target",
+                    WorkflowStepEffect.ReadOnly,
+                    new WorkflowCommand(
+                        "workflow:write-two",
+                        new PluginCommandInvocation
+                        {
+                            CommandId = "write-two",
+                            InputType = AcceptedInputType.File,
+                        },
+                        [new WorkflowValueBinding(
+                            "source",
+                            "selected-path",
+                            WorkflowBindingTarget.Path)])),
+            ]);
+        var runner = new CapturingRunner((command, _) => command == "workflow:write-one"
+            ? PluginCommandResult.Success(outputs: new Dictionary<string, PluginCommandOutput>
+            {
+                ["selected-path"] = new(PluginCommandOutputType.Path, "C:\\private.txt"),
+            })
+            : PluginCommandResult.Success());
+
+        var result = await new CommandWorkflowExecutor(registry, runner)
+            .ExecuteAsync(workflow, Authorize(registry, workflow));
+
+        Assert.Equal(WorkflowExecutionStatus.Completed, result.Status);
+        Assert.Equal("C:\\private.txt", Assert.Single(runner.Invocations[1]!.Paths));
+        Assert.DoesNotContain(result.Events, item => item.Message?.Contains("private.txt") == true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InvalidOutputsFailStepWithoutLeakingValues()
+    {
+        var registry = CreateRegistry();
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.invalid-output",
+            "Invalid output",
+            WorkflowFailureMode.Stop,
+            [new CommandWorkflowStep(
+                "source",
+                WorkflowStepEffect.ReadOnly,
+                Command("write-one"))]);
+        var privateValue = new string('p', CommandWorkflowBindingResolver.MaximumOutputValueLength + 1);
+        var runner = new CapturingRunner((_, _) => PluginCommandResult.Success(
+            outputs: new Dictionary<string, PluginCommandOutput>
+            {
+                ["secret"] = new(PluginCommandOutputType.Text, privateValue),
+            }));
+
+        var result = await new CommandWorkflowExecutor(registry, runner)
+            .ExecuteAsync(workflow, Authorize(registry, workflow));
+
+        Assert.Equal(WorkflowExecutionStatus.Failed, result.Status);
+        Assert.DoesNotContain(result.Events, item => item.Message?.Contains(privateValue) == true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CompensationCanBindItsOwnPrimaryOutput()
+    {
+        var registry = CreateRegistry();
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.compensation-binding",
+            "Compensation binding",
+            WorkflowFailureMode.Compensate,
+            [
+                new CommandWorkflowStep(
+                    "write",
+                    WorkflowStepEffect.Mutating,
+                    Command("write-one"),
+                    new WorkflowCommand(
+                        "workflow:undo-one",
+                        new PluginCommandInvocation { CommandId = "undo-one" },
+                        [new WorkflowValueBinding(
+                            "write",
+                            "restore-token",
+                            WorkflowBindingTarget.Argument,
+                            "token")])),
+                new CommandWorkflowStep(
+                    "failure",
+                    WorkflowStepEffect.ReadOnly,
+                    Command("fail")),
+            ]);
+        var runner = new CapturingRunner((command, _) => command switch
+        {
+            "workflow:write-one" => PluginCommandResult.Success(
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["restore-token"] = new(PluginCommandOutputType.Text, "private-token"),
+                }),
+            "workflow:fail" => PluginCommandResult.Failure("expected failure"),
+            _ => PluginCommandResult.Success(),
+        });
+
+        var result = await new CommandWorkflowExecutor(registry, runner)
+            .ExecuteAsync(workflow, Authorize(registry, workflow));
+
+        Assert.Equal(WorkflowExecutionStatus.Compensated, result.Status);
+        var undoIndex = runner.Calls.IndexOf("workflow:undo-one");
+        Assert.Equal("private-token", runner.Invocations[undoIndex]!.Arguments["token"]);
+        Assert.DoesNotContain(result.Events, item => item.Message?.Contains("private-token") == true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_InvalidCompensationOutputsMarkCompensationFailed()
+    {
+        var registry = CreateRegistry();
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.invalid-compensation-output",
+            "Invalid compensation output",
+            WorkflowFailureMode.Compensate,
+            [
+                new CommandWorkflowStep(
+                    "write",
+                    WorkflowStepEffect.Mutating,
+                    Command("write-one"),
+                    Command("undo-one")),
+                new CommandWorkflowStep(
+                    "failure",
+                    WorkflowStepEffect.ReadOnly,
+                    Command("fail")),
+            ]);
+        var runner = new CapturingRunner((command, _) => command switch
+        {
+            "workflow:fail" => PluginCommandResult.Failure("expected failure"),
+            "workflow:undo-one" => PluginCommandResult.Success(
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["oversized"] = new(
+                        PluginCommandOutputType.Text,
+                        new string('x', CommandWorkflowBindingResolver.MaximumOutputValueLength + 1)),
+                }),
+            _ => PluginCommandResult.Success(),
+        });
+
+        var result = await new CommandWorkflowExecutor(registry, runner)
+            .ExecuteAsync(workflow, Authorize(registry, workflow));
+
+        Assert.Equal(WorkflowExecutionStatus.CompensationFailed, result.Status);
+        Assert.Contains(result.Events, item => item.Kind == WorkflowExecutionEventKind.CompensationFailed);
+    }
+
     private static CommandWorkflowAuthorization Authorize(
         PluginRegistry registry,
         CommandWorkflowDefinition workflow)
@@ -271,7 +425,17 @@ public class CommandWorkflowExecutorTests
     }
 
     private static PluginCommand CommandManifest(string id)
-        => new() { Id = id, Title = id };
+        => new()
+        {
+            Id = id,
+            Title = id,
+            AcceptedInputs =
+            [
+                AcceptedInputType.None,
+                AcceptedInputType.File,
+                AcceptedInputType.Files,
+            ],
+        };
 
     private sealed class FakeRunner : IWorkflowCommandRunner
     {
@@ -291,6 +455,29 @@ public class CommandWorkflowExecutorTests
         {
             Calls.Add(commandKey);
             return Task.FromResult(_execute(commandKey, cancellationToken));
+        }
+    }
+
+    private sealed class CapturingRunner : IWorkflowCommandRunner
+    {
+        private readonly Func<string, PluginCommandInvocation?, PluginCommandResult> _execute;
+
+        public CapturingRunner(Func<string, PluginCommandInvocation?, PluginCommandResult> execute)
+        {
+            _execute = execute;
+        }
+
+        public List<string> Calls { get; } = new();
+        public List<PluginCommandInvocation?> Invocations { get; } = new();
+
+        public Task<PluginCommandResult> ExecuteAsync(
+            string commandKey,
+            PluginCommandInvocation? invocation = null,
+            CancellationToken cancellationToken = default)
+        {
+            Calls.Add(commandKey);
+            Invocations.Add(invocation);
+            return Task.FromResult(_execute(commandKey, invocation));
         }
     }
 

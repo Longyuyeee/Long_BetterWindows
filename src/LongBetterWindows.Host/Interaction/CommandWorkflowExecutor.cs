@@ -63,6 +63,10 @@ namespace LongBetterWindows.Host.Interaction
             var approvedAuthorization = authorization!;
 
             var completed = new List<CommandWorkflowStep>();
+            var stepOutputs = new Dictionary<
+                string,
+                IReadOnlyDictionary<string, PluginCommandOutput>>(
+                StringComparer.OrdinalIgnoreCase);
             foreach (var step in workflow.Steps)
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -72,6 +76,7 @@ namespace LongBetterWindows.Host.Interaction
                         workflow,
                         preflight.Fingerprint,
                         completed,
+                        stepOutputs,
                         WorkflowExecutionStatus.Cancelled,
                         "Workflow was cancelled.",
                         events,
@@ -93,6 +98,7 @@ namespace LongBetterWindows.Host.Interaction
                         workflow,
                         preflight.Fingerprint,
                         completed,
+                        stepOutputs,
                         WorkflowExecutionStatus.Failed,
                         message,
                         events,
@@ -101,12 +107,27 @@ namespace LongBetterWindows.Host.Interaction
                 }
 
                 AddEvent(WorkflowExecutionEventKind.StepStarted, step.Id);
+                var binding = CommandWorkflowBindingResolver.Resolve(step.Command!, stepOutputs);
+                if (!binding.IsSuccess)
+                {
+                    AddEvent(WorkflowExecutionEventKind.StepFailed, step.Id, binding.Error);
+                    return await FinishFailureAsync(
+                        workflow,
+                        preflight.Fingerprint,
+                        completed,
+                        stepOutputs,
+                        WorkflowExecutionStatus.Failed,
+                        binding.Error,
+                        events,
+                        AddEvent,
+                        approvedAuthorization);
+                }
                 PluginCommandResult commandResult;
                 try
                 {
                     commandResult = await _runner.ExecuteAsync(
                         step.Command!.CommandKey,
-                        step.Command.Invocation,
+                        binding.Invocation,
                         cancellationToken);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -131,6 +152,7 @@ namespace LongBetterWindows.Host.Interaction
                         workflow,
                         preflight.Fingerprint,
                         completed,
+                        stepOutputs,
                         cancelled ? WorkflowExecutionStatus.Cancelled : WorkflowExecutionStatus.Failed,
                         commandResult.Message,
                         events,
@@ -138,7 +160,26 @@ namespace LongBetterWindows.Host.Interaction
                         approvedAuthorization);
                 }
 
+                if (!CommandWorkflowBindingResolver.TrySnapshotOutputs(
+                    commandResult,
+                    out var outputs,
+                    out var outputError))
+                {
+                    AddEvent(WorkflowExecutionEventKind.StepFailed, step.Id, outputError);
+                    return await FinishFailureAsync(
+                        workflow,
+                        preflight.Fingerprint,
+                        completed,
+                        stepOutputs,
+                        WorkflowExecutionStatus.Failed,
+                        outputError,
+                        events,
+                        AddEvent,
+                        approvedAuthorization);
+                }
+
                 completed.Add(step);
+                stepOutputs[step.Id] = outputs;
                 AddEvent(WorkflowExecutionEventKind.StepSucceeded, step.Id, commandResult.Message);
             }
 
@@ -154,6 +195,7 @@ namespace LongBetterWindows.Host.Interaction
             CommandWorkflowDefinition workflow,
             string fingerprint,
             IReadOnlyList<CommandWorkflowStep> completed,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, PluginCommandOutput>> stepOutputs,
             WorkflowExecutionStatus originalStatus,
             string? originalMessage,
             List<WorkflowExecutionEvent> events,
@@ -183,18 +225,37 @@ namespace LongBetterWindows.Host.Interaction
                 if (step.Compensation is null) continue;
                 compensationAttempted = true;
                 addEvent(WorkflowExecutionEventKind.CompensationStarted, step.Id, null);
+                var binding = CommandWorkflowBindingResolver.Resolve(step.Compensation, stepOutputs);
+                if (!binding.IsSuccess)
+                {
+                    compensationFailed = true;
+                    addEvent(
+                        WorkflowExecutionEventKind.CompensationFailed,
+                        step.Id,
+                        binding.Error);
+                    continue;
+                }
                 PluginCommandResult compensationResult;
                 using var timeout = new CancellationTokenSource(_compensationTimeout);
                 try
                 {
                     compensationResult = await _runner.ExecuteAsync(
                         step.Compensation.CommandKey,
-                        step.Compensation.Invocation,
+                        binding.Invocation,
                         timeout.Token);
                 }
                 catch (Exception ex)
                 {
                     compensationResult = PluginCommandResult.Failure(ex.Message);
+                }
+
+                if (compensationResult.IsSuccess
+                    && !CommandWorkflowBindingResolver.TrySnapshotOutputs(
+                        compensationResult,
+                        out _,
+                        out var outputError))
+                {
+                    compensationResult = PluginCommandResult.Failure(outputError!);
                 }
 
                 if (compensationResult.IsSuccess)

@@ -554,6 +554,10 @@ public class QualityGateTests
         Assert.Contains("AutomationProperties.Name=\"添加命令参数\"", invocationEditorXaml);
         Assert.Contains("AutomationProperties.Name=\"保存组合动作\"", xaml);
         Assert.Contains("CommandWorkflowPlanner", session);
+        Assert.Contains("CommandWorkflowBindingResolver.Resolve", Read(
+            "src", "LongBetterWindows.Host", "Interaction", "CommandWorkflowExecutor.cs"));
+        Assert.Contains("MaximumOutputCount", Read(
+            "src", "LongBetterWindows.Host", "Interaction", "CommandWorkflowBindingResolver.cs"));
         Assert.Contains("ExpectedExistingDefinitionSha256", Read(
             "src", "LongBetterWindows.Host", "Interaction", "CommandWorkflowRepository.cs"));
     }

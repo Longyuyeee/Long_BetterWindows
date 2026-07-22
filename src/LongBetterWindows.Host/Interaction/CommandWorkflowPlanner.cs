@@ -137,13 +137,20 @@ namespace LongBetterWindows.Host.Interaction
             {
                 issues.Add($"Workflow step {role} input type is not accepted: {stepId}");
             }
-            ValidateBindings(stepId, role, command.Bindings, availableSourceSteps, issues);
+            ValidateBindings(
+                stepId,
+                role,
+                command.Bindings,
+                invocation.InputType,
+                availableSourceSteps,
+                issues);
         }
 
         private static void ValidateBindings(
             string stepId,
             string role,
             IReadOnlyList<WorkflowValueBinding>? bindings,
+            AcceptedInputType inputType,
             ISet<string> availableSourceSteps,
             ICollection<string> issues)
         {
@@ -168,6 +175,19 @@ namespace LongBetterWindows.Host.Interaction
                 }
                 if (binding.Target == WorkflowBindingTarget.Text && ++textTargets > 1)
                     issues.Add($"Workflow step {role} has duplicate text bindings: {stepId}");
+                if (binding.Target == WorkflowBindingTarget.Text
+                    && inputType is AcceptedInputType.None or AcceptedInputType.Image)
+                {
+                    issues.Add($"Workflow step {role} text binding is incompatible with its input type: {stepId}");
+                }
+                if (binding.Target == WorkflowBindingTarget.Path
+                    && inputType is not (AcceptedInputType.File
+                        or AcceptedInputType.Files
+                        or AcceptedInputType.Folder
+                        or AcceptedInputType.ExplorerSelection))
+                {
+                    issues.Add($"Workflow step {role} path binding is incompatible with its input type: {stepId}");
+                }
                 if (binding.Target == WorkflowBindingTarget.Argument)
                 {
                     if (string.IsNullOrWhiteSpace(binding.ArgumentKey)
