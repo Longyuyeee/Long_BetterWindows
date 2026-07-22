@@ -13,6 +13,13 @@
       "description": "格式化并校验文本或剪贴板中的 JSON",
       "aliases": ["json", "格式化", "format", "json geshihua"],
       "accepted_inputs": ["text", "clipboard"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "格式化后的 JSON 文本"
+        }
+      ],
       "view_mode": "document",
       "priority": 20
     },
@@ -22,6 +29,13 @@
       "description": "移除 JSON 中不必要的空白字符",
       "aliases": ["压缩json", "minify", "yasuo"],
       "accepted_inputs": ["text", "clipboard"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "压缩后的 JSON 文本"
+        }
+      ],
       "view_mode": "document",
       "priority": 16
     }

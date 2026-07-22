@@ -55,9 +55,21 @@
         const result = JSON.stringify(JSON.parse(input.value), null, spaces);
         output.value = result;
         stat.textContent = result.length.toLocaleString() + ' 字符';
-        setStatus(spaces ? 'JSON 格式化完成' : 'JSON 压缩完成', 'success');
+        const message = spaces ? 'JSON 格式化完成' : 'JSON 压缩完成';
+        if (result.length > 65536) {
+          setStatus('处理结果超过 65,536 个字符，无法作为命令输出', 'danger');
+          return { success: false, message: 'JSON 处理结果超过命令输出上限', outputs: {} };
+        }
+        setStatus(message, 'success');
+        return {
+          success: true,
+          message: message,
+          outputs: { result: { type: 'text', value: result } }
+        };
       } catch (error) {
-        setStatus('JSON 解析失败：' + error.message, 'danger');
+        const message = 'JSON 解析失败：' + error.message;
+        setStatus(message, 'danger');
+        return { success: false, message: message, outputs: {} };
       }
     }
 
@@ -84,7 +96,7 @@
     window.LongUI?.onCommand(function (command) {
       const text = window.LongUI.commandText(command);
       if (text) input.value = text;
-      transform(command.command_id === 'json.minify' ? 0 : 2);
+      return transform(command.command_id === 'json.minify' ? 0 : 2);
     });
   </script>
 </body>

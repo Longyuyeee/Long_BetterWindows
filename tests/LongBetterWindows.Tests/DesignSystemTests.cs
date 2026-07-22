@@ -338,6 +338,27 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public async Task JsonCommands_DeclareAndReturnBoundedTextResult()
+    {
+        var root = FindRepositoryRoot();
+        var pluginDirectory = Path.Combine(root, "src", "JsonFormatterPlugin");
+        var result = await ManifestReader.ReadAsync(pluginDirectory);
+        var page = File.ReadAllText(Path.Combine(pluginDirectory, "index.html"));
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(2, result.Manifest!.Commands.Count);
+        Assert.All(result.Manifest.Commands, command =>
+        {
+            var output = Assert.Single(command.Outputs);
+            Assert.Equal("result", output.Key);
+            Assert.Equal(PluginCommandOutputType.Text, output.Type);
+        });
+        Assert.Contains("outputs: { result: { type: 'text', value: result } }", page);
+        Assert.Contains("result.length > 65536", page);
+        Assert.Contains("return transform(command.command_id === 'json.minify'", page);
+    }
+
+    [Fact]
     public void WebRuntime_UsesPluginPermissionContextAndLowercaseResponseContract()
     {
         var root = FindRepositoryRoot();
