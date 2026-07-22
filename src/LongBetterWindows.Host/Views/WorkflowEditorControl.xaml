@@ -375,10 +375,16 @@
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Detail}" FontSize="10" TextTrimming="CharacterEllipsis"
                                                        Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
-                                            <Button Grid.Column="1" Content="复制" Tag="{Binding}" Margin="8,0,0,3"
-                                                    Padding="8,3" Style="{StaticResource LongButton}"
-                                                    Click="CopyTerminalOutput_Click"
-                                                    automation:AutomationProperties.Name="复制终端输出值" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,3">
+                                                <Button Content="复制" Tag="{Binding}" Padding="8,3"
+                                                        Style="{StaticResource LongButton}"
+                                                        Click="CopyTerminalOutput_Click"
+                                                        automation:AutomationProperties.Name="复制终端输出值" />
+                                                <Button Content="导出" Tag="{Binding}" Margin="6,0,0,0" Padding="8,3"
+                                                        Style="{StaticResource LongButton}"
+                                                        Click="ExportTerminalOutput_Click"
+                                                        automation:AutomationProperties.Name="导出终端输出值" />
+                                            </StackPanel>
                                             <TextBox Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Value}" IsReadOnly="True"
                                                      MaxHeight="120" TextWrapping="Wrap" AcceptsReturn="True"
                                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" />

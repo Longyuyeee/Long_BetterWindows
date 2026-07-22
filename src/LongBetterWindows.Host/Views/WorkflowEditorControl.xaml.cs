@@ -15,6 +15,7 @@ namespace LongBetterWindows.Host.Views
         private readonly CommandWorkflowEditorSession _session;
         private readonly CommandWorkflowExecutionReportRepository _reports;
         private readonly CommandWorkflowRunSession _runSession;
+        private readonly WorkflowTerminalOutputExporter _terminalOutputExporter = new();
         private CommandWorkflowExecutionReview? _executionReview;
         private CommandWorkflowImportReview? _importReview;
         private int _reportListVersion;
@@ -483,6 +484,58 @@ namespace LongBetterWindows.Host.Views
         private void ClearTerminalOutputs_Click(object sender, RoutedEventArgs e)
             => ClearTerminalOutputs();
 
+        private async void ExportTerminalOutput_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: TerminalOutputItem item }) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "导出终端输出",
+                Filter = "文本文件 (*.txt)|*.txt|所有文件 (*.*)|*.*",
+                FileName = $"{item.Source.StepId}-{item.Source.OutputKey}.txt",
+                AddExtension = true,
+                DefaultExt = ".txt",
+                OverwritePrompt = false,
+            };
+            if (dialog.ShowDialog() != true) return;
+
+            var review = _terminalOutputExporter.Prepare(item.Source, dialog.FileName);
+            if (!review.IsValid)
+            {
+                MessageBox.Show(
+                    string.Join(Environment.NewLine, review.Issues),
+                    "无法准备终端输出导出",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            var approved = MessageBox.Show(
+                "即将把终端输出明文写入磁盘。\n\n"
+                    + $"输出：{item.Source.StepId} / {item.Source.OutputKey}\n"
+                    + $"类型：{item.Source.Type}\n"
+                    + $"UTF-8 大小：{review.Utf8ByteCount:N0} 字节\n"
+                    + $"SHA-256：{review.ValueSha256}\n"
+                    + $"目标：{review.DestinationPath}\n\n"
+                    + "现有文件不会被覆盖。是否批准本次导出？",
+                "批准终端输出导出",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
+            if (approved != MessageBoxResult.Yes) return;
+
+            var result = await _terminalOutputExporter.ExportApprovedAsync(
+                item.Source,
+                dialog.FileName,
+                review.Fingerprint);
+            MessageBox.Show(
+                result.IsSuccess
+                    ? $"终端输出已导出到：{result.Path}\nSHA-256：{result.ValueSha256}"
+                    : result.Error ?? "终端输出导出失败。",
+                "导出终端输出",
+                MessageBoxButton.OK,
+                result.IsSuccess ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+
         private void ClearTerminalOutputs()
         {
             TerminalOutputList.ItemsSource = null;
@@ -857,10 +910,13 @@ namespace LongBetterWindows.Host.Views
                     $"{(summary.Role == WorkflowOutputRole.Compensation ? "补偿" : "命令")} · "
                         + $"{summary.Type} · {summary.ValueLength:N0} 字符");
         }
-        private sealed record TerminalOutputItem(string Detail, string Value)
+        private sealed record TerminalOutputItem(WorkflowTerminalOutput Source)
         {
+            public string Detail => $"{Source.StepId} / {Source.OutputKey} / {Source.Type}";
+            public string Value => Source.Value;
+
             public static TerminalOutputItem From(WorkflowTerminalOutput output)
-                => new($"{output.StepId} / {output.OutputKey} / {output.Type}", output.Value);
+                => new(output);
         }
         private sealed record ReportListItem(string ReportId, string Status, string Detail)
         {
