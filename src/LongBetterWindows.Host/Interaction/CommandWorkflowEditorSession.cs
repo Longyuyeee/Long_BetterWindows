@@ -243,6 +243,51 @@ namespace LongBetterWindows.Host.Interaction
             return true;
         }
 
+        public bool UpdateBindings(
+            string stepId,
+            WorkflowCommandRole role,
+            IReadOnlyList<WorkflowValueBinding> bindings)
+        {
+            if (!Enum.IsDefined(role)) throw new ArgumentOutOfRangeException(nameof(role));
+            ArgumentNullException.ThrowIfNull(bindings);
+            if (bindings.Count > 64)
+            {
+                State = State with { Error = "A workflow command cannot contain more than 64 bindings." };
+                return false;
+            }
+
+            var draft = RequireDraft();
+            var index = FindStep(draft, stepId);
+            if (index < 0) return false;
+            var step = draft.Steps[index];
+            var command = role == WorkflowCommandRole.Primary
+                ? step.Command
+                : step.Compensation;
+            if (command is null)
+            {
+                State = State with { Error = $"Workflow step {role.ToString().ToLowerInvariant()} is not configured: {stepId}" };
+                return false;
+            }
+
+            var copied = bindings.Select(binding => binding with
+            {
+                SourceStepId = binding.SourceStepId?.Trim() ?? string.Empty,
+                OutputKey = binding.OutputKey?.Trim() ?? string.Empty,
+                ArgumentKey = binding.Target == WorkflowBindingTarget.Argument
+                    ? binding.ArgumentKey?.Trim()
+                    : null,
+            }).ToArray();
+            if (BindingListsEqual(command.Bindings, copied)) return true;
+
+            var updatedCommand = command with { Bindings = copied };
+            var steps = draft.Steps.ToList();
+            steps[index] = role == WorkflowCommandRole.Primary
+                ? step with { Command = updatedCommand }
+                : step with { Compensation = updatedCommand };
+            SetDraft(draft with { Steps = steps }, State.ExistingDefinitionSha256, isDirty: true);
+            return true;
+        }
+
         public async Task<CommandWorkflowImportReview> PreviewImportAsync(
             string sourcePath,
             CancellationToken cancellationToken = default)
@@ -452,5 +497,14 @@ namespace LongBetterWindows.Host.Interaction
                 && first.Arguments.All(argument =>
                     second.Arguments.TryGetValue(argument.Key, out var value)
                     && string.Equals(argument.Value, value, StringComparison.Ordinal));
+
+        private static bool BindingListsEqual(
+            IReadOnlyList<WorkflowValueBinding>? first,
+            IReadOnlyList<WorkflowValueBinding> second)
+        {
+            first ??= Array.Empty<WorkflowValueBinding>();
+            return first.Count == second.Count
+                && first.Zip(second).All(pair => pair.First == pair.Second);
+        }
     }
 }

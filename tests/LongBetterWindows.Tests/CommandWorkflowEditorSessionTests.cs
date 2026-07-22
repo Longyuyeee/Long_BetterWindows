@@ -272,6 +272,62 @@ public sealed class CommandWorkflowEditorSessionTests : IDisposable
     }
 
     [Fact]
+    public void UpdateBindings_UpdatesSelectedRoleWithDefensiveCopy()
+    {
+        var session = Session();
+        session.StartNew("workflow.binding-edit", "Binding edit");
+        session.AddStep("editor:first");
+        session.AddStep("editor:second", WorkflowStepEffect.Mutating);
+        session.UpdateStep(
+            "step-2",
+            WorkflowStepEffect.Mutating,
+            "editor:second",
+            "editor:undo");
+        var bindings = new List<WorkflowValueBinding>
+        {
+            new(" step-1 ", " result ", WorkflowBindingTarget.Argument, " mode "),
+        };
+
+        var updated = session.UpdateBindings(
+            "step-2",
+            WorkflowCommandRole.Compensation,
+            bindings);
+        bindings[0] = new WorkflowValueBinding(
+            "changed",
+            "changed",
+            WorkflowBindingTarget.Text);
+
+        Assert.True(updated);
+        var binding = Assert.Single(session.State.Draft!.Steps[1].Compensation!.Bindings!);
+        Assert.Equal("step-1", binding.SourceStepId);
+        Assert.Equal("result", binding.OutputKey);
+        Assert.Equal("mode", binding.ArgumentKey);
+        Assert.Null(session.State.Draft.Steps[1].Command!.Bindings);
+    }
+
+    [Fact]
+    public void UpdateBindings_InvalidDeclarationMakesDraftUnsavable()
+    {
+        var session = Session();
+        session.StartNew("workflow.invalid-binding", "Invalid binding");
+        session.AddStep("editor:first");
+        session.AddStep("editor:second");
+
+        var updated = session.UpdateBindings(
+            "step-2",
+            WorkflowCommandRole.Primary,
+            [new WorkflowValueBinding(
+                "step-1",
+                "missing",
+                WorkflowBindingTarget.Argument,
+                "value")]);
+
+        Assert.True(updated);
+        Assert.False(session.State.CanSave);
+        Assert.Contains(session.State.Preflight!.Issues, issue => issue.Contains("not declared"));
+    }
+
+    [Fact]
     public async Task PreviewImport_DoesNotReplaceCurrentDraftUntilAdopted()
     {
         Directory.CreateDirectory(_root);
@@ -401,6 +457,15 @@ public sealed class CommandWorkflowEditorSessionTests : IDisposable
             Id = id,
             Title = id,
             AcceptedInputs = [AcceptedInputType.None, AcceptedInputType.Text],
+            Outputs =
+            [
+                new PluginCommandOutputDeclaration
+                {
+                    Key = "result",
+                    Type = PluginCommandOutputType.Text,
+                    Description = "Test result",
+                },
+            ],
         };
 
     public void Dispose()
