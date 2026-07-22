@@ -53,10 +53,10 @@ namespace LongBetterWindows.Host
 
             Log.Information("Long窗口·全能助手 正在启动...");
 
-            ServicesInitializer.Initialize();
+            _startupOptions = AppStartupOptions.Parse(e.Args);
+            ServicesInitializer.Initialize(_startupOptions.QualityWorkflowsDirectory);
             Log.Information("所有服务已初始化。");
 
-            _startupOptions = AppStartupOptions.Parse(e.Args);
             _qualityRuntime = new QualityRuntimeService(this);
             _forceHighContrast = _startupOptions.ForceHighContrast;
             _forceReduceMotion = _startupOptions.ForceReduceMotion;
@@ -134,6 +134,21 @@ namespace LongBetterWindows.Host
                     return;
                 }
 
+                if (MainWindow is Window qualityWindow
+                    && (_startupOptions.QualityCaptureWidth > 0
+                        || _startupOptions.QualityCaptureHeight > 0))
+                {
+                    qualityWindow.WindowState = WindowState.Normal;
+                    if (_startupOptions.QualityCaptureWidth > 0)
+                        qualityWindow.Width = _startupOptions.QualityCaptureWidth;
+                    if (_startupOptions.QualityCaptureHeight > 0)
+                        qualityWindow.Height = _startupOptions.QualityCaptureHeight;
+                    qualityWindow.UpdateLayout();
+                    await Dispatcher.InvokeAsync(
+                        () => { },
+                        DispatcherPriority.Render);
+                }
+
                 if (_startupOptions.OpenPaletteForQuality)
                     CommandPaletteWindow.ShowPalette();
                 if (_startupOptions.OpenSuperPanelForQuality)
@@ -141,7 +156,8 @@ namespace LongBetterWindows.Host
                     if (_startupOptions.UseLiveContextForQuality)
                         SuperPanelWindow.ShowPanel();
                     else
-                        SuperPanelWindow.ShowPanelForQuality();
+                        SuperPanelWindow.ShowPanelForQuality(
+                            _startupOptions.UseEmptyContextForQuality);
                 }
 
                 if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath))

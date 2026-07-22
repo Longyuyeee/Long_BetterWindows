@@ -10,6 +10,7 @@ namespace LongBetterWindows.Host.Interaction
     public enum SearchActionKind
     {
         ExecuteCommand,
+        OpenWorkflowReview,
         ContinueSearch,
         OpenPath,
         OpenContainingFolder,

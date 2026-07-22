@@ -92,6 +92,60 @@ public class SuperPanelActionCoordinatorTests
         Assert.Contains(selected.Id, preferences.GetRecentResultIds());
     }
 
+    [Fact]
+    public async Task WorkflowReview_HidesBeforeLauncherAndRecordsRecentUse()
+    {
+        var preferences = new SearchPreferenceService(new MemoryStorage());
+        var launcherCalled = false;
+        var hiddenBeforeLaunch = false;
+        var hidden = false;
+        var coordinator = new SuperPanelActionCoordinator(
+            new PluginRegistry(),
+            preferences,
+            (workflowId, _) =>
+            {
+                launcherCalled = workflowId == "workflow.safe";
+                hiddenBeforeLaunch = hidden;
+                return Task.FromResult(PluginCommandResult.Success());
+            });
+        var selected = Result(new SearchResultAction(
+            SearchActionKind.OpenWorkflowReview,
+            "workflow.safe"));
+
+        var outcome = await coordinator.ExecuteAsync(
+            selected,
+            selected.PrimaryAction,
+            ContextSnapshot.Empty,
+            () =>
+            {
+                hidden = true;
+                return Task.CompletedTask;
+            });
+
+        Assert.True(outcome.IsSuccess, outcome.Message);
+        Assert.True(launcherCalled);
+        Assert.True(hiddenBeforeLaunch);
+        Assert.Contains(selected.Id, preferences.GetRecentResultIds());
+    }
+
+    [Fact]
+    public async Task WorkflowReview_WithoutLauncherFailsClosed()
+    {
+        var coordinator = CreateCoordinator(new PluginRegistry(), out _);
+        var selected = Result(new SearchResultAction(
+            SearchActionKind.OpenWorkflowReview,
+            "workflow.safe"));
+
+        var outcome = await coordinator.ExecuteAsync(
+            selected,
+            selected.PrimaryAction,
+            ContextSnapshot.Empty);
+
+        Assert.False(outcome.IsSuccess);
+        Assert.True(outcome.KeepPanelOpen);
+        Assert.Contains("不可用", outcome.Message);
+    }
+
     private static SuperPanelActionCoordinator CreateCoordinator(
         PluginRegistry registry,
         out SearchPreferenceService preferences)

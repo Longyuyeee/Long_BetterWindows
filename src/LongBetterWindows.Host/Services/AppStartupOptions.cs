@@ -18,6 +18,8 @@ namespace LongBetterWindows.Host.Services
         public string? MarketplaceCatalogPath { get; private init; }
         public string? MarketplaceTrustStorePath { get; private init; }
         public bool UseLiveContextForQuality { get; private init; }
+        public bool UseEmptyContextForQuality { get; private init; }
+        public string? QualityWorkflowsDirectory { get; private init; }
         public bool ForceHighContrast { get; private init; }
         public bool ForceReduceMotion { get; private init; }
         public int QualityIdleMilliseconds { get; private init; }
@@ -53,6 +55,8 @@ namespace LongBetterWindows.Host.Services
                 MarketplaceCatalogPath = ReadArgument(arguments, "--quality-market-catalog"),
                 MarketplaceTrustStorePath = ReadArgument(arguments, "--quality-market-trust-store"),
                 UseLiveContextForQuality = HasSwitch(arguments, "--quality-live-context"),
+                UseEmptyContextForQuality = HasSwitch(arguments, "--quality-empty-context"),
+                QualityWorkflowsDirectory = ReadArgument(arguments, "--quality-workflows-dir"),
                 ForceHighContrast = HasSwitch(arguments, "--quality-high-contrast"),
                 ForceReduceMotion = HasSwitch(arguments, "--quality-reduce-motion"),
                 QualityIdleMilliseconds = ReadIntegerArgument(arguments, "--quality-idle-ms", 0, 60_000),

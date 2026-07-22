@@ -18,10 +18,11 @@ namespace LongBetterWindows.Host.Interaction
 
         public SuperPanelActionCoordinator(
             PluginRegistry plugins,
-            SearchPreferenceService preferences)
+            SearchPreferenceService preferences,
+            Func<string, CancellationToken, Task<PluginCommandResult>>? workflowReviewLauncher = null)
         {
             _plugins = plugins;
-            _executor = new SearchResultActionExecutor(plugins);
+            _executor = new SearchResultActionExecutor(plugins, workflowReviewLauncher);
             _preferences = preferences;
         }
 
@@ -53,9 +54,12 @@ namespace LongBetterWindows.Host.Interaction
                         Message: "操作已失效");
                 }
 
-                if (beforeCommandExecution is not null)
-                    await beforeCommandExecution();
             }
+
+            if (action.Kind is SearchActionKind.ExecuteCommand
+                or SearchActionKind.OpenWorkflowReview
+                && beforeCommandExecution is not null)
+                await beforeCommandExecution();
 
             PluginCommandResult result = await _executor.ExecuteAsync(
                 action, context, cancellationToken);

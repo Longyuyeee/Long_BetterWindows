@@ -3,7 +3,9 @@ param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [ValidateRange(5,60)] [int] $TimeoutSeconds = 25,
     [string] $ReleaseDirectory,
-    [switch] $NoBuild
+    [switch] $NoBuild,
+    [switch] $WorkflowOnly,
+    [switch] $WorkflowOutputOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,6 +15,49 @@ if (Test-Path -LiteralPath $outputRoot) {
     throw "Desktop UI smoke output directory already exists: $outputRoot"
 }
 [IO.Directory]::CreateDirectory($outputRoot) | Out-Null
+$workflowRoot = Join-Path $outputRoot 'workflows'
+[IO.Directory]::CreateDirectory($workflowRoot) | Out-Null
+$qualityWorkflow = @'
+{
+  "schema_version": 3,
+  "source": {
+    "kind": "local_managed",
+    "source_id": "local-managed"
+  },
+  "workflow": {
+    "id": "workflow.quality.review",
+    "name": "Quality Workflow Review",
+    "failure_mode": "stop",
+    "steps": [
+      {
+        "id": "generate",
+        "effect": "read_only",
+        "command": {
+          "command_key": "com.long.uuid-generator:uuid.generate",
+          "invocation": {
+            "command_id": "uuid.generate",
+            "input_type": "none",
+            "text": null,
+            "paths": [],
+            "image_png": null,
+            "arguments": {
+              "amount": "100",
+              "uppercase": "false",
+              "compact": "false"
+            }
+          },
+          "bindings": []
+        },
+        "compensation": null
+      }
+    ]
+  }
+}
+'@
+[IO.File]::WriteAllText(
+    (Join-Path $workflowRoot 'workflow.quality.review.workflow.json'),
+    $qualityWorkflow,
+    [Text.UTF8Encoding]::new($false))
 
 $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
 if (-not (Test-Path -LiteralPath $dotnet)) {
@@ -51,6 +96,11 @@ public static class LongDesktopInput {
     [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
     [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr window);
     [DllImport("user32.dll")] static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+    [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
     const uint KeyUp = 0x0002;
     delegate bool EnumWindowsCallback(IntPtr window, IntPtr state);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr state);
@@ -93,6 +143,84 @@ public static class LongDesktopInput {
         System.Threading.Thread.Sleep(80);
         keybd_event(0x1B, 0, 0, UIntPtr.Zero);
         keybd_event(0x1B, 0, KeyUp, UIntPtr.Zero);
+    }
+    public static void Enter(IntPtr window) {
+        Activate(window);
+        System.Threading.Thread.Sleep(80);
+        keybd_event(0x0D, 0, 0, UIntPtr.Zero);
+        keybd_event(0x0D, 0, KeyUp, UIntPtr.Zero);
+    }
+    public static void Tab(IntPtr window) {
+        Activate(window);
+        keybd_event(0x09, 0, 0, UIntPtr.Zero);
+        keybd_event(0x09, 0, KeyUp, UIntPtr.Zero);
+    }
+    public static void ShiftTab(IntPtr window) {
+        Activate(window);
+        keybd_event(0x10, 0, 0, UIntPtr.Zero);
+        keybd_event(0x09, 0, 0, UIntPtr.Zero);
+        keybd_event(0x09, 0, KeyUp, UIntPtr.Zero);
+        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
+    }
+    public static void Space(IntPtr window) {
+        Activate(window);
+        keybd_event(0x20, 0, 0, UIntPtr.Zero);
+        keybd_event(0x20, 0, KeyUp, UIntPtr.Zero);
+    }
+    public static void Click(IntPtr window, int x, int y) {
+        Activate(window);
+        System.Threading.Thread.Sleep(100);
+        IntPtr previousContext = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        try {
+            int left = GetSystemMetrics(76);
+            int top = GetSystemMetrics(77);
+            int width = GetSystemMetrics(78);
+            int height = GetSystemMetrics(79);
+            uint normalizedX = (uint)Math.Max(0, Math.Min(65535,
+                ((long)(x - left) * 65535) / Math.Max(1, width - 1)));
+            uint normalizedY = (uint)Math.Max(0, Math.Min(65535,
+                ((long)(y - top) * 65535) / Math.Max(1, height - 1)));
+            mouse_event(0xC001, normalizedX, normalizedY, 0, UIntPtr.Zero);
+            System.Threading.Thread.Sleep(80);
+            mouse_event(0x0002, normalizedX, normalizedY, 0, UIntPtr.Zero);
+            mouse_event(0x0004, normalizedX, normalizedY, 0, UIntPtr.Zero);
+        }
+        finally {
+            if (previousContext != IntPtr.Zero) SetThreadDpiAwarenessContext(previousContext);
+        }
+    }
+    public static void CtrlShiftT(IntPtr window) {
+        Activate(window);
+        keybd_event(0x11, 0, 0, UIntPtr.Zero);
+        keybd_event(0x10, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(120);
+        keybd_event(0x54, 0, 0, UIntPtr.Zero);
+        keybd_event(0x54, 0, KeyUp, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(120);
+        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
+        keybd_event(0x11, 0, KeyUp, UIntPtr.Zero);
+    }
+    public static void CtrlShiftEnter(IntPtr window) {
+        Activate(window);
+        keybd_event(0x11, 0, 0, UIntPtr.Zero);
+        keybd_event(0x10, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(120);
+        keybd_event(0x0D, 0, 0, UIntPtr.Zero);
+        keybd_event(0x0D, 0, KeyUp, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(120);
+        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
+        keybd_event(0x11, 0, KeyUp, UIntPtr.Zero);
+    }
+    public static void CtrlShiftDelete(IntPtr window) {
+        Activate(window);
+        keybd_event(0x11, 0, 0, UIntPtr.Zero);
+        keybd_event(0x10, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(120);
+        keybd_event(0x2E, 0, 0, UIntPtr.Zero);
+        keybd_event(0x2E, 0, KeyUp, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(120);
+        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
+        keybd_event(0x11, 0, KeyUp, UIntPtr.Zero);
     }
     public static void TypeSearchText(IntPtr window) {
         SetForegroundWindow(window);
@@ -138,27 +266,23 @@ function Find-WindowByAutomationId([int] $processId, [string] $automationId) {
 function Find-DescendantByAutomationId(
     [Windows.Automation.AutomationElement] $root,
     [string] $automationId) {
-    $elements = $root.FindAll(
+    $condition = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::AutomationIdProperty,
+        $automationId)
+    return $root.FindFirst(
         [Windows.Automation.TreeScope]::Descendants,
-        [Windows.Automation.Condition]::TrueCondition)
-    for ($index = 0; $index -lt $elements.Count; $index++) {
-        $element = $elements.Item($index)
-        if ($element.Current.AutomationId -eq $automationId) { return $element }
-    }
-    return $null
+        $condition)
 }
 
 function Find-DescendantByName(
     [Windows.Automation.AutomationElement] $root,
     [string] $name) {
-    $elements = $root.FindAll(
+    $condition = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::NameProperty,
+        $name)
+    return $root.FindFirst(
         [Windows.Automation.TreeScope]::Descendants,
-        [Windows.Automation.Condition]::TrueCondition)
-    for ($index = 0; $index -lt $elements.Count; $index++) {
-        $element = $elements.Item($index)
-        if ($element.Current.Name -eq $name) { return $element }
-    }
-    return $null
+        $condition)
 }
 
 function Find-ProcessElementByAutomationId([int] $processId, [string] $automationId) {
@@ -168,6 +292,44 @@ function Find-ProcessElementByAutomationId([int] $processId, [string] $automatio
         if ($root.Current.AutomationId -eq $automationId) { return $root }
         $match = Find-DescendantByAutomationId $root $automationId
         if ($null -ne $match) { return $match }
+    }
+    return $null
+}
+
+function Find-RawSiblingByAutomationId(
+    [Windows.Automation.AutomationElement] $element,
+    [string] $automationId) {
+    $walker = [Windows.Automation.TreeWalker]::RawViewWalker
+    $candidate = $element
+    for ($index = 0; $index -lt 8; $index++) {
+        $candidate = $walker.GetNextSibling($candidate)
+        if ($null -eq $candidate) { return $null }
+        if ($candidate.Current.AutomationId -eq $automationId) { return $candidate }
+    }
+    return $null
+}
+
+function Find-RawDescendantByAutomationId(
+    [Windows.Automation.AutomationElement] $element,
+    [string] $automationId,
+    [int] $remainingDepth = 8) {
+    if ($remainingDepth -le 0) { return $null }
+    $walker = [Windows.Automation.TreeWalker]::RawViewWalker
+    $child = $walker.GetFirstChild($element)
+    while ($null -ne $child) {
+        if ($child.Current.AutomationId -eq $automationId) { return $child }
+        $match = Find-RawDescendantByAutomationId `
+            $child $automationId ($remainingDepth - 1)
+        if ($null -ne $match) { return $match }
+        $child = $walker.GetNextSibling($child)
+    }
+    return $null
+}
+
+function Get-FocusedElementByAutomationId([string] $automationId) {
+    $focused = [Windows.Automation.AutomationElement]::FocusedElement
+    if ($null -ne $focused -and $focused.Current.AutomationId -eq $automationId) {
+        return $focused
     }
     return $null
 }
@@ -182,6 +344,43 @@ function Invoke-AutomationElement(
         throw $failureMessage
     }
     ([Windows.Automation.InvokePattern]$pattern).Invoke()
+}
+
+function Click-AutomationElement(
+    [Windows.Automation.AutomationElement] $element,
+    [IntPtr] $windowHandle,
+    [string] $failureMessage) {
+    if ($null -eq $element) { throw $failureMessage }
+    $bounds = $element.Current.BoundingRectangle
+    if ($bounds.IsEmpty -or $element.Current.IsOffscreen) { throw $failureMessage }
+    Write-Stage ("Clicking {0} at {1},{2} size {3}x{4}." -f `
+        $element.Current.AutomationId,
+        [int]$bounds.Left,
+        [int]$bounds.Top,
+        [int]$bounds.Width,
+        [int]$bounds.Height)
+    [LongDesktopInput]::Click(
+        $windowHandle,
+        [int]($bounds.Left + ($bounds.Width / 2)),
+        [int]($bounds.Top + ($bounds.Height / 2)))
+}
+
+function Set-AutomationToggleOn(
+    [Windows.Automation.AutomationElement] $element,
+    [string] $failureMessage) {
+    if ($null -eq $element) { throw $failureMessage }
+    $pattern = $null
+    if (-not $element.TryGetCurrentPattern(
+        [Windows.Automation.TogglePattern]::Pattern, [ref]$pattern)) {
+        throw $failureMessage
+    }
+    $toggle = [Windows.Automation.TogglePattern]$pattern
+    if ($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On) {
+        $toggle.Toggle()
+    }
+    Wait-Until {
+        $toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::On
+    } $failureMessage | Out-Null
 }
 
 function Get-AutomationSemantics(
@@ -220,7 +419,8 @@ function Get-LastAccessibilityLogLine {
 function Start-QualityHost([string[]] $viewArguments) {
     $arguments = @(
         '--theme', 'dark',
-        '--plugins-dir', $pluginsDirectory
+        '--plugins-dir', $pluginsDirectory,
+        '--quality-workflows-dir', $workflowRoot
     )
     $arguments += $viewArguments
     $process = Start-Process -FilePath $executable -ArgumentList $arguments `
@@ -242,6 +442,8 @@ $report = [ordered]@{
     release_executable = $executable
     palette = [ordered]@{}
     super_panel = [ordered]@{}
+    workflow_review = [ordered]@{}
+    workflow_output = [ordered]@{}
     plugin_lifecycle = [ordered]@{}
     marketplace = [ordered]@{}
     automation_semantics = [ordered]@{}
@@ -253,11 +455,15 @@ $paletteProcess = $null
 $paletteMenuProcess = $null
 $superPanelProcess = $null
 $superPanelTransitionProcess = $null
+$workflowPaletteProcess = $null
+$workflowPanelProcess = $null
+$workflowOutputProcess = $null
 $pluginProcess = $null
 $marketProcess = $null
 $accessibilityProcess = $null
 
 try {
+    if (-not $WorkflowOnly -and -not $WorkflowOutputOnly) {
     Write-Stage 'Starting Command Palette host.'
     Set-Clipboard -Value 'long-ui-smoke-pending'
     $paletteProcess = Start-QualityHost '--quality-open-palette'
@@ -440,7 +646,218 @@ try {
     $report.super_panel['palette_shown_on_transition'] = $true
     Stop-QualityHost $superPanelTransitionProcess
     $superPanelTransitionProcess = $null
+    }
 
+    if (-not $WorkflowOutputOnly) {
+    Write-Stage 'Starting managed workflow review from Command Palette.'
+    $workflowPaletteProcess = Start-QualityHost '--quality-open-palette'
+    $workflowPalette = Wait-Until {
+        Find-WindowByAutomationId $workflowPaletteProcess.Id 'Long.CommandPalette'
+    } 'Command Palette did not appear for the managed workflow review.'
+    $workflowSearch = Wait-Until {
+        Find-DescendantByAutomationId $workflowPalette 'Long.CommandPalette.Search'
+    } 'Workflow review search was not discoverable.'
+    $workflowResults = Wait-Until {
+        Find-DescendantByAutomationId $workflowPalette 'Long.CommandPalette.Results'
+    } 'Workflow review results were not discoverable.'
+    $workflowValuePattern = [Windows.Automation.ValuePattern]$workflowSearch.GetCurrentPattern(
+        [Windows.Automation.ValuePattern]::Pattern)
+    $workflowValuePattern.SetValue('Quality Workflow Review')
+    $paletteWorkflowResult = Wait-Until {
+        Find-DescendantByName $workflowResults 'Quality Workflow Review'
+    } 'The managed workflow did not appear in Command Palette search.'
+    $workflowSearch.SetFocus()
+    Wait-Until { $workflowSearch.Current.HasKeyboardFocus } `
+        'Workflow review search did not receive keyboard focus.' | Out-Null
+    Write-Stage 'Opening the managed workflow review with Enter.'
+    [LongDesktopInput]::Enter([IntPtr]$workflowPalette.Current.NativeWindowHandle)
+    $paletteWorkflowMain = Wait-Until {
+        Find-WindowByAutomationId $workflowPaletteProcess.Id 'Long.MainWindow'
+    } 'The main window did not appear after opening a workflow from Command Palette.'
+    $paletteWorkflowReview = Wait-Until {
+        $paletteWorkflowMain.Current.ItemStatus -like `
+            'workflow-review:workflow.quality.review;layout:*;width:*'
+    } 'The workflow permission review did not appear from Command Palette.'
+    $paletteWorkflowCancel = Wait-Until {
+        Find-DescendantByAutomationId `
+            $paletteWorkflowMain 'Long.Workflow.ReviewCancel'
+    } 'The top-level workflow review cancel action was not discoverable.'
+    $report.automation_semantics['workflow_review'] = [ordered]@{
+        cancel = Get-AutomationSemantics $paletteWorkflowCancel 'ControlType.Button' `
+            'Workflow review cancel semantics failed.'
+    }
+    Wait-Until {
+        $null -eq (Find-WindowByAutomationId `
+            $workflowPaletteProcess.Id 'Long.CommandPalette')
+    } 'Opening a workflow did not hide Command Palette.' | Out-Null
+    Write-Stage 'Validating the wide workflow review layout.'
+    Start-Sleep -Milliseconds 500
+    Write-Stage "Wide workflow probe: Width=$($paletteWorkflowMain.Current.BoundingRectangle.Width), Status=$($paletteWorkflowMain.Current.ItemStatus)"
+    $wideLayoutAnnounced = Wait-Until {
+        $paletteWorkflowMain.Current.ItemStatus -like `
+            'workflow-review:workflow.quality.review;layout:wide;width:*'
+    } 'The workflow wide layout was not announced by the main window.'
+    Invoke-AutomationElement $paletteWorkflowCancel `
+        'The top-level workflow review cancel action did not support InvokePattern.'
+    Wait-Until {
+        [string]::IsNullOrWhiteSpace($paletteWorkflowMain.Current.ItemStatus)
+    } 'The cancel action did not close the workflow review opened from Command Palette.' | Out-Null
+    Stop-QualityHost $workflowPaletteProcess
+    $workflowPaletteProcess = $null
+
+    Write-Stage 'Starting managed workflow review from Super Panel.'
+    $workflowPanelProcess = Start-QualityHost @(
+        '--quality-open-super-panel',
+        '--quality-empty-context',
+        '--quality-width', '720',
+        '--quality-height', '560')
+    $workflowPanel = Wait-Until {
+        Find-WindowByAutomationId $workflowPanelProcess.Id 'Long.SuperPanel'
+    } 'Super Panel did not appear for the managed workflow review.'
+    $workflowPanelResults = Wait-Until {
+        Find-DescendantByAutomationId $workflowPanel 'Long.SuperPanel.Results'
+    } 'Super Panel workflow results were not discoverable.'
+    $panelWorkflowResult = Wait-Until {
+        Find-DescendantByName $workflowPanelResults 'Quality Workflow Review'
+    } 'The managed workflow did not appear in Super Panel.'
+    $workflowPanelResults.SetFocus()
+    Write-Stage 'Opening the managed workflow review from Super Panel with Enter.'
+    [LongDesktopInput]::Enter([IntPtr]$workflowPanel.Current.NativeWindowHandle)
+    $panelWorkflowMain = Wait-Until {
+        Find-WindowByAutomationId $workflowPanelProcess.Id 'Long.MainWindow'
+    } 'The main window did not appear after opening a workflow from Super Panel.'
+    $panelWorkflowReview = Wait-Until {
+        $panelWorkflowMain.Current.ItemStatus -like `
+            'workflow-review:workflow.quality.review*'
+    } 'The workflow permission review did not appear from Super Panel.'
+    Write-Stage "Narrow workflow initial probe: Width=$($panelWorkflowMain.Current.BoundingRectangle.Width), Status=$($panelWorkflowMain.Current.ItemStatus)"
+    $compactLayoutAnnounced = Wait-Until {
+        $panelWorkflowMain.Current.ItemStatus -like `
+            'workflow-review:workflow.quality.review;layout:compact;width:*'
+    } 'The workflow compact layout was not announced by the narrow main window.'
+    Write-Stage "Compact workflow probe: Width=$($panelWorkflowMain.Current.BoundingRectangle.Width), Status=$($panelWorkflowMain.Current.ItemStatus)"
+    $panelWorkflowCancel = Wait-Until {
+        Find-DescendantByAutomationId `
+            $panelWorkflowMain 'Long.Workflow.ReviewCancel'
+    } 'The Super Panel workflow review cancel action was not discoverable.'
+    Wait-Until {
+        $null -eq (Find-WindowByAutomationId `
+            $workflowPanelProcess.Id 'Long.SuperPanel')
+    } 'Opening a workflow did not hide Super Panel.' | Out-Null
+    Invoke-AutomationElement $panelWorkflowCancel `
+        'The Super Panel workflow review cancel action did not support InvokePattern.'
+    Wait-Until {
+        [string]::IsNullOrWhiteSpace($panelWorkflowMain.Current.ItemStatus)
+    } 'The cancel action did not close the workflow review opened from Super Panel.' | Out-Null
+    $report.workflow_review = [ordered]@{
+        isolated_workflow_root = $workflowRoot
+        palette_result_discovered = $null -ne $paletteWorkflowResult
+        palette_enter_opened_review = $null -ne $paletteWorkflowReview
+        palette_hidden_on_navigation = $true
+        palette_cancel_closed_review = $true
+        wide_layout_announced = [bool]$wideLayoutAnnounced
+        compact_layout_announced = [bool]$compactLayoutAnnounced
+        super_panel_result_discovered = $null -ne $panelWorkflowResult
+        super_panel_enter_opened_review = $null -ne $panelWorkflowReview
+        super_panel_hidden_on_navigation = $true
+        super_panel_cancel_closed_review = $true
+        execution_was_not_confirmed = $true
+    }
+    Stop-QualityHost $workflowPanelProcess
+    $workflowPanelProcess = $null
+    }
+
+    Write-Stage 'Starting approved long terminal-output workflow.'
+    $workflowOutputProcess = Start-QualityHost '--quality-open-palette'
+    $outputPalette = Wait-Until {
+        Find-WindowByAutomationId $workflowOutputProcess.Id 'Long.CommandPalette'
+    } 'Command Palette did not appear for the long-output workflow.'
+    $outputSearch = Wait-Until {
+        Find-DescendantByAutomationId $outputPalette 'Long.CommandPalette.Search'
+    } 'Long-output workflow search was not discoverable.'
+    $outputResults = Wait-Until {
+        Find-DescendantByAutomationId $outputPalette 'Long.CommandPalette.Results'
+    } 'Long-output workflow results were not discoverable.'
+    Write-Stage 'Long-output Command Palette search controls discovered.'
+    $outputSearchPattern = [Windows.Automation.ValuePattern]$outputSearch.GetCurrentPattern(
+        [Windows.Automation.ValuePattern]::Pattern)
+    $outputSearchPattern.SetValue('Quality Workflow Review')
+    Wait-Until {
+        Find-DescendantByName $outputResults 'Quality Workflow Review'
+    } 'The long-output workflow did not appear in Command Palette.' | Out-Null
+    Write-Stage 'Long-output workflow search result discovered.'
+    $outputSearch.SetFocus()
+    [LongDesktopInput]::Enter([IntPtr]$outputPalette.Current.NativeWindowHandle)
+    $outputMain = Wait-Until {
+        Find-WindowByAutomationId $workflowOutputProcess.Id 'Long.MainWindow'
+    } 'The main window did not appear for the long-output workflow.'
+    Wait-Until {
+        $outputMain.Current.ItemStatus -like `
+            'workflow-review:workflow.quality.review;layout:*;width:*'
+    } 'The long-output workflow review did not appear.' | Out-Null
+    Write-Stage 'Long-output workflow review opened.'
+    $outputMainHandle = [IntPtr]$outputMain.Current.NativeWindowHandle
+    $outputMainBounds = $outputMain.Current.BoundingRectangle
+    $outputTerminalApproval = Wait-Until {
+        Find-DescendantByAutomationId `
+            $outputMain 'Long.Workflow.TerminalOutput.ApproveTopLevel'
+    } 'The shallow title-bar terminal-output approval was not discoverable.'
+    $outputReviewConfirm = Wait-Until {
+        Find-RawSiblingByAutomationId `
+            $outputTerminalApproval 'Long.Workflow.ReviewConfirmTopLevel'
+    } 'The adjacent top-level workflow confirmation was not discoverable.'
+    Click-AutomationElement $outputTerminalApproval $outputMainHandle `
+        'The terminal-output approval could not be clicked.'
+    Start-Sleep -Milliseconds 500
+    Write-Stage 'Long-output approval enabled with the visible review control.'
+    Write-Stage 'Confirming the isolated read-only long-output workflow.'
+    Click-AutomationElement $outputReviewConfirm $outputMainHandle `
+        'The workflow confirmation could not be clicked.'
+    Start-Sleep -Milliseconds 500
+    $outputResultStatus = Wait-Until {
+        $status = [string]$outputMain.Current.ItemStatus
+        if ($status -match '^workflow-result:执行完成;terminal-length:\d+;bounded-scroll:true$') {
+            $status
+        }
+    } 'The isolated long-output workflow did not complete with bounded output.'
+    $terminalOutputLength = [int]([regex]::Match(
+        $outputResultStatus,
+        'terminal-length:(\d+)').Groups[1].Value)
+    if ($terminalOutputLength -lt 3600) {
+        throw "The terminal output was not long enough: $terminalOutputLength characters."
+    }
+    $clearTerminalOutput = Wait-Until {
+        Find-RawDescendantByAutomationId `
+            $outputMain 'Long.Workflow.TerminalOutput.ClearTopLevel'
+    } 'The shallow title-bar terminal output clear action was not discoverable.'
+    Click-AutomationElement $clearTerminalOutput $outputMainHandle `
+        'The terminal output clear action could not be clicked.'
+    Start-Sleep -Milliseconds 500
+    Wait-Until {
+        $outputMain.Current.ItemStatus -eq 'workflow-result:terminal-cleared'
+    } 'Clearing terminal output did not clear the in-memory value.' | Out-Null
+    $isolatedReportRoot = Join-Path $workflowRoot '.reports'
+    $isolatedReport = Wait-Until {
+        if (Test-Path -LiteralPath $isolatedReportRoot) {
+            Get-ChildItem -LiteralPath $isolatedReportRoot -File -Filter '*.json' `
+                -Recurse | Select-Object -First 1
+        }
+    } 'The long-output execution report was not written to the isolated report root.'
+    $report.workflow_output = [ordered]@{
+        isolated_report_root = $isolatedReportRoot
+        read_only_execution_confirmed = $true
+        review_state_cleared_after_confirmation = $true
+        execution_completed = $true
+        terminal_output_approved = $true
+        terminal_output_length = $terminalOutputLength
+        terminal_output_bounded_scroll = $true
+        terminal_output_cleared = $true
+        isolated_report_written = $null -ne $isolatedReport
+    }
+    Stop-QualityHost $workflowOutputProcess
+    $workflowOutputProcess = $null
+
+    if (-not $WorkflowOnly -and -not $WorkflowOutputOnly) {
     Write-Stage 'Starting embedded Base64 plugin workflow.'
     $pluginProcess = Start-QualityHost @(
         '--run-command', 'com.long.base64:base64.encode',
@@ -623,6 +1040,7 @@ try {
         Stop-QualityHost $accessibilityProcess
         $accessibilityProcess = $null
     }
+    }
     $report.passed = $true
 }
 catch {
@@ -633,6 +1051,9 @@ finally {
     Stop-QualityHost $paletteMenuProcess
     Stop-QualityHost $superPanelProcess
     Stop-QualityHost $superPanelTransitionProcess
+    Stop-QualityHost $workflowPaletteProcess
+    Stop-QualityHost $workflowPanelProcess
+    Stop-QualityHost $workflowOutputProcess
     Stop-QualityHost $pluginProcess
     Stop-QualityHost $marketProcess
     Stop-QualityHost $accessibilityProcess

@@ -21,6 +21,8 @@ public class AppStartupOptionsTests
             "--quality-height", "800",
             "--quality-high-contrast",
             "--quality-reduce-motion",
+            "--quality-empty-context",
+            "--quality-workflows-dir", "quality-workflows",
         ]);
 
         Assert.Equal("dark", options.ThemeOverride);
@@ -36,6 +38,8 @@ public class AppStartupOptionsTests
         Assert.Equal(800, options.QualityCaptureHeight);
         Assert.True(options.ForceHighContrast);
         Assert.True(options.ForceReduceMotion);
+        Assert.True(options.UseEmptyContextForQuality);
+        Assert.Equal("quality-workflows", options.QualityWorkflowsDirectory);
     }
 
     [Fact]

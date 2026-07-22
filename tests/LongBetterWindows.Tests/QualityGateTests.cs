@@ -30,6 +30,8 @@ public class QualityGateTests
         Assert.Contains("RecoverInterruptedTransactionsAsync", installer);
         Assert.Contains("TransactionPhase.Committed", installer);
         Assert.Contains("_transactionGate", installer);
+        Assert.Contains("MoveDirectoryWithRetryAsync", installer);
+        Assert.Contains("attempt < maximumAttempts - 1", installer);
         Assert.Contains("ConcurrentDictionary<string, SemaphoreSlim>", transport);
         Assert.Contains("CleanupStaleTemporaryFiles", transport);
         Assert.Contains("ShouldRetry", transport);
@@ -1053,7 +1055,10 @@ public class QualityGateTests
         var script = Read("run-desktop-ui-smoke.ps1");
         var palette = Read("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml");
         var superPanel = Read("src", "LongBetterWindows.Host", "Views", "SuperPanelWindow.xaml");
+        var workflow = Read("src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml");
+        var appResources = Read("src", "LongBetterWindows.Host", "App.xaml");
         var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml");
+        var mainCode = Read("src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
         var plugin = Read("src", "LongBetterWindows.Host", "Views", "PluginWindowHost.xaml");
 
         Assert.Contains("Long.CommandPalette.Search", palette);
@@ -1061,6 +1066,23 @@ public class QualityGateTests
         Assert.Contains("Long.Result.MoreActions", palette);
         Assert.Contains("Long.SuperPanel.Results", superPanel);
         Assert.Contains("Long.SuperPanel.OpenCommandCenter", superPanel);
+        Assert.Contains("Long.Workflow.ExecutionReview", workflow);
+        Assert.Contains("Long.Workflow.ExecutionReview.Cancel", workflow);
+        Assert.Contains("Long.Workflow.ExecutionResult.Title", workflow);
+        Assert.Contains("Long.Workflow.TerminalOutput.Value", workflow);
+        Assert.Contains("Long.Workflow.TerminalOutput.Clear", workflow);
+        Assert.Contains("Long.Workflow.WideNavigation", workflow);
+        Assert.Contains("Long.Workflow.CompactNavigation", workflow);
+        Assert.Contains("Long.ToolCenter.ContentScroll", Read(
+            "src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml"));
+        Assert.Contains("HorizontalContentAlignment=\"Stretch\"", Read(
+            "src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml"));
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", Read(
+            "src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml"));
+        Assert.Contains("HorizontalContentAlignment=\"Stretch\"", Read(
+            "src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml"));
+        Assert.Contains("Long.Workflow.ReviewCancel", main);
+        Assert.Contains("BooleanToVisibilityConverter x:Key=\"BooleanToVisibility\"", appResources);
         Assert.Contains("Long.Plugin.EmbeddedTitle", main);
         Assert.Contains("Long.Plugin.Detach", main);
         Assert.Contains("Long.Plugin.DetachedWindow", plugin);
@@ -1072,6 +1094,29 @@ public class QualityGateTests
         Assert.Contains("palette_shown_on_transition", script);
         Assert.Contains("escape_closed_detached_window", script);
         Assert.Contains("escape_closed_panel", script);
+        Assert.Contains("--quality-workflows-dir", script);
+        Assert.Contains("palette_enter_opened_review", script);
+        Assert.Contains("super_panel_enter_opened_review", script);
+        Assert.Contains("Long.Workflow.ReviewCancel", script);
+        Assert.Contains("wide_layout_announced", script);
+        Assert.Contains("compact_layout_announced", script);
+        Assert.Contains("terminal_output_length", script);
+        Assert.Contains("terminal_output_bounded_scroll", script);
+        Assert.Contains("MaxHeight=\"120\"", workflow);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", workflow);
+        Assert.Contains("isolated_report_written", script);
+        Assert.Contains("[switch] $WorkflowOutputOnly", script);
+        Assert.Contains("CtrlShiftT", script);
+        Assert.Contains("CtrlShiftEnter", script);
+        Assert.Contains("CtrlShiftDelete", script);
+        Assert.Contains("Long.Workflow.TerminalOutput.ApproveTopLevel", main);
+        Assert.Contains("Long.Workflow.ReviewConfirmTopLevel", main);
+        Assert.Contains("Long.Workflow.TerminalOutput.ClearTopLevel", main);
+        Assert.Contains(";layout:{(compact ? \"compact\" : \"wide\")};width:{Math.Round(width)}", mainCode);
+        Assert.Contains("'--quality-width', '720'", script);
+        Assert.Contains("execution_was_not_confirmed", script);
+        Assert.DoesNotContain("Invoke-AutomationElement $paletteWorkflowConfirm", script);
+        Assert.DoesNotContain("Invoke-AutomationElement $panelWorkflowConfirm", script);
     }
 
     [Fact]

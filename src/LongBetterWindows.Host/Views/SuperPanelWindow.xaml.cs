@@ -30,7 +30,8 @@ namespace LongBetterWindows.Host.Views
             _plugins = HostProvider.Instance.PluginStore;
             _actionCoordinator = new SuperPanelActionCoordinator(
                 _plugins,
-                ServicesInitializer.SearchPreferences);
+                ServicesInitializer.SearchPreferences,
+                WorkflowReviewNavigation.OpenAsync);
             _groupCoordinator = new SuperPanelGroupCoordinator(
                 ServicesInitializer.SearchPreferences,
                 ServicesInitializer.SuperPanelGroups);
@@ -57,23 +58,25 @@ namespace LongBetterWindows.Host.Views
         public static void ShowPanel()
             => ShowPanelCore(null);
 
-        internal static void ShowPanelForQuality()
-            => ShowPanelCore(new ContextSnapshot(DateTimeOffset.UtcNow, new[]
-            {
-                new ContextItem
+        internal static void ShowPanelForQuality(bool useEmptyContext = false)
+            => ShowPanelCore(useEmptyContext
+                ? ContextSnapshot.Empty
+                : new ContextSnapshot(DateTimeOffset.UtcNow, new[]
                 {
-                    Id = "quality.url",
-                    Source = ContextSource.Clipboard,
-                    Label = "剪贴板链接 · https://long.example/quality",
-                    Text = "https://long.example/quality",
-                    CompatibleInputTypes = new[]
+                    new ContextItem
                     {
-                        LongBetterWindows.Host.Contracts.AcceptedInputType.Url,
-                        LongBetterWindows.Host.Contracts.AcceptedInputType.Clipboard,
-                        LongBetterWindows.Host.Contracts.AcceptedInputType.Text,
+                        Id = "quality.url",
+                        Source = ContextSource.Clipboard,
+                        Label = "剪贴板链接 · https://long.example/quality",
+                        Text = "https://long.example/quality",
+                        CompatibleInputTypes = new[]
+                        {
+                            LongBetterWindows.Host.Contracts.AcceptedInputType.Url,
+                            LongBetterWindows.Host.Contracts.AcceptedInputType.Clipboard,
+                            LongBetterWindows.Host.Contracts.AcceptedInputType.Text,
+                        },
                     },
-                },
-            }));
+                }));
 
         private static void ShowPanelCore(ContextSnapshot? presetContext)
         {

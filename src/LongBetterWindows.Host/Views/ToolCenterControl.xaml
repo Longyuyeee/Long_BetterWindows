@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:LongBetterWindows.Host.Views"
+             xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
              Focusable="True" PreviewKeyDown="UserControl_PreviewKeyDown">
     <Grid>
         <Grid.ColumnDefinitions>
@@ -78,8 +79,14 @@
             </Grid>
 
             <ScrollViewer Grid.Row="1" Style="{StaticResource DarkScrollViewerStyle}"
+                          automation:AutomationProperties.AutomationId="Long.ToolCenter.ContentScroll"
+                          automation:AutomationProperties.Name="Tool Center 页面内容"
+                          HorizontalContentAlignment="Stretch"
+                          HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
-                <Grid x:Name="ContentBody" Margin="32,0,32,32">
+                <Border x:Name="ContentBodyFrame" Padding="32,0,32,32"
+                        HorizontalAlignment="Stretch">
+                <Grid x:Name="ContentBody">
                     <!-- 概览 -->
                     <StackPanel x:Name="PanelOverview">
                         <Border x:Name="WelcomeBanner" Visibility="Collapsed" Margin="0,0,0,18"
@@ -140,7 +147,11 @@
 
                     <!-- 组合动作 -->
                     <Grid x:Name="PanelWorkflows" Visibility="Collapsed">
-                        <ContentControl x:Name="WorkflowEditorHost" />
+                        <ContentControl x:Name="WorkflowEditorHost"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Stretch"
+                                        automation:AutomationProperties.AutomationId="Long.ToolCenter.WorkflowHost"
+                                        automation:AutomationProperties.Name="组合动作工作台" />
                     </Grid>
 
                     <!-- 插件管理 -->
@@ -207,6 +218,7 @@
                         <Border Style="{StaticResource LongCard}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="数据与隐私" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="固定和最近使用只保存结果 ID、次数与时间，不保存查询、文本或路径。" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="SearchPreferenceStatusText" Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel><Button Grid.Column="1" Content="清除搜索偏好" Style="{StaticResource LongButton}" Click="ClearSearchPreferences_Click"/></Grid></Border>
                     </StackPanel>
                 </Grid>
+                </Border>
             </ScrollViewer>
         </Grid>
     </Grid>

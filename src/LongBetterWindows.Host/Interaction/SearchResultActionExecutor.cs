@@ -9,11 +9,15 @@ namespace LongBetterWindows.Host.Interaction
     {
         private readonly PluginRegistry _plugins;
         private readonly CommandExecutor _commands;
+        private readonly Func<string, CancellationToken, Task<PluginCommandResult>>? _workflowReviewLauncher;
 
-        public SearchResultActionExecutor(PluginRegistry plugins)
+        public SearchResultActionExecutor(
+            PluginRegistry plugins,
+            Func<string, CancellationToken, Task<PluginCommandResult>>? workflowReviewLauncher = null)
         {
             _plugins = plugins;
             _commands = new CommandExecutor(plugins);
+            _workflowReviewLauncher = workflowReviewLauncher;
         }
 
         public async Task<PluginCommandResult> ExecuteAsync(
@@ -31,6 +35,11 @@ namespace LongBetterWindows.Host.Interaction
                         ?? CommandInvocationFactory.Create(descriptor, context);
                     return await _commands.ExecuteAsync(
                         descriptor.Key, invocation, cancellationToken);
+
+                case SearchActionKind.OpenWorkflowReview:
+                    if (_workflowReviewLauncher is null)
+                        return PluginCommandResult.Failure("组合动作审查入口当前不可用。");
+                    return await _workflowReviewLauncher(action.Target, cancellationToken);
 
                 case SearchActionKind.OpenPath:
                     return FromHostResponse(

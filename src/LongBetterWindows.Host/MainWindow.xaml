@@ -33,6 +33,9 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -48,14 +51,46 @@
                                    Foreground="{DynamicResource Long.Brush.Text.Muted}" VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <Button Grid.Column="1" Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                    <Button x:Name="WorkflowReviewCancelButton" Grid.Column="1"
+                            Visibility="Collapsed" Style="{StaticResource LongButton}" Width="112" Height="30"
+                            Margin="0,0,8,0" Click="CancelWorkflowReview_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            AutomationProperties.AutomationId="Long.Workflow.ReviewCancel"
+                            AutomationProperties.Name="取消组合动作执行审查"
+                            Content="取消执行审查" />
+
+                    <Button x:Name="WorkflowTerminalApprovalButton" Grid.Column="2"
+                            Visibility="Collapsed" Style="{StaticResource LongButton}" Width="126" Height="30"
+                            Margin="0,0,8,0" Click="WorkflowTerminalApprovalButton_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.ApproveTopLevel"
+                            Content="允许终端输出" />
+
+                    <Button x:Name="WorkflowReviewConfirmButton" Grid.Column="3"
+                            Visibility="Collapsed" Style="{StaticResource LongButton.Primary}" Width="88" Height="30"
+                            Margin="0,0,8,0" Click="ConfirmWorkflowReview_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            AutomationProperties.AutomationId="Long.Workflow.ReviewConfirmTopLevel"
+                            AutomationProperties.Name="确认执行已审查的组合动作"
+                            Content="确认执行" />
+
+                    <Button x:Name="WorkflowTerminalClearButton" Grid.Column="2"
+                            Visibility="Collapsed" Style="{StaticResource LongButton}" Width="112" Height="30"
+                            Margin="0,0,8,0" Click="ClearWorkflowTerminalOutputs_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.ClearTopLevel"
+                            AutomationProperties.Name="清除组合动作敏感终端输出"
+                            ToolTip="清除敏感输出 (Ctrl+Shift+Delete)"
+                            Content="清除敏感输出" />
+
+                    <Button x:Name="OpenSuperPanelButton" Grid.Column="4" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                             Margin="0,0,6,0" Click="OpenSuperPanel_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             ToolTip="打开 Long 超级面板" AutomationProperties.Name="打开 Long 超级面板">
                         <Path Data="{StaticResource Long.Icon.Command}" Style="{StaticResource LongIcon}" Width="14" Height="14" />
                     </Button>
 
-                    <Button Grid.Column="2" Style="{StaticResource LongButton}" Height="30" MinWidth="148"
+                    <Button x:Name="OpenPaletteButton" Grid.Column="5" Style="{StaticResource LongButton}" Height="30" MinWidth="148"
                             Margin="0,0,10,0" Click="OpenPalette_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             AutomationProperties.Name="打开命令中心">
@@ -69,12 +104,12 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Grid.Column="3" Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                    <Button Grid.Column="6" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                             Margin="0,0,4,0" Click="Minimize_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True" AutomationProperties.Name="最小化">
                         <TextBlock Text="—" FontSize="14" />
                     </Button>
-                    <Button Grid.Column="4" Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                    <Button Grid.Column="7" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                             Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             AutomationProperties.Name="关闭">
                         <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}" Width="13" Height="13" />

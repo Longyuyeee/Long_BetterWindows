@@ -28,7 +28,9 @@ namespace LongBetterWindows.Host.Views
             InitializeComponent();
             _plugins = HostProvider.Instance.PluginStore;
             _executor = new CommandExecutor(_plugins);
-            _actionExecutor = new SearchResultActionExecutor(_plugins);
+            _actionExecutor = new SearchResultActionExecutor(
+                _plugins,
+                WorkflowReviewNavigation.OpenAsync);
             _plugins.PluginsChanged += OnPluginsChanged;
             Closed += (_, _) =>
             {
@@ -247,6 +249,11 @@ namespace LongBetterWindows.Host.Views
 
             if (selected.PrimaryAction.Kind != SearchActionKind.ExecuteCommand)
             {
+                if (selected.PrimaryAction.Kind == SearchActionKind.OpenWorkflowReview)
+                {
+                    Hide();
+                    await Task.Delay(40);
+                }
                 await ExecuteHostActionAsync(selected, selected.PrimaryAction);
                 return;
             }

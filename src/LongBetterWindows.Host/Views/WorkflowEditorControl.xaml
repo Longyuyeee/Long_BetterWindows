@@ -3,6 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:views="clr-namespace:LongBetterWindows.Host.Views"
              xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+             automation:AutomationProperties.AutomationId="Long.Workflow.Editor"
+             automation:AutomationProperties.Name="组合动作编辑器"
              Loaded="WorkflowEditorControl_Loaded"
              Unloaded="WorkflowEditorControl_Unloaded">
     <Grid MinHeight="600">
@@ -13,7 +15,9 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Grid Grid.Column="0">
+        <Grid Grid.Column="0"
+              automation:AutomationProperties.AutomationId="Long.Workflow.WideNavigation"
+              automation:AutomationProperties.Name="组合动作宽屏导航">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -44,6 +48,8 @@
             </Grid>
 
             <ListBox x:Name="WorkflowList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                     automation:AutomationProperties.AutomationId="Long.Workflow.List"
+                     automation:AutomationProperties.Name="本机组合动作列表"
                      SelectionChanged="WorkflowList_SelectionChanged"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <ListBox.ItemContainerStyle>
@@ -71,7 +77,9 @@
 
         <Grid Grid.Column="3">
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Grid x:Name="CompactWorkflowBar" Visibility="Collapsed" Margin="0,0,0,14">
+            <Grid x:Name="CompactWorkflowBar" Visibility="Collapsed" Margin="0,0,0,14"
+                  automation:AutomationProperties.AutomationId="Long.Workflow.CompactNavigation"
+                  automation:AutomationProperties.Name="组合动作紧凑导航">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <ComboBox x:Name="CompactWorkflowCombo" Style="{StaticResource LongComboBox}"
                           DisplayMemberPath="Name" SelectedValuePath="Id"
@@ -145,6 +153,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button x:Name="PrepareRunButton" Style="{StaticResource LongButton}" Margin="0,0,8,0"
+                                automation:AutomationProperties.AutomationId="Long.Workflow.PrepareRun"
                                 Click="PrepareRun_Click" automation:AutomationProperties.Name="准备执行组合动作">
                             <StackPanel Orientation="Horizontal">
                                 <Path Data="{StaticResource Long.Icon.Play}" Style="{StaticResource LongIcon}" Width="16" Height="16" />
@@ -284,14 +293,19 @@
                 </Border>
 
                 <Border x:Name="ExecutionReviewPanel" Visibility="Collapsed" Margin="0,10,0,0"
+                        automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview"
+                        automation:AutomationProperties.Name="组合动作执行权限审查"
                         CornerRadius="{DynamicResource Long.Radius.Control}" Padding="12"
                         Background="{DynamicResource Long.Brush.Accent.Soft}"
                         BorderBrush="{DynamicResource Long.Brush.Focus}" BorderThickness="1">
                     <StackPanel>
                         <TextBlock Text="确认本次执行权限" FontWeight="SemiBold" />
                         <TextBlock x:Name="ExecutionReviewSummary" Margin="0,5,0,8" TextWrapping="Wrap"
+                                   automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.Summary"
                                    FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                         <ItemsControl x:Name="ExecutionPermissionList">
+                            <automation:AutomationProperties.AutomationId>Long.Workflow.ExecutionReview.Permissions</automation:AutomationProperties.AutomationId>
+                            <automation:AutomationProperties.Name>本次执行插件权限</automation:AutomationProperties.Name>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,3">
@@ -304,22 +318,26 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <CheckBox x:Name="TerminalOutputApprovalCheckBox"
-                                  Content="允许本次执行在内存中显示未消费的终端输出值"
+                                  automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.TerminalOutput"
+                                  Content="允许本次执行在内存中显示未消费的终端输出值（Ctrl+Shift+T）"
                                   Margin="0,9,0,0"
                                   automation:AutomationProperties.Name="允许显示本次工作流终端输出值" />
                         <TextBlock Text="默认关闭；值不会写入执行报告。"
                                    Margin="24,3,0,0" FontSize="10" TextWrapping="Wrap"
                                    Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-                            <Button Content="取消" Style="{StaticResource LongButton}" Margin="0,0,8,0"
+                            <Button x:Name="CancelRunReviewButton" Content="取消" Style="{StaticResource LongButton}" Margin="0,0,8,0"
+                                    automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.Cancel"
                                     Click="CancelRunReview_Click" automation:AutomationProperties.Name="取消执行确认" />
-                            <Button Content="确认并执行" Style="{StaticResource LongButton.Primary}"
+                            <Button Content="确认并执行（Ctrl+Shift+Enter）" Style="{StaticResource LongButton.Primary}"
+                                    automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.Confirm"
                                     Click="ConfirmRun_Click" automation:AutomationProperties.Name="确认并执行组合动作" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
                 <Border x:Name="ExecutionRunningPanel" Visibility="Collapsed" Margin="0,10,0,0"
+                        automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionRunning"
                         CornerRadius="{DynamicResource Long.Radius.Control}" Padding="12"
                         Background="{DynamicResource Long.Brush.Background.Raised}"
                         BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
@@ -336,12 +354,16 @@
                 </Border>
 
                 <Border x:Name="ExecutionResultPanel" Visibility="Collapsed" Margin="0,10,0,0"
+                        automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionResult"
+                        automation:AutomationProperties.Name="组合动作执行结果"
                         CornerRadius="{DynamicResource Long.Radius.Control}" Padding="12"
                         Background="{DynamicResource Long.Brush.Background.Raised}"
                         BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
                     <StackPanel>
-                        <TextBlock x:Name="ExecutionResultTitle" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ExecutionResultTitle" FontWeight="SemiBold"
+                                   automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionResult.Title" />
                         <TextBlock x:Name="ExecutionResultDetail" Margin="0,4,0,0" FontSize="11"
+                                   automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionResult.Detail"
                                    TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                         <ItemsControl x:Name="ExecutionOutputList" Margin="0,8,0,0" Visibility="Collapsed"
                                       automation:AutomationProperties.Name="工作流输出摘要">
@@ -358,12 +380,14 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <StackPanel x:Name="TerminalOutputPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                        <StackPanel x:Name="TerminalOutputPanel" Margin="0,12,0,0" Visibility="Collapsed"
+                                    automation:AutomationProperties.AutomationId="Long.Workflow.TerminalOutput">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <TextBlock Text="本次终端输出（仅内存）" FontWeight="SemiBold" />
                                 <Button Grid.Column="1" Content="清除" Style="{StaticResource LongButton}"
                                         Padding="8,3" Click="ClearTerminalOutputs_Click"
+                                        automation:AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.Clear"
                                         automation:AutomationProperties.Name="清除本次终端输出" />
                             </Grid>
                             <ItemsControl x:Name="TerminalOutputList" Margin="0,6,0,0"
@@ -386,6 +410,8 @@
                                                         automation:AutomationProperties.Name="导出终端输出值" />
                                             </StackPanel>
                                             <TextBox Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Value}" IsReadOnly="True"
+                                                     automation:AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.Value"
+                                                     automation:AutomationProperties.Name="终端输出值"
                                                      MaxHeight="120" TextWrapping="Wrap" AcceptsReturn="True"
                                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" />
                                         </Grid>

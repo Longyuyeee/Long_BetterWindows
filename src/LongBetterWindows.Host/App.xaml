@@ -13,6 +13,7 @@
                 <ResourceDictionary Source="Themes/Styles.xaml" />
                 <ResourceDictionary Source="Themes/LongComponents.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
             <!-- 全局字体 -->
             <Style TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="{DynamicResource Long.Font.Ui}" />

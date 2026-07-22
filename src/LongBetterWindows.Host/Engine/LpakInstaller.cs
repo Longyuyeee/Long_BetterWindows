@@ -102,12 +102,12 @@ namespace LongBetterWindows.Host.Engine
                 if (Directory.Exists(targetDir))
                 {
                     await UnloadPluginAsync(manifest.Id);
-                    Directory.Move(targetDir, backupDir);
+                    await MoveDirectoryWithRetryAsync(targetDir, backupDir);
                     targetMovedToBackup = true;
                     await WriteJournalAsync(transactionDir, manifest.Id, TransactionPhase.BackedUp);
                 }
 
-                Directory.Move(stagingDir, targetDir);
+                await MoveDirectoryWithRetryAsync(stagingDir, targetDir);
                 stagedMovedToTarget = true;
                 await _scanner.ScanAsync();
                 await WriteJournalAsync(transactionDir, manifest.Id, TransactionPhase.Committed);
@@ -130,7 +130,7 @@ namespace LongBetterWindows.Host.Engine
                     if (stagedMovedToTarget && Directory.Exists(targetDir))
                         Directory.Delete(targetDir, true);
                     if (targetMovedToBackup && Directory.Exists(backupDir))
-                        Directory.Move(backupDir, targetDir);
+                        await MoveDirectoryWithRetryAsync(backupDir, targetDir);
                     if (targetMovedToBackup)
                         await _scanner.ScanAsync();
                 }
@@ -182,7 +182,7 @@ namespace LongBetterWindows.Host.Engine
                 Directory.CreateDirectory(transactionDir);
                 await WriteJournalAsync(transactionDir, pluginId, TransactionPhase.Prepared);
                 await UnloadPluginAsync(pluginId);
-                Directory.Move(targetDir, backupDir);
+                await MoveDirectoryWithRetryAsync(targetDir, backupDir);
                 await WriteJournalAsync(transactionDir, pluginId, TransactionPhase.BackedUp);
                 await _scanner.ScanAsync();
                 await WriteJournalAsync(transactionDir, pluginId, TransactionPhase.Committed);
@@ -200,7 +200,7 @@ namespace LongBetterWindows.Host.Engine
                 try
                 {
                     if (!Directory.Exists(targetDir) && Directory.Exists(backupDir))
-                        Directory.Move(backupDir, targetDir);
+                        await MoveDirectoryWithRetryAsync(backupDir, targetDir);
                     await _scanner.ScanAsync();
                 }
                 catch (Exception rollbackError)
@@ -257,7 +257,8 @@ namespace LongBetterWindows.Host.Engine
                     if (journal.Phase != TransactionPhase.Committed)
                     {
                         if (Directory.Exists(targetDir)) Directory.Delete(targetDir, true);
-                        if (Directory.Exists(backupDir)) Directory.Move(backupDir, targetDir);
+                        if (Directory.Exists(backupDir))
+                            await MoveDirectoryWithRetryAsync(backupDir, targetDir);
                         Log.Warning("已恢复未提交的插件事务: {PluginId}", journal.PluginId);
                     }
 
@@ -302,6 +303,29 @@ namespace LongBetterWindows.Host.Engine
             if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("插件 ID 生成了非法安装路径。");
             return target;
+        }
+
+        private static async Task MoveDirectoryWithRetryAsync(
+            string source,
+            string destination)
+        {
+            const int maximumAttempts = 6;
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    Directory.Move(source, destination);
+                    return;
+                }
+                catch (Exception ex) when (
+                    ex is IOException or UnauthorizedAccessException
+                    && attempt < maximumAttempts - 1
+                    && Directory.Exists(source)
+                    && !Directory.Exists(destination))
+                {
+                    await Task.Delay(25 << attempt);
+                }
+            }
         }
 
         private async Task UnloadPluginAsync(string pluginId)

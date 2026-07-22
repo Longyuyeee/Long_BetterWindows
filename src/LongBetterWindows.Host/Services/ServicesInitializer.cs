@@ -1,3 +1,4 @@
+using System.IO;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
@@ -39,11 +40,13 @@ namespace LongBetterWindows.Host.Services
         public static NetworkMonitorService NetworkMonitor { get; private set; } = null!;
         public static ContextCaptureService ContextCapture { get; private set; } = null!;
         public static SearchCoordinator Search { get; private set; } = null!;
+        public static CommandWorkflowRepository Workflows { get; private set; } = null!;
+        public static string WorkflowReportsDirectory { get; private set; } = string.Empty;
         public static SearchPreferenceService SearchPreferences { get; private set; } = null!;
         public static SuperPanelGroupService SuperPanelGroups { get; private set; } = null!;
         public static MouseGestureService MouseGestures { get; private set; } = null!;
 
-        public static void Initialize()
+        public static void Initialize(string? workflowsDirectory = null)
         {
             var provider = HostProvider.Instance;
 
@@ -85,10 +88,23 @@ namespace LongBetterWindows.Host.Services
                 new ClipboardImageContextProvider(Clipboard),
                 new ClipboardContextProvider(Clipboard),
             });
+            var localDataRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "LongBetterWindows");
+            var workflowRoot = string.IsNullOrWhiteSpace(workflowsDirectory)
+                ? Path.Combine(localDataRoot, "Workflows")
+                : Path.GetFullPath(workflowsDirectory);
+            WorkflowReportsDirectory = string.IsNullOrWhiteSpace(workflowsDirectory)
+                ? Path.Combine(localDataRoot, "WorkflowReports")
+                : Path.Combine(workflowRoot, ".reports");
+            Workflows = new CommandWorkflowRepository(
+                workflowRoot,
+                "local-managed");
             Search = new SearchCoordinator(
                 new ISearchProvider[]
                 {
                     new StaticCommandSearchProvider(provider.PluginStore.Commands),
+                    new ManagedWorkflowSearchProvider(provider.PluginStore, Workflows),
                     new WindowsSettingsSearchProvider(),
                     new LocalFileSearchProvider(),
                 },

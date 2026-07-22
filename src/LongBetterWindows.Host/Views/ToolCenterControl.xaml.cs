@@ -10,6 +10,10 @@ namespace LongBetterWindows.Host.Views
 {
     public partial class ToolCenterControl : UserControl
     {
+        internal event EventHandler? WorkflowReviewClosed;
+        internal event Action<bool>? WorkflowLayoutChanged;
+        internal event Action<WorkflowExecutionResultState>? WorkflowExecutionResultChanged;
+        internal event EventHandler? WorkflowTerminalOutputsCleared;
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
         private bool _startupEnabled;
@@ -82,10 +86,13 @@ namespace LongBetterWindows.Host.Views
         {
             var isNarrow = width < 860;
             NavigationColumn.Width = new GridLength(isNarrow ? 160 : 220);
+            ContentBodyFrame.Width = Math.Max(
+                0,
+                width - NavigationColumn.Width.Value - 1);
             PageHeader.Margin = isNarrow
                 ? new Thickness(18, 16, 18, 12)
                 : new Thickness(32, 20, 32, 16);
-            ContentBody.Margin = isNarrow
+            ContentBodyFrame.Padding = isNarrow
                 ? new Thickness(18, 0, 18, 18)
                 : new Thickness(32, 0, 32, 32);
 
@@ -138,6 +145,46 @@ namespace LongBetterWindows.Host.Views
         internal void OpenDiagnosticsForQuality() => ShowPage("diagnostics");
         internal void OpenPluginsForQuality() => ShowPage("plugins");
 
+        internal async Task<string?> OpenWorkflowReviewAsync(
+            string workflowId,
+            CancellationToken cancellationToken = default)
+        {
+            ShowPage("workflows");
+            if (WorkflowEditorHost.Content is not WorkflowEditorControl editor)
+                return "组合动作编辑器当前不可用。";
+            return await editor.OpenExecutionReviewAsync(workflowId, cancellationToken);
+        }
+
+        internal void FocusWorkflowReview()
+        {
+            if (WorkflowEditorHost.Content is WorkflowEditorControl editor)
+                editor.FocusExecutionReview();
+        }
+
+        internal bool CancelWorkflowReview()
+            => WorkflowEditorHost.Content is WorkflowEditorControl editor
+                && editor.CancelExecutionReview();
+
+        internal bool IsWorkflowLayoutCompact
+            => WorkflowEditorHost.Content is WorkflowEditorControl editor
+                && editor.IsCompactLayout;
+
+        internal double WorkflowLayoutWidth
+            => WorkflowEditorHost.ActualWidth;
+
+        internal bool ClearWorkflowTerminalOutputs()
+            => WorkflowEditorHost.Content is WorkflowEditorControl editor
+                && editor.ClearTerminalOutputs();
+
+        internal bool ToggleWorkflowTerminalOutputApproval()
+            => WorkflowEditorHost.Content is WorkflowEditorControl editor
+                && editor.ToggleTerminalOutputApproval();
+
+        internal Task<bool> ConfirmWorkflowReviewAsync()
+            => WorkflowEditorHost.Content is WorkflowEditorControl editor
+                ? editor.ConfirmExecutionReviewAsync()
+                : Task.FromResult(false);
+
         private void Navigation_Click(object sender, RoutedEventArgs e)
         {
             if (sender is RadioButton { Tag: string page })
@@ -171,7 +218,18 @@ namespace LongBetterWindows.Host.Views
                 if (key == "plugins")
                     PluginManagementHost.Refresh();
                 else if (key == "workflows" && WorkflowEditorHost.Content == null)
-                    WorkflowEditorHost.Content = new WorkflowEditorControl();
+                {
+                    var editor = new WorkflowEditorControl();
+                    editor.ExecutionReviewClosed += (_, _) =>
+                        WorkflowReviewClosed?.Invoke(this, EventArgs.Empty);
+                    editor.ResponsiveLayoutChanged += compact =>
+                        WorkflowLayoutChanged?.Invoke(compact);
+                    editor.ExecutionResultChanged += result =>
+                        WorkflowExecutionResultChanged?.Invoke(result);
+                    editor.TerminalOutputsCleared += (_, _) =>
+                        WorkflowTerminalOutputsCleared?.Invoke(this, EventArgs.Empty);
+                    WorkflowEditorHost.Content = editor;
+                }
                 else if (key == "market" && MarketHost.Content == null)
                     MarketHost.Content = new MarketplaceControl();
                 else if (key == "diagnostics" && DiagnosticsHost.Content == null)

@@ -1,15 +1,22 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
+using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
 
 namespace LongBetterWindows.Host.Views
 {
     public partial class WorkflowEditorControl : UserControl
     {
+        internal event EventHandler? ExecutionReviewClosed;
+        internal event Action<bool>? ResponsiveLayoutChanged;
+        internal event Action<WorkflowExecutionResultState>? ExecutionResultChanged;
+        internal event EventHandler? TerminalOutputsCleared;
         private readonly PluginRegistry _plugins = HostProvider.Instance.PluginStore;
         private readonly CommandWorkflowRepository _repository;
         private readonly CommandWorkflowEditorSession _session;
@@ -17,6 +24,10 @@ namespace LongBetterWindows.Host.Views
         private readonly CommandWorkflowRunSession _runSession;
         private readonly WorkflowTerminalOutputExporter _terminalOutputExporter = new();
         private CommandWorkflowExecutionReview? _executionReview;
+        private bool? _isCompactLayout;
+
+        internal bool IsCompactLayout => _isCompactLayout ?? ActualWidth < 700;
+        internal double LayoutWidth => ActualWidth;
         private CommandWorkflowImportReview? _importReview;
         private int _reportListVersion;
         private int _reportLoadVersion;
@@ -26,16 +37,10 @@ namespace LongBetterWindows.Host.Views
         public WorkflowEditorControl()
         {
             InitializeComponent();
-            var root = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LongBetterWindows",
-                "Workflows");
-            _repository = new CommandWorkflowRepository(root, "local-managed");
+            _repository = ServicesInitializer.Workflows;
             _session = new CommandWorkflowEditorSession(_plugins, _repository);
-            _reports = new CommandWorkflowExecutionReportRepository(Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LongBetterWindows",
-                "WorkflowReports"));
+            _reports = new CommandWorkflowExecutionReportRepository(
+                ServicesInitializer.WorkflowReportsDirectory);
             _runSession = new CommandWorkflowRunSession(_plugins, _reports);
             FailureModeCombo.ItemsSource = FailureOptions;
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
@@ -363,51 +368,106 @@ namespace LongBetterWindows.Host.Views
             ReportTimeline.ItemsSource = null;
         }
 
+        internal async Task<string?> OpenExecutionReviewAsync(
+            string workflowId,
+            CancellationToken cancellationToken = default)
+        {
+            _runSession.CancelReview();
+            _executionReview = null;
+            ExecutionReviewPanel.Visibility = Visibility.Collapsed;
+            if (!await _session.LoadAsync(workflowId, cancellationToken))
+                return _session.State.Error ?? "组合动作已经失效。";
+
+            await RefreshListAsync(workflowId);
+            RenderEditor();
+            await RefreshReportsAsync(workflowId);
+            return PrepareRun()
+                ? null
+                : _session.State.Error ?? "组合动作未能通过实时预检。";
+        }
+
         private void PrepareRun_Click(object sender, RoutedEventArgs e)
+            => PrepareRun();
+
+        private bool PrepareRun()
         {
             var state = _session.State;
             if (state.Draft is null
                 || state.ExistingDefinitionSha256 is null
-                || state.IsDirty) return;
+                || state.IsDirty) return false;
             ClearTerminalOutputs();
             TerminalOutputApprovalCheckBox.IsChecked = false;
             _executionReview = _runSession.Prepare(state.Draft);
             if (!_executionReview.IsValid)
             {
-                ExecutionResultTitle.Text = "无法准备执行";
-                ExecutionResultDetail.Text = string.Join(Environment.NewLine, _executionReview.Issues);
-                ExecutionOutputList.ItemsSource = null;
-                ExecutionOutputList.Visibility = Visibility.Collapsed;
+                var failure = WorkflowExecutionPresentation.DescribePrepareFailure(_executionReview);
+                ExecutionResultTitle.Text = failure.Title;
+                ExecutionResultDetail.Text = failure.Detail;
+                ExecutionOutputList.ItemsSource = failure.Outputs;
+                ExecutionOutputList.Visibility = failure.HasOutputs ? Visibility.Visible : Visibility.Collapsed;
                 ExecutionResultPanel.Visibility = Visibility.Visible;
-                return;
+                return false;
             }
-            ExecutionReviewSummary.Text = _executionReview.ContainsMutatingSteps
-                ? $"{_executionReview.StepCount} 个步骤，包含系统或文件修改；失败策略为“{FailureLabel(state.Draft.FailureMode)}”。"
-                : $"{_executionReview.StepCount} 个只读步骤；失败策略为“{FailureLabel(state.Draft.FailureMode)}”。";
-            ExecutionPermissionList.ItemsSource = _executionReview.Permissions
-                .Select(permission => new PermissionReviewItem(
-                    $"{permission.PluginId}  v{permission.PluginVersion}",
-                    permission.Capabilities.Count == 0
-                        ? "无额外能力"
-                        : string.Join("、", permission.Capabilities)))
-                .ToList();
+            var presentation = WorkflowExecutionPresentation.DescribeReview(
+                _executionReview,
+                state.Draft.FailureMode);
+            ExecutionReviewSummary.Text = presentation.Summary;
+            ExecutionPermissionList.ItemsSource = presentation.Permissions;
             ExecutionResultPanel.Visibility = Visibility.Collapsed;
             ExecutionReviewPanel.Visibility = Visibility.Visible;
+            FocusExecutionReview();
+            return true;
+        }
+
+        internal void FocusExecutionReview()
+        {
+            if (ExecutionReviewPanel.Visibility != Visibility.Visible) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                ExecutionReviewPanel.BringIntoView();
+                UpdateLayout();
+                var focusScope = FocusManager.GetFocusScope(CancelRunReviewButton);
+                FocusManager.SetFocusedElement(focusScope, CancelRunReviewButton);
+                CancelRunReviewButton.Focus();
+                Keyboard.Focus(CancelRunReviewButton);
+            }), DispatcherPriority.ContextIdle);
         }
 
         private void CancelRunReview_Click(object sender, RoutedEventArgs e)
+            => CancelExecutionReview();
+
+        internal bool CancelExecutionReview()
         {
+            if (ExecutionReviewPanel.Visibility != Visibility.Visible) return false;
             _runSession.CancelReview();
             _executionReview = null;
             ExecutionReviewPanel.Visibility = Visibility.Collapsed;
+            Dispatcher.BeginInvoke(new Action(() =>
+                Keyboard.Focus(PrepareRunButton)), DispatcherPriority.Input);
+            ExecutionReviewClosed?.Invoke(this, EventArgs.Empty);
+            return true;
         }
 
         private async void ConfirmRun_Click(object sender, RoutedEventArgs e)
+            => await ConfirmExecutionReviewAsync();
+
+        internal bool ToggleTerminalOutputApproval()
+        {
+            if (ExecutionReviewPanel.Visibility != Visibility.Visible) return false;
+            TerminalOutputApprovalCheckBox.IsChecked =
+                TerminalOutputApprovalCheckBox.IsChecked != true;
+            return TerminalOutputApprovalCheckBox.IsChecked == true;
+        }
+
+        internal async Task<bool> ConfirmExecutionReviewAsync()
         {
             var draft = _session.State.Draft;
             var review = _executionReview;
-            if (draft is null || review is null) return;
+            if (draft is null
+                || review is null
+                || ExecutionReviewPanel.Visibility != Visibility.Visible) return false;
             ExecutionReviewPanel.Visibility = Visibility.Collapsed;
+            ExecutionReviewClosed?.Invoke(this, EventArgs.Empty);
             ExecutionRunningPanel.Visibility = Visibility.Visible;
             SetEditingEnabled(false);
             try
@@ -417,33 +477,19 @@ namespace LongBetterWindows.Host.Views
                     review.Fingerprint,
                     includeSensitiveMessages: false,
                     includeTerminalOutputValues: TerminalOutputApprovalCheckBox.IsChecked == true);
-                if (!result.IsAccepted || result.Execution is null)
+                var presentation = WorkflowExecutionPresentation.DescribeRunResult(result);
+                ExecutionResultTitle.Text = presentation.Title;
+                ExecutionResultDetail.Text = presentation.Detail;
+                ExecutionOutputList.ItemsSource = presentation.Outputs;
+                ExecutionOutputList.Visibility = presentation.HasOutputs ? Visibility.Visible : Visibility.Collapsed;
+                TerminalOutputList.ItemsSource = presentation.TerminalOutputs;
+                TerminalOutputPanel.Visibility = presentation.HasTerminalOutputs ? Visibility.Visible : Visibility.Collapsed;
+                ExecutionResultChanged?.Invoke(new WorkflowExecutionResultState(
+                    presentation.Title,
+                    presentation.TerminalOutputs.Sum(output => output.Value.Length),
+                    presentation.HasTerminalOutputs));
+                if (result.IsAccepted && result.Execution is not null)
                 {
-                    ExecutionResultTitle.Text = "执行未开始";
-                    ExecutionResultDetail.Text = result.Error ?? "执行批准已经失效。";
-                    ExecutionOutputList.ItemsSource = null;
-                    ExecutionOutputList.Visibility = Visibility.Collapsed;
-                    ClearTerminalOutputs();
-                }
-                else
-                {
-                    ExecutionResultTitle.Text = StatusLabel(result.Execution.Status);
-                    ExecutionResultDetail.Text = result.ReportSave?.IsSuccess == true
-                        ? $"已记录 {result.Execution.Events.Count} 个脱敏事件。"
-                        : $"执行已结束，但报告保存失败：{result.ReportSave?.Error}";
-                    ExecutionOutputList.ItemsSource = result.Execution.OutputSummaries
-                        .Select(OutputSummaryItem.From)
-                        .ToList();
-                    ExecutionOutputList.Visibility = result.Execution.OutputSummaries.Count > 0
-                        ? Visibility.Visible
-                        : Visibility.Collapsed;
-                    var terminalOutputs = result.Execution.TerminalOutputs
-                        .Select(TerminalOutputItem.From)
-                        .ToList();
-                    TerminalOutputList.ItemsSource = terminalOutputs;
-                    TerminalOutputPanel.Visibility = terminalOutputs.Count > 0
-                        ? Visibility.Visible
-                        : Visibility.Collapsed;
                     await RefreshReportsAsync(draft.Id);
                     ReportsExpander.IsExpanded = true;
                 }
@@ -456,6 +502,7 @@ namespace LongBetterWindows.Host.Views
                 SetEditingEnabled(true);
                 RenderStatus();
             }
+            return true;
         }
 
         private void CancelExecution_Click(object sender, RoutedEventArgs e)
@@ -463,7 +510,7 @@ namespace LongBetterWindows.Host.Views
 
         private void CopyTerminalOutput_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button { Tag: TerminalOutputItem output }) return;
+            if (sender is not Button { Tag: WorkflowTerminalOutputItem output }) return;
             try
             {
                 if (output.Value.Length == 0)
@@ -486,7 +533,7 @@ namespace LongBetterWindows.Host.Views
 
         private async void ExportTerminalOutput_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button { Tag: TerminalOutputItem item }) return;
+            if (sender is not Button { Tag: WorkflowTerminalOutputItem item }) return;
             var dialog = new SaveFileDialog
             {
                 Title = "导出终端输出",
@@ -536,10 +583,13 @@ namespace LongBetterWindows.Host.Views
                 result.IsSuccess ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
-        private void ClearTerminalOutputs()
+        internal bool ClearTerminalOutputs()
         {
+            var hadOutputs = TerminalOutputPanel.Visibility == Visibility.Visible;
             TerminalOutputList.ItemsSource = null;
             TerminalOutputPanel.Visibility = Visibility.Collapsed;
+            if (hadOutputs) TerminalOutputsCleared?.Invoke(this, EventArgs.Empty);
+            return hadOutputs;
         }
 
         private async Task RefreshReportsAsync(string workflowId)
@@ -553,14 +603,14 @@ namespace LongBetterWindows.Host.Views
                 ReportDetailMeta.Text = result.Error;
                 return;
             }
-            ReportList.ItemsSource = result.Reports.Select(ReportListItem.From).ToList();
+            ReportList.ItemsSource = WorkflowExecutionPresentation.ToReportListItems(result.Reports);
             if (result.Issues.Count > 0)
                 ReportDetailMeta.Text = $"{result.Issues.Count} 个报告文件未能载入";
         }
 
         private async void ReportList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (ReportList.SelectedItem is not ReportListItem item) return;
+            if (ReportList.SelectedItem is not WorkflowReportListItem item) return;
             var version = Interlocked.Increment(ref _reportLoadVersion);
             var result = await _reports.LoadAsync(item.ReportId);
             if (version != _reportLoadVersion) return;
@@ -571,15 +621,10 @@ namespace LongBetterWindows.Host.Views
                 ReportTimeline.ItemsSource = null;
                 return;
             }
-            var report = result.Report!;
-            ReportDetailTitle.Text = StatusLabel(report.Status);
-            var messageState = report.MessagesIncluded ? "消息未在界面展示" : "消息已脱敏";
-            ReportDetailMeta.Text = $"{report.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss} · {report.Events.Count} 个事件 · {messageState}";
-            ReportTimeline.ItemsSource = report.Events.Select(item => new TimelineItem(
-                item.Timestamp.ToLocalTime().ToString("HH:mm:ss"),
-                EventLabel(item.Kind),
-                item.StepId ?? "工作流"))
-                .ToList();
+            var presentation = WorkflowExecutionPresentation.DescribeReport(result.Report!);
+            ReportDetailTitle.Text = presentation.Title;
+            ReportDetailMeta.Text = presentation.Meta;
+            ReportTimeline.ItemsSource = presentation.Timeline;
         }
 
         private void RenderEditor()
@@ -818,6 +863,9 @@ namespace LongBetterWindows.Host.Views
             WorkflowDividerColumn.Width = new GridLength(compact ? 0 : 1);
             WorkflowGapColumn.Width = new GridLength(compact ? 0 : 20);
             CompactWorkflowBar.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            if (_isCompactLayout == compact) return;
+            _isCompactLayout = compact;
+            ResponsiveLayoutChanged?.Invoke(compact);
         }
 
         private void SetEditingEnabled(bool enabled)
@@ -855,18 +903,7 @@ namespace LongBetterWindows.Host.Views
         }
 
         private static string FailureLabel(WorkflowFailureMode mode)
-            => mode == WorkflowFailureMode.Compensate ? "失败时回滚" : "失败时停止";
-
-        private static string StatusLabel(WorkflowExecutionStatus status)
-            => status switch
-            {
-                WorkflowExecutionStatus.Completed => "执行完成",
-                WorkflowExecutionStatus.Compensated => "失败后已回滚",
-                WorkflowExecutionStatus.CompensationFailed => "回滚未完全成功",
-                WorkflowExecutionStatus.Cancelled => "执行已取消",
-                WorkflowExecutionStatus.Rejected => "执行已拒绝",
-                _ => "执行失败",
-            };
+            => WorkflowExecutionPresentation.FailureLabel(mode);
 
         private static string InputTypeLabel(AcceptedInputType inputType)
             => inputType switch
@@ -882,50 +919,7 @@ namespace LongBetterWindows.Host.Views
                 _ => "资源管理器选区",
             };
 
-        private static string EventLabel(WorkflowExecutionEventKind kind)
-            => kind switch
-            {
-                WorkflowExecutionEventKind.PreflightPassed => "预检通过",
-                WorkflowExecutionEventKind.AuthorizationApproved => "批准已确认",
-                WorkflowExecutionEventKind.StepStarted => "步骤开始",
-                WorkflowExecutionEventKind.StepSucceeded => "步骤成功",
-                WorkflowExecutionEventKind.StepFailed => "步骤失败",
-                WorkflowExecutionEventKind.StepCancelled => "步骤取消",
-                WorkflowExecutionEventKind.CompensationStarted => "开始回滚",
-                WorkflowExecutionEventKind.CompensationSucceeded => "回滚成功",
-                WorkflowExecutionEventKind.CompensationFailed => "回滚失败",
-                WorkflowExecutionEventKind.WorkflowCompleted => "流程完成",
-                _ => "流程拒绝",
-            };
-
         private sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum;
-        private sealed record PermissionReviewItem(string Plugin, string Capabilities);
-        private sealed record TimelineItem(string Time, string Kind, string Step);
-        private sealed record OutputSummaryItem(string Step, string Output, string Detail)
-        {
-            public static OutputSummaryItem From(WorkflowOutputSummary summary)
-                => new(
-                    summary.StepId,
-                    summary.OutputKey,
-                    $"{(summary.Role == WorkflowOutputRole.Compensation ? "补偿" : "命令")} · "
-                        + $"{summary.Type} · {summary.ValueLength:N0} 字符");
-        }
-        private sealed record TerminalOutputItem(WorkflowTerminalOutput Source)
-        {
-            public string Detail => $"{Source.StepId} / {Source.OutputKey} / {Source.Type}";
-            public string Value => Source.Value;
-
-            public static TerminalOutputItem From(WorkflowTerminalOutput output)
-                => new(output);
-        }
-        private sealed record ReportListItem(string ReportId, string Status, string Detail)
-        {
-            public static ReportListItem From(WorkflowExecutionReportSummary summary)
-                => new(
-                    summary.ReportId,
-                    StatusLabel(summary.Status),
-                    $"{summary.StartedAt.ToLocalTime():MM-dd HH:mm} · {summary.EventCount} 事件");
-        }
         private sealed record CommandOption(string Key, string Display)
         {
             public static CommandOption From(CommandDescriptor descriptor)
@@ -957,4 +951,9 @@ namespace LongBetterWindows.Host.Views
             public required WorkflowInvocationEditorModel CompensationInput { get; init; }
         }
     }
+
+    internal sealed record WorkflowExecutionResultState(
+        string Title,
+        int TerminalOutputLength,
+        bool HasTerminalOutputs);
 }

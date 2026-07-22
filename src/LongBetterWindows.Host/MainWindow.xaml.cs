@@ -1,6 +1,8 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Interop;
 using System.Windows.Input;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
@@ -13,11 +15,39 @@ namespace LongBetterWindows.Host
         private TrayService? _tray;
         private Func<Task>? _embeddedCloseRequested;
         private Action? _embeddedDetachRequested;
+        private string? _activeWorkflowReviewId;
+        private bool _workflowTerminalOutputApproved;
 
         public MainWindow()
         {
             InitializeComponent();
             _tray = new TrayService(this);
+            ToolCenter.WorkflowReviewClosed += (_, _) =>
+            {
+                _activeWorkflowReviewId = null;
+                _workflowTerminalOutputApproved = false;
+                AutomationProperties.SetItemStatus(this, string.Empty);
+                SetWorkflowReviewChrome(false);
+            };
+            ToolCenter.WorkflowLayoutChanged += compact =>
+            {
+                if (_activeWorkflowReviewId is not null)
+                    SetWorkflowLayoutAutomationStatus(compact, ToolCenter.WorkflowLayoutWidth);
+            };
+            ToolCenter.WorkflowExecutionResultChanged += result =>
+            {
+                AutomationProperties.SetItemStatus(
+                    this,
+                    $"workflow-result:{result.Title};terminal-length:{result.TerminalOutputLength};bounded-scroll:{(result.TerminalOutputLength > 1024 ? "true" : "false")}");
+                WorkflowTerminalClearButton.Visibility = result.HasTerminalOutputs
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            };
+            ToolCenter.WorkflowTerminalOutputsCleared += (_, _) =>
+            {
+                AutomationProperties.SetItemStatus(this, "workflow-result:terminal-cleared");
+                WorkflowTerminalClearButton.Visibility = Visibility.Collapsed;
+            };
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -64,6 +94,48 @@ namespace LongBetterWindows.Host
 
         private void OpenSuperPanel_Click(object sender, RoutedEventArgs e)
             => SuperPanelWindow.ShowPanel();
+
+        internal async Task<string?> OpenWorkflowReviewAsync(
+            string workflowId,
+            CancellationToken cancellationToken = default)
+        {
+            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
+                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
+            ToolCenter.Visibility = Visibility.Visible;
+            var error = await ToolCenter.OpenWorkflowReviewAsync(workflowId, cancellationToken);
+            if (error is null)
+            {
+                await Dispatcher.InvokeAsync(
+                    () => ToolCenter.UpdateLayout(),
+                    DispatcherPriority.Loaded,
+                    cancellationToken);
+                _activeWorkflowReviewId = workflowId;
+                _workflowTerminalOutputApproved = false;
+                WorkflowTerminalClearButton.Visibility = Visibility.Collapsed;
+                WorkflowTerminalApprovalButton.Content = "允许终端输出";
+                SetWorkflowLayoutAutomationStatus(
+                    ToolCenter.IsWorkflowLayoutCompact,
+                    ToolCenter.WorkflowLayoutWidth);
+                SetWorkflowReviewChrome(true);
+                Activate();
+                ToolCenter.FocusWorkflowReview();
+            }
+            return error;
+        }
+
+        private void SetWorkflowLayoutAutomationStatus(
+            bool compact,
+            double width,
+            bool? terminalApproved = null)
+        {
+            if (_activeWorkflowReviewId is null) return;
+            if (terminalApproved.HasValue)
+                _workflowTerminalOutputApproved = terminalApproved.Value;
+            AutomationProperties.SetItemStatus(
+                this,
+                $"workflow-review:{_activeWorkflowReviewId};layout:{(compact ? "compact" : "wide")};width:{Math.Round(width)}"
+                    + $";terminal-approved:{_workflowTerminalOutputApproved.ToString().ToLowerInvariant()}");
+        }
 
         private void Minimize_Click(object sender, RoutedEventArgs e)
             => WindowState = WindowState.Minimized;
@@ -143,11 +215,89 @@ namespace LongBetterWindows.Host
 
         private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            var modifiers = Keyboard.Modifiers;
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (_activeWorkflowReviewId is not null
+                && key == Key.T
+                && modifiers.HasFlag(ModifierKeys.Control)
+                && modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                var approved = ToolCenter.ToggleWorkflowTerminalOutputApproval();
+                WorkflowTerminalApprovalButton.Content = approved
+                    ? "已允许终端输出 ✓"
+                    : "允许终端输出";
+                SetWorkflowLayoutAutomationStatus(
+                    ToolCenter.IsWorkflowLayoutCompact,
+                    ToolCenter.WorkflowLayoutWidth,
+                    approved);
+                e.Handled = true;
+                return;
+            }
+            if (_activeWorkflowReviewId is not null
+                && key == Key.Enter
+                && modifiers.HasFlag(ModifierKeys.Control)
+                && modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                e.Handled = await ToolCenter.ConfirmWorkflowReviewAsync();
+                return;
+            }
+            if (key == Key.Delete
+                && modifiers.HasFlag(ModifierKeys.Control)
+                && modifiers.HasFlag(ModifierKeys.Shift)
+                && WorkflowTerminalClearButton.Visibility == Visibility.Visible)
+            {
+                e.Handled = ToolCenter.ClearWorkflowTerminalOutputs();
+                return;
+            }
+            if (e.Key == Key.Escape && ToolCenter.CancelWorkflowReview())
+            {
+                e.Handled = true;
+                return;
+            }
             if (e.Key != Key.Escape
                 || EmbeddedPluginSurface.Visibility != Visibility.Visible) return;
             await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
             e.Handled = true;
         }
+
+        private void CancelWorkflowReview_Click(object sender, RoutedEventArgs e)
+        {
+            AutomationProperties.SetItemStatus(this, string.Empty);
+            SetWorkflowReviewChrome(false);
+            ToolCenter.CancelWorkflowReview();
+        }
+
+        private async void WorkflowTerminalApprovalButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_activeWorkflowReviewId is null) return;
+            await Task.Delay(100);
+            var approved = ToolCenter.ToggleWorkflowTerminalOutputApproval();
+            _workflowTerminalOutputApproved = approved;
+            WorkflowTerminalApprovalButton.Content = approved
+                ? "已允许终端输出 ✓"
+                : "允许终端输出";
+        }
+
+        private async void ConfirmWorkflowReview_Click(object sender, RoutedEventArgs e)
+        {
+            await Task.Delay(100);
+            await ToolCenter.ConfirmWorkflowReviewAsync();
+        }
+
+        private void SetWorkflowReviewChrome(bool visible)
+        {
+            var reviewVisibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            WorkflowReviewCancelButton.Visibility = reviewVisibility;
+            WorkflowTerminalApprovalButton.Visibility = reviewVisibility;
+            WorkflowReviewConfirmButton.Visibility = reviewVisibility;
+            OpenSuperPanelButton.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
+            OpenPaletteButton.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
+            if (!visible)
+                WorkflowTerminalApprovalButton.Content = "允许终端输出";
+        }
+
+        private void ClearWorkflowTerminalOutputs_Click(object sender, RoutedEventArgs e)
+            => ToolCenter.ClearWorkflowTerminalOutputs();
 
         protected override void OnSourceInitialized(EventArgs e)
         {
