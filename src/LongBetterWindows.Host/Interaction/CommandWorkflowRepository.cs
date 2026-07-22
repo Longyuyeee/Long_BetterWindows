@@ -13,6 +13,25 @@ namespace LongBetterWindows.Host.Interaction
         string DefinitionSha256,
         string? Error);
 
+    public sealed record ManagedCommandWorkflowSummary(
+        string Id,
+        string Name,
+        WorkflowFailureMode FailureMode,
+        int StepCount,
+        string DefinitionSha256,
+        DateTimeOffset UpdatedAt,
+        bool ContainsSensitiveInputs);
+
+    public sealed record CommandWorkflowListIssue(
+        string FileName,
+        string Error);
+
+    public sealed record CommandWorkflowListResult(
+        bool IsSuccess,
+        IReadOnlyList<ManagedCommandWorkflowSummary> Workflows,
+        IReadOnlyList<CommandWorkflowListIssue> Issues,
+        string? Error);
+
     /// <summary>Atomically stores local workflows and reads external imports without adopting them.</summary>
     public sealed class CommandWorkflowRepository
     {
@@ -156,6 +175,57 @@ namespace LongBetterWindows.Host.Interaction
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 return Task.FromResult(ReadFailure($"Workflow storage is unavailable: {ex.Message}"));
+            }
+        }
+
+        public async Task<CommandWorkflowListResult> ListManagedAsync(
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                EnsureManagedRoot();
+                var workflows = new List<ManagedCommandWorkflowSummary>();
+                var issues = new List<CommandWorkflowListIssue>();
+                foreach (var path in Directory.EnumerateFiles(
+                    _root,
+                    "*.workflow.json",
+                    SearchOption.TopDirectoryOnly))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var result = await ReadAsync(path, isManagedFile: true, cancellationToken);
+                    if (!result.IsSuccess)
+                    {
+                        issues.Add(new CommandWorkflowListIssue(
+                            Path.GetFileName(path),
+                            result.Error ?? "Workflow document could not be read."));
+                        continue;
+                    }
+                    var workflow = result.Workflow!;
+                    workflows.Add(new ManagedCommandWorkflowSummary(
+                        workflow.Id,
+                        workflow.Name,
+                        workflow.FailureMode,
+                        workflow.Steps.Count,
+                        result.DefinitionSha256,
+                        new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero),
+                        CommandWorkflowDocumentCodec.ContainsSensitiveInputs(workflow)));
+                }
+                return new CommandWorkflowListResult(
+                    true,
+                    workflows
+                        .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                        .ThenBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
+                        .ToList(),
+                    issues,
+                    null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return new CommandWorkflowListResult(
+                    false,
+                    Array.Empty<ManagedCommandWorkflowSummary>(),
+                    Array.Empty<CommandWorkflowListIssue>(),
+                    $"Workflow storage is unavailable: {ex.Message}");
             }
         }
 
