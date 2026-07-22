@@ -2,6 +2,8 @@
 
 本目录包含 7 个完整的示例插件，覆盖 JavaScript、TypeScript 和 C# 三种语言。
 
+另有可直接导入 Tool Center 的 [组合动作样例](workflows/README.md)，用于演示跨步骤结构化输出绑定。
+
 ---
 
 ## 📚 示例列表

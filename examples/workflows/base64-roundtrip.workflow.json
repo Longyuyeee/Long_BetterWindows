@@ -1,0 +1,55 @@
+{
+  "schema_version": 3,
+  "source": {
+    "kind": "imported",
+    "source_id": "long.examples.workflow.base64-roundtrip"
+  },
+  "workflow": {
+    "id": "workflow.example.base64-roundtrip",
+    "name": "Base64 编码与解码往返",
+    "failure_mode": "stop",
+    "steps": [
+      {
+        "id": "encode",
+        "effect": "read_only",
+        "command": {
+          "command_key": "com.long.base64:base64.encode",
+          "invocation": {
+            "command_id": "base64.encode",
+            "input_type": "text",
+            "text": "Long BetterWindows",
+            "paths": [],
+            "image_png": null,
+            "arguments": {}
+          },
+          "bindings": []
+        },
+        "compensation": null
+      },
+      {
+        "id": "decode",
+        "effect": "read_only",
+        "command": {
+          "command_key": "com.long.base64:base64.decode",
+          "invocation": {
+            "command_id": "base64.decode",
+            "input_type": "text",
+            "text": null,
+            "paths": [],
+            "image_png": null,
+            "arguments": {}
+          },
+          "bindings": [
+            {
+              "source_step_id": "encode",
+              "output_key": "result",
+              "target": "text",
+              "argument_key": null
+            }
+          ]
+        },
+        "compensation": null
+      }
+    ]
+  }
+}
