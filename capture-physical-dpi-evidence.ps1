@@ -10,6 +10,7 @@ param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [Parameter(Mandatory=$true)]
     [ValidateSet(100,125,150,200,250)] [int] $ExpectedScalePercent,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [ValidateSet('light','dark')] [string[]] $Themes = @('light','dark'),
     [ValidateSet('main','market','palette','plugin')]
     [string[]] $Views = @('main','market','palette','plugin'),
@@ -23,6 +24,17 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
+$actualCommit = (& git -C $repoRoot rev-parse HEAD).Trim().ToLowerInvariant()
+if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $expectedCommit) {
+    throw 'Repository HEAD does not match ExpectedSourceCommit.'
+}
+& git -C $repoRoot diff --quiet HEAD --
+if ($LASTEXITCODE -ne 0) { throw 'Physical DPI evidence requires a clean tracked source tree.' }
+if ($NoBuild) { throw 'Formal physical DPI evidence must rebuild the expected source commit.' }
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $outputRoot) {
     throw "Physical DPI evidence output directory already exists: $outputRoot"
@@ -44,10 +56,8 @@ if (-not (Test-Path -LiteralPath $dotnet)) {
     $dotnet = $command.Source
 }
 $project = Join-Path $repoRoot 'src\LongBetterWindows.Host\LongBetterWindows.Host.csproj'
-if (-not $NoBuild) {
-    & $dotnet build $project -c Release
-    if ($LASTEXITCODE -ne 0) { throw 'Physical DPI evidence Release build failed.' }
-}
+& $dotnet build $project -c Release
+if ($LASTEXITCODE -ne 0) { throw 'Physical DPI evidence Release build failed.' }
 $executable = Join-Path $repoRoot 'src\LongBetterWindows.Host\bin\Release\net8.0-windows\LongBetterWindows.Host.exe'
 if (-not (Test-Path -LiteralPath $executable)) { throw "Host executable was not found: $executable" }
 
@@ -114,6 +124,7 @@ $manifest = [ordered]@{
     schema_version = 1
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'physical_device_dpi_evidence'
+    source_commit = $expectedCommit
     expected_scale_percent = $ExpectedScalePercent
     expected_dpi = $expectedDpi
     automated_checks_passed = $true

@@ -5,6 +5,7 @@
 #>
 param(
     [Parameter(Mandatory=$true)] [string] $EvidenceDirectory,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)]
     [ValidateSet(100,125,150,200,250)] [int] $ConfirmScalePercent,
     [Parameter(Mandatory=$true)] [string] $Reviewer,
@@ -13,6 +14,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
 if (-not $ConfirmVisualReview) { throw 'ConfirmVisualReview must be supplied after inspecting all captures.' }
 if ([string]::IsNullOrWhiteSpace($Reviewer)) { throw 'Reviewer must not be empty.' }
 if ([string]::IsNullOrWhiteSpace($ReviewNotes) -or $ReviewNotes.Trim().Length -lt 8) {
@@ -25,6 +30,9 @@ if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Evidence manifest was 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.classification -ne 'physical_device_dpi_evidence') {
     throw "Unexpected evidence classification: $($manifest.classification)"
+}
+if ([string]$manifest.source_commit -ne $expectedCommit) {
+    throw 'Physical DPI evidence source commit does not match ExpectedSourceCommit.'
 }
 if (-not [bool]$manifest.automated_checks_passed) { throw 'Automated physical DPI checks did not pass.' }
 if ([int]$manifest.expected_scale_percent -ne $ConfirmScalePercent) {

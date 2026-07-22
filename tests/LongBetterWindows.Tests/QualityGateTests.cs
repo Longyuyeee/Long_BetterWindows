@@ -204,11 +204,18 @@ public class QualityGateTests
         Assert.Contains("actual_monitor_dpi", capture);
         Assert.Contains("Physical monitor DPI mismatch", capture);
         Assert.Contains("physical_device_dpi_evidence", capture);
+        Assert.Contains("ExpectedSourceCommit", capture);
+        Assert.Contains("Repository HEAD does not match ExpectedSourceCommit", capture);
+        Assert.Contains("requires a clean tracked source tree", capture);
+        Assert.Contains("must rebuild the expected source commit", capture);
+        Assert.Contains("source_commit = $expectedCommit", capture);
         Assert.Contains("ApproveAfterVisualReview", capture);
         Assert.Contains("no_clipping_or_overflow", capture);
         Assert.Contains("webview_preview", capture);
         Assert.Contains("wpf_render_target", capture);
         Assert.Contains("ConfirmVisualReview", approve);
+        Assert.Contains("ExpectedSourceCommit", approve);
+        Assert.Contains("Physical DPI evidence source commit does not match ExpectedSourceCommit", approve);
         Assert.Contains("Scale confirmation mismatch", approve);
         Assert.Contains("Evidence changed after capture", approve);
         Assert.Contains("Get-FileHash", approve);
@@ -217,6 +224,9 @@ public class QualityGateTests
         Assert.Contains("Get-FileHash", verify);
         Assert.Contains("Expected 8 captures", verify);
         Assert.Contains("approved_physical_device_dpi_matrix", verify);
+        Assert.Contains("ExpectedSourceCommit", verify);
+        Assert.Contains("Physical DPI evidence source commit does not match ExpectedSourceCommit", verify);
+        Assert.Contains("source_commit = $expectedCommit", verify);
     }
 
     [Fact]

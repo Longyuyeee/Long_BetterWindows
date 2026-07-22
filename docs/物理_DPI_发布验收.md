@@ -18,6 +18,7 @@
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\capture-physical-dpi-evidence.ps1 `
   -OutputDirectory .\artifacts\physical-dpi-100-YYYYMMDD `
+  -ExpectedSourceCommit "完整的 40 位候选源码提交" `
   -ExpectedScalePercent 100
 ```
 
@@ -34,6 +35,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\capture-physical-dpi-evidence.ps1
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\approve-physical-dpi-evidence.ps1 `
   -EvidenceDirectory .\artifacts\physical-dpi-100-YYYYMMDD `
+  -ExpectedSourceCommit "完整的 40 位候选源码提交" `
   -ConfirmScalePercent 100 `
   -Reviewer "测试人员姓名" `
   -ReviewNotes "亮暗主题和四类视图均已逐张检查" `
@@ -53,10 +55,11 @@ powershell.exe -ExecutionPolicy Bypass -File .\verify-physical-dpi-matrix.ps1 `
     .\artifacts\physical-dpi-125-YYYYMMDD, `
     .\artifacts\physical-dpi-150-YYYYMMDD, `
     .\artifacts\physical-dpi-200-YYYYMMDD `
+  -ExpectedSourceCommit "完整的 40 位候选源码提交" `
   -OutputPath .\artifacts\quality\physical-dpi-release-matrix.json
 ```
 
-汇总门禁要求四个唯一档位、每档 8 张图片、人工状态为 `approved`、文件哈希未变化、实际显示器缩放与档位一致。任一条件不满足即失败。
+采集要求仓库 `HEAD` 等于指定的完整提交 SHA、受跟踪文件无改动，并重新构建该提交；`-NoBuild` 不能用于正式物理证据。汇总门禁要求四个唯一档位来自同一个指定提交、每档 8 张图片、人工状态为 `approved`、文件哈希未变化、实际显示器缩放与档位一致。任一条件不满足即失败。
 
 ## 当前证据
 

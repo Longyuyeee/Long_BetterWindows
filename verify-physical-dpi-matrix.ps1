@@ -5,10 +5,15 @@
 #>
 param(
     [Parameter(Mandatory=$true)] [string[]] $EvidenceDirectories,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [string] $OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
 $requiredScales = @(100,125,150,200)
 $results = @()
 foreach ($directory in $EvidenceDirectories) {
@@ -20,6 +25,9 @@ foreach ($directory in $EvidenceDirectories) {
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($manifest.classification -ne 'physical_device_dpi_evidence') {
         throw "Unexpected evidence classification: $manifestPath"
+    }
+    if ([string]$manifest.source_commit -ne $expectedCommit) {
+        throw "Physical DPI evidence source commit does not match ExpectedSourceCommit: $manifestPath"
     }
     $scale = [int]$manifest.expected_scale_percent
     if ($scale -notin $requiredScales) { throw "Unsupported release matrix scale: $scale%" }
@@ -48,6 +56,7 @@ foreach ($directory in $EvidenceDirectories) {
     }
     $results += [ordered]@{
         scale_percent = $scale
+        source_commit = $expectedCommit
         reviewer = $manifest.human_review.reviewer
         reviewed_at = $manifest.human_review.reviewed_at
         capture_count = $captures.Count
@@ -65,6 +74,7 @@ $summary = [ordered]@{
     schema_version = 1
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_physical_device_dpi_matrix'
+    source_commit = $expectedCommit
     required_scales = $requiredScales
     capture_count = ($results | Measure-Object -Property capture_count -Sum).Sum
     passed = $true
