@@ -98,6 +98,72 @@ public sealed class CommandWorkflowEditorSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteCurrent_RemovesSavedWorkflowAndClearsDraft()
+    {
+        var session = Session();
+        session.StartNew("workflow.delete", "Delete workflow");
+        session.AddStep("editor:first");
+        await session.SaveAsync(allowSensitiveInputs: false);
+
+        var result = await session.DeleteCurrentAsync();
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Null(session.State.Draft);
+        Assert.Empty((await new CommandWorkflowRepository(_root, "local-user")
+            .ListManagedAsync()).Workflows);
+    }
+
+    [Fact]
+    public async Task DeleteManaged_RejectsStaleDefinitionHash()
+    {
+        var session = Session();
+        session.StartNew("workflow.stale-delete", "Stale delete");
+        session.AddStep("editor:first");
+        var saved = await session.SaveAsync(allowSensitiveInputs: false);
+        var repository = new CommandWorkflowRepository(_root, "local-user");
+
+        var result = await repository.DeleteManagedAsync(
+            "workflow.stale-delete",
+            new string('f', 64));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("stale delete", result.Error);
+        Assert.Equal(saved.DefinitionSha256, (await repository.LoadManagedAsync(
+            "workflow.stale-delete")).DefinitionSha256);
+    }
+
+    [Fact]
+    public async Task LoadedDraft_NoOpControlUpdatesRemainClean()
+    {
+        var session = Session();
+        session.StartNew("workflow.clean", "Clean workflow");
+        session.AddStep("editor:first");
+        await session.SaveAsync(allowSensitiveInputs: false);
+        await session.LoadAsync("workflow.clean");
+
+        session.UpdateIdentity("workflow.clean", "Clean workflow");
+        session.SetFailureMode(WorkflowFailureMode.Stop);
+        session.UpdateStep("step-1", WorkflowStepEffect.ReadOnly, "editor:first", null);
+
+        Assert.False(session.State.IsDirty);
+    }
+
+    [Fact]
+    public void AddStep_EnforcesMaximumBeforeDraftMutation()
+    {
+        var session = Session();
+        session.StartNew("workflow.maximum", "Maximum workflow");
+        for (var index = 0; index < CommandWorkflowPlanner.MaximumStepCount; index++)
+            Assert.True(session.AddStep("editor:first"));
+
+        var added = session.AddStep("editor:second");
+
+        Assert.False(added);
+        Assert.Equal(CommandWorkflowPlanner.MaximumStepCount, session.State.Draft!.Steps.Count);
+        Assert.Contains("cannot contain more", session.State.Error);
+    }
+
+    [Fact]
     public async Task Save_RejectsDraftWhoseCommandDisappeared()
     {
         var registry = Registry();

@@ -149,6 +149,7 @@ namespace LongBetterWindows.Host.Views
             (string Key, FrameworkElement Panel, RadioButton Navigation, string Title, string Subtitle)[] pages =
             {
                 ("overview", PanelOverview, NavOverview, "概览", "平台状态、关键能力和下一步操作"),
+                ("workflows", PanelWorkflows, NavWorkflows, "组合动作", "编排、预检并安全保存跨插件工作流"),
                 ("plugins", PanelPlugins, NavPlugins, "插件", "管理已安装插件、运行状态、权限和设置"),
                 ("market", PanelMarket, NavMarket, "插件市场", "发现、审查并安装可信的 Long 原生插件"),
                 ("system", PanelSystem, NavSystem, "系统集成", "配置 Explorer、启动项和全局快捷键"),
@@ -169,6 +170,8 @@ namespace LongBetterWindows.Host.Views
                 PageSubtitle.Text = subtitle;
                 if (key == "plugins")
                     PluginManagementHost.Refresh();
+                else if (key == "workflows" && WorkflowEditorHost.Content == null)
+                    WorkflowEditorHost.Content = new WorkflowEditorControl();
                 else if (key == "market" && MarketHost.Content == null)
                     MarketHost.Content = new MarketplaceControl();
                 else if (key == "diagnostics" && DiagnosticsHost.Content == null)
@@ -193,7 +196,7 @@ namespace LongBetterWindows.Host.Views
             if (e.Key == Key.Tab && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
                 e.Handled = true;
-                var pages = new[] { "overview", "plugins", "market", "system", "diagnostics", "developer", "settings" };
+                var pages = new[] { "overview", "workflows", "plugins", "market", "system", "diagnostics", "developer", "settings" };
                 var current = Array.IndexOf(pages, _activePage);
                 var direction = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;
                 ShowPage(pages[(current + direction + pages.Length) % pages.Length]);

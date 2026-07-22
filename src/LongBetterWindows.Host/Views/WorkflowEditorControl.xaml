@@ -1,0 +1,229 @@
+<UserControl x:Class="LongBetterWindows.Host.Views.WorkflowEditorControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
+             Loaded="WorkflowEditorControl_Loaded"
+             Unloaded="WorkflowEditorControl_Unloaded">
+    <Grid MinHeight="600">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="WorkflowListColumn" Width="232" />
+            <ColumnDefinition x:Name="WorkflowDividerColumn" Width="1" />
+            <ColumnDefinition x:Name="WorkflowGapColumn" Width="20" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="本机工作流" FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock x:Name="WorkflowCountText" Text="0 项" Margin="0,3,0,0"
+                               FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                </StackPanel>
+                <Button Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="0,0,6,0"
+                        Click="Refresh_Click" ToolTip="刷新工作流"
+                        automation:AutomationProperties.Name="刷新工作流列表">
+                    <Path Data="{StaticResource Long.Icon.Refresh}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                </Button>
+                <Button Grid.Column="2" Style="{StaticResource LongIconButton}"
+                        Click="NewWorkflow_Click" ToolTip="新建组合动作"
+                        automation:AutomationProperties.Name="新建组合动作">
+                    <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                </Button>
+            </Grid>
+
+            <ListBox x:Name="WorkflowList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                     SelectionChanged="WorkflowList_SelectionChanged"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
+                        <Setter Property="Margin" Value="0,0,0,5" />
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="2,1">
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Row="1" Margin="0,4,0,0" FontSize="10"
+                                       Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                       Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock x:Name="ListStatusText" Grid.Row="2" Margin="2,10,2,0" FontSize="10"
+                       TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+        </Grid>
+
+        <Border Grid.Column="1" Background="{DynamicResource Long.Brush.Stroke.Default}" />
+
+        <Grid Grid.Column="3">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Grid x:Name="CompactWorkflowBar" Visibility="Collapsed" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <ComboBox x:Name="CompactWorkflowCombo" Style="{StaticResource LongComboBox}"
+                          DisplayMemberPath="Name" SelectedValuePath="Id"
+                          SelectionChanged="CompactWorkflowCombo_SelectionChanged"
+                          automation:AutomationProperties.Name="选择本机工作流" />
+                <Button Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="8,0,6,0"
+                        Click="Refresh_Click" ToolTip="刷新工作流"
+                        automation:AutomationProperties.Name="刷新工作流列表">
+                    <Path Data="{StaticResource Long.Icon.Refresh}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                </Button>
+                <Button Grid.Column="2" Style="{StaticResource LongIconButton}"
+                        Click="NewWorkflow_Click" ToolTip="新建组合动作"
+                        automation:AutomationProperties.Name="新建组合动作">
+                    <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                </Button>
+            </Grid>
+
+            <Grid x:Name="EmptyEditor" Grid.Row="1">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="320">
+                    <Path Data="{StaticResource Long.Icon.Command}" Style="{StaticResource LongIcon}"
+                          Width="34" Height="34" HorizontalAlignment="Center" />
+                    <TextBlock Text="选择或创建一个组合动作" Margin="0,14,0,0" FontSize="15"
+                               FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="工作流只在本机保存，执行前仍会重新预检并要求批准。"
+                               Margin="0,7,0,0" TextAlignment="Center" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                </StackPanel>
+            </Grid>
+
+            <StackPanel x:Name="EditorBody" Grid.Row="1" Visibility="Collapsed">
+                <Grid Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="EditorHeading" Text="组合动作" FontSize="17" FontWeight="SemiBold" />
+                        <TextBlock x:Name="EditorDirtyText" Margin="0,4,0,0" FontSize="11"
+                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="DeleteWorkflowButton" Style="{StaticResource LongIconButton}" Margin="0,0,8,0"
+                                Click="DeleteWorkflow_Click" ToolTip="删除组合动作"
+                                automation:AutomationProperties.Name="删除组合动作">
+                            <Path Data="{StaticResource Long.Icon.Delete}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                        </Button>
+                        <Button x:Name="SaveWorkflowButton" Style="{StaticResource LongButton.Primary}"
+                                Click="SaveWorkflow_Click" automation:AutomationProperties.Name="保存组合动作">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Long.Icon.Save}" Style="{StaticResource LongIcon}"
+                                      Stroke="{DynamicResource Long.Brush.Text.OnAccent}" Width="16" Height="16" />
+                                <TextBlock Text="保存" Margin="7,0,0,0" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="1.1*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="1.6*"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="工作流 ID" Margin="2,0,0,6" FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        <TextBox x:Name="WorkflowIdBox" Style="{StaticResource LongTextBox}" MaxLength="64"
+                                 TextChanged="Identity_TextChanged" automation:AutomationProperties.Name="工作流 ID" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="名称" Margin="2,0,0,6" FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        <TextBox x:Name="WorkflowNameBox" Style="{StaticResource LongTextBox}" MaxLength="120"
+                                 TextChanged="Identity_TextChanged" automation:AutomationProperties.Name="组合动作名称" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="1.1*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="1.6*"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="失败策略" Margin="2,0,0,6" FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        <ComboBox x:Name="FailureModeCombo" Style="{StaticResource LongComboBox}"
+                                  DisplayMemberPath="Label" SelectedValuePath="Value"
+                                  SelectionChanged="FailureMode_SelectionChanged"
+                                  automation:AutomationProperties.Name="失败策略" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="添加命令步骤" Margin="2,0,0,6" FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <ComboBox x:Name="AddCommandCombo" Style="{StaticResource LongComboBox}"
+                                      DisplayMemberPath="Display" SelectedValuePath="Key"
+                                      automation:AutomationProperties.Name="选择要添加的命令" />
+                            <Button Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="8,0,0,0"
+                                    Click="AddStep_Click" ToolTip="添加步骤"
+                                    automation:AutomationProperties.Name="添加命令步骤">
+                                <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="步骤" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,10" />
+                <ItemsControl x:Name="StepsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource LongCard}" Effect="{x:Null}" Margin="0,0,0,8" Padding="12">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Position}" VerticalAlignment="Center" FontFamily="{DynamicResource Long.Font.Mono}"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    <ComboBox Grid.Column="1" Margin="0,0,8,0" Style="{StaticResource LongComboBox}"
+                                              ItemsSource="{Binding CommandOptions}" DisplayMemberPath="Display" SelectedValuePath="Key"
+                                              SelectedValue="{Binding CommandKey}" SelectionChanged="StepCommand_SelectionChanged"
+                                              automation:AutomationProperties.Name="步骤命令" />
+                                    <ComboBox Grid.Column="2" Margin="0,0,8,0" Style="{StaticResource LongComboBox}"
+                                              ItemsSource="{Binding EffectOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                                              SelectedValue="{Binding Effect}" SelectionChanged="StepEffect_SelectionChanged"
+                                              automation:AutomationProperties.Name="步骤类型" />
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                        <Button Style="{StaticResource LongIconButton}" Margin="0,0,5,0" IsEnabled="{Binding CanMoveUp}"
+                                                Tag="{Binding}" Click="MoveStepUp_Click" ToolTip="上移步骤"
+                                                automation:AutomationProperties.Name="上移步骤">
+                                            <Path Data="{StaticResource Long.Icon.ArrowUp}" Style="{StaticResource LongIcon}" Width="16" Height="16" />
+                                        </Button>
+                                        <Button Style="{StaticResource LongIconButton}" Margin="0,0,5,0" IsEnabled="{Binding CanMoveDown}"
+                                                Tag="{Binding}" Click="MoveStepDown_Click" ToolTip="下移步骤"
+                                                automation:AutomationProperties.Name="下移步骤">
+                                            <Path Data="{StaticResource Long.Icon.ArrowDown}" Style="{StaticResource LongIcon}" Width="16" Height="16" />
+                                        </Button>
+                                        <Button Style="{StaticResource LongIconButton}" Tag="{Binding}" Click="RemoveStep_Click" ToolTip="删除步骤"
+                                                automation:AutomationProperties.Name="删除步骤">
+                                            <Path Data="{StaticResource Long.Icon.Delete}" Style="{StaticResource LongIcon}" Width="16" Height="16" />
+                                        </Button>
+                                    </StackPanel>
+                                    <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,9,0,0"
+                                          Visibility="{Binding IsMutating, Converter={StaticResource BooleanToVisibility}}">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="补偿命令" VerticalAlignment="Center" FontSize="11"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                        <ComboBox Grid.Column="1" Style="{StaticResource LongComboBox}"
+                                                  ItemsSource="{Binding CompensationOptions}" DisplayMemberPath="Display" SelectedValuePath="Key"
+                                                  SelectedValue="{Binding CompensationKey}" SelectionChanged="StepCompensation_SelectionChanged"
+                                                  automation:AutomationProperties.Name="步骤补偿命令" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock x:Name="EmptyStepsText" Text="尚未添加步骤" Margin="2,8,0,10"
+                           Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                <Border x:Name="PreflightPanel" CornerRadius="{DynamicResource Long.Radius.Control}"
+                        Padding="12,10" Margin="0,6,0,0" Background="{DynamicResource Long.Brush.Background.Raised}"
+                        BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock x:Name="PreflightTitle" FontWeight="SemiBold" />
+                        <TextBlock x:Name="PreflightDetail" Margin="0,4,0,0" TextWrapping="Wrap"
+                                   FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        <CheckBox x:Name="SensitiveInputCheckBox" Content="允许将潜在敏感输入保存到本机文件"
+                                  Margin="0,9,0,0" Visibility="Collapsed"
+                                  automation:AutomationProperties.Name="允许保存敏感输入" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

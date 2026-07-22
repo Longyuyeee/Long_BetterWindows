@@ -511,6 +511,30 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void WorkflowEditor_DelegatesDraftAndPersistenceToInteractionLayer()
+    {
+        var view = Read(
+            "src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml.cs");
+        var xaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml");
+        var session = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "CommandWorkflowEditorSession.cs");
+
+        Assert.Contains("new CommandWorkflowEditorSession", view);
+        Assert.Contains("_session.AddStep", view);
+        Assert.Contains("_session.UpdateStep", view);
+        Assert.Contains("_session.SaveAsync", view);
+        Assert.Contains("_session.DeleteCurrentAsync", view);
+        Assert.Contains("ApplyResponsiveLayout", view);
+        Assert.Contains("CompactWorkflowCombo", xaml);
+        Assert.DoesNotContain("File.WriteAllText", view);
+        Assert.Contains("AutomationProperties.Name=\"保存组合动作\"", xaml);
+        Assert.Contains("CommandWorkflowPlanner", session);
+        Assert.Contains("ExpectedExistingDefinitionSha256", Read(
+            "src", "LongBetterWindows.Host", "Interaction", "CommandWorkflowRepository.cs"));
+    }
+
+    [Fact]
     public void SuperPanel_ReusesUnifiedContextSearchExecutionAndPreferences()
     {
         var xaml = Read("src", "LongBetterWindows.Host", "Views", "SuperPanelWindow.xaml");

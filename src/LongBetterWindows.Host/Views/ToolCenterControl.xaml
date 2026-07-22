@@ -29,6 +29,8 @@
                 <StackPanel Grid.Row="1">
                     <RadioButton x:Name="NavOverview" Content="概览" GroupName="MainNav" IsChecked="True"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="overview" />
+                    <RadioButton x:Name="NavWorkflows" Content="组合动作" GroupName="MainNav"
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="workflows" />
                     <RadioButton x:Name="NavPlugins" Content="插件" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="plugins" />
                     <RadioButton x:Name="NavMarket" Content="插件市场" GroupName="MainNav"
@@ -135,6 +137,11 @@
                             </Border>
                         </Grid>
                     </StackPanel>
+
+                    <!-- 组合动作 -->
+                    <Grid x:Name="PanelWorkflows" Visibility="Collapsed">
+                        <ContentControl x:Name="WorkflowEditorHost" />
+                    </Grid>
 
                     <!-- 插件管理 -->
                     <Grid x:Name="PanelPlugins" Visibility="Collapsed">

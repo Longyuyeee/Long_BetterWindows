@@ -121,6 +121,7 @@ public class DesignSystemTests
         var requiredPages = new[]
         {
             "PanelOverview",
+            "PanelWorkflows",
             "PanelPlugins",
             "PanelMarket",
             "PanelSystem",

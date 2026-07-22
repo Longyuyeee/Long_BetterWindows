@@ -32,6 +32,10 @@ namespace LongBetterWindows.Host.Interaction
         IReadOnlyList<CommandWorkflowListIssue> Issues,
         string? Error);
 
+    public sealed record CommandWorkflowDeleteResult(
+        bool IsSuccess,
+        string? Error);
+
     /// <summary>Atomically stores local workflows and reads external imports without adopting them.</summary>
     public sealed class CommandWorkflowRepository
     {
@@ -226,6 +230,54 @@ namespace LongBetterWindows.Host.Interaction
                     Array.Empty<ManagedCommandWorkflowSummary>(),
                     Array.Empty<CommandWorkflowListIssue>(),
                     $"Workflow storage is unavailable: {ex.Message}");
+            }
+        }
+
+        public async Task<CommandWorkflowDeleteResult> DeleteManagedAsync(
+            string workflowId,
+            string expectedDefinitionSha256,
+            CancellationToken cancellationToken = default)
+        {
+            if (!IsIdentifier(workflowId))
+                return new CommandWorkflowDeleteResult(false, "Workflow id is invalid.");
+            if (!TryNormalizeHash(expectedDefinitionSha256, out var expectedHash))
+                return new CommandWorkflowDeleteResult(false, "Expected workflow hash must be 64 hexadecimal characters.");
+
+            await _writeGate.WaitAsync(cancellationToken);
+            try
+            {
+                string path;
+                try
+                {
+                    EnsureManagedRoot();
+                    path = GetManagedPath(workflowId);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    return new CommandWorkflowDeleteResult(false, $"Workflow storage is unavailable: {ex.Message}");
+                }
+                var existing = await ReadAsync(path, isManagedFile: true, cancellationToken);
+                if (!existing.IsSuccess)
+                    return new CommandWorkflowDeleteResult(false, existing.Error);
+                if (!string.Equals(existing.DefinitionSha256, expectedHash, StringComparison.Ordinal))
+                {
+                    return new CommandWorkflowDeleteResult(
+                        false,
+                        "Workflow changed since it was loaded; refusing a stale delete.");
+                }
+                try
+                {
+                    File.Delete(path);
+                    return new CommandWorkflowDeleteResult(true, null);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    return new CommandWorkflowDeleteResult(false, $"Workflow could not be deleted: {ex.Message}");
+                }
+            }
+            finally
+            {
+                _writeGate.Release();
             }
         }
 

@@ -69,10 +69,13 @@ namespace LongBetterWindows.Host.Interaction
                 State = State with { Error = "A saved workflow id cannot be changed." };
                 return;
             }
+            var normalizedName = name?.Trim() ?? string.Empty;
+            if (string.Equals(draft.Id, normalizedId, StringComparison.Ordinal)
+                && string.Equals(draft.Name, normalizedName, StringComparison.Ordinal)) return;
             SetDraft(draft with
             {
                 Id = normalizedId,
-                Name = name?.Trim() ?? string.Empty,
+                Name = normalizedName,
             }, State.ExistingDefinitionSha256, isDirty: true);
         }
 
@@ -80,6 +83,7 @@ namespace LongBetterWindows.Host.Interaction
         {
             if (!Enum.IsDefined(failureMode))
                 throw new ArgumentOutOfRangeException(nameof(failureMode));
+            if (RequireDraft().FailureMode == failureMode) return;
             SetDraft(
                 RequireDraft() with { FailureMode = failureMode },
                 State.ExistingDefinitionSha256,
@@ -93,6 +97,14 @@ namespace LongBetterWindows.Host.Interaction
             if (!Enum.IsDefined(effect))
                 throw new ArgumentOutOfRangeException(nameof(effect));
             var draft = RequireDraft();
+            if (draft.Steps.Count >= CommandWorkflowPlanner.MaximumStepCount)
+            {
+                State = State with
+                {
+                    Error = $"A workflow cannot contain more than {CommandWorkflowPlanner.MaximumStepCount} steps.",
+                };
+                return false;
+            }
             var command = CreateCommand(commandKey);
             if (command is null)
             {
@@ -128,6 +140,13 @@ namespace LongBetterWindows.Host.Interaction
                 State = State with { Error = "A selected workflow command is no longer available." };
                 return false;
             }
+            var existing = draft.Steps[index];
+            if (existing.Effect == effect
+                && string.Equals(existing.Command?.CommandKey, command.CommandKey, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(
+                    existing.Compensation?.CommandKey,
+                    compensation?.CommandKey,
+                    StringComparison.OrdinalIgnoreCase)) return true;
             var steps = draft.Steps.ToList();
             steps[index] = steps[index] with
             {
@@ -191,6 +210,27 @@ namespace LongBetterWindows.Host.Interaction
             {
                 State = State with { Error = result.Error };
             }
+            return result;
+        }
+
+        public async Task<CommandWorkflowDeleteResult> DeleteCurrentAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var draft = RequireDraft();
+            if (State.ExistingDefinitionSha256 is null)
+            {
+                const string error = "The workflow has not been saved.";
+                State = State with { Error = error };
+                return new CommandWorkflowDeleteResult(false, error);
+            }
+            var result = await _repository.DeleteManagedAsync(
+                draft.Id,
+                State.ExistingDefinitionSha256,
+                cancellationToken);
+            if (result.IsSuccess)
+                State = new CommandWorkflowEditorState(null, null, false, null, null);
+            else
+                State = State with { Error = result.Error };
             return result;
         }
 
