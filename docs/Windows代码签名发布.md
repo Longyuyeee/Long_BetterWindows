@@ -19,15 +19,19 @@
 4. 准备受信任的 HTTPS RFC 3161 时间戳服务地址。
 5. 输入候选的 `release-manifest.json` 必须记录 `source_dirty=false`、`signed=false` 和完整源码提交 SHA。
 
+### v1.9.0 当前前置审计
+
+2026-07-22 已确认本机安装 Windows SDK x64 SignTool，冻结候选提交为 `fe1d6b1d7ee008794e8199e3d77a306f9d66b940`。当前 `CurrentUser\My` 和 `LocalMachine\My` 均未发现同时具备可访问私钥与 Code Signing EKU 的证书，因此正式签名保持阻断。使用不存在的证书指纹执行完整参数预检时，脚本退出码为 1、没有创建 `v1.9.0-signed`，输入 Manifest SHA-256 保持 `26fae976f51874412cd6b29d0d11e2bc65996a9ee016d01fc2e229a404c6213e`。
+
 ## 3. 签名
 
 ```powershell
 .\sign-release.ps1 `
-  -InputReleaseDirectory .\artifacts\releases\v1.9.0-clean `
+  -InputReleaseDirectory .\artifacts\releases\v1.9.0 `
   -OutputDirectory .\artifacts\releases\v1.9.0-signed `
   -CertificateThumbprint "正式证书指纹" `
   -ExpectedSubject "批准的发布主体" `
-  -ExpectedSourceCommit "完整的 40 位候选源码提交" `
+  -ExpectedSourceCommit "fe1d6b1d7ee008794e8199e3d77a306f9d66b940" `
   -TimestampUrl "https://timestamp.example.com" `
   -CertificateStoreLocation CurrentUser `
   -ConfirmSign
