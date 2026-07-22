@@ -217,7 +217,7 @@ Long_BetterWindows/
 - [x] 内置插件开发 IDE
 - [x] 插件脚手架 + 5 种模板
 - [x] .lpak 打包分发
-- [x] 296 个自动化测试
+- [x] 304 个自动化测试
 - [x] 插件开发指南 + 内置文档浏览器
 
 ### 进行中 / 预留
@@ -234,6 +234,7 @@ Long_BetterWindows/
 - [x] v1.9 Long 超级面板与完整插件生命周期
 - [x] v1.9 Long 原生插件市场核心功能与可信分发链
 - [ ] v1.9 真实 Registry/CDN 生产演练与正式凭据签核
+- [ ] v1.9 之后的组合动作编排（协议与权限预检已完成，执行器和编辑器待开发）
 - [ ] Win11 Sparse Package 一级右键菜单（appxmanifest 已预留）
 - [ ] CI/CD（workflow 已就绪，待 Token 权限修复）
 - [ ] 国际化（zh-CN / en-US 已完成，待 UI 集成）
