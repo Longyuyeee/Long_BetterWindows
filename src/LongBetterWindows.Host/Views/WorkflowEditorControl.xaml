@@ -303,6 +303,13 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <CheckBox x:Name="TerminalOutputApprovalCheckBox"
+                                  Content="允许本次执行在内存中显示未消费的终端输出值"
+                                  Margin="0,9,0,0"
+                                  automation:AutomationProperties.Name="允许显示本次工作流终端输出值" />
+                        <TextBlock Text="默认关闭；值不会写入执行报告。"
+                                   Margin="24,3,0,0" FontSize="10" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
                             <Button Content="取消" Style="{StaticResource LongButton}" Margin="0,0,8,0"
                                     Click="CancelRunReview_Click" automation:AutomationProperties.Name="取消执行确认" />
@@ -351,6 +358,35 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <StackPanel x:Name="TerminalOutputPanel" Margin="0,12,0,0" Visibility="Collapsed">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBlock Text="本次终端输出（仅内存）" FontWeight="SemiBold" />
+                                <Button Grid.Column="1" Content="清除" Style="{StaticResource LongButton}"
+                                        Padding="8,3" Click="ClearTerminalOutputs_Click"
+                                        automation:AutomationProperties.Name="清除本次终端输出" />
+                            </Grid>
+                            <ItemsControl x:Name="TerminalOutputList" Margin="0,6,0,0"
+                                          automation:AutomationProperties.Name="本次工作流终端输出">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Detail}" FontSize="10" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                            <Button Grid.Column="1" Content="复制" Tag="{Binding}" Margin="8,0,0,3"
+                                                    Padding="8,3" Style="{StaticResource LongButton}"
+                                                    Click="CopyTerminalOutput_Click"
+                                                    automation:AutomationProperties.Name="复制终端输出值" />
+                                            <TextBox Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Value}" IsReadOnly="True"
+                                                     MaxHeight="120" TextWrapping="Wrap" AcceptsReturn="True"
+                                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

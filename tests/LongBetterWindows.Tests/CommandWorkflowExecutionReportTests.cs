@@ -43,6 +43,14 @@ public sealed class CommandWorkflowExecutionReportTests : IDisposable
                     PluginCommandOutputType.Text,
                     2048),
             ],
+            TerminalOutputs =
+            [
+                new WorkflowTerminalOutput(
+                    "step",
+                    "terminal-output",
+                    PluginCommandOutputType.Text,
+                    "private-terminal-value"),
+            ],
         };
 
         var report = CommandWorkflowExecutionReportCodec.Create(
@@ -53,6 +61,8 @@ public sealed class CommandWorkflowExecutionReportTests : IDisposable
 
         Assert.DoesNotContain("output_summaries", json);
         Assert.DoesNotContain("private-output-key", json);
+        Assert.DoesNotContain("terminal-output", json);
+        Assert.DoesNotContain("private-terminal-value", json);
         Assert.DoesNotContain("2048", json);
     }
 
@@ -195,7 +205,8 @@ public sealed class CommandWorkflowExecutionReportTests : IDisposable
                     null,
                     eventMessage),
             ],
-            Array.Empty<WorkflowOutputSummary>());
+            Array.Empty<WorkflowOutputSummary>(),
+            Array.Empty<WorkflowTerminalOutput>());
     }
 
     public void Dispose()

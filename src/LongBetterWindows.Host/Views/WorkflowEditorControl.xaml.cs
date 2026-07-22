@@ -368,6 +368,8 @@ namespace LongBetterWindows.Host.Views
             if (state.Draft is null
                 || state.ExistingDefinitionSha256 is null
                 || state.IsDirty) return;
+            ClearTerminalOutputs();
+            TerminalOutputApprovalCheckBox.IsChecked = false;
             _executionReview = _runSession.Prepare(state.Draft);
             if (!_executionReview.IsValid)
             {
@@ -412,13 +414,15 @@ namespace LongBetterWindows.Host.Views
                 var result = await _runSession.ExecuteApprovedAsync(
                     draft,
                     review.Fingerprint,
-                    includeSensitiveMessages: false);
+                    includeSensitiveMessages: false,
+                    includeTerminalOutputValues: TerminalOutputApprovalCheckBox.IsChecked == true);
                 if (!result.IsAccepted || result.Execution is null)
                 {
                     ExecutionResultTitle.Text = "执行未开始";
                     ExecutionResultDetail.Text = result.Error ?? "执行批准已经失效。";
                     ExecutionOutputList.ItemsSource = null;
                     ExecutionOutputList.Visibility = Visibility.Collapsed;
+                    ClearTerminalOutputs();
                 }
                 else
                 {
@@ -430,6 +434,13 @@ namespace LongBetterWindows.Host.Views
                         .Select(OutputSummaryItem.From)
                         .ToList();
                     ExecutionOutputList.Visibility = result.Execution.OutputSummaries.Count > 0
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+                    var terminalOutputs = result.Execution.TerminalOutputs
+                        .Select(TerminalOutputItem.From)
+                        .ToList();
+                    TerminalOutputList.ItemsSource = terminalOutputs;
+                    TerminalOutputPanel.Visibility = terminalOutputs.Count > 0
                         ? Visibility.Visible
                         : Visibility.Collapsed;
                     await RefreshReportsAsync(draft.Id);
@@ -448,6 +459,35 @@ namespace LongBetterWindows.Host.Views
 
         private void CancelExecution_Click(object sender, RoutedEventArgs e)
             => _runSession.CancelExecution();
+
+        private void CopyTerminalOutput_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: TerminalOutputItem output }) return;
+            try
+            {
+                if (output.Value.Length == 0)
+                    Clipboard.Clear();
+                else
+                    Clipboard.SetText(output.Value);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(
+                    $"无法复制终端输出：{exception.Message}",
+                    "Long Better Windows",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private void ClearTerminalOutputs_Click(object sender, RoutedEventArgs e)
+            => ClearTerminalOutputs();
+
+        private void ClearTerminalOutputs()
+        {
+            TerminalOutputList.ItemsSource = null;
+            TerminalOutputPanel.Visibility = Visibility.Collapsed;
+        }
 
         private async Task RefreshReportsAsync(string workflowId)
         {
@@ -754,6 +794,7 @@ namespace LongBetterWindows.Host.Views
 
         private void InvalidateExecutionReview()
         {
+            ClearTerminalOutputs();
             if (ExecutionReviewPanel.Visibility != Visibility.Visible) return;
             _runSession.CancelReview();
             _executionReview = null;
@@ -815,6 +856,11 @@ namespace LongBetterWindows.Host.Views
                     summary.OutputKey,
                     $"{(summary.Role == WorkflowOutputRole.Compensation ? "补偿" : "命令")} · "
                         + $"{summary.Type} · {summary.ValueLength:N0} 字符");
+        }
+        private sealed record TerminalOutputItem(string Detail, string Value)
+        {
+            public static TerminalOutputItem From(WorkflowTerminalOutput output)
+                => new($"{output.StepId} / {output.OutputKey} / {output.Type}", output.Value);
         }
         private sealed record ReportListItem(string ReportId, string Status, string Detail)
         {

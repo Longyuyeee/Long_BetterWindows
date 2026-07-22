@@ -105,12 +105,19 @@ namespace LongBetterWindows.Host.Interaction
         PluginCommandOutputType Type,
         int ValueLength);
 
+    public sealed record WorkflowTerminalOutput(
+        string StepId,
+        string OutputKey,
+        PluginCommandOutputType Type,
+        string Value);
+
     public sealed record CommandWorkflowExecutionResult(
         WorkflowExecutionStatus Status,
         string Fingerprint,
         string? Message,
         IReadOnlyList<WorkflowExecutionEvent> Events,
-        IReadOnlyList<WorkflowOutputSummary> OutputSummaries);
+        IReadOnlyList<WorkflowOutputSummary> OutputSummaries,
+        IReadOnlyList<WorkflowTerminalOutput> TerminalOutputs);
 
     public interface IWorkflowCommandRunner
     {

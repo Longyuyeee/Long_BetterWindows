@@ -230,6 +230,98 @@ public class CommandWorkflowExecutorTests
         Assert.Equal(PluginCommandOutputType.Path, summary.Type);
         Assert.Equal("C:\\private.txt".Length, summary.ValueLength);
         Assert.DoesNotContain("private.txt", summary.ToString());
+        Assert.Empty(result.TerminalOutputs);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ExplicitTerminalValuesIncludeOnlyUnconsumedOutputs()
+    {
+        var registry = CreateRegistry();
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.terminal-output",
+            "Terminal output",
+            WorkflowFailureMode.Stop,
+            [
+                new CommandWorkflowStep(
+                    "source",
+                    WorkflowStepEffect.ReadOnly,
+                    Command("write-one")),
+                new CommandWorkflowStep(
+                    "target",
+                    WorkflowStepEffect.ReadOnly,
+                    new WorkflowCommand(
+                        "workflow:write-two",
+                        new PluginCommandInvocation
+                        {
+                            CommandId = "write-two",
+                            InputType = AcceptedInputType.File,
+                        },
+                        [new WorkflowValueBinding(
+                            "source",
+                            "selected-path",
+                            WorkflowBindingTarget.Path)])),
+            ]);
+        var runner = new CapturingRunner((command, _) => command switch
+        {
+            "workflow:write-one" => PluginCommandResult.Success(
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["selected-path"] = new(PluginCommandOutputType.Path, "C:\\private.txt"),
+                }),
+            _ => PluginCommandResult.Success(
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["final-text"] = new(PluginCommandOutputType.Text, "private-final-value"),
+                }),
+        });
+
+        var result = await new CommandWorkflowExecutor(registry, runner).ExecuteAsync(
+            workflow,
+            Authorize(registry, workflow),
+            includeTerminalOutputValues: true);
+
+        var terminal = Assert.Single(result.TerminalOutputs);
+        Assert.Equal("target", terminal.StepId);
+        Assert.Equal("final-text", terminal.OutputKey);
+        Assert.Equal("private-final-value", terminal.Value);
+        Assert.DoesNotContain(result.TerminalOutputs, output => output.OutputKey == "selected-path");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CompensationBindingPreventsRestoreTokenFromBecomingTerminal()
+    {
+        var registry = CreateRegistry();
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.restore-token",
+            "Restore token",
+            WorkflowFailureMode.Compensate,
+            [
+                new CommandWorkflowStep(
+                    "write",
+                    WorkflowStepEffect.Mutating,
+                    Command("write-one"),
+                    new WorkflowCommand(
+                        "workflow:undo-one",
+                        new PluginCommandInvocation { CommandId = "undo-one" },
+                        [new WorkflowValueBinding(
+                            "write",
+                            "restore-token",
+                            WorkflowBindingTarget.Argument,
+                            "token")]))
+            ]);
+        var runner = new CapturingRunner((_, _) => PluginCommandResult.Success(
+            outputs: new Dictionary<string, PluginCommandOutput>
+            {
+                ["restore-token"] = new(PluginCommandOutputType.Text, "private-restore-token"),
+            }));
+
+        var result = await new CommandWorkflowExecutor(registry, runner).ExecuteAsync(
+            workflow,
+            Authorize(registry, workflow),
+            includeTerminalOutputValues: true);
+
+        Assert.Equal(WorkflowExecutionStatus.Completed, result.Status);
+        Assert.Empty(result.TerminalOutputs);
     }
 
     [Fact]
@@ -487,6 +579,14 @@ public class CommandWorkflowExecutorTests
             outputs.Add(new PluginCommandOutputDeclaration
             {
                 Key = "oversized",
+                Type = PluginCommandOutputType.Text,
+            });
+        }
+        if (id == "write-two")
+        {
+            outputs.Add(new PluginCommandOutputDeclaration
+            {
+                Key = "final-text",
                 Type = PluginCommandOutputType.Text,
             });
         }

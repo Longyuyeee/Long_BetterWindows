@@ -53,6 +53,33 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task ExecuteApproved_RevealsTerminalValuesOnlyWhenExplicitlyRequested()
+    {
+        var registry = Registry();
+        var runner = new FakeRunner((_, _) => Task.FromResult(PluginCommandResult.Success(
+            outputs: new Dictionary<string, PluginCommandOutput>
+            {
+                ["result"] = new(PluginCommandOutputType.Text, "private terminal value"),
+            })));
+        using var session = Session(registry, runner);
+        var workflow = Workflow();
+
+        var defaultReview = session.Prepare(workflow);
+        var redacted = await session.ExecuteApprovedAsync(workflow, defaultReview.Fingerprint);
+        var approvedReview = session.Prepare(workflow);
+        var revealed = await session.ExecuteApprovedAsync(
+            workflow,
+            approvedReview.Fingerprint,
+            includeTerminalOutputValues: true);
+
+        Assert.Empty(redacted.Execution!.TerminalOutputs);
+        var output = Assert.Single(revealed.Execution!.TerminalOutputs);
+        Assert.Equal("step-1", output.StepId);
+        Assert.Equal("result", output.OutputKey);
+        Assert.Equal("private terminal value", output.Value);
+    }
+
+    [Fact]
     public async Task ExecuteApproved_PluginReregisteredAfterReviewIsRejectedAndAudited()
     {
         var registry = Registry();
@@ -169,7 +196,8 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
             new string('a', 64),
             null,
             [new WorkflowExecutionEvent(1, timestamp, WorkflowExecutionEventKind.WorkflowCompleted, null, null)],
-            Array.Empty<WorkflowOutputSummary>());
+            Array.Empty<WorkflowOutputSummary>(),
+            Array.Empty<WorkflowTerminalOutput>());
 
     private static PluginRegistry Registry()
     {
@@ -194,6 +222,14 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
                         Id = "run",
                         Title = "Run",
                         AcceptedInputs = [AcceptedInputType.None],
+                        Outputs =
+                        [
+                            new PluginCommandOutputDeclaration
+                            {
+                                Key = "result",
+                                Type = PluginCommandOutputType.Text,
+                            },
+                        ],
                     },
                 ],
             },

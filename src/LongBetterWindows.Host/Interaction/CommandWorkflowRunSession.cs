@@ -81,6 +81,7 @@ namespace LongBetterWindows.Host.Interaction
             CommandWorkflowDefinition workflow,
             string reviewedFingerprint,
             bool includeSensitiveMessages = false,
+            bool includeTerminalOutputValues = false,
             CancellationToken cancellationToken = default)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -111,7 +112,11 @@ namespace LongBetterWindows.Host.Interaction
                 var authorization = new CommandWorkflowAuthorization(
                     review.Fingerprint,
                     review.Permissions);
-                var result = await _executor.ExecuteAsync(workflow, authorization, execution.Token);
+                var result = await _executor.ExecuteAsync(
+                    workflow,
+                    authorization,
+                    execution.Token,
+                    includeTerminalOutputValues);
                 var report = CommandWorkflowExecutionReportCodec.Create(
                     workflow,
                     result,

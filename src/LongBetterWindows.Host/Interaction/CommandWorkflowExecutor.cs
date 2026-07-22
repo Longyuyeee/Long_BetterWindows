@@ -30,7 +30,8 @@ namespace LongBetterWindows.Host.Interaction
         public async Task<CommandWorkflowExecutionResult> ExecuteAsync(
             CommandWorkflowDefinition workflow,
             CommandWorkflowAuthorization? authorization,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            bool includeTerminalOutputValues = false)
         {
             ArgumentNullException.ThrowIfNull(workflow);
             var preflight = _planner.Preflight(workflow);
@@ -215,12 +216,16 @@ namespace LongBetterWindows.Host.Interaction
             }
 
             AddEvent(WorkflowExecutionEventKind.WorkflowCompleted);
+            var terminalOutputs = includeTerminalOutputValues
+                ? BuildTerminalOutputs(workflow, stepOutputs)
+                : Array.Empty<WorkflowTerminalOutput>();
             return Result(
                 WorkflowExecutionStatus.Completed,
                 preflight.Fingerprint,
                 "Workflow completed.",
                 events,
-                outputSummaries);
+                outputSummaries,
+                terminalOutputs);
         }
 
         private async Task<CommandWorkflowExecutionResult> FinishFailureAsync(
@@ -390,7 +395,8 @@ namespace LongBetterWindows.Host.Interaction
             string fingerprint,
             string? message,
             IReadOnlyList<WorkflowExecutionEvent> events,
-            IReadOnlyList<WorkflowOutputSummary>? outputSummaries = null)
+            IReadOnlyList<WorkflowOutputSummary>? outputSummaries = null,
+            IReadOnlyList<WorkflowTerminalOutput>? terminalOutputs = null)
             => new(
                 status,
                 fingerprint,
@@ -398,7 +404,10 @@ namespace LongBetterWindows.Host.Interaction
                 events.ToList(),
                 outputSummaries is null
                     ? Array.Empty<WorkflowOutputSummary>()
-                    : outputSummaries.ToList());
+                    : outputSummaries.ToList(),
+                terminalOutputs is null
+                    ? Array.Empty<WorkflowTerminalOutput>()
+                    : terminalOutputs.ToList());
 
         private static void AddOutputSummaries(
             ICollection<WorkflowOutputSummary> summaries,
@@ -414,6 +423,50 @@ namespace LongBetterWindows.Host.Interaction
                     output.Key,
                     output.Value.Type,
                     output.Value.Value.Length));
+            }
+        }
+
+        private static IReadOnlyList<WorkflowTerminalOutput> BuildTerminalOutputs(
+            CommandWorkflowDefinition workflow,
+            IReadOnlyDictionary<string, IReadOnlyDictionary<string, PluginCommandOutput>> stepOutputs)
+        {
+            var consumed = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var step in workflow.Steps)
+            {
+                AddConsumedBindings(consumed, step.Command?.Bindings);
+                AddConsumedBindings(consumed, step.Compensation?.Bindings);
+            }
+
+            var result = new List<WorkflowTerminalOutput>();
+            foreach (var step in workflow.Steps)
+            {
+                if (!stepOutputs.TryGetValue(step.Id, out var outputs)) continue;
+                consumed.TryGetValue(step.Id, out var consumedKeys);
+                foreach (var output in outputs.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+                {
+                    if (consumedKeys?.Contains(output.Key) == true) continue;
+                    result.Add(new WorkflowTerminalOutput(
+                        step.Id,
+                        output.Key,
+                        output.Value.Type,
+                        output.Value.Value));
+                }
+            }
+            return result;
+        }
+
+        private static void AddConsumedBindings(
+            IDictionary<string, HashSet<string>> consumed,
+            IReadOnlyList<WorkflowValueBinding>? bindings)
+        {
+            foreach (var binding in bindings ?? Array.Empty<WorkflowValueBinding>())
+            {
+                if (!consumed.TryGetValue(binding.SourceStepId, out var keys))
+                {
+                    keys = new HashSet<string>(StringComparer.Ordinal);
+                    consumed[binding.SourceStepId] = keys;
+                }
+                keys.Add(binding.OutputKey);
             }
         }
     }
