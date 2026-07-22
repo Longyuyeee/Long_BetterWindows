@@ -316,7 +316,7 @@ namespace LongBetterWindows.Host.Views
             if (state.Draft is null
                 || state.ExistingDefinitionSha256 is null
                 || state.IsDirty
-                || HasInvalidInvocationArguments()) return;
+                || HasInvalidInvocationEditors()) return;
             var dialog = new SaveFileDialog
             {
                 Title = "导出组合动作",
@@ -507,29 +507,40 @@ namespace LongBetterWindows.Host.Views
                 var compensationOptions = new[] { new CommandOption(string.Empty, "不设置") }
                     .Concat(commands)
                     .ToList();
-                StepsList.ItemsSource = draft.Steps.Select((step, index) => new StepEditorItem
+                var stepEditors = new List<StepEditorItem>();
+                var priorOutputs = new List<WorkflowBindingOutputOption>();
+                for (var index = 0; index < draft.Steps.Count; index++)
                 {
-                    Id = step.Id,
-                    Position = (index + 1).ToString("00"),
-                    CommandKey = step.Command?.CommandKey ?? string.Empty,
-                    Effect = step.Effect,
-                    CompensationKey = step.Compensation?.CommandKey ?? string.Empty,
-                    CanMoveUp = index > 0,
-                    CanMoveDown = index < draft.Steps.Count - 1,
-                    CommandOptions = commands,
-                    CompensationOptions = compensationOptions,
-                    EffectOptions = EffectOptions,
-                    PrimaryInput = CreateInvocationEditor(
-                        step.Id,
-                        WorkflowCommandRole.Primary,
-                        "命令输入",
-                        step.Command),
-                    CompensationInput = CreateInvocationEditor(
-                        step.Id,
-                        WorkflowCommandRole.Compensation,
-                        "补偿输入",
-                        step.Compensation),
-                }).ToList();
+                    var step = draft.Steps[index];
+                    var primaryOutputs = GetDeclaredOutputOptions(step.Id, step.Command);
+                    stepEditors.Add(new StepEditorItem
+                    {
+                        Id = step.Id,
+                        Position = (index + 1).ToString("00"),
+                        CommandKey = step.Command?.CommandKey ?? string.Empty,
+                        Effect = step.Effect,
+                        CompensationKey = step.Compensation?.CommandKey ?? string.Empty,
+                        CanMoveUp = index > 0,
+                        CanMoveDown = index < draft.Steps.Count - 1,
+                        CommandOptions = commands,
+                        CompensationOptions = compensationOptions,
+                        EffectOptions = EffectOptions,
+                        PrimaryInput = CreateInvocationEditor(
+                            step.Id,
+                            WorkflowCommandRole.Primary,
+                            "命令输入",
+                            step.Command,
+                            priorOutputs),
+                        CompensationInput = CreateInvocationEditor(
+                            step.Id,
+                            WorkflowCommandRole.Compensation,
+                            "补偿输入",
+                            step.Compensation,
+                            priorOutputs.Concat(primaryOutputs).ToArray()),
+                    });
+                    priorOutputs.AddRange(primaryOutputs);
+                }
+                StepsList.ItemsSource = stepEditors;
                 EmptyStepsText.Visibility = draft.Steps.Count == 0
                     ? Visibility.Visible
                     : Visibility.Collapsed;
@@ -588,7 +599,8 @@ namespace LongBetterWindows.Host.Views
             string stepId,
             WorkflowCommandRole role,
             string roleLabel,
-            WorkflowCommand? command)
+            WorkflowCommand? command,
+            IReadOnlyList<WorkflowBindingOutputOption> availableOutputs)
         {
             var invocation = command?.Invocation ?? new PluginCommandInvocation();
             var descriptor = command is null ? null : _plugins.Commands.Get(command.CommandKey);
@@ -601,6 +613,7 @@ namespace LongBetterWindows.Host.Views
                 StepId = stepId,
                 Role = role,
                 RoleLabel = roleLabel,
+                BindingEditor = new WorkflowBindingEditorModel(availableOutputs, invocation.InputType),
                 InputType = invocation.InputType,
                 InputOptions = options,
                 Text = invocation.Text ?? string.Empty,
@@ -608,43 +621,60 @@ namespace LongBetterWindows.Host.Views
                 ImagePng = invocation.ImagePng?.ToArray(),
             };
             editor.LoadArguments(invocation.Arguments);
+            editor.BindingEditor.LoadBindings(command?.Bindings);
             return editor;
+        }
+
+        private IReadOnlyList<WorkflowBindingOutputOption> GetDeclaredOutputOptions(
+            string stepId,
+            WorkflowCommand? command)
+        {
+            var descriptor = command is null ? null : _plugins.Commands.Get(command.CommandKey);
+            return descriptor?.Command.Outputs.Select(output => new WorkflowBindingOutputOption(
+                    stepId,
+                    output.Key,
+                    output.Type,
+                    output.Description))
+                .ToArray()
+                ?? Array.Empty<WorkflowBindingOutputOption>();
         }
 
         private bool ApplyInvocation(WorkflowInvocationEditorModel item)
         {
-            if (!item.TryBuildArguments(out var arguments)) return false;
-            return _session.UpdateInvocation(
+            if (!item.TryBuildArguments(out var arguments)
+                || !item.BindingEditor.TryBuildBindings(out var bindings)) return false;
+            if (!_session.UpdateInvocation(
                 item.StepId,
                 item.Role,
                 item.InputType,
                 item.Text,
                 item.Paths,
                 item.ImagePng,
-                arguments);
+                arguments)) return false;
+            return _session.UpdateBindings(item.StepId, item.Role, bindings);
         }
 
         private void RenderStatus()
         {
             var state = _session.State;
-            var hasInvalidArguments = HasInvalidInvocationArguments();
+            var hasInvalidEditors = HasInvalidInvocationEditors();
             EditorDirtyText.Text = state.ExistingDefinitionSha256 is null
                 ? "尚未保存"
                 : state.IsDirty ? "有未保存的更改" : "已保存到本机";
-            SaveWorkflowButton.IsEnabled = state.CanSave && state.IsDirty && !hasInvalidArguments;
+            SaveWorkflowButton.IsEnabled = state.CanSave && state.IsDirty && !hasInvalidEditors;
             ExportWorkflowButton.IsEnabled = state.ExistingDefinitionSha256 is not null
                 && !state.IsDirty
-                && !hasInvalidArguments;
+                && !hasInvalidEditors;
             PrepareRunButton.IsEnabled = state.Preflight?.IsValid == true
                 && state.ExistingDefinitionSha256 is not null
                 && !state.IsDirty
-                && !hasInvalidArguments
+                && !hasInvalidEditors
                 && !_runSession.IsRunning;
-            if (hasInvalidArguments)
+            if (hasInvalidEditors)
             {
-                PreflightTitle.Text = "参数需要修正";
+                PreflightTitle.Text = "输入或绑定需要修正";
                 PreflightTitle.Foreground = (System.Windows.Media.Brush)FindResource("Long.Brush.State.Danger");
-                PreflightDetail.Text = "参数键不能为空或重复；修正后才能保存或执行。";
+                PreflightDetail.Text = "检查高级参数和步骤输出绑定；修正后才能保存或执行。";
                 return;
             }
             if (state.Preflight?.IsValid == true)
@@ -664,10 +694,12 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
-        private bool HasInvalidInvocationArguments()
+        private bool HasInvalidInvocationEditors()
             => StepsList.ItemsSource is IEnumerable<StepEditorItem> steps
                 && steps.Any(step => step.PrimaryInput.HasArgumentError
-                    || (step.HasCompensation && step.CompensationInput.HasArgumentError));
+                    || step.PrimaryInput.BindingEditor.HasError
+                    || (step.HasCompensation && (step.CompensationInput.HasArgumentError
+                        || step.CompensationInput.BindingEditor.HasError)));
 
         private void SetListStatus(string text, bool isError)
         {
@@ -705,7 +737,7 @@ namespace LongBetterWindows.Host.Views
             ExportWorkflowButton.IsEnabled = enabled
                 && _session.State.ExistingDefinitionSha256 is not null
                 && !_session.State.IsDirty
-                && !HasInvalidInvocationArguments();
+                && !HasInvalidInvocationEditors();
             SaveWorkflowButton.IsEnabled = enabled && _session.State.CanSave && _session.State.IsDirty;
             PrepareRunButton.IsEnabled = enabled;
         }

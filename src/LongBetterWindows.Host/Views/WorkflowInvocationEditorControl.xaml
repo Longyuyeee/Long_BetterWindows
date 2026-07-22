@@ -81,5 +81,57 @@
                 </Button>
             </StackPanel>
         </Expander>
+        <Expander Margin="100,8,0,0" IsExpanded="False" DataContext="{Binding BindingEditor}">
+            <Expander.Header>
+                <TextBlock Text="{Binding Summary}" FontSize="11"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+            </Expander.Header>
+            <StackPanel Margin="0,7,0,0">
+                <ItemsControl ItemsSource="{Binding Bindings}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.6*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="1*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="1*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Style="{StaticResource LongComboBox}"
+                                          ItemsSource="{Binding OutputOptions}" DisplayMemberPath="Display"
+                                          SelectedItem="{Binding Output}"
+                                          SelectionChanged="BindingOutput_SelectionChanged"
+                                          automation:AutomationProperties.Name="绑定来源输出" />
+                                <ComboBox Grid.Column="2" Style="{StaticResource LongComboBox}"
+                                          ItemsSource="{Binding TargetOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                                          SelectedValue="{Binding Target}"
+                                          SelectionChanged="BindingTarget_SelectionChanged"
+                                          automation:AutomationProperties.Name="绑定目标" />
+                                <TextBox Grid.Column="4" Style="{StaticResource LongTextBox}"
+                                         Text="{Binding ArgumentKey}" MaxLength="128"
+                                         TextChanged="BindingArgumentKey_TextChanged"
+                                         Visibility="{Binding ShowArgumentKey, Converter={StaticResource BooleanToVisibility}}"
+                                         automation:AutomationProperties.Name="绑定参数键" />
+                                <Button Grid.Column="5" Style="{StaticResource LongIconButton}" Margin="7,0,0,0"
+                                        Tag="{Binding}" Click="RemoveBinding_Click" ToolTip="删除绑定"
+                                        automation:AutomationProperties.Name="删除步骤输出绑定">
+                                    <Path Data="{StaticResource Long.Icon.Delete}" Style="{StaticResource LongIcon}" Width="15" Height="15" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding Error}" Margin="2,0,0,6" TextWrapping="Wrap" FontSize="10"
+                           Foreground="{DynamicResource Long.Brush.State.Danger}"
+                           Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibility}}" />
+                <Button Style="{StaticResource LongIconButton}" HorizontalAlignment="Left"
+                        IsEnabled="{Binding CanAdd}" Click="AddBinding_Click" ToolTip="添加步骤输出绑定"
+                        automation:AutomationProperties.Name="添加步骤输出绑定">
+                    <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="15" Height="15" />
+                </Button>
+            </StackPanel>
+        </Expander>
     </StackPanel>
 </UserControl>

@@ -161,6 +161,52 @@ namespace LongBetterWindows.Host.Views
             RaiseInvocationChanged();
         }
 
+        private void AddBinding_Click(object sender, RoutedEventArgs e)
+        {
+            if (Editor is null || !Editor.BindingEditor.AddBinding()) return;
+            RaiseInvocationChanged();
+        }
+
+        private void RemoveBinding_Click(object sender, RoutedEventArgs e)
+        {
+            if (Editor is null
+                || sender is not Button { Tag: WorkflowBindingEditorItem binding }
+                || !Editor.BindingEditor.RemoveBinding(binding)) return;
+            RaiseInvocationChanged();
+        }
+
+        private void BindingOutput_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_rendering
+                || sender is not ComboBox
+                {
+                    DataContext: WorkflowBindingEditorItem binding,
+                    SelectedItem: WorkflowBindingOutputOption output,
+                }) return;
+            binding.Output = output;
+            RaiseInvocationChanged();
+        }
+
+        private void BindingTarget_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_rendering
+                || sender is not ComboBox
+                {
+                    DataContext: WorkflowBindingEditorItem binding,
+                    SelectedValue: WorkflowBindingTarget target,
+                }) return;
+            binding.Target = target;
+            RaiseInvocationChanged();
+        }
+
+        private void BindingArgumentKey_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_rendering
+                || sender is not TextBox { DataContext: WorkflowBindingEditorItem binding } textBox) return;
+            binding.ArgumentKey = textBox.Text;
+            RaiseInvocationChanged();
+        }
+
         private void RaiseInvocationChanged()
             => InvocationChanged?.Invoke(this, EventArgs.Empty);
 
@@ -189,6 +235,9 @@ namespace LongBetterWindows.Host.Views
         public required string RoleLabel { get; init; }
         public required IReadOnlyList<WorkflowInputTypeOption> InputOptions { get; init; }
         public ObservableCollection<WorkflowArgumentEditorItem> Arguments { get; } = new();
+        public WorkflowBindingEditorModel BindingEditor { get; set; } = new(
+            Array.Empty<WorkflowBindingOutputOption>(),
+            AcceptedInputType.None);
 
         public AcceptedInputType InputType
         {
@@ -201,6 +250,7 @@ namespace LongBetterWindows.Host.Views
                 OnPropertyChanged(nameof(ShowText));
                 OnPropertyChanged(nameof(ShowPaths));
                 OnPropertyChanged(nameof(ShowImage));
+                BindingEditor.SetInputType(value);
             }
         }
 
