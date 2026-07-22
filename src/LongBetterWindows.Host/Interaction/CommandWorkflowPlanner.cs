@@ -22,6 +22,7 @@ namespace LongBetterWindows.Host.Interaction
         {
             ArgumentNullException.ThrowIfNull(workflow);
 
+            var catalogRevision = _plugins.CatalogRevision;
             var issues = new List<string>();
             var pluginIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (!IsValidIdentifier(workflow.Id))
@@ -50,19 +51,25 @@ namespace LongBetterWindows.Host.Interaction
                 }
             }
 
-            var permissions = pluginIds
-                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
-                .Select(id =>
+            var permissions = new List<WorkflowPermissionRequirement>();
+            foreach (var id in pluginIds.OrderBy(id => id, StringComparer.OrdinalIgnoreCase))
+            {
+                var entry = _plugins.Get(id);
+                if (entry is null)
                 {
-                    var entry = _plugins.Get(id)!;
-                    return new WorkflowPermissionRequirement(
-                        id,
-                        entry.Manifest.Version,
-                        entry.Manifest.Capabilities
-                            .OrderBy(capability => capability, StringComparer.OrdinalIgnoreCase)
-                            .ToList());
-                })
-                .ToList();
+                    issues.Add($"Workflow plugin changed during preflight: {id}");
+                    continue;
+                }
+                permissions.Add(new WorkflowPermissionRequirement(
+                    id,
+                    entry.Manifest.Version,
+                    entry.RegistrationRevision,
+                    entry.Manifest.Capabilities
+                        .OrderBy(capability => capability, StringComparer.OrdinalIgnoreCase)
+                        .ToList()));
+            }
+            if (_plugins.CatalogRevision != catalogRevision)
+                issues.Add("Plugin catalog changed during workflow preflight.");
 
             return new CommandWorkflowPreflightResult(
                 issues.Count == 0,
@@ -146,6 +153,7 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     WriteField(writer, permission.PluginId);
                     WriteField(writer, permission.PluginVersion);
+                    writer.Write(permission.RegistrationRevision);
                     writer.Write(permission.Capabilities.Count);
                     foreach (var capability in permission.Capabilities)
                         WriteField(writer, capability);

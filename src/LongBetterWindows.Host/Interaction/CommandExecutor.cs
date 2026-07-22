@@ -6,7 +6,7 @@ using Serilog;
 namespace LongBetterWindows.Host.Interaction
 {
     /// <summary>将命令索引中的描述符解析为插件调用，并提供旧插件 UI 兼容路径。</summary>
-    public sealed class CommandExecutor
+    public sealed class CommandExecutor : IWorkflowCommandRunner
     {
         private readonly PluginRegistry _plugins;
 

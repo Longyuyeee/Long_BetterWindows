@@ -12,6 +12,7 @@ namespace LongBetterWindows.Host.Engine
         private readonly object _lock = new();
         private SearchCoordinator? _searchCoordinator;
         private Func<string, Task>? _hostResourceReleaser;
+        private long _catalogRevision;
 
         /// <summary>随插件注册和注销自动同步的功能指令索引。</summary>
         public CommandRegistry Commands { get; } = new();
@@ -37,6 +38,12 @@ namespace LongBetterWindows.Host.Engine
         public int Count
         {
             get { lock (_lock) return _entries.Count; }
+        }
+
+        /// <summary>插件命令目录注册或注销时递增；运行状态变化不影响该值。</summary>
+        public long CatalogRevision
+        {
+            get { lock (_lock) return _catalogRevision; }
         }
 
         public PluginEntry? Get(string pluginId)
@@ -66,7 +73,8 @@ namespace LongBetterWindows.Host.Engine
                     return false;
                 }
 
-                var entry = new PluginEntry(manifest, instance, directory)
+                _catalogRevision++;
+                var entry = new PluginEntry(manifest, instance, directory, _catalogRevision)
                 {
                     State = PluginState.Loaded
                 };
@@ -91,6 +99,7 @@ namespace LongBetterWindows.Host.Engine
                 _searchCoordinator?.UnregisterProvider("plugin:" + pluginId);
                 _entries.Remove(pluginId);
                 Commands.UnregisterPlugin(pluginId);
+                _catalogRevision++;
                 Log.Information("插件 {PluginId} 已注销", pluginId);
             }
 

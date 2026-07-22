@@ -19,13 +19,19 @@ namespace LongBetterWindows.Host.Engine
         public PluginState State { get; set; } = PluginState.Loaded;
         public string Directory { get; }
         public PluginLifecyclePreference Lifecycle { get; }
+        public long RegistrationRevision { get; }
 
-        public PluginEntry(PluginManifest manifest, object instance, string directory)
+        public PluginEntry(
+            PluginManifest manifest,
+            object instance,
+            string directory,
+            long registrationRevision)
         {
             Manifest = manifest;
             Instance = instance;
             Directory = directory;
             Lifecycle = manifest.Lifecycle ?? new PluginLifecyclePreference();
+            RegistrationRevision = registrationRevision;
             _settings = LoadSettings(directory, manifest.DefaultSettings);
         }
 
