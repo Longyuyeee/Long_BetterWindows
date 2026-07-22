@@ -300,6 +300,8 @@ public class QualityGateTests
     public void ReleaseDownloadEvidence_VerifiesManifestHashAndInternetOriginWithoutLaunchingPackage()
     {
         var capture = Read("capture-release-download-evidence.ps1");
+        var approve = Read("approve-release-download-evidence.ps1");
+        var verify = Read("verify-release-download-evidence.ps1");
 
         Assert.Contains("ExpectedSourceCommit", capture);
         Assert.Contains("ExpectedDistributionChannel", capture);
@@ -314,6 +316,17 @@ public class QualityGateTests
         Assert.Contains("first_launch_observed = $false", capture);
         Assert.DoesNotContain("Start-Process", capture);
         Assert.DoesNotContain("Expand-Archive", capture);
+        Assert.Contains("Reviewer must differ", approve);
+        Assert.Contains("ConfirmExtractedExecutableOriginChecked", approve);
+        Assert.Contains("ConfirmSmartScreenObserved", approve);
+        Assert.Contains("ConfirmAntivirusObserved", approve);
+        Assert.Contains("ConfirmFirstLaunchObserved", approve);
+        Assert.Contains("Get-FileHash", approve);
+        Assert.Contains("release_download_human_approval", approve);
+        Assert.Contains("Release-download evidence changed after human approval", verify);
+        Assert.Contains("distinct operator and reviewer identities", verify);
+        Assert.Contains("Interactive release-download checklist is incomplete", verify);
+        Assert.Contains("approved_release_download_gate", verify);
     }
 
     [Fact]
