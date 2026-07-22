@@ -336,6 +336,21 @@
                         <TextBlock x:Name="ExecutionResultTitle" FontWeight="SemiBold" />
                         <TextBlock x:Name="ExecutionResultDetail" Margin="0,4,0,0" FontSize="11"
                                    TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        <ItemsControl x:Name="ExecutionOutputList" Margin="0,8,0,0" Visibility="Collapsed"
+                                      automation:AutomationProperties.Name="工作流输出摘要">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="0.8*"/><ColumnDefinition Width="1*"/><ColumnDefinition Width="1.2*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Step}" FontSize="10" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Output}" FontSize="10" TextTrimming="CharacterEllipsis"
+                                                   FontFamily="{DynamicResource Long.Font.Mono}" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Detail}" FontSize="10"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
 

@@ -223,6 +223,13 @@ public class CommandWorkflowExecutorTests
         Assert.Equal(WorkflowExecutionStatus.Completed, result.Status);
         Assert.Equal("C:\\private.txt", Assert.Single(runner.Invocations[1]!.Paths));
         Assert.DoesNotContain(result.Events, item => item.Message?.Contains("private.txt") == true);
+        var summary = Assert.Single(result.OutputSummaries);
+        Assert.Equal("source", summary.StepId);
+        Assert.Equal(WorkflowOutputRole.Primary, summary.Role);
+        Assert.Equal("selected-path", summary.OutputKey);
+        Assert.Equal(PluginCommandOutputType.Path, summary.Type);
+        Assert.Equal("C:\\private.txt".Length, summary.ValueLength);
+        Assert.DoesNotContain("private.txt", summary.ToString());
     }
 
     [Fact]
@@ -334,6 +341,33 @@ public class CommandWorkflowExecutorTests
 
         Assert.Equal(WorkflowExecutionStatus.CompensationFailed, result.Status);
         Assert.Contains(result.Events, item => item.Kind == WorkflowExecutionEventKind.CompensationFailed);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ValidCompensationOutputsAddMetadataWithoutValues()
+    {
+        var registry = CreateRegistry();
+        var workflow = Workflow();
+        var runner = new CapturingRunner((command, _) => command switch
+        {
+            "workflow:fail" => PluginCommandResult.Failure("expected failure"),
+            "workflow:undo-one" => PluginCommandResult.Success(
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["oversized"] = new(PluginCommandOutputType.Text, "private-compensation-value"),
+                }),
+            _ => PluginCommandResult.Success(),
+        });
+
+        var result = await new CommandWorkflowExecutor(registry, runner)
+            .ExecuteAsync(workflow, Authorize(registry, workflow));
+
+        Assert.Equal(WorkflowExecutionStatus.Compensated, result.Status);
+        var summary = Assert.Single(result.OutputSummaries);
+        Assert.Equal(WorkflowOutputRole.Compensation, summary.Role);
+        Assert.Equal("oversized", summary.OutputKey);
+        Assert.Equal("private-compensation-value".Length, summary.ValueLength);
+        Assert.DoesNotContain("private-compensation-value", summary.ToString());
     }
 
     private static CommandWorkflowAuthorization Authorize(

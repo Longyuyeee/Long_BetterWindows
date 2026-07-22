@@ -373,6 +373,8 @@ namespace LongBetterWindows.Host.Views
             {
                 ExecutionResultTitle.Text = "无法准备执行";
                 ExecutionResultDetail.Text = string.Join(Environment.NewLine, _executionReview.Issues);
+                ExecutionOutputList.ItemsSource = null;
+                ExecutionOutputList.Visibility = Visibility.Collapsed;
                 ExecutionResultPanel.Visibility = Visibility.Visible;
                 return;
             }
@@ -415,6 +417,8 @@ namespace LongBetterWindows.Host.Views
                 {
                     ExecutionResultTitle.Text = "执行未开始";
                     ExecutionResultDetail.Text = result.Error ?? "执行批准已经失效。";
+                    ExecutionOutputList.ItemsSource = null;
+                    ExecutionOutputList.Visibility = Visibility.Collapsed;
                 }
                 else
                 {
@@ -422,6 +426,12 @@ namespace LongBetterWindows.Host.Views
                     ExecutionResultDetail.Text = result.ReportSave?.IsSuccess == true
                         ? $"已记录 {result.Execution.Events.Count} 个脱敏事件。"
                         : $"执行已结束，但报告保存失败：{result.ReportSave?.Error}";
+                    ExecutionOutputList.ItemsSource = result.Execution.OutputSummaries
+                        .Select(OutputSummaryItem.From)
+                        .ToList();
+                    ExecutionOutputList.Visibility = result.Execution.OutputSummaries.Count > 0
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
                     await RefreshReportsAsync(draft.Id);
                     ReportsExpander.IsExpanded = true;
                 }
@@ -797,6 +807,15 @@ namespace LongBetterWindows.Host.Views
         private sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum;
         private sealed record PermissionReviewItem(string Plugin, string Capabilities);
         private sealed record TimelineItem(string Time, string Kind, string Step);
+        private sealed record OutputSummaryItem(string Step, string Output, string Detail)
+        {
+            public static OutputSummaryItem From(WorkflowOutputSummary summary)
+                => new(
+                    summary.StepId,
+                    summary.OutputKey,
+                    $"{(summary.Role == WorkflowOutputRole.Compensation ? "补偿" : "命令")} · "
+                        + $"{summary.Type} · {summary.ValueLength:N0} 字符");
+        }
         private sealed record ReportListItem(string ReportId, string Status, string Detail)
         {
             public static ReportListItem From(WorkflowExecutionReportSummary summary)

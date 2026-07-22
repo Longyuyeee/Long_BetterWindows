@@ -30,6 +30,33 @@ public sealed class CommandWorkflowExecutionReportTests : IDisposable
     }
 
     [Fact]
+    public void Create_DoesNotPersistInMemoryOutputSummaries()
+    {
+        var execution = Result() with
+        {
+            OutputSummaries =
+            [
+                new WorkflowOutputSummary(
+                    "step",
+                    WorkflowOutputRole.Primary,
+                    "private-output-key",
+                    PluginCommandOutputType.Text,
+                    2048),
+            ],
+        };
+
+        var report = CommandWorkflowExecutionReportCodec.Create(
+            Workflow(),
+            execution,
+            reportId: "report.output-redaction");
+        var json = CommandWorkflowExecutionReportCodec.Serialize(report);
+
+        Assert.DoesNotContain("output_summaries", json);
+        Assert.DoesNotContain("private-output-key", json);
+        Assert.DoesNotContain("2048", json);
+    }
+
+    [Fact]
     public async Task Save_MessageReportRequiresExplicitApprovalAndRoundTrips()
     {
         var repository = new CommandWorkflowExecutionReportRepository(_root);
@@ -167,7 +194,8 @@ public sealed class CommandWorkflowExecutionReportTests : IDisposable
                     WorkflowExecutionEventKind.WorkflowCompleted,
                     null,
                     eventMessage),
-            ]);
+            ],
+            Array.Empty<WorkflowOutputSummary>());
     }
 
     public void Dispose()

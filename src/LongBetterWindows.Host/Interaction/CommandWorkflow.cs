@@ -92,11 +92,25 @@ namespace LongBetterWindows.Host.Interaction
         string? StepId,
         string? Message);
 
+    public enum WorkflowOutputRole
+    {
+        Primary,
+        Compensation,
+    }
+
+    public sealed record WorkflowOutputSummary(
+        string StepId,
+        WorkflowOutputRole Role,
+        string OutputKey,
+        PluginCommandOutputType Type,
+        int ValueLength);
+
     public sealed record CommandWorkflowExecutionResult(
         WorkflowExecutionStatus Status,
         string Fingerprint,
         string? Message,
-        IReadOnlyList<WorkflowExecutionEvent> Events);
+        IReadOnlyList<WorkflowExecutionEvent> Events,
+        IReadOnlyList<WorkflowOutputSummary> OutputSummaries);
 
     public interface IWorkflowCommandRunner
     {

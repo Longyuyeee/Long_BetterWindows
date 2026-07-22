@@ -35,6 +35,7 @@ namespace LongBetterWindows.Host.Interaction
             ArgumentNullException.ThrowIfNull(workflow);
             var preflight = _planner.Preflight(workflow);
             var events = new List<WorkflowExecutionEvent>();
+            var outputSummaries = new List<WorkflowOutputSummary>();
             var sequence = 0;
             void AddEvent(
                 WorkflowExecutionEventKind kind,
@@ -79,6 +80,7 @@ namespace LongBetterWindows.Host.Interaction
                         preflight.Fingerprint,
                         completed,
                         stepOutputs,
+                        outputSummaries,
                         WorkflowExecutionStatus.Cancelled,
                         "Workflow was cancelled.",
                         events,
@@ -101,6 +103,7 @@ namespace LongBetterWindows.Host.Interaction
                         preflight.Fingerprint,
                         completed,
                         stepOutputs,
+                        outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         message,
                         events,
@@ -118,6 +121,7 @@ namespace LongBetterWindows.Host.Interaction
                         preflight.Fingerprint,
                         completed,
                         stepOutputs,
+                        outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         binding.Error,
                         events,
@@ -155,6 +159,7 @@ namespace LongBetterWindows.Host.Interaction
                         preflight.Fingerprint,
                         completed,
                         stepOutputs,
+                        outputSummaries,
                         cancelled ? WorkflowExecutionStatus.Cancelled : WorkflowExecutionStatus.Failed,
                         commandResult.Message,
                         events,
@@ -172,6 +177,7 @@ namespace LongBetterWindows.Host.Interaction
                         preflight.Fingerprint,
                         completed,
                         stepOutputs,
+                        outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         error,
                         events,
@@ -190,6 +196,7 @@ namespace LongBetterWindows.Host.Interaction
                         preflight.Fingerprint,
                         completed,
                         stepOutputs,
+                        outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         outputError,
                         events,
@@ -199,6 +206,11 @@ namespace LongBetterWindows.Host.Interaction
 
                 completed.Add(step);
                 stepOutputs[step.Id] = outputs;
+                AddOutputSummaries(
+                    outputSummaries,
+                    step.Id,
+                    WorkflowOutputRole.Primary,
+                    outputs);
                 AddEvent(WorkflowExecutionEventKind.StepSucceeded, step.Id, commandResult.Message);
             }
 
@@ -207,7 +219,8 @@ namespace LongBetterWindows.Host.Interaction
                 WorkflowExecutionStatus.Completed,
                 preflight.Fingerprint,
                 "Workflow completed.",
-                events);
+                events,
+                outputSummaries);
         }
 
         private async Task<CommandWorkflowExecutionResult> FinishFailureAsync(
@@ -215,6 +228,7 @@ namespace LongBetterWindows.Host.Interaction
             string fingerprint,
             IReadOnlyList<CommandWorkflowStep> completed,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, PluginCommandOutput>> stepOutputs,
+            List<WorkflowOutputSummary> outputSummaries,
             WorkflowExecutionStatus originalStatus,
             string? originalMessage,
             List<WorkflowExecutionEvent> events,
@@ -222,7 +236,7 @@ namespace LongBetterWindows.Host.Interaction
             CommandWorkflowAuthorization authorization)
         {
             if (workflow.FailureMode != WorkflowFailureMode.Compensate)
-                return Result(originalStatus, fingerprint, originalMessage, events);
+                return Result(originalStatus, fingerprint, originalMessage, events, outputSummaries);
 
             var compensationAttempted = false;
             var compensationFailed = false;
@@ -237,7 +251,8 @@ namespace LongBetterWindows.Host.Interaction
                     WorkflowExecutionStatus.CompensationFailed,
                     fingerprint,
                     originalMessage,
-                    events);
+                    events,
+                    outputSummaries);
             }
             foreach (var step in completed.Reverse())
             {
@@ -269,6 +284,8 @@ namespace LongBetterWindows.Host.Interaction
                 }
 
                 var declaration = _plugins.Commands.Get(step.Compensation.CommandKey);
+                IReadOnlyDictionary<string, PluginCommandOutput> compensationOutputs =
+                    new Dictionary<string, PluginCommandOutput>();
                 if (compensationResult.IsSuccess && declaration is null)
                 {
                     compensationResult = PluginCommandResult.Failure(
@@ -278,7 +295,7 @@ namespace LongBetterWindows.Host.Interaction
                     && !CommandWorkflowBindingResolver.TrySnapshotDeclaredOutputs(
                             compensationResult,
                             declaration!.Command.Outputs,
-                            out _,
+                            out compensationOutputs,
                             out var outputError))
                 {
                     compensationResult = PluginCommandResult.Failure(outputError!);
@@ -286,6 +303,11 @@ namespace LongBetterWindows.Host.Interaction
 
                 if (compensationResult.IsSuccess)
                 {
+                    AddOutputSummaries(
+                        outputSummaries,
+                        step.Id,
+                        WorkflowOutputRole.Compensation,
+                        compensationOutputs);
                     addEvent(
                         WorkflowExecutionEventKind.CompensationSucceeded,
                         step.Id,
@@ -302,14 +324,15 @@ namespace LongBetterWindows.Host.Interaction
             }
 
             if (!compensationAttempted)
-                return Result(originalStatus, fingerprint, originalMessage, events);
+                return Result(originalStatus, fingerprint, originalMessage, events, outputSummaries);
             return Result(
                 compensationFailed
                     ? WorkflowExecutionStatus.CompensationFailed
                     : WorkflowExecutionStatus.Compensated,
                 fingerprint,
                 originalMessage,
-                events);
+                events,
+                outputSummaries);
         }
 
         private static bool IsAuthorized(
@@ -366,7 +389,32 @@ namespace LongBetterWindows.Host.Interaction
             WorkflowExecutionStatus status,
             string fingerprint,
             string? message,
-            IReadOnlyList<WorkflowExecutionEvent> events)
-            => new(status, fingerprint, message, events.ToList());
+            IReadOnlyList<WorkflowExecutionEvent> events,
+            IReadOnlyList<WorkflowOutputSummary>? outputSummaries = null)
+            => new(
+                status,
+                fingerprint,
+                message,
+                events.ToList(),
+                outputSummaries is null
+                    ? Array.Empty<WorkflowOutputSummary>()
+                    : outputSummaries.ToList());
+
+        private static void AddOutputSummaries(
+            ICollection<WorkflowOutputSummary> summaries,
+            string stepId,
+            WorkflowOutputRole role,
+            IReadOnlyDictionary<string, PluginCommandOutput> outputs)
+        {
+            foreach (var output in outputs.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+            {
+                summaries.Add(new WorkflowOutputSummary(
+                    stepId,
+                    role,
+                    output.Key,
+                    output.Value.Type,
+                    output.Value.Value.Length));
+            }
+        }
     }
 }

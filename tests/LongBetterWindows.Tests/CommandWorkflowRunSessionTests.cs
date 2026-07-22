@@ -168,7 +168,8 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
             WorkflowExecutionStatus.Completed,
             new string('a', 64),
             null,
-            [new WorkflowExecutionEvent(1, timestamp, WorkflowExecutionEventKind.WorkflowCompleted, null, null)]);
+            [new WorkflowExecutionEvent(1, timestamp, WorkflowExecutionEventKind.WorkflowCompleted, null, null)],
+            Array.Empty<WorkflowOutputSummary>());
 
     private static PluginRegistry Registry()
     {
