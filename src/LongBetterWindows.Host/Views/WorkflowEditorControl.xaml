@@ -25,12 +25,12 @@
                     <TextBlock x:Name="WorkflowCountText" Text="0 项" Margin="0,3,0,0"
                                FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                 </StackPanel>
-                <Button Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="0,0,6,0"
+                <Button x:Name="RefreshWorkflowButton" Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="0,0,6,0"
                         Click="Refresh_Click" ToolTip="刷新工作流"
                         automation:AutomationProperties.Name="刷新工作流列表">
                     <Path Data="{StaticResource Long.Icon.Refresh}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
                 </Button>
-                <Button Grid.Column="2" Style="{StaticResource LongIconButton}"
+                <Button x:Name="NewWorkflowButton" Grid.Column="2" Style="{StaticResource LongIconButton}"
                         Click="NewWorkflow_Click" ToolTip="新建组合动作"
                         automation:AutomationProperties.Name="新建组合动作">
                     <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
@@ -71,12 +71,12 @@
                           DisplayMemberPath="Name" SelectedValuePath="Id"
                           SelectionChanged="CompactWorkflowCombo_SelectionChanged"
                           automation:AutomationProperties.Name="选择本机工作流" />
-                <Button Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="8,0,6,0"
+                <Button x:Name="CompactRefreshButton" Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="8,0,6,0"
                         Click="Refresh_Click" ToolTip="刷新工作流"
                         automation:AutomationProperties.Name="刷新工作流列表">
                     <Path Data="{StaticResource Long.Icon.Refresh}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
                 </Button>
-                <Button Grid.Column="2" Style="{StaticResource LongIconButton}"
+                <Button x:Name="CompactNewButton" Grid.Column="2" Style="{StaticResource LongIconButton}"
                         Click="NewWorkflow_Click" ToolTip="新建组合动作"
                         automation:AutomationProperties.Name="新建组合动作">
                     <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
@@ -104,6 +104,13 @@
                                    Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="PrepareRunButton" Style="{StaticResource LongButton}" Margin="0,0,8,0"
+                                Click="PrepareRun_Click" automation:AutomationProperties.Name="准备执行组合动作">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource Long.Icon.Play}" Style="{StaticResource LongIcon}" Width="16" Height="16" />
+                                <TextBlock Text="准备执行" Margin="7,0,0,0" />
+                            </StackPanel>
+                        </Button>
                         <Button x:Name="DeleteWorkflowButton" Style="{StaticResource LongIconButton}" Margin="0,0,8,0"
                                 Click="DeleteWorkflow_Click" ToolTip="删除组合动作"
                                 automation:AutomationProperties.Name="删除组合动作">
@@ -150,7 +157,7 @@
                             <ComboBox x:Name="AddCommandCombo" Style="{StaticResource LongComboBox}"
                                       DisplayMemberPath="Display" SelectedValuePath="Key"
                                       automation:AutomationProperties.Name="选择要添加的命令" />
-                            <Button Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="8,0,0,0"
+                            <Button x:Name="AddStepButton" Grid.Column="1" Style="{StaticResource LongIconButton}" Margin="8,0,0,0"
                                     Click="AddStep_Click" ToolTip="添加步骤"
                                     automation:AutomationProperties.Name="添加命令步骤">
                                 <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
@@ -223,6 +230,106 @@
                                   automation:AutomationProperties.Name="允许保存敏感输入" />
                     </StackPanel>
                 </Border>
+
+                <Border x:Name="ExecutionReviewPanel" Visibility="Collapsed" Margin="0,10,0,0"
+                        CornerRadius="{DynamicResource Long.Radius.Control}" Padding="12"
+                        Background="{DynamicResource Long.Brush.Accent.Soft}"
+                        BorderBrush="{DynamicResource Long.Brush.Focus}" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="确认本次执行权限" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ExecutionReviewSummary" Margin="0,5,0,8" TextWrapping="Wrap"
+                                   FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        <ItemsControl x:Name="ExecutionPermissionList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,3">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Plugin}" FontFamily="{DynamicResource Long.Font.Mono}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Capabilities}" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                            <Button Content="取消" Style="{StaticResource LongButton}" Margin="0,0,8,0"
+                                    Click="CancelRunReview_Click" automation:AutomationProperties.Name="取消执行确认" />
+                            <Button Content="确认并执行" Style="{StaticResource LongButton.Primary}"
+                                    Click="ConfirmRun_Click" automation:AutomationProperties.Name="确认并执行组合动作" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="ExecutionRunningPanel" Visibility="Collapsed" Margin="0,10,0,0"
+                        CornerRadius="{DynamicResource Long.Radius.Control}" Padding="12"
+                        Background="{DynamicResource Long.Brush.Background.Raised}"
+                        BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="正在执行" FontWeight="SemiBold" />
+                            <TextBlock Text="命令按顺序运行；取消后仍会按失败策略尝试补偿。" Margin="0,4,12,0"
+                                       TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="取消执行" Style="{StaticResource LongButton}"
+                                Click="CancelExecution_Click" automation:AutomationProperties.Name="取消正在运行的组合动作" />
+                    </Grid>
+                </Border>
+
+                <Border x:Name="ExecutionResultPanel" Visibility="Collapsed" Margin="0,10,0,0"
+                        CornerRadius="{DynamicResource Long.Radius.Control}" Padding="12"
+                        Background="{DynamicResource Long.Brush.Background.Raised}"
+                        BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock x:Name="ExecutionResultTitle" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ExecutionResultDetail" Margin="0,4,0,0" FontSize="11"
+                                   TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    </StackPanel>
+                </Border>
+
+                <Expander x:Name="ReportsExpander" Header="执行记录" Margin="0,14,0,0" IsExpanded="False">
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="1"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <ListBox x:Name="ReportList" MaxHeight="220" Background="Transparent" BorderThickness="0"
+                                 SelectionChanged="ReportList_SelectionChanged"
+                                 automation:AutomationProperties.Name="执行报告列表">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
+                                    <Setter Property="Margin" Value="0,0,0,5" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Status}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Detail}" Margin="0,3,0,0" FontSize="10"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Border Grid.Column="1" Background="{DynamicResource Long.Brush.Stroke.Default}" />
+                        <StackPanel Grid.Column="3">
+                            <TextBlock x:Name="ReportDetailTitle" Text="选择一条执行记录" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ReportDetailMeta" Margin="0,4,0,8" FontSize="10"
+                                       Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                            <ItemsControl x:Name="ReportTimeline">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,3">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="58"/><ColumnDefinition Width="145"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Time}" FontFamily="{DynamicResource Long.Font.Mono}" FontSize="10"
+                                                       Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Kind}" FontSize="11" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Step}" FontSize="11"
+                                                       Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Grid>
+                </Expander>
             </StackPanel>
         </Grid>
     </Grid>

@@ -525,8 +525,15 @@ public class QualityGateTests
         Assert.Contains("_session.UpdateStep", view);
         Assert.Contains("_session.SaveAsync", view);
         Assert.Contains("_session.DeleteCurrentAsync", view);
+        Assert.Contains("new CommandWorkflowRunSession", view);
+        Assert.Contains("_runSession.Prepare", view);
+        Assert.Contains("_runSession.ExecuteApprovedAsync", view);
+        Assert.Contains("_runSession.CancelExecution", view);
+        Assert.Contains("_reports.ListAsync", view);
         Assert.Contains("ApplyResponsiveLayout", view);
         Assert.Contains("CompactWorkflowCombo", xaml);
+        Assert.Contains("AutomationProperties.Name=\"确认并执行组合动作\"", xaml);
+        Assert.Contains("ReportTimeline", xaml);
         Assert.DoesNotContain("File.WriteAllText", view);
         Assert.Contains("AutomationProperties.Name=\"保存组合动作\"", xaml);
         Assert.Contains("CommandWorkflowPlanner", session);

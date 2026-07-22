@@ -11,6 +11,11 @@ namespace LongBetterWindows.Host.Views
         private readonly PluginRegistry _plugins = HostProvider.Instance.PluginStore;
         private readonly CommandWorkflowRepository _repository;
         private readonly CommandWorkflowEditorSession _session;
+        private readonly CommandWorkflowExecutionReportRepository _reports;
+        private readonly CommandWorkflowRunSession _runSession;
+        private CommandWorkflowExecutionReview? _executionReview;
+        private int _reportListVersion;
+        private int _reportLoadVersion;
         private bool _rendering = true;
         private bool _subscribed;
 
@@ -23,6 +28,11 @@ namespace LongBetterWindows.Host.Views
                 "Workflows");
             _repository = new CommandWorkflowRepository(root, "local-managed");
             _session = new CommandWorkflowEditorSession(_plugins, _repository);
+            _reports = new CommandWorkflowExecutionReportRepository(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "LongBetterWindows",
+                "WorkflowReports"));
+            _runSession = new CommandWorkflowRunSession(_plugins, _reports);
             FailureModeCombo.ItemsSource = FailureOptions;
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             _rendering = false;
@@ -53,6 +63,8 @@ namespace LongBetterWindows.Host.Views
 
         private void WorkflowEditorControl_Unloaded(object sender, RoutedEventArgs e)
         {
+            _runSession.CancelReview();
+            _runSession.CancelExecution();
             if (!_subscribed) return;
             _plugins.PluginsChanged -= PluginsChanged;
             _subscribed = false;
@@ -112,6 +124,7 @@ namespace LongBetterWindows.Host.Views
             if (_rendering || WorkflowList.SelectedItem is not WorkflowListItem item) return;
             await _session.LoadAsync(item.Id);
             RenderEditor();
+            await RefreshReportsAsync(item.Id);
         }
 
         private async void CompactWorkflowCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -119,6 +132,7 @@ namespace LongBetterWindows.Host.Views
             if (_rendering || CompactWorkflowCombo.SelectedItem is not WorkflowListItem item) return;
             await _session.LoadAsync(item.Id);
             RenderEditor();
+            await RefreshReportsAsync(item.Id);
         }
 
         private void NewWorkflow_Click(object sender, RoutedEventArgs e)
@@ -129,6 +143,8 @@ namespace LongBetterWindows.Host.Views
             WorkflowList.SelectedItem = null;
             CompactWorkflowCombo.SelectedItem = null;
             _rendering = false;
+            ReportList.ItemsSource = null;
+            ReportTimeline.ItemsSource = null;
             RenderEditor();
             WorkflowNameBox.Focus();
             WorkflowNameBox.SelectAll();
@@ -145,6 +161,7 @@ namespace LongBetterWindows.Host.Views
         private void Identity_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_rendering || _session.State.Draft is null) return;
+            InvalidateExecutionReview();
             _session.UpdateIdentity(WorkflowIdBox.Text, WorkflowNameBox.Text);
             RenderStatus();
         }
@@ -207,7 +224,10 @@ namespace LongBetterWindows.Host.Views
             var result = await _session.SaveAsync(SensitiveInputCheckBox.IsChecked == true);
             RenderEditor();
             if (result.IsSuccess)
+            {
                 await RefreshListAsync(_session.State.Draft?.Id);
+                await RefreshReportsAsync(_session.State.Draft!.Id);
+            }
         }
 
         private async void DeleteWorkflow_Click(object sender, RoutedEventArgs e)
@@ -229,10 +249,130 @@ namespace LongBetterWindows.Host.Views
             }
             RenderEditor();
             await RefreshListAsync();
+            ReportList.ItemsSource = null;
+            ReportTimeline.ItemsSource = null;
+        }
+
+        private void PrepareRun_Click(object sender, RoutedEventArgs e)
+        {
+            var state = _session.State;
+            if (state.Draft is null
+                || state.ExistingDefinitionSha256 is null
+                || state.IsDirty) return;
+            _executionReview = _runSession.Prepare(state.Draft);
+            if (!_executionReview.IsValid)
+            {
+                ExecutionResultTitle.Text = "无法准备执行";
+                ExecutionResultDetail.Text = string.Join(Environment.NewLine, _executionReview.Issues);
+                ExecutionResultPanel.Visibility = Visibility.Visible;
+                return;
+            }
+            ExecutionReviewSummary.Text = _executionReview.ContainsMutatingSteps
+                ? $"{_executionReview.StepCount} 个步骤，包含系统或文件修改；失败策略为“{FailureLabel(state.Draft.FailureMode)}”。"
+                : $"{_executionReview.StepCount} 个只读步骤；失败策略为“{FailureLabel(state.Draft.FailureMode)}”。";
+            ExecutionPermissionList.ItemsSource = _executionReview.Permissions
+                .Select(permission => new PermissionReviewItem(
+                    $"{permission.PluginId}  v{permission.PluginVersion}",
+                    permission.Capabilities.Count == 0
+                        ? "无额外能力"
+                        : string.Join("、", permission.Capabilities)))
+                .ToList();
+            ExecutionResultPanel.Visibility = Visibility.Collapsed;
+            ExecutionReviewPanel.Visibility = Visibility.Visible;
+        }
+
+        private void CancelRunReview_Click(object sender, RoutedEventArgs e)
+        {
+            _runSession.CancelReview();
+            _executionReview = null;
+            ExecutionReviewPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private async void ConfirmRun_Click(object sender, RoutedEventArgs e)
+        {
+            var draft = _session.State.Draft;
+            var review = _executionReview;
+            if (draft is null || review is null) return;
+            ExecutionReviewPanel.Visibility = Visibility.Collapsed;
+            ExecutionRunningPanel.Visibility = Visibility.Visible;
+            SetEditingEnabled(false);
+            try
+            {
+                var result = await _runSession.ExecuteApprovedAsync(
+                    draft,
+                    review.Fingerprint,
+                    includeSensitiveMessages: false);
+                if (!result.IsAccepted || result.Execution is null)
+                {
+                    ExecutionResultTitle.Text = "执行未开始";
+                    ExecutionResultDetail.Text = result.Error ?? "执行批准已经失效。";
+                }
+                else
+                {
+                    ExecutionResultTitle.Text = StatusLabel(result.Execution.Status);
+                    ExecutionResultDetail.Text = result.ReportSave?.IsSuccess == true
+                        ? $"已记录 {result.Execution.Events.Count} 个脱敏事件。"
+                        : $"执行已结束，但报告保存失败：{result.ReportSave?.Error}";
+                    await RefreshReportsAsync(draft.Id);
+                    ReportsExpander.IsExpanded = true;
+                }
+                ExecutionResultPanel.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                _executionReview = null;
+                ExecutionRunningPanel.Visibility = Visibility.Collapsed;
+                SetEditingEnabled(true);
+                RenderStatus();
+            }
+        }
+
+        private void CancelExecution_Click(object sender, RoutedEventArgs e)
+            => _runSession.CancelExecution();
+
+        private async Task RefreshReportsAsync(string workflowId)
+        {
+            var version = Interlocked.Increment(ref _reportListVersion);
+            var result = await _reports.ListAsync(workflowId);
+            if (version != _reportListVersion) return;
+            if (!result.IsSuccess)
+            {
+                ReportDetailTitle.Text = "执行记录不可用";
+                ReportDetailMeta.Text = result.Error;
+                return;
+            }
+            ReportList.ItemsSource = result.Reports.Select(ReportListItem.From).ToList();
+            if (result.Issues.Count > 0)
+                ReportDetailMeta.Text = $"{result.Issues.Count} 个报告文件未能载入";
+        }
+
+        private async void ReportList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ReportList.SelectedItem is not ReportListItem item) return;
+            var version = Interlocked.Increment(ref _reportLoadVersion);
+            var result = await _reports.LoadAsync(item.ReportId);
+            if (version != _reportLoadVersion) return;
+            if (!result.IsSuccess)
+            {
+                ReportDetailTitle.Text = "报告读取失败";
+                ReportDetailMeta.Text = result.Error;
+                ReportTimeline.ItemsSource = null;
+                return;
+            }
+            var report = result.Report!;
+            ReportDetailTitle.Text = StatusLabel(report.Status);
+            var messageState = report.MessagesIncluded ? "消息未在界面展示" : "消息已脱敏";
+            ReportDetailMeta.Text = $"{report.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss} · {report.Events.Count} 个事件 · {messageState}";
+            ReportTimeline.ItemsSource = report.Events.Select(item => new TimelineItem(
+                item.Timestamp.ToLocalTime().ToString("HH:mm:ss"),
+                EventLabel(item.Kind),
+                item.StepId ?? "工作流"))
+                .ToList();
         }
 
         private void RenderEditor()
         {
+            InvalidateExecutionReview();
             _rendering = true;
             try
             {
@@ -286,6 +426,10 @@ namespace LongBetterWindows.Host.Views
                 ? "尚未保存"
                 : state.IsDirty ? "有未保存的更改" : "已保存到本机";
             SaveWorkflowButton.IsEnabled = state.CanSave && state.IsDirty;
+            PrepareRunButton.IsEnabled = state.Preflight?.IsValid == true
+                && state.ExistingDefinitionSha256 is not null
+                && !state.IsDirty
+                && !_runSession.IsRunning;
             if (state.Preflight?.IsValid == true)
             {
                 PreflightTitle.Text = "预检通过";
@@ -319,7 +463,74 @@ namespace LongBetterWindows.Host.Views
             CompactWorkflowBar.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        private void SetEditingEnabled(bool enabled)
+        {
+            WorkflowList.IsEnabled = enabled;
+            CompactWorkflowCombo.IsEnabled = enabled;
+            RefreshWorkflowButton.IsEnabled = enabled;
+            NewWorkflowButton.IsEnabled = enabled;
+            CompactRefreshButton.IsEnabled = enabled;
+            CompactNewButton.IsEnabled = enabled;
+            WorkflowIdBox.IsEnabled = enabled && _session.State.ExistingDefinitionSha256 is null;
+            WorkflowNameBox.IsEnabled = enabled;
+            FailureModeCombo.IsEnabled = enabled;
+            AddCommandCombo.IsEnabled = enabled;
+            AddStepButton.IsEnabled = enabled;
+            StepsList.IsEnabled = enabled;
+            DeleteWorkflowButton.IsEnabled = enabled && _session.State.ExistingDefinitionSha256 is not null;
+            SaveWorkflowButton.IsEnabled = enabled && _session.State.CanSave && _session.State.IsDirty;
+            PrepareRunButton.IsEnabled = enabled;
+        }
+
+        private void InvalidateExecutionReview()
+        {
+            if (ExecutionReviewPanel.Visibility != Visibility.Visible) return;
+            _runSession.CancelReview();
+            _executionReview = null;
+            ExecutionReviewPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private static string FailureLabel(WorkflowFailureMode mode)
+            => mode == WorkflowFailureMode.Compensate ? "失败时回滚" : "失败时停止";
+
+        private static string StatusLabel(WorkflowExecutionStatus status)
+            => status switch
+            {
+                WorkflowExecutionStatus.Completed => "执行完成",
+                WorkflowExecutionStatus.Compensated => "失败后已回滚",
+                WorkflowExecutionStatus.CompensationFailed => "回滚未完全成功",
+                WorkflowExecutionStatus.Cancelled => "执行已取消",
+                WorkflowExecutionStatus.Rejected => "执行已拒绝",
+                _ => "执行失败",
+            };
+
+        private static string EventLabel(WorkflowExecutionEventKind kind)
+            => kind switch
+            {
+                WorkflowExecutionEventKind.PreflightPassed => "预检通过",
+                WorkflowExecutionEventKind.AuthorizationApproved => "批准已确认",
+                WorkflowExecutionEventKind.StepStarted => "步骤开始",
+                WorkflowExecutionEventKind.StepSucceeded => "步骤成功",
+                WorkflowExecutionEventKind.StepFailed => "步骤失败",
+                WorkflowExecutionEventKind.StepCancelled => "步骤取消",
+                WorkflowExecutionEventKind.CompensationStarted => "开始回滚",
+                WorkflowExecutionEventKind.CompensationSucceeded => "回滚成功",
+                WorkflowExecutionEventKind.CompensationFailed => "回滚失败",
+                WorkflowExecutionEventKind.WorkflowCompleted => "流程完成",
+                _ => "流程拒绝",
+            };
+
         private sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum;
+        private sealed record PermissionReviewItem(string Plugin, string Capabilities);
+        private sealed record TimelineItem(string Time, string Kind, string Step);
+        private sealed record ReportListItem(string ReportId, string Status, string Detail)
+        {
+            public static ReportListItem From(WorkflowExecutionReportSummary summary)
+                => new(
+                    summary.ReportId,
+                    StatusLabel(summary.Status),
+                    $"{summary.StartedAt.ToLocalTime():MM-dd HH:mm} · {summary.EventCount} 事件");
+        }
         private sealed record CommandOption(string Key, string Display)
         {
             public static CommandOption From(CommandDescriptor descriptor)

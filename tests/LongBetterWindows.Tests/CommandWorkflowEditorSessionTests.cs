@@ -164,6 +164,44 @@ public sealed class CommandWorkflowEditorSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateStep_UnchangedCommandPreservesExistingInvocationInputs()
+    {
+        var registry = Registry();
+        var repository = new CommandWorkflowRepository(_root, "local-user");
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.inputs",
+            "Input workflow",
+            WorkflowFailureMode.Stop,
+            [
+                new CommandWorkflowStep(
+                    "step-1",
+                    WorkflowStepEffect.ReadOnly,
+                    new WorkflowCommand(
+                        "editor:first",
+                        new PluginCommandInvocation
+                        {
+                            CommandId = "first",
+                            InputType = AcceptedInputType.Text,
+                            Text = "private input",
+                        })),
+            ]);
+        await repository.SaveAsync(
+            workflow,
+            new CommandWorkflowSaveOptions(AllowSensitiveInputs: true));
+        var session = Session(registry, repository);
+        await session.LoadAsync(workflow.Id);
+
+        session.UpdateStep(
+            "step-1",
+            WorkflowStepEffect.Mutating,
+            "editor:first",
+            "editor:undo");
+
+        Assert.Equal("private input", session.State.Draft!.Steps[0].Command!.Invocation!.Text);
+        Assert.Equal(AcceptedInputType.Text, session.State.Draft.Steps[0].Command!.Invocation!.InputType);
+    }
+
+    [Fact]
     public async Task Save_RejectsDraftWhoseCommandDisappeared()
     {
         var registry = Registry();
@@ -231,7 +269,7 @@ public sealed class CommandWorkflowEditorSessionTests : IDisposable
         {
             Id = id,
             Title = id,
-            AcceptedInputs = [AcceptedInputType.None],
+            AcceptedInputs = [AcceptedInputType.None, AcceptedInputType.Text],
         };
 
     public void Dispose()

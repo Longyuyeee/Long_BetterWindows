@@ -131,16 +131,26 @@ namespace LongBetterWindows.Host.Interaction
             var draft = RequireDraft();
             var index = FindStep(draft, stepId);
             if (index < 0) return false;
-            var command = CreateCommand(commandKey);
+            var existing = draft.Steps[index];
+            var command = string.Equals(
+                existing.Command?.CommandKey,
+                commandKey,
+                StringComparison.OrdinalIgnoreCase)
+                ? existing.Command
+                : CreateCommand(commandKey);
             var compensation = string.IsNullOrWhiteSpace(compensationCommandKey)
                 ? null
-                : CreateCommand(compensationCommandKey);
+                : string.Equals(
+                    existing.Compensation?.CommandKey,
+                    compensationCommandKey,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? existing.Compensation
+                    : CreateCommand(compensationCommandKey);
             if (command is null || (!string.IsNullOrWhiteSpace(compensationCommandKey) && compensation is null))
             {
                 State = State with { Error = "A selected workflow command is no longer available." };
                 return false;
             }
-            var existing = draft.Steps[index];
             if (existing.Effect == effect
                 && string.Equals(existing.Command?.CommandKey, command.CommandKey, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(
