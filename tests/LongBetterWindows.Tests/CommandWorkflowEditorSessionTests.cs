@@ -202,6 +202,118 @@ public sealed class CommandWorkflowEditorSessionTests : IDisposable
     }
 
     [Fact]
+    public void UpdateInvocation_UpdatesSelectedRoleWithDefensiveCopies()
+    {
+        var session = Session();
+        session.StartNew("workflow.input-edit", "Input edit");
+        session.AddStep("editor:first", WorkflowStepEffect.Mutating);
+        session.UpdateStep(
+            "step-1",
+            WorkflowStepEffect.Mutating,
+            "editor:first",
+            "editor:undo");
+        var paths = new List<string> { "C:\\first.txt" };
+        var arguments = new Dictionary<string, string> { ["mode"] = "safe" };
+
+        var updated = session.UpdateInvocation(
+            "step-1",
+            WorkflowCommandRole.Compensation,
+            AcceptedInputType.Text,
+            text: "restore",
+            paths: paths,
+            arguments: arguments);
+        paths[0] = "C:\\changed.txt";
+        arguments["mode"] = "unsafe";
+
+        Assert.True(updated);
+        var invocation = session.State.Draft!.Steps[0].Compensation!.Invocation!;
+        Assert.Equal("restore", invocation.Text);
+        Assert.Equal("C:\\first.txt", Assert.Single(invocation.Paths));
+        Assert.Equal("safe", invocation.Arguments["mode"]);
+        Assert.Null(session.State.Draft.Steps[0].Command!.Invocation!.Text);
+    }
+
+    [Fact]
+    public void UpdateInvocation_RejectsInputOutsideCommandContract()
+    {
+        var session = Session();
+        session.StartNew("workflow.input-contract", "Input contract");
+        session.AddStep("editor:first");
+
+        var updated = session.UpdateInvocation(
+            "step-1",
+            WorkflowCommandRole.Primary,
+            AcceptedInputType.File,
+            paths: ["C:\\input.txt"]);
+
+        Assert.False(updated);
+        Assert.Equal(AcceptedInputType.None,
+            session.State.Draft!.Steps[0].Command!.Invocation!.InputType);
+        Assert.Contains("does not accept", session.State.Error);
+    }
+
+    [Fact]
+    public async Task PreviewImport_DoesNotReplaceCurrentDraftUntilAdopted()
+    {
+        Directory.CreateDirectory(_root);
+        var importPath = Path.Combine(_root, "external.json");
+        await File.WriteAllTextAsync(
+            importPath,
+            CommandWorkflowDocumentCodec.Serialize(
+                new CommandWorkflowDefinition(
+                    "workflow.imported",
+                    "Imported workflow",
+                    WorkflowFailureMode.Stop,
+                    [new CommandWorkflowStep(
+                        "step",
+                        WorkflowStepEffect.ReadOnly,
+                        new WorkflowCommand(
+                            "editor:first",
+                            new PluginCommandInvocation { CommandId = "first" }))]),
+                new WorkflowDocumentSource(WorkflowDocumentSourceKind.Imported, "external.source")));
+        var managedRoot = Path.Combine(_root, "managed");
+        var session = Session(repository: new CommandWorkflowRepository(managedRoot, "local-user"));
+        session.StartNew("workflow.current", "Current workflow");
+
+        var review = await session.PreviewImportAsync(importPath);
+
+        Assert.True(review.IsSuccess, review.Error);
+        Assert.Equal(WorkflowDocumentTrustLevel.Untrusted, review.TrustLevel);
+        Assert.Equal("workflow.current", session.State.Draft!.Id);
+        Assert.False(Directory.Exists(managedRoot));
+
+        Assert.True(session.AdoptImport(review));
+        Assert.Equal("workflow.imported", session.State.Draft!.Id);
+        Assert.Null(session.State.ExistingDefinitionSha256);
+        Assert.True(session.State.IsDirty);
+    }
+
+    [Fact]
+    public async Task AdoptImport_CannotOverwriteManagedWorkflowWithSameId()
+    {
+        var repository = new CommandWorkflowRepository(_root, "local-user");
+        var session = Session(repository: repository);
+        session.StartNew("workflow.collision", "Managed workflow");
+        session.AddStep("editor:first");
+        await session.SaveAsync(allowSensitiveInputs: false);
+        var importPath = Path.Combine(_root, "external.json");
+        await File.WriteAllTextAsync(
+            importPath,
+            CommandWorkflowDocumentCodec.Serialize(
+                session.State.Draft! with { Name = "External workflow" },
+                new WorkflowDocumentSource(WorkflowDocumentSourceKind.Imported, "external.source")));
+        var review = await session.PreviewImportAsync(importPath);
+        session.AdoptImport(review);
+
+        var saved = await session.SaveAsync(allowSensitiveInputs: false);
+
+        Assert.False(saved.IsSuccess);
+        Assert.Contains("existing definition", saved.Error);
+        Assert.Equal("Managed workflow", (await repository.LoadManagedAsync(
+            "workflow.collision")).Workflow!.Name);
+    }
+
+    [Fact]
     public async Task Save_RejectsDraftWhoseCommandDisappeared()
     {
         var registry = Registry();

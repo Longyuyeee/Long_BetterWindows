@@ -114,8 +114,7 @@ namespace LongBetterWindows.Host.Interaction
                 issues.Add($"Workflow step {role} command id does not match its target: {stepId}");
                 return;
             }
-            if (invocation.InputType != AcceptedInputType.None
-                && !descriptor.Command.AcceptedInputs.Contains(invocation.InputType))
+            if (!descriptor.Command.AcceptedInputs.Contains(invocation.InputType))
             {
                 issues.Add($"Workflow step {role} input type is not accepted: {stepId}");
             }

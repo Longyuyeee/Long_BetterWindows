@@ -3,6 +3,24 @@ using LongBetterWindows.Host.Engine;
 
 namespace LongBetterWindows.Host.Interaction
 {
+    public enum WorkflowCommandRole
+    {
+        Primary,
+        Compensation,
+    }
+
+    public sealed record CommandWorkflowImportReview(
+        bool IsSuccess,
+        string SourcePath,
+        CommandWorkflowDefinition? Workflow,
+        WorkflowDocumentSource? Source,
+        WorkflowDocumentTrustLevel TrustLevel,
+        string DefinitionSha256,
+        int? MigratedFromSchemaVersion,
+        CommandWorkflowPreflightResult? Preflight,
+        bool ContainsSensitiveInputs,
+        string? Error);
+
     public sealed record CommandWorkflowEditorState(
         CommandWorkflowDefinition? Draft,
         string? ExistingDefinitionSha256,
@@ -168,6 +186,108 @@ namespace LongBetterWindows.Host.Interaction
             return true;
         }
 
+        public bool UpdateInvocation(
+            string stepId,
+            WorkflowCommandRole role,
+            AcceptedInputType inputType,
+            string? text = null,
+            IReadOnlyList<string>? paths = null,
+            byte[]? imagePng = null,
+            IReadOnlyDictionary<string, string>? arguments = null)
+        {
+            if (!Enum.IsDefined(role)) throw new ArgumentOutOfRangeException(nameof(role));
+            if (!Enum.IsDefined(inputType)) throw new ArgumentOutOfRangeException(nameof(inputType));
+            var draft = RequireDraft();
+            var index = FindStep(draft, stepId);
+            if (index < 0) return false;
+            var step = draft.Steps[index];
+            var command = role == WorkflowCommandRole.Primary
+                ? step.Command
+                : step.Compensation;
+            if (command?.Invocation is null)
+            {
+                State = State with { Error = $"Workflow step {role.ToString().ToLowerInvariant()} is not configured: {stepId}" };
+                return false;
+            }
+            var descriptor = _plugins.Commands.Get(command.CommandKey);
+            if (descriptor is null)
+            {
+                State = State with { Error = $"Command was not found: {command.CommandKey}" };
+                return false;
+            }
+            if (!descriptor.Command.AcceptedInputs.Contains(inputType))
+            {
+                State = State with { Error = $"Command does not accept {inputType} input: {command.CommandKey}" };
+                return false;
+            }
+
+            var invocation = new PluginCommandInvocation
+            {
+                CommandId = command.Invocation.CommandId,
+                InputType = inputType,
+                Text = text,
+                Paths = paths?.ToArray() ?? Array.Empty<string>(),
+                ImagePng = imagePng?.ToArray(),
+                Arguments = arguments is null
+                    ? new Dictionary<string, string>()
+                    : new Dictionary<string, string>(arguments, StringComparer.Ordinal),
+            };
+            if (InvocationEquals(command.Invocation, invocation)) return true;
+
+            var updatedCommand = command with { Invocation = invocation };
+            var steps = draft.Steps.ToList();
+            steps[index] = role == WorkflowCommandRole.Primary
+                ? step with { Command = updatedCommand }
+                : step with { Compensation = updatedCommand };
+            SetDraft(draft with { Steps = steps }, State.ExistingDefinitionSha256, isDirty: true);
+            return true;
+        }
+
+        public async Task<CommandWorkflowImportReview> PreviewImportAsync(
+            string sourcePath,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await _repository.ImportAsync(sourcePath, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return new CommandWorkflowImportReview(
+                    false,
+                    sourcePath,
+                    null,
+                    result.Source,
+                    result.TrustLevel,
+                    result.DefinitionSha256,
+                    result.MigratedFromSchemaVersion,
+                    null,
+                    false,
+                    result.Error);
+            }
+            var workflow = result.Workflow!;
+            return new CommandWorkflowImportReview(
+                true,
+                sourcePath,
+                workflow,
+                result.Source,
+                result.TrustLevel,
+                result.DefinitionSha256,
+                result.MigratedFromSchemaVersion,
+                _planner.Preflight(workflow),
+                CommandWorkflowDocumentCodec.ContainsSensitiveInputs(workflow),
+                null);
+        }
+
+        public bool AdoptImport(CommandWorkflowImportReview review)
+        {
+            ArgumentNullException.ThrowIfNull(review);
+            if (!review.IsSuccess || review.Workflow is null)
+            {
+                State = State with { Error = review.Error ?? "Workflow import review is invalid." };
+                return false;
+            }
+            SetDraft(review.Workflow, existingHash: null, isDirty: true);
+            return true;
+        }
+
         public bool RemoveStep(string stepId)
         {
             var draft = RequireDraft();
@@ -298,5 +418,19 @@ namespace LongBetterWindows.Host.Interaction
             }
             return $"step-{steps.Count + 1}";
         }
+
+        private static bool InvocationEquals(
+            PluginCommandInvocation first,
+            PluginCommandInvocation second)
+            => string.Equals(first.CommandId, second.CommandId, StringComparison.Ordinal)
+                && first.InputType == second.InputType
+                && string.Equals(first.Text, second.Text, StringComparison.Ordinal)
+                && first.Paths.SequenceEqual(second.Paths, StringComparer.Ordinal)
+                && (first.ImagePng ?? Array.Empty<byte>()).SequenceEqual(
+                    second.ImagePng ?? Array.Empty<byte>())
+                && first.Arguments.Count == second.Arguments.Count
+                && first.Arguments.All(argument =>
+                    second.Arguments.TryGetValue(argument.Key, out var value)
+                    && string.Equals(argument.Value, value, StringComparison.Ordinal));
     }
 }

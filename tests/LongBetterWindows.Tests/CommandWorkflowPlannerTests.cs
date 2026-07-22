@@ -98,6 +98,30 @@ public class CommandWorkflowPlannerTests
     }
 
     [Fact]
+    public void Preflight_NoneInputCannotBypassCommandContract()
+    {
+        var planner = new CommandWorkflowPlanner(CreateRegistry());
+        var workflow = Workflow() with
+        {
+            FailureMode = WorkflowFailureMode.Stop,
+            Steps =
+            [
+                new CommandWorkflowStep(
+                    "inspect",
+                    WorkflowStepEffect.ReadOnly,
+                    new WorkflowCommand(
+                        "files:inspect",
+                        new PluginCommandInvocation { CommandId = "inspect" })),
+            ],
+        };
+
+        var result = planner.Preflight(workflow);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Contains("input type"));
+    }
+
+    [Fact]
     public void Preflight_ChangedInvocationContent_ChangesFingerprintWithoutExposingContent()
     {
         var planner = new CommandWorkflowPlanner(CreateRegistry());
