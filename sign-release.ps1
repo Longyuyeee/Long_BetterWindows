@@ -11,6 +11,7 @@ param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [Parameter(Mandatory=$true)] [string] $CertificateThumbprint,
     [Parameter(Mandatory=$true)] [string] $ExpectedSubject,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)] [uri] $TimestampUrl,
     [ValidateSet('CurrentUser','LocalMachine')] [string] $CertificateStoreLocation = 'CurrentUser',
     [string] $SignToolPath,
@@ -21,6 +22,10 @@ $ErrorActionPreference = 'Stop'
 if (-not $ConfirmSign) { throw 'ConfirmSign is required before invoking a protected code-signing key.' }
 if ($TimestampUrl.Scheme -ne 'https') { throw 'TimestampUrl must use HTTPS.' }
 if ([string]::IsNullOrWhiteSpace($ExpectedSubject)) { throw 'ExpectedSubject must not be empty.' }
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
 $inputRoot = [IO.Path]::GetFullPath($InputReleaseDirectory).TrimEnd('\')
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory).TrimEnd('\')
 if ($inputRoot -eq $outputRoot) { throw 'Input and output release directories must differ.' }
@@ -30,6 +35,10 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "Release
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ([bool]$manifest.source_dirty) { throw 'Code signing requires a candidate rebuilt from a clean source commit.' }
 if ([bool]$manifest.signed) { throw 'Input release is already marked signed.' }
+$manifestCommit = ([string]$manifest.commit).Trim().ToLowerInvariant()
+if ($manifestCommit -notmatch '^[0-9a-f]{40}$' -or $manifestCommit -ne $expectedCommit) {
+    throw 'Candidate source commit does not match ExpectedSourceCommit.'
+}
 if (@(Get-ChildItem -LiteralPath $inputRoot -Recurse -Force -Attributes ReparsePoint -ErrorAction SilentlyContinue).Count -gt 0) {
     throw 'Code signing input must not contain reparse points.'
 }
@@ -122,6 +131,7 @@ try {
     $manifest.release_eligible = $true
     $manifest | Add-Member -NotePropertyName signing -NotePropertyValue ([ordered]@{
         signed_at = [DateTimeOffset]::UtcNow.ToString('O')
+        source_commit = $expectedCommit
         certificate_thumbprint = $thumbprint
         certificate_subject = $certificate.Subject
         certificate_not_after = $certificate.NotAfter.ToUniversalTime().ToString('O')
@@ -135,7 +145,11 @@ try {
     @($signedPackages | ForEach-Object { "$($_.sha256)  $($_.file)" }) |
         Set-Content -LiteralPath (Join-Path $stagingRoot 'SHA256SUMS.txt') -Encoding UTF8
 
-    & $verifyScript -ReleaseDirectory $stagingRoot -SignToolPath $signToolResolver -ExpectedCertificateThumbprint $thumbprint
+    & $verifyScript `
+        -ReleaseDirectory $stagingRoot `
+        -SignToolPath $signToolResolver `
+        -ExpectedCertificateThumbprint $thumbprint `
+        -ExpectedSourceCommit $expectedCommit
     Move-Item -LiteralPath $stagingRoot -Destination $outputRoot
     Write-Output "Signed release created: $outputRoot"
 }

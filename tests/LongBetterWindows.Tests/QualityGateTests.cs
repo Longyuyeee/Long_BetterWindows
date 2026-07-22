@@ -279,6 +279,10 @@ public class QualityGateTests
         var verify = Read("verify-signed-release.ps1");
 
         Assert.Contains("ConfirmSign", sign);
+        Assert.Contains("ExpectedSourceCommit", sign);
+        Assert.Contains("ExpectedSourceCommit must be a full 40-character Git commit SHA", sign);
+        Assert.Contains("Candidate source commit does not match ExpectedSourceCommit", sign);
+        Assert.Contains("source_commit = $expectedCommit", sign);
         Assert.Contains("Code signing requires a candidate rebuilt from a clean source commit", sign);
         Assert.Contains("Cert:\\$CertificateStoreLocation\\My\\$thumbprint", sign);
         Assert.DoesNotContain("PfxPassword", sign, StringComparison.OrdinalIgnoreCase);
@@ -299,6 +303,9 @@ public class QualityGateTests
         Assert.Contains("verify /pa /all /tw", verify);
         Assert.Contains("Signed file count mismatch", verify);
         Assert.Contains("verified_windows_authenticode_release", verify);
+        Assert.Contains("ExpectedSourceCommit", verify);
+        Assert.Contains("Signed release source commit does not match ExpectedSourceCommit", verify);
+        Assert.Contains("source_commit = $expectedCommit", verify);
     }
 
     [Fact]

@@ -5,6 +5,7 @@
 #>
 param(
     [Parameter(Mandatory=$true)] [string] $ReleaseDirectory,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [string] $SignToolPath,
     [string] $ExpectedCertificateThumbprint,
     [string] $OutputPath
@@ -70,6 +71,15 @@ if ([bool]$manifest.source_dirty) { throw 'Signed release verification rejects s
 if (-not [bool]$manifest.signed -or -not [bool]$manifest.release_eligible) {
     throw 'Release manifest is not marked signed and release-eligible.'
 }
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
+}
+$manifestCommit = ([string]$manifest.commit).Trim().ToLowerInvariant()
+$signingCommit = ([string]$manifest.signing.source_commit).Trim().ToLowerInvariant()
+if ($manifestCommit -ne $expectedCommit -or $signingCommit -ne $expectedCommit) {
+    throw 'Signed release source commit does not match ExpectedSourceCommit.'
+}
 $manifestThumbprint = ([string]$manifest.signing.certificate_thumbprint).Replace(' ','').ToUpperInvariant()
 $expectedThumbprint = if ([string]::IsNullOrWhiteSpace($ExpectedCertificateThumbprint)) {
     $manifestThumbprint
@@ -122,6 +132,7 @@ $summary = [ordered]@{
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'verified_windows_authenticode_release'
     version = [string]$manifest.version
+    source_commit = $expectedCommit
     certificate_thumbprint = $expectedThumbprint
     timestamp_url = [string]$manifest.signing.timestamp_url
     passed = $true
