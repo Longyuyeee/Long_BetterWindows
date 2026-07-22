@@ -54,10 +54,14 @@ function Wait-ForNoAddedProductWebViewProcesses(
 function New-ReleaseZip([string] $SourceDirectory, [string] $DestinationPath) {
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $sourceRoot = [IO.Path]::GetFullPath($SourceDirectory).TrimEnd('\') + '\'
     $archive = [IO.Compression.ZipFile]::Open($DestinationPath, [IO.Compression.ZipArchiveMode]::Create)
     try {
         foreach ($file in Get-ChildItem -LiteralPath $SourceDirectory -File -Recurse) {
-            $entryName = [IO.Path]::GetRelativePath($SourceDirectory, $file.FullName).Replace('\', '/')
+            if (-not $file.FullName.StartsWith($sourceRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Release archive input escapes source root: $($file.FullName)"
+            }
+            $entryName = $file.FullName.Substring($sourceRoot.Length).Replace('\', '/')
             $entry = $archive.CreateEntry($entryName, [IO.Compression.CompressionLevel]::Optimal)
             $entryStream = $entry.Open()
             $fileStream = [IO.File]::OpenRead($file.FullName)

@@ -672,6 +672,8 @@ public class QualityGateTests
         Assert.Contains("[IO.Compression.ZipArchiveMode]::Create", release);
         Assert.Contains("Add-Type -AssemblyName System.IO.Compression", release);
         Assert.Contains(".Replace('\\', '/')", release);
+        Assert.Contains("Release archive input escapes source root", release);
+        Assert.DoesNotContain("Path]::GetRelativePath", release);
         Assert.Contains("Assert-ReleaseZipLayout", release);
         Assert.Contains("PluginManifests=$manifestCount", release);
         Assert.DoesNotContain("Compress-Archive", release);
