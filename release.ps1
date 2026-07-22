@@ -53,11 +53,35 @@ function Wait-ForNoAddedProductWebViewProcesses(
 
 function New-ReleaseZip([string] $SourceDirectory, [string] $DestinationPath) {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [IO.Compression.ZipFile]::CreateFromDirectory(
-        $SourceDirectory,
-        $DestinationPath,
-        [IO.Compression.CompressionLevel]::Optimal,
-        $false)
+    $archive = [IO.Compression.ZipFile]::Open($DestinationPath, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($file in Get-ChildItem -LiteralPath $SourceDirectory -File -Recurse) {
+            $entryName = [IO.Path]::GetRelativePath($SourceDirectory, $file.FullName).Replace('\', '/')
+            $entry = $archive.CreateEntry($entryName, [IO.Compression.CompressionLevel]::Optimal)
+            $entryStream = $entry.Open()
+            $fileStream = [IO.File]::OpenRead($file.FullName)
+            try { $fileStream.CopyTo($entryStream) }
+            finally {
+                $fileStream.Dispose()
+                $entryStream.Dispose()
+            }
+        }
+    }
+    finally { $archive.Dispose() }
+}
+
+function Assert-ReleaseZipLayout([string] $ZipPath) {
+    $archive = [IO.Compression.ZipFile]::OpenRead($ZipPath)
+    try {
+        $hostCount = @($archive.Entries | Where-Object { $_.FullName -eq 'LongBetterWindows.Host.exe' }).Count
+        $manifestCount = @($archive.Entries | Where-Object {
+            $_.FullName -match '^Plugins/[^/]+/manifest\.json$'
+        }).Count
+        if ($hostCount -ne 1 -or $manifestCount -ne $expectedPluginCount) {
+            throw "ZIP layout check failed: Hosts=$hostCount, PluginManifests=$manifestCount"
+        }
+    }
+    finally { $archive.Dispose() }
 }
 
 if (-not (Test-Path -LiteralPath $dotnet)) {
@@ -187,6 +211,7 @@ try {
         $zipName = "LongBetterWindows-v$Version-win-x64-$($variant.Name).zip"
         $zipPath = Join-Path $releaseRoot $zipName
         New-ReleaseZip -SourceDirectory $publishDirectory -DestinationPath $zipPath
+        Assert-ReleaseZipLayout -ZipPath $zipPath
         $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
         $packages += [pscustomobject]@{
             file = $zipName
