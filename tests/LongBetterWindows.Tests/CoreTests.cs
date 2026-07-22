@@ -193,6 +193,76 @@ public class CoreTests
     }
 
     [Fact]
+    public void WebBridgeProtocol_RoundTripsStructuredCommandResult()
+    {
+        var message = WebPluginBridgeProtocol.ParseCommandResult(
+            """
+            {"type":"long.command-result","request_id":"request-1","success":true,
+             "message":"done","outputs":{"result":{"type":"text","value":"encoded"}}}
+            """);
+
+        Assert.NotNull(message);
+        Assert.True(WebPluginBridgeProtocol.TryCreateCommandResult(
+            message!,
+            out var result,
+            out var error));
+        Assert.Null(error);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("encoded", result.Outputs["result"].Value);
+        Assert.Equal(PluginCommandOutputType.Text, result.Outputs["result"].Type);
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_RejectsInvalidStructuredOutput()
+    {
+        var message = WebPluginBridgeProtocol.ParseCommandResult(
+            """
+            {"type":"long.command-result","request_id":"request-1","success":true,
+             "outputs":{"result":{"type":"binary","value":"data"}}}
+            """);
+
+        Assert.NotNull(message);
+        Assert.False(WebPluginBridgeProtocol.TryCreateCommandResult(
+            message!,
+            out var result,
+            out var error));
+        Assert.False(result.IsSuccess);
+        Assert.Contains("invalid", error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task WebCommandCoordinator_CorrelatesResultWithPendingRequest()
+    {
+        string? sent = null;
+        using var coordinator = new WebPluginCommandCoordinator(
+            "com.test.web",
+            message =>
+            {
+                sent = message;
+                return Task.CompletedTask;
+            },
+            TimeSpan.FromSeconds(1));
+
+        var pending = coordinator.SendAsync(
+            new PluginCommandInvocation { CommandId = "transform" },
+            CancellationToken.None);
+        await Task.Yield();
+        Assert.NotNull(sent);
+        using var document = System.Text.Json.JsonDocument.Parse(sent!);
+        var requestId = document.RootElement.GetProperty("request_id").GetString();
+
+        var response = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            type = "long.command-result",
+            request_id = requestId,
+            success = true,
+            outputs = new { },
+        });
+        Assert.True(coordinator.TryHandle(response));
+        Assert.True((await pending).IsSuccess);
+    }
+
+    [Fact]
     public void WebBridgeProtocol_SerializesLowercaseResponseAndEventContracts()
     {
         using var success = JsonDocument.Parse(

@@ -30,12 +30,50 @@
 
   const commandHandlers = LongUI._commandHandlers || new Set();
   LongUI._commandHandlers = commandHandlers;
+  const commandQueue = LongUI._commandQueue || [];
+  LongUI._commandQueue = commandQueue;
+
+  function normalizeCommandResult(result) {
+    if (typeof result === 'string') return { success: true, message: result, outputs: {} };
+    if (!result || typeof result !== 'object') return { success: true, outputs: {} };
+    return {
+      success: result.success !== false,
+      message: typeof result.message === 'string' ? result.message : undefined,
+      outputs: result.outputs && typeof result.outputs === 'object' ? result.outputs : {}
+    };
+  }
+
+  async function dispatchCommand(envelope) {
+    LongUI.lastCommand = envelope.command;
+    const results = [];
+    try {
+      for (const handler of Array.from(commandHandlers))
+        results.push(await handler(envelope.command));
+      window.dispatchEvent(new CustomEvent('long:command', { detail: envelope.command }));
+      const selected = results.find(function (result) { return result !== undefined; });
+      const response = normalizeCommandResult(selected);
+      window.chrome.webview.postMessage(Object.assign({
+        type: 'long.command-result',
+        request_id: envelope.request_id
+      }, response));
+    } catch (error) {
+      window.chrome.webview.postMessage({
+        type: 'long.command-result',
+        request_id: envelope.request_id,
+        success: false,
+        message: error && error.message ? error.message : String(error),
+        outputs: {}
+      });
+    }
+  }
 
   LongUI.onCommand = function (handler) {
     if (typeof handler !== 'function') return function () {};
     commandHandlers.add(handler);
-    if (LongUI.lastCommand)
-      queueMicrotask(function () { handler(LongUI.lastCommand); });
+    if (commandQueue.length)
+      queueMicrotask(function () {
+        commandQueue.splice(0).forEach(function (envelope) { void dispatchCommand(envelope); });
+      });
     return function () { commandHandlers.delete(handler); };
   };
 
@@ -55,11 +93,9 @@
         try { message = JSON.parse(message); } catch (_) { return; }
       }
       if (!message || message.type !== 'long.command' || !message.command) return;
-      LongUI.lastCommand = message.command;
-      commandHandlers.forEach(function (handler) {
-        try { handler(message.command); } catch (error) { console.error(error); }
-      });
-      window.dispatchEvent(new CustomEvent('long:command', { detail: message.command }));
+      const envelope = { request_id: message.request_id, command: message.command };
+      if (!commandHandlers.size) commandQueue.push(envelope);
+      else void dispatchCommand(envelope);
     });
   }
 

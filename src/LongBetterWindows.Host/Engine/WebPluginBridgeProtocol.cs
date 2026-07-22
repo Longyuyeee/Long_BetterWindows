@@ -1,4 +1,5 @@
 using LongBetterWindows.Host.Contracts;
+using System.Text.Json.Serialization;
 
 namespace LongBetterWindows.Host.Engine
 {
@@ -18,8 +19,92 @@ namespace LongBetterWindows.Host.Engine
         internal static string SerializeError(int id, string error) =>
             System.Text.Json.JsonSerializer.Serialize(new { id, error });
 
-        internal static string SerializeCommand(PluginCommandInvocation command) =>
-            System.Text.Json.JsonSerializer.Serialize(new { type = "long.command", command });
+        internal static string SerializeCommand(
+            string requestId,
+            PluginCommandInvocation command) =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                type = "long.command",
+                request_id = requestId,
+                command,
+            });
+
+        internal static WebCommandResultMessage? ParseCommandResult(string json)
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("type", out var type)
+                || !string.Equals(
+                    type.GetString(),
+                    "long.command-result",
+                    StringComparison.Ordinal)) return null;
+            return System.Text.Json.JsonSerializer.Deserialize<WebCommandResultMessage>(
+                json,
+                MessageJsonOptions);
+        }
+
+        internal static bool TryCreateCommandResult(
+            WebCommandResultMessage message,
+            out PluginCommandResult result,
+            out string? error)
+        {
+            if (string.IsNullOrWhiteSpace(message.RequestId) || message.RequestId.Length > 64)
+            {
+                result = PluginCommandResult.Failure("Web command result request id is missing.");
+                error = result.Message;
+                return false;
+            }
+            if (message.Message?.Length > 4_096)
+            {
+                result = PluginCommandResult.Failure("Web command result message is too long.");
+                error = result.Message;
+                return false;
+            }
+            if (!message.Success)
+            {
+                result = PluginCommandResult.Failure(
+                    string.IsNullOrWhiteSpace(message.Message)
+                        ? "Web command failed."
+                        : message.Message);
+                error = null;
+                return true;
+            }
+            if (message.Outputs is null || message.Outputs.Count > 64)
+            {
+                result = PluginCommandResult.Failure("Web command returned more than 64 outputs.");
+                error = result.Message;
+                return false;
+            }
+
+            var outputs = new Dictionary<string, PluginCommandOutput>(StringComparer.Ordinal);
+            foreach (var entry in message.Outputs)
+            {
+                if (!IsIdentifier(entry.Key)
+                    || entry.Value is null
+                    || entry.Value.Value is null
+                    || entry.Value.Value.Length > 65_536)
+                {
+                    result = PluginCommandResult.Failure("Web command returned an invalid output.");
+                    error = result.Message;
+                    return false;
+                }
+                if (!Enum.TryParse<PluginCommandOutputType>(
+                    entry.Value.Type,
+                    ignoreCase: true,
+                    out var outputType)
+                    || !Enum.IsDefined(outputType)
+                    || (outputType == PluginCommandOutputType.Path
+                        && string.IsNullOrWhiteSpace(entry.Value.Value)))
+                {
+                    result = PluginCommandResult.Failure("Web command returned an invalid output type or value.");
+                    error = result.Message;
+                    return false;
+                }
+                outputs.Add(entry.Key, new PluginCommandOutput(outputType, entry.Value.Value));
+            }
+            result = PluginCommandResult.Success(message.Message, outputs: outputs);
+            error = null;
+            return true;
+        }
 
         internal static string SerializeHotkey(string hotkey) =>
             System.Text.Json.JsonSerializer.Serialize(new { type = "hotkey", hotkey });
@@ -341,6 +426,13 @@ console.log('[Long] Bridge ready · __PLUGIN_ID__');
 
             return js.Replace("__PLUGIN_ID__", pluginId);
         }
+
+        private static bool IsIdentifier(string value)
+            => !string.IsNullOrWhiteSpace(value)
+                && value.Length <= 64
+                && (char.IsLetter(value[0]) || value[0] == '_')
+                && value.All(character => char.IsLetterOrDigit(character)
+                    || character is '_' or '-' or '.');
     }
 
     internal sealed class WebBridgeRequest
@@ -348,5 +440,20 @@ console.log('[Long] Bridge ready · __PLUGIN_ID__');
         public int Id { get; set; }
         public string Method { get; set; } = string.Empty;
         public object?[] Args { get; set; } = Array.Empty<object?>();
+    }
+
+    internal sealed class WebCommandResultMessage
+    {
+        [JsonPropertyName("request_id")]
+        public string RequestId { get; set; } = string.Empty;
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public Dictionary<string, WebCommandOutputMessage>? Outputs { get; set; } = new();
+    }
+
+    internal sealed class WebCommandOutputMessage
+    {
+        public string? Type { get; set; } = string.Empty;
+        public string? Value { get; set; } = string.Empty;
     }
 }

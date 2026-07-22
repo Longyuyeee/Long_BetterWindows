@@ -290,6 +290,8 @@ public class DesignSystemTests
         Assert.Contains("LongUI.onCommand", script);
         Assert.Contains("long.command", script);
         Assert.Contains("long:command", script);
+        Assert.Contains("long.command-result", script);
+        Assert.Contains("request_id", script);
     }
 
     [Fact]

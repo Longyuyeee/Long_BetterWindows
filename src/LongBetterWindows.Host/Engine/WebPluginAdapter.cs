@@ -107,8 +107,7 @@ namespace LongBetterWindows.Host.Engine
             if (!await EnsureRuntimeInitializedAsync())
                 return Contracts.PluginCommandResult.Failure("插件界面初始化失败，请检查 WebView2 Runtime。");
 
-            await _runtime.SendCommandAsync(invocation);
-            return Contracts.PluginCommandResult.Success();
+            return await _runtime.SendCommandAsync(invocation, cancellationToken);
         }
     }
 }

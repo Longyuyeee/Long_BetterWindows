@@ -24,6 +24,7 @@ namespace LongBetterWindows.Host.Engine
         private readonly PluginManifest _manifest;
         private readonly WebPluginViewLifecycle _viewLifecycle;
         private readonly WebPluginHostDispatcher _hostDispatcher;
+        private readonly WebPluginCommandCoordinator _commands;
 
         public WebView2? WebView => _viewLifecycle.View;
         public PluginManifest Manifest => _manifest;
@@ -39,6 +40,9 @@ namespace LongBetterWindows.Host.Engine
                 manifest.Id,
                 HostProvider.Instance,
                 PostWebMessage);
+            _commands = new WebPluginCommandCoordinator(
+                manifest.Id,
+                message => _viewLifecycle.SendMessageAsync(message));
             // WebView2 延迟到 UI 线程创建（InitializeAsync）
         }
 
@@ -46,12 +50,17 @@ namespace LongBetterWindows.Host.Engine
 
         public Task<bool> InitializeAsync() => _viewLifecycle.InitializeAsync();
 
-        public void Dispose() => _viewLifecycle.Dispose();
+        public void Dispose()
+        {
+            _commands.Dispose();
+            _viewLifecycle.Dispose();
+        }
         private void HandleJsMessage(string json)
         {
             // 处理来自 JS 的异步消息
             try
             {
+                if (_commands.TryHandle(json)) return;
                 var msg = WebPluginBridgeProtocol.ParseRequest(json);
                 if (msg == null) return;
 
@@ -83,9 +92,10 @@ namespace LongBetterWindows.Host.Engine
 
         private void PostWebMessage(string json) => _viewLifecycle.PostMessage(json);
 
-        public Task SendCommandAsync(PluginCommandInvocation invocation) =>
-            _viewLifecycle.SendMessageAsync(
-                WebPluginBridgeProtocol.SerializeCommand(invocation));
+        public async Task<PluginCommandResult> SendCommandAsync(
+            PluginCommandInvocation invocation,
+            CancellationToken cancellationToken = default)
+            => await _commands.SendAsync(invocation, cancellationToken);
 
         private async Task<object?> DispatchJsCall(string method, object?[] args)
         {
