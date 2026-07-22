@@ -133,6 +133,25 @@ public sealed class CommandWorkflowEditorSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task ExportCurrent_RequiresSavedCleanDraft()
+    {
+        var session = Session();
+        session.StartNew("workflow.export-draft", "Export draft");
+        session.AddStep("editor:first");
+        var exportPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.workflow.json");
+
+        var unsaved = await session.ExportCurrentAsync(exportPath);
+        await session.SaveAsync(allowSensitiveInputs: false);
+        session.UpdateIdentity("workflow.export-draft", "Changed");
+        var dirty = await session.ExportCurrentAsync(exportPath);
+
+        Assert.False(unsaved.IsSuccess);
+        Assert.False(dirty.IsSuccess);
+        Assert.Contains("saved without pending changes", dirty.Error);
+        Assert.False(File.Exists(exportPath));
+    }
+
+    [Fact]
     public async Task LoadedDraft_NoOpControlUpdatesRemainClean()
     {
         var session = Session();

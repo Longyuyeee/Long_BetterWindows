@@ -175,6 +175,71 @@ public sealed class CommandWorkflowRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task ExportManaged_RewritesSourceAndPreservesDefinitionHash()
+    {
+        var repository = Repository();
+        var saved = await repository.SaveAsync(Workflow("workflow.export"));
+        var exportRoot = Path.Combine(Path.GetTempPath(), "long-workflow-exports", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(exportRoot);
+        var exportPath = Path.Combine(exportRoot, "shared.workflow.json");
+        try
+        {
+            var exported = await repository.ExportManagedAsync(
+                "workflow.export",
+                saved.DefinitionSha256,
+                exportPath);
+            var imported = await repository.ImportAsync(exportPath);
+
+            Assert.True(exported.IsSuccess, exported.Error);
+            Assert.True(imported.IsSuccess, imported.Error);
+            Assert.Equal(saved.DefinitionSha256, imported.DefinitionSha256);
+            Assert.Equal(WorkflowDocumentSourceKind.Imported, imported.Source!.Kind);
+            Assert.Equal("local-user:export", imported.Source.SourceId);
+            Assert.Equal(WorkflowDocumentTrustLevel.Untrusted, imported.TrustLevel);
+            Assert.Empty(Directory.GetFiles(exportRoot, "*.tmp"));
+        }
+        finally
+        {
+            Directory.Delete(exportRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ExportManaged_RejectsStaleHashWithoutCreatingTarget()
+    {
+        var repository = Repository();
+        await repository.SaveAsync(Workflow("workflow.stale-export"));
+        Directory.CreateDirectory(_root);
+        var exportPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.workflow.json");
+
+        var result = await repository.ExportManagedAsync(
+            "workflow.stale-export",
+            new string('f', 64),
+            exportPath);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("stale export", result.Error);
+        Assert.False(File.Exists(exportPath));
+    }
+
+    [Fact]
+    public async Task ExportManaged_RejectsDestinationInsideManagedRoot()
+    {
+        var repository = Repository();
+        var saved = await repository.SaveAsync(Workflow("workflow.internal-export"));
+        var exportPath = Path.Combine(_root, "shared.json");
+
+        var result = await repository.ExportManagedAsync(
+            "workflow.internal-export",
+            saved.DefinitionSha256,
+            exportPath);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("outside", result.Error);
+        Assert.False(File.Exists(exportPath));
+    }
+
+    [Fact]
     public async Task LoadManaged_MalformedUtf8IsRejected()
     {
         Directory.CreateDirectory(_root);

@@ -36,6 +36,12 @@ namespace LongBetterWindows.Host.Interaction
         bool IsSuccess,
         string? Error);
 
+    public sealed record CommandWorkflowExportResult(
+        bool IsSuccess,
+        string? Path,
+        string DefinitionSha256,
+        string? Error);
+
     /// <summary>Atomically stores local workflows and reads external imports without adopting them.</summary>
     public sealed class CommandWorkflowRepository
     {
@@ -297,6 +303,99 @@ namespace LongBetterWindows.Host.Interaction
             }
         }
 
+        public async Task<CommandWorkflowExportResult> ExportManagedAsync(
+            string workflowId,
+            string expectedDefinitionSha256,
+            string destinationPath,
+            CancellationToken cancellationToken = default)
+        {
+            if (!IsIdentifier(workflowId)) return ExportFailure("Workflow id is invalid.");
+            if (!TryNormalizeHash(expectedDefinitionSha256, out var expectedHash))
+                return ExportFailure("Expected workflow hash must be 64 hexadecimal characters.");
+            if (string.IsNullOrWhiteSpace(destinationPath))
+                return ExportFailure("Workflow export path must not be empty.");
+
+            string targetPath;
+            string targetDirectory;
+            try
+            {
+                targetPath = Path.GetFullPath(destinationPath);
+                targetDirectory = Path.GetDirectoryName(targetPath)
+                    ?? throw new IOException("Workflow export directory is invalid.");
+                if (IsWithinManagedRoot(targetPath))
+                    return ExportFailure("Workflow exports must be written outside the managed workflow directory.");
+                var directory = new DirectoryInfo(targetDirectory);
+                if (!directory.Exists) return ExportFailure("Workflow export directory does not exist.");
+                if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                    return ExportFailure("Workflow export directory must not be a reparse point.");
+                if (File.Exists(targetPath)
+                    && (File.GetAttributes(targetPath) & FileAttributes.ReparsePoint) != 0)
+                {
+                    return ExportFailure("Workflow export target must not be a reparse point.");
+                }
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+            {
+                return ExportFailure($"Workflow export path is invalid: {ex.Message}");
+            }
+
+            var managed = await LoadManagedAsync(workflowId, cancellationToken);
+            if (!managed.IsSuccess)
+                return ExportFailure(managed.Error ?? "Managed workflow could not be read.");
+            if (!string.Equals(managed.DefinitionSha256, expectedHash, StringComparison.Ordinal))
+                return ExportFailure("Workflow changed since it was loaded; refusing a stale export.");
+
+            byte[] bytes;
+            try
+            {
+                var json = CommandWorkflowDocumentCodec.Serialize(
+                    managed.Workflow!,
+                    new WorkflowDocumentSource(
+                        WorkflowDocumentSourceKind.Imported,
+                        $"{_localSourceId}:export"));
+                bytes = StrictUtf8.GetBytes(json);
+                if (bytes.LongLength > MaximumDocumentBytes)
+                    return ExportFailure("Workflow document exceeds the maximum size.");
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return ExportFailure(ex.Message);
+            }
+
+            var temporaryPath = Path.Combine(
+                targetDirectory,
+                $".{Path.GetFileName(targetPath)}.{Guid.NewGuid():N}.tmp");
+            try
+            {
+                await using (var stream = new FileStream(
+                    temporaryPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    4096,
+                    FileOptions.Asynchronous | FileOptions.WriteThrough))
+                {
+                    await stream.WriteAsync(bytes, cancellationToken);
+                    await stream.FlushAsync(cancellationToken);
+                    stream.Flush(flushToDisk: true);
+                }
+                File.Move(temporaryPath, targetPath, overwrite: true);
+                return new CommandWorkflowExportResult(
+                    true,
+                    targetPath,
+                    managed.DefinitionSha256,
+                    null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return ExportFailure($"Workflow document could not be exported: {ex.Message}");
+            }
+            finally
+            {
+                TryDelete(temporaryPath);
+            }
+        }
+
         private async Task<WorkflowDocumentReadResult> ReadAsync(
             string path,
             bool isManagedFile,
@@ -359,6 +458,13 @@ namespace LongBetterWindows.Host.Interaction
             return path;
         }
 
+        private bool IsWithinManagedRoot(string path)
+        {
+            var root = _root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            return path.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static bool TryNormalizeHash(string value, out string normalized)
         {
             normalized = value.Trim().ToLowerInvariant();
@@ -395,6 +501,9 @@ namespace LongBetterWindows.Host.Interaction
                     || character is '.' or '_' or '-' or ':');
 
         private static CommandWorkflowSaveResult SaveFailure(string error)
+            => new(false, null, string.Empty, error);
+
+        private static CommandWorkflowExportResult ExportFailure(string error)
             => new(false, null, string.Empty, error);
 
         private static WorkflowDocumentReadResult ReadFailure(string error)

@@ -19,6 +19,7 @@
     <StreamGeometry x:Key="Long.Icon.ArrowDown">M12,5 L12,19 M6,13 L12,19 L18,13</StreamGeometry>
     <StreamGeometry x:Key="Long.Icon.Play">M7,4 L19,12 L7,20 Z</StreamGeometry>
     <StreamGeometry x:Key="Long.Icon.Import">M12,3 L12,15 M7,10 L12,15 L17,10 M4,17 L4,21 L20,21 L20,17</StreamGeometry>
+    <StreamGeometry x:Key="Long.Icon.Export">M12,16 L12,4 M7,9 L12,4 L17,9 M4,15 L4,21 L20,21 L20,15</StreamGeometry>
 
     <Style x:Key="LongIcon" TargetType="Path">
         <Setter Property="Width" Value="20" />

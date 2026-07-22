@@ -364,6 +364,26 @@ namespace LongBetterWindows.Host.Interaction
             return result;
         }
 
+        public async Task<CommandWorkflowExportResult> ExportCurrentAsync(
+            string destinationPath,
+            CancellationToken cancellationToken = default)
+        {
+            var draft = RequireDraft();
+            if (State.ExistingDefinitionSha256 is null || State.IsDirty)
+            {
+                const string error = "Workflow must be saved without pending changes before export.";
+                State = State with { Error = error };
+                return new CommandWorkflowExportResult(false, null, string.Empty, error);
+            }
+            var result = await _repository.ExportManagedAsync(
+                draft.Id,
+                State.ExistingDefinitionSha256,
+                destinationPath,
+                cancellationToken);
+            if (!result.IsSuccess) State = State with { Error = result.Error };
+            return result;
+        }
+
         public void RefreshPreflight()
         {
             if (State.Draft is null) return;

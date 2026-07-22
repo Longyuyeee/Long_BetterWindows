@@ -532,6 +532,7 @@ public class QualityGateTests
         Assert.Contains("_session.DeleteCurrentAsync", view);
         Assert.Contains("_session.PreviewImportAsync", view);
         Assert.Contains("_session.AdoptImport", view);
+        Assert.Contains("_session.ExportCurrentAsync", view);
         Assert.Contains("new CommandWorkflowRunSession", view);
         Assert.Contains("_runSession.Prepare", view);
         Assert.Contains("_runSession.ExecuteApprovedAsync", view);
@@ -542,6 +543,7 @@ public class QualityGateTests
         Assert.Contains("WorkflowInvocationEditorControl", xaml);
         Assert.Contains("AutomationProperties.Name=\"导入外部工作流\"", xaml);
         Assert.Contains("AutomationProperties.Name=\"采用导入工作流为草稿\"", xaml);
+        Assert.Contains("AutomationProperties.Name=\"导出组合动作\"", xaml);
         Assert.Contains("AutomationProperties.Name=\"确认并执行组合动作\"", xaml);
         Assert.Contains("ReportTimeline", xaml);
         Assert.DoesNotContain("File.WriteAllText", view);

@@ -310,6 +310,35 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
+        private async void ExportWorkflow_Click(object sender, RoutedEventArgs e)
+        {
+            var state = _session.State;
+            if (state.Draft is null
+                || state.ExistingDefinitionSha256 is null
+                || state.IsDirty
+                || HasInvalidInvocationArguments()) return;
+            var dialog = new SaveFileDialog
+            {
+                Title = "导出组合动作",
+                Filter = "Long 工作流 (*.workflow.json)|*.workflow.json",
+                FileName = $"{state.Draft.Id}.workflow.json",
+                AddExtension = true,
+                DefaultExt = ".workflow.json",
+                OverwritePrompt = true,
+            };
+            if (dialog.ShowDialog() != true) return;
+            ExportWorkflowButton.IsEnabled = false;
+            var result = await _session.ExportCurrentAsync(dialog.FileName);
+            RenderStatus();
+            MessageBox.Show(
+                result.IsSuccess
+                    ? $"组合动作已导出到：{result.Path}"
+                    : result.Error ?? "组合动作导出失败。",
+                "导出组合动作",
+                MessageBoxButton.OK,
+                result.IsSuccess ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+
         private async void DeleteWorkflow_Click(object sender, RoutedEventArgs e)
         {
             var draft = _session.State.Draft;
@@ -603,6 +632,9 @@ namespace LongBetterWindows.Host.Views
                 ? "尚未保存"
                 : state.IsDirty ? "有未保存的更改" : "已保存到本机";
             SaveWorkflowButton.IsEnabled = state.CanSave && state.IsDirty && !hasInvalidArguments;
+            ExportWorkflowButton.IsEnabled = state.ExistingDefinitionSha256 is not null
+                && !state.IsDirty
+                && !hasInvalidArguments;
             PrepareRunButton.IsEnabled = state.Preflight?.IsValid == true
                 && state.ExistingDefinitionSha256 is not null
                 && !state.IsDirty
@@ -670,6 +702,10 @@ namespace LongBetterWindows.Host.Views
             AddStepButton.IsEnabled = enabled;
             StepsList.IsEnabled = enabled;
             DeleteWorkflowButton.IsEnabled = enabled && _session.State.ExistingDefinitionSha256 is not null;
+            ExportWorkflowButton.IsEnabled = enabled
+                && _session.State.ExistingDefinitionSha256 is not null
+                && !_session.State.IsDirty
+                && !HasInvalidInvocationArguments();
             SaveWorkflowButton.IsEnabled = enabled && _session.State.CanSave && _session.State.IsDirty;
             PrepareRunButton.IsEnabled = enabled;
         }

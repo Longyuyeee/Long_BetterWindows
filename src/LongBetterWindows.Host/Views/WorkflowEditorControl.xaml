@@ -151,6 +151,11 @@
                                 <TextBlock Text="准备执行" Margin="7,0,0,0" />
                             </StackPanel>
                         </Button>
+                        <Button x:Name="ExportWorkflowButton" Style="{StaticResource LongIconButton}" Margin="0,0,8,0"
+                                Click="ExportWorkflow_Click" ToolTip="导出组合动作"
+                                automation:AutomationProperties.Name="导出组合动作">
+                            <Path Data="{StaticResource Long.Icon.Export}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                        </Button>
                         <Button x:Name="DeleteWorkflowButton" Style="{StaticResource LongIconButton}" Margin="0,0,8,0"
                                 Click="DeleteWorkflow_Click" ToolTip="删除组合动作"
                                 automation:AutomationProperties.Name="删除组合动作">
