@@ -669,6 +669,8 @@ public class QualityGateTests
         Assert.Contains("source_dirty", release);
         Assert.Contains("release_eligible", release);
         Assert.Contains("Get-FileHash", release);
+        Assert.Contains("[IO.Compression.ZipFile]::CreateFromDirectory", release);
+        Assert.DoesNotContain("Compress-Archive", release);
         Assert.Contains("WaitForExit($smokeTimeoutMilliseconds)", release);
         Assert.Contains("pluginCount -ne $expectedPluginCount", release);
     }

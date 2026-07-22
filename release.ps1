@@ -51,6 +51,15 @@ function Wait-ForNoAddedProductWebViewProcesses(
     return $added
 }
 
+function New-ReleaseZip([string] $SourceDirectory, [string] $DestinationPath) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [IO.Compression.ZipFile]::CreateFromDirectory(
+        $SourceDirectory,
+        $DestinationPath,
+        [IO.Compression.CompressionLevel]::Optimal,
+        $false)
+}
+
 if (-not (Test-Path -LiteralPath $dotnet)) {
     $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
     if ($null -eq $dotnetCommand) { throw '未找到 dotnet CLI。发布需要 .NET SDK。' }
@@ -177,7 +186,7 @@ try {
 
         $zipName = "LongBetterWindows-v$Version-win-x64-$($variant.Name).zip"
         $zipPath = Join-Path $releaseRoot $zipName
-        Compress-Archive -Path (Join-Path $publishDirectory '*') -DestinationPath $zipPath -CompressionLevel Optimal
+        New-ReleaseZip -SourceDirectory $publishDirectory -DestinationPath $zipPath
         $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
         $packages += [pscustomobject]@{
             file = $zipName
