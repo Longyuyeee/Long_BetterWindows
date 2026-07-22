@@ -57,14 +57,30 @@
       try {
         output.value = btoa(unescape(encodeURIComponent(input.value)));
         setStatus('编码完成', 'success');
-      } catch (_) { setStatus('无法编码当前内容', 'danger'); }
+        return {
+          success: true,
+          message: '编码完成',
+          outputs: { result: { type: 'text', value: output.value } }
+        };
+      } catch (_) {
+        setStatus('无法编码当前内容', 'danger');
+        return { success: false, message: '无法编码当前内容', outputs: {} };
+      }
     }
 
     function decode() {
       try {
         output.value = decodeURIComponent(escape(atob(input.value.trim())));
         setStatus('解码完成', 'success');
-      } catch (_) { setStatus('请输入有效的 Base64 内容', 'danger'); }
+        return {
+          success: true,
+          message: '解码完成',
+          outputs: { result: { type: 'text', value: output.value } }
+        };
+      } catch (_) {
+        setStatus('请输入有效的 Base64 内容', 'danger');
+        return { success: false, message: '请输入有效的 Base64 内容', outputs: {} };
+      }
     }
 
     async function paste() {
@@ -90,7 +106,7 @@
     window.LongUI?.onCommand(function (command) {
       const text = window.LongUI.commandText(command);
       if (text) input.value = text;
-      if (command.command_id === 'base64.decode') decode(); else encode();
+      return command.command_id === 'base64.decode' ? decode() : encode();
     });
   </script>
 </body>

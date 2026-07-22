@@ -13,6 +13,13 @@
       "description": "将文本或剪贴板内容编码为 Base64",
       "aliases": ["base64", "编码", "encode", "bianma"],
       "accepted_inputs": ["text", "clipboard"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "编码后的 Base64 文本"
+        }
+      ],
       "view_mode": "form",
       "priority": 18
     },
@@ -22,6 +29,13 @@
       "description": "将 Base64 内容还原为文本",
       "aliases": ["解码", "decode", "jiema"],
       "accepted_inputs": ["text", "clipboard"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "解码后的原始文本"
+        }
+      ],
       "view_mode": "form",
       "priority": 17
     }

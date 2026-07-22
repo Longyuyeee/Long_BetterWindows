@@ -1,5 +1,7 @@
 using System.IO;
 using System.Xml.Linq;
+using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Engine;
 
 namespace LongBetterWindows.Tests;
 
@@ -292,6 +294,26 @@ public class DesignSystemTests
         Assert.Contains("long:command", script);
         Assert.Contains("long.command-result", script);
         Assert.Contains("request_id", script);
+    }
+
+    [Fact]
+    public async Task Base64Commands_DeclareAndReturnTextResult()
+    {
+        var root = FindRepositoryRoot();
+        var pluginDirectory = Path.Combine(root, "src", "Base64Tool");
+        var result = await ManifestReader.ReadAsync(pluginDirectory);
+        var page = File.ReadAllText(Path.Combine(pluginDirectory, "index.html"));
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(2, result.Manifest!.Commands.Count);
+        Assert.All(result.Manifest.Commands, command =>
+        {
+            var output = Assert.Single(command.Outputs);
+            Assert.Equal("result", output.Key);
+            Assert.Equal(PluginCommandOutputType.Text, output.Type);
+        });
+        Assert.Contains("outputs: { result: { type: 'text', value: output.value } }", page);
+        Assert.Contains("return command.command_id === 'base64.decode' ? decode() : encode();", page);
     }
 
     [Fact]
