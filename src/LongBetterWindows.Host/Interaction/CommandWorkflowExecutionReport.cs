@@ -31,6 +31,25 @@ namespace LongBetterWindows.Host.Interaction
         string? Path,
         string? Error);
 
+    public sealed record WorkflowExecutionReportSummary(
+        string ReportId,
+        string WorkflowId,
+        WorkflowExecutionStatus Status,
+        DateTimeOffset StartedAt,
+        DateTimeOffset FinishedAt,
+        int EventCount,
+        bool MessagesIncluded);
+
+    public sealed record WorkflowExecutionReportListIssue(
+        string FileName,
+        string Error);
+
+    public sealed record WorkflowExecutionReportListResult(
+        bool IsSuccess,
+        IReadOnlyList<WorkflowExecutionReportSummary> Reports,
+        IReadOnlyList<WorkflowExecutionReportListIssue> Issues,
+        string? Error);
+
     public static class CommandWorkflowExecutionReportCodec
     {
         public const int CurrentSchemaVersion = 1;
@@ -263,6 +282,63 @@ namespace LongBetterWindows.Host.Interaction
             catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
             {
                 return Task.FromResult(ReadFailure($"Execution report storage is unavailable: {ex.Message}"));
+            }
+        }
+
+        public async Task<WorkflowExecutionReportListResult> ListAsync(
+            string? workflowId = null,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                EnsureRoot();
+                var reports = new List<WorkflowExecutionReportSummary>();
+                var issues = new List<WorkflowExecutionReportListIssue>();
+                foreach (var path in Directory.EnumerateFiles(
+                    _root,
+                    "*.workflow-report.json",
+                    SearchOption.TopDirectoryOnly))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var result = await ReadAsync(path, cancellationToken);
+                    if (!result.IsSuccess)
+                    {
+                        issues.Add(new WorkflowExecutionReportListIssue(
+                            Path.GetFileName(path),
+                            result.Error ?? "Execution report could not be read."));
+                        continue;
+                    }
+                    var report = result.Report!;
+                    if (!string.IsNullOrWhiteSpace(workflowId)
+                        && !string.Equals(report.WorkflowId, workflowId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    reports.Add(new WorkflowExecutionReportSummary(
+                        report.ReportId,
+                        report.WorkflowId,
+                        report.Status,
+                        report.StartedAt,
+                        report.FinishedAt,
+                        report.Events.Count,
+                        report.MessagesIncluded));
+                }
+                return new WorkflowExecutionReportListResult(
+                    true,
+                    reports
+                        .OrderByDescending(item => item.StartedAt)
+                        .ThenByDescending(item => item.ReportId, StringComparer.Ordinal)
+                        .ToList(),
+                    issues,
+                    null);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return new WorkflowExecutionReportListResult(
+                    false,
+                    Array.Empty<WorkflowExecutionReportSummary>(),
+                    Array.Empty<WorkflowExecutionReportListIssue>(),
+                    $"Execution report storage is unavailable: {ex.Message}");
             }
         }
 
