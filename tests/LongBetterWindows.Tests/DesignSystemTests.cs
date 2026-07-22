@@ -359,6 +359,24 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public async Task TimestampCommand_DeclaresAndReturnsTextResult()
+    {
+        var root = FindRepositoryRoot();
+        var pluginDirectory = Path.Combine(root, "src", "TimestampConverter");
+        var result = await ManifestReader.ReadAsync(pluginDirectory);
+        var page = File.ReadAllText(Path.Combine(pluginDirectory, "index.html"));
+
+        Assert.True(result.IsSuccess, result.Error);
+        var command = Assert.Single(result.Manifest!.Commands);
+        var output = Assert.Single(command.Outputs);
+        Assert.Equal("result", output.Key);
+        Assert.Equal(PluginCommandOutputType.Text, output.Type);
+        Assert.Contains("outputs: { result: { type: 'text', value: summary } }", page);
+        Assert.Contains("return { success: false, message: '无法识别当前时间'", page);
+        Assert.Contains("return useNow();", page);
+    }
+
+    [Fact]
     public void WebRuntime_UsesPluginPermissionContextAndLowercaseResponseContract()
     {
         var root = FindRepositoryRoot();

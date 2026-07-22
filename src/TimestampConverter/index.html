@@ -14,12 +14,12 @@
   <script>
     const input = document.getElementById('input'); const result = document.getElementById('result'); const status = document.getElementById('status'); let summary = '';
     function parse(value) { const text = value.trim(); if (/^-?\d+(\.\d+)?$/.test(text)) { const number = Number(text); return new Date(Math.abs(number) < 100000000000 ? number * 1000 : number); } return new Date(text); }
-    function convert() { const date = parse(input.value); if (Number.isNaN(date.getTime())) { status.textContent = '无法识别当前时间'; status.className = 'long-status long-status--danger'; return; } const seconds = Math.floor(date.getTime() / 1000); summary = '秒级时间戳：' + seconds + '\n毫秒时间戳：' + date.getTime() + '\n本地时间：' + date.toLocaleString() + '\nUTC：' + date.toISOString(); result.textContent = summary; status.textContent = '转换完成'; status.className = 'long-status long-status--success'; window.LongUI?.announce('时间转换完成'); }
-    function useNow() { input.value = Date.now().toString(); convert(); }
+    function convert() { const date = parse(input.value); if (Number.isNaN(date.getTime())) { status.textContent = '无法识别当前时间'; status.className = 'long-status long-status--danger'; return { success: false, message: '无法识别当前时间', outputs: {} }; } const seconds = Math.floor(date.getTime() / 1000); summary = '秒级时间戳：' + seconds + '\n毫秒时间戳：' + date.getTime() + '\n本地时间：' + date.toLocaleString() + '\nUTC：' + date.toISOString(); result.textContent = summary; status.textContent = '转换完成'; status.className = 'long-status long-status--success'; window.LongUI?.announce('时间转换完成'); return { success: true, message: '时间转换完成', outputs: { result: { type: 'text', value: summary } } }; }
+    function useNow() { input.value = Date.now().toString(); return convert(); }
     async function copy() { if (!summary) return; try { await long.clipboard.setText(summary); status.textContent = '摘要已复制'; } catch (_) { status.textContent = '复制失败'; status.className = 'long-status long-status--danger'; } }
     document.getElementById('convertButton').addEventListener('click', convert); document.getElementById('nowButton').addEventListener('click', useNow); document.getElementById('copyButton').addEventListener('click', copy);
     document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); convert(); } });
-    window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) { input.value = text; convert(); } else useNow(); });
+    window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) { input.value = text; return convert(); } return useNow(); });
     useNow();
   </script>
 </body>

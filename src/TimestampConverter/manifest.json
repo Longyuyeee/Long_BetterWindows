@@ -13,6 +13,13 @@
       "description": "在 Unix 时间戳与本地日期时间之间转换",
       "aliases": ["时间戳", "unix time", "timestamp", "shijianchuo"],
       "accepted_inputs": ["text", "clipboard", "none"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "时间戳、本地时间与 UTC 的转换摘要"
+        }
+      ],
       "view_mode": "form",
       "priority": 14
     }
