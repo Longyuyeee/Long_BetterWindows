@@ -23,7 +23,7 @@ v1.9 当前选择未签名分发。`release.ps1` 会生成 `distribution_channel
 
 ### v1.9.0 当前前置审计
 
-2026-07-22 已确认本机安装 Windows SDK x64 SignTool，冻结候选提交为 `fe1d6b1d7ee008794e8199e3d77a306f9d66b940`。当前 `CurrentUser\My` 和 `LocalMachine\My` 均未发现同时具备可访问私钥与 Code Signing EKU 的证书，因此正式签名保持阻断。使用不存在的证书指纹执行完整参数预检时，脚本退出码为 1、没有创建 `v1.9.0-signed`，输入 Manifest SHA-256 保持 `26fae976f51874412cd6b29d0d11e2bc65996a9ee016d01fc2e229a404c6213e`。
+2026-07-22 已确认本机安装 Windows SDK x64 SignTool，但当前不采购正式证书，v1.9 继续使用合格的 `unsigned` 候选。若未来升级签名，必须从当时冻结候选的完整源码提交执行，不得复用本节示例中的历史提交。
 
 ## 3. 签名
 
@@ -33,7 +33,7 @@ v1.9 当前选择未签名分发。`release.ps1` 会生成 `distribution_channel
   -OutputDirectory .\artifacts\releases\v1.9.0-signed `
   -CertificateThumbprint "正式证书指纹" `
   -ExpectedSubject "批准的发布主体" `
-  -ExpectedSourceCommit "fe1d6b1d7ee008794e8199e3d77a306f9d66b940" `
+  -ExpectedSourceCommit "完整的 40 位候选源码提交" `
   -TimestampUrl "https://timestamp.example.com" `
   -CertificateStoreLocation CurrentUser `
   -ConfirmSign
