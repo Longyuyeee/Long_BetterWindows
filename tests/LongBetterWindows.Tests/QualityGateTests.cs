@@ -670,6 +670,7 @@ public class QualityGateTests
         Assert.Contains("release_eligible", release);
         Assert.Contains("Get-FileHash", release);
         Assert.Contains("[IO.Compression.ZipArchiveMode]::Create", release);
+        Assert.Contains("Add-Type -AssemblyName System.IO.Compression", release);
         Assert.Contains(".Replace('\\', '/')", release);
         Assert.Contains("Assert-ReleaseZipLayout", release);
         Assert.Contains("PluginManifests=$manifestCount", release);

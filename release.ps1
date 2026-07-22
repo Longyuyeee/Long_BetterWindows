@@ -52,6 +52,7 @@ function Wait-ForNoAddedProductWebViewProcesses(
 }
 
 function New-ReleaseZip([string] $SourceDirectory, [string] $DestinationPath) {
+    Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [IO.Compression.ZipFile]::Open($DestinationPath, [IO.Compression.ZipArchiveMode]::Create)
     try {
