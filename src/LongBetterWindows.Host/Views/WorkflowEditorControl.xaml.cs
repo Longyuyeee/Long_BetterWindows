@@ -1,8 +1,10 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
+using Microsoft.Win32;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -14,6 +16,7 @@ namespace LongBetterWindows.Host.Views
         private readonly CommandWorkflowExecutionReportRepository _reports;
         private readonly CommandWorkflowRunSession _runSession;
         private CommandWorkflowExecutionReview? _executionReview;
+        private CommandWorkflowImportReview? _importReview;
         private int _reportListVersion;
         private int _reportLoadVersion;
         private bool _rendering = true;
@@ -137,6 +140,7 @@ namespace LongBetterWindows.Host.Views
 
         private void NewWorkflow_Click(object sender, RoutedEventArgs e)
         {
+            _importReview = null;
             var suffix = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
             _session.StartNew($"workflow.{suffix}", "新组合动作");
             _rendering = true;
@@ -148,6 +152,69 @@ namespace LongBetterWindows.Host.Views
             RenderEditor();
             WorkflowNameBox.Focus();
             WorkflowNameBox.SelectAll();
+        }
+
+        private async void ImportWorkflow_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "选择外部工作流",
+                Filter = "Long 工作流 (*.workflow.json)|*.workflow.json|JSON 文件 (*.json)|*.json",
+                CheckFileExists = true,
+                Multiselect = false,
+            };
+            if (dialog.ShowDialog() != true) return;
+            var review = await _session.PreviewImportAsync(dialog.FileName);
+            if (!review.IsSuccess)
+            {
+                MessageBox.Show(
+                    review.Error ?? "外部工作流无法读取。",
+                    "导入工作流",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+            _importReview = review;
+            RenderImportReview();
+        }
+
+        private void CancelImport_Click(object sender, RoutedEventArgs e)
+        {
+            _importReview = null;
+            RenderEditor();
+        }
+
+        private void AdoptImport_Click(object sender, RoutedEventArgs e)
+        {
+            var review = _importReview;
+            if (review is null) return;
+            if (_session.State.IsDirty)
+            {
+                var answer = MessageBox.Show(
+                    "当前草稿有未保存的更改。采用外部工作流会替换当前草稿，是否继续？",
+                    "采用外部工作流",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No);
+                if (answer != MessageBoxResult.Yes) return;
+            }
+            if (!_session.AdoptImport(review))
+            {
+                MessageBox.Show(
+                    _session.State.Error ?? "外部工作流无法采用。",
+                    "导入工作流",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+            _importReview = null;
+            _rendering = true;
+            WorkflowList.SelectedItem = null;
+            CompactWorkflowCombo.SelectedItem = null;
+            _rendering = false;
+            ReportList.ItemsSource = null;
+            ReportTimeline.ItemsSource = null;
+            RenderEditor();
         }
 
         private async void Refresh_Click(object sender, RoutedEventArgs e)
@@ -188,6 +255,96 @@ namespace LongBetterWindows.Host.Views
 
         private void StepCompensation_SelectionChanged(object sender, SelectionChangedEventArgs e)
             => UpdateStep(sender);
+
+        private void InvocationInputType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_rendering
+                || sender is not ComboBox { DataContext: InvocationEditorItem item } combo
+                || combo.SelectedValue is not AcceptedInputType inputType) return;
+            item.InputType = inputType;
+            if (ApplyInvocation(item)) RenderEditor();
+        }
+
+        private void InvocationText_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_rendering || sender is not TextBox { DataContext: InvocationEditorItem item } textBox) return;
+            item.Text = textBox.Text;
+            if (!ApplyInvocation(item)) return;
+            InvalidateExecutionReview();
+            SensitiveInputCheckBox.Visibility = CommandWorkflowDocumentCodec.ContainsSensitiveInputs(
+                _session.State.Draft!) ? Visibility.Visible : Visibility.Collapsed;
+            RenderStatus();
+        }
+
+        private void PickInvocationPaths_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: InvocationEditorItem item }) return;
+            IReadOnlyList<string>? paths;
+            if (item.InputType == AcceptedInputType.Folder)
+            {
+                var dialog = new OpenFolderDialog
+                {
+                    Title = "选择命令文件夹",
+                    Multiselect = false,
+                };
+                paths = dialog.ShowDialog() == true ? [dialog.FolderName] : null;
+            }
+            else
+            {
+                var dialog = new OpenFileDialog
+                {
+                    Title = "选择命令文件",
+                    CheckFileExists = true,
+                    Multiselect = item.InputType is AcceptedInputType.Files
+                        or AcceptedInputType.ExplorerSelection,
+                };
+                paths = dialog.ShowDialog() == true ? dialog.FileNames : null;
+            }
+            if (paths is null) return;
+            item.Paths = paths;
+            if (ApplyInvocation(item)) RenderEditor();
+        }
+
+        private void ClearInvocationPaths_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: InvocationEditorItem item }) return;
+            item.Paths = Array.Empty<string>();
+            if (ApplyInvocation(item)) RenderEditor();
+        }
+
+        private void PickInvocationImage_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: InvocationEditorItem item }) return;
+            var dialog = new OpenFileDialog
+            {
+                Title = "选择 PNG 图片",
+                Filter = "PNG 图片 (*.png)|*.png",
+                CheckFileExists = true,
+                Multiselect = false,
+            };
+            if (dialog.ShowDialog() != true) return;
+            try
+            {
+                var file = new FileInfo(dialog.FileName);
+                if (file.Length > CommandWorkflowDocumentCodec.MaximumImageBytes)
+                    throw new InvalidOperationException("PNG 图片不能超过 2 MB。");
+                var bytes = File.ReadAllBytes(dialog.FileName);
+                if (!IsPng(bytes)) throw new InvalidOperationException("选择的文件不是有效的 PNG 图片。");
+                item.ImagePng = bytes;
+                if (ApplyInvocation(item)) RenderEditor();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                MessageBox.Show(ex.Message, "命令图片", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void ClearInvocationImage_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: InvocationEditorItem item }) return;
+            item.ImagePng = null;
+            if (ApplyInvocation(item)) RenderEditor();
+        }
 
         private void UpdateStep(object sender)
         {
@@ -376,8 +533,15 @@ namespace LongBetterWindows.Host.Views
             _rendering = true;
             try
             {
+                if (_importReview is not null)
+                {
+                    RenderImportReview();
+                    return;
+                }
+                SetImportReviewMode(false);
                 var state = _session.State;
                 var draft = state.Draft;
+                ImportReviewPanel.Visibility = Visibility.Collapsed;
                 EmptyEditor.Visibility = draft is null ? Visibility.Visible : Visibility.Collapsed;
                 EditorBody.Visibility = draft is null ? Visibility.Collapsed : Visibility.Visible;
                 if (draft is null) return;
@@ -403,6 +567,16 @@ namespace LongBetterWindows.Host.Views
                     CommandOptions = commands,
                     CompensationOptions = compensationOptions,
                     EffectOptions = EffectOptions,
+                    PrimaryInput = CreateInvocationEditor(
+                        step.Id,
+                        WorkflowCommandRole.Primary,
+                        "命令输入",
+                        step.Command),
+                    CompensationInput = CreateInvocationEditor(
+                        step.Id,
+                        WorkflowCommandRole.Compensation,
+                        "补偿输入",
+                        step.Compensation),
                 }).ToList();
                 EmptyStepsText.Visibility = draft.Steps.Count == 0
                     ? Visibility.Visible
@@ -418,6 +592,81 @@ namespace LongBetterWindows.Host.Views
                 _rendering = false;
             }
         }
+
+        private void RenderImportReview()
+        {
+            var review = _importReview;
+            if (review?.Workflow is null) return;
+            SetImportReviewMode(true);
+            EmptyEditor.Visibility = Visibility.Collapsed;
+            EditorBody.Visibility = Visibility.Collapsed;
+            ImportReviewPanel.Visibility = Visibility.Visible;
+            ImportReviewName.Text = $"{review.Workflow.Name}  ·  {review.Workflow.Id}";
+            ImportReviewSource.Text = $"{review.SourcePath}\nSHA-256  {review.DefinitionSha256}";
+            ImportReviewSummary.Text = $"{review.Workflow.Steps.Count} 个步骤 · "
+                + $"{FailureLabel(review.Workflow.FailureMode)} · "
+                + (review.ContainsSensitiveInputs ? "包含潜在敏感输入" : "不包含持久化输入");
+            ImportReviewTrust.Text = review.TrustLevel switch
+            {
+                WorkflowDocumentTrustLevel.TrustedSource => "来源与已信任定义匹配",
+                WorkflowDocumentTrustLevel.LocalManaged => "本机托管来源",
+                _ => "未信任的外部来源",
+            };
+            var preflight = review.Preflight;
+            ImportReviewPreflight.Text = preflight?.IsValid == true
+                ? $"预检通过；采用后仍需保存，并在每次执行前重新批准 {preflight.Permissions.Count} 个插件。"
+                : "预检未通过；采用后可编辑修正："
+                    + Environment.NewLine
+                    + string.Join(Environment.NewLine, preflight?.Issues ?? Array.Empty<string>());
+        }
+
+        private void SetImportReviewMode(bool active)
+        {
+            WorkflowList.IsEnabled = !active;
+            CompactWorkflowCombo.IsEnabled = !active;
+            RefreshWorkflowButton.IsEnabled = !active;
+            ImportWorkflowButton.IsEnabled = !active;
+            NewWorkflowButton.IsEnabled = !active;
+            CompactRefreshButton.IsEnabled = !active;
+            CompactImportButton.IsEnabled = !active;
+            CompactNewButton.IsEnabled = !active;
+        }
+
+        private InvocationEditorItem CreateInvocationEditor(
+            string stepId,
+            WorkflowCommandRole role,
+            string roleLabel,
+            WorkflowCommand? command)
+        {
+            var invocation = command?.Invocation ?? new PluginCommandInvocation();
+            var descriptor = command is null ? null : _plugins.Commands.Get(command.CommandKey);
+            var options = (descriptor?.Command.AcceptedInputs ?? [AcceptedInputType.None])
+                .Distinct()
+                .Select(type => new EnumOption<AcceptedInputType>(type, InputTypeLabel(type)))
+                .ToList();
+            return new InvocationEditorItem
+            {
+                StepId = stepId,
+                Role = role,
+                RoleLabel = roleLabel,
+                InputType = invocation.InputType,
+                InputOptions = options,
+                Text = invocation.Text ?? string.Empty,
+                Paths = invocation.Paths.ToArray(),
+                ImagePng = invocation.ImagePng?.ToArray(),
+                Arguments = new Dictionary<string, string>(invocation.Arguments, StringComparer.Ordinal),
+            };
+        }
+
+        private bool ApplyInvocation(InvocationEditorItem item)
+            => _session.UpdateInvocation(
+                item.StepId,
+                item.Role,
+                item.InputType,
+                item.Text,
+                item.Paths,
+                item.ImagePng,
+                item.Arguments);
 
         private void RenderStatus()
         {
@@ -468,8 +717,10 @@ namespace LongBetterWindows.Host.Views
             WorkflowList.IsEnabled = enabled;
             CompactWorkflowCombo.IsEnabled = enabled;
             RefreshWorkflowButton.IsEnabled = enabled;
+            ImportWorkflowButton.IsEnabled = enabled;
             NewWorkflowButton.IsEnabled = enabled;
             CompactRefreshButton.IsEnabled = enabled;
+            CompactImportButton.IsEnabled = enabled;
             CompactNewButton.IsEnabled = enabled;
             WorkflowIdBox.IsEnabled = enabled && _session.State.ExistingDefinitionSha256 is null;
             WorkflowNameBox.IsEnabled = enabled;
@@ -503,6 +754,31 @@ namespace LongBetterWindows.Host.Views
                 WorkflowExecutionStatus.Rejected => "执行已拒绝",
                 _ => "执行失败",
             };
+
+        private static string InputTypeLabel(AcceptedInputType inputType)
+            => inputType switch
+            {
+                AcceptedInputType.None => "无输入",
+                AcceptedInputType.Text => "文本",
+                AcceptedInputType.Url => "URL",
+                AcceptedInputType.Image => "PNG 图片",
+                AcceptedInputType.File => "单个文件",
+                AcceptedInputType.Files => "多个文件",
+                AcceptedInputType.Folder => "文件夹",
+                AcceptedInputType.Clipboard => "剪贴板文本快照",
+                _ => "资源管理器选区",
+            };
+
+        private static bool IsPng(byte[] bytes)
+            => bytes.Length >= 8
+                && bytes[0] == 0x89
+                && bytes[1] == 0x50
+                && bytes[2] == 0x4e
+                && bytes[3] == 0x47
+                && bytes[4] == 0x0d
+                && bytes[5] == 0x0a
+                && bytes[6] == 0x1a
+                && bytes[7] == 0x0a;
 
         private static string EventLabel(WorkflowExecutionEventKind kind)
             => kind switch
@@ -552,11 +828,36 @@ namespace LongBetterWindows.Host.Views
             public WorkflowStepEffect Effect { get; set; }
             public required string CompensationKey { get; set; }
             public bool IsMutating => Effect == WorkflowStepEffect.Mutating;
+            public bool HasCompensation => !string.IsNullOrWhiteSpace(CompensationKey);
             public bool CanMoveUp { get; init; }
             public bool CanMoveDown { get; init; }
             public required IReadOnlyList<CommandOption> CommandOptions { get; init; }
             public required IReadOnlyList<CommandOption> CompensationOptions { get; init; }
             public required IReadOnlyList<EnumOption<WorkflowStepEffect>> EffectOptions { get; init; }
+            public required InvocationEditorItem PrimaryInput { get; init; }
+            public required InvocationEditorItem CompensationInput { get; init; }
+        }
+
+        private sealed class InvocationEditorItem
+        {
+            public required string StepId { get; init; }
+            public WorkflowCommandRole Role { get; init; }
+            public required string RoleLabel { get; init; }
+            public AcceptedInputType InputType { get; set; }
+            public required IReadOnlyList<EnumOption<AcceptedInputType>> InputOptions { get; init; }
+            public required string Text { get; set; }
+            public required IReadOnlyList<string> Paths { get; set; }
+            public byte[]? ImagePng { get; set; }
+            public required IReadOnlyDictionary<string, string> Arguments { get; init; }
+            public bool ShowText => InputType is not (AcceptedInputType.None or AcceptedInputType.Image);
+            public bool ShowPaths => InputType is AcceptedInputType.File
+                or AcceptedInputType.Files
+                or AcceptedInputType.Folder
+                or AcceptedInputType.ExplorerSelection;
+            public bool ShowImage => InputType == AcceptedInputType.Image;
+            public bool HasPaths => Paths.Count > 0;
+            public bool HasImage => ImagePng is { Length: > 0 };
+            public string ImageSummary => HasImage ? $"已载入 {ImagePng!.Length:N0} 字节" : "尚未选择图片";
         }
     }
 }

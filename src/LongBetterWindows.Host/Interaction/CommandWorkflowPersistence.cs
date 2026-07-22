@@ -73,6 +73,7 @@ namespace LongBetterWindows.Host.Interaction
     public static class CommandWorkflowDocumentCodec
     {
         public const int CurrentSchemaVersion = 2;
+        public const int MaximumImageBytes = 2 * 1024 * 1024;
 
         private static readonly JsonSerializerOptions CompactJson = CreateOptions(writeIndented: false);
         private static readonly JsonSerializerOptions IndentedJson = CreateOptions(writeIndented: true);
@@ -286,7 +287,7 @@ namespace LongBetterWindows.Host.Interaction
             {
                 return $"Workflow step {role} paths are invalid: {stepId}";
             }
-            if ((invocation.ImagePng?.Length ?? 0) > 2 * 1024 * 1024)
+            if ((invocation.ImagePng?.Length ?? 0) > MaximumImageBytes)
                 return $"Workflow step {role} image is too large: {stepId}";
             if ((invocation.Arguments?.Count ?? 0) > 64
                 || (invocation.Arguments?.Any(argument =>

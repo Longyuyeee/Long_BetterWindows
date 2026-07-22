@@ -4,6 +4,56 @@
              xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
              Loaded="WorkflowEditorControl_Loaded"
              Unloaded="WorkflowEditorControl_Unloaded">
+    <UserControl.Resources>
+        <DataTemplate x:Key="WorkflowInvocationEditorTemplate">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="100"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding RoleLabel}" VerticalAlignment="Center" FontSize="11"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    <ComboBox Grid.Column="1" Style="{StaticResource LongComboBox}"
+                              ItemsSource="{Binding InputOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                              SelectedValue="{Binding InputType}" SelectionChanged="InvocationInputType_SelectionChanged"
+                              automation:AutomationProperties.Name="命令输入类型" />
+                </Grid>
+                <Grid Margin="100,8,0,0" Visibility="{Binding ShowText, Converter={StaticResource BooleanToVisibility}}">
+                    <TextBox Style="{StaticResource LongTextBox}" Text="{Binding Text}" MaxLength="65536"
+                             TextChanged="InvocationText_TextChanged" MinHeight="34" TextWrapping="Wrap"
+                             automation:AutomationProperties.Name="命令文本输入" />
+                </Grid>
+                <StackPanel Margin="100,8,0,0" Visibility="{Binding ShowPaths, Converter={StaticResource BooleanToVisibility}}">
+                    <ItemsControl ItemsSource="{Binding Paths}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Margin="2,2" TextTrimming="CharacterEllipsis"
+                                           FontFamily="{DynamicResource Long.Font.Mono}" FontSize="10"
+                                           ToolTip="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                        <Button Content="选择路径" Style="{StaticResource LongButton}" Tag="{Binding}"
+                                Click="PickInvocationPaths_Click"
+                                automation:AutomationProperties.Name="选择命令路径" />
+                        <Button Content="清除" Style="{StaticResource LongButton}" Tag="{Binding}" Margin="7,0,0,0"
+                                IsEnabled="{Binding HasPaths}" Click="ClearInvocationPaths_Click"
+                                automation:AutomationProperties.Name="清除命令路径" />
+                    </StackPanel>
+                </StackPanel>
+                <Grid Margin="100,8,0,0" Visibility="{Binding ShowImage, Converter={StaticResource BooleanToVisibility}}">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding ImageSummary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               FontSize="10" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                    <Button Grid.Column="1" Content="选择 PNG" Style="{StaticResource LongButton}" Tag="{Binding}" Margin="8,0,0,0"
+                            Click="PickInvocationImage_Click"
+                            automation:AutomationProperties.Name="选择命令 PNG 图片" />
+                    <Button Grid.Column="2" Content="清除" Style="{StaticResource LongButton}" Tag="{Binding}" Margin="7,0,0,0"
+                            IsEnabled="{Binding HasImage}" Click="ClearInvocationImage_Click"
+                            automation:AutomationProperties.Name="清除命令图片" />
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
     <Grid MinHeight="600">
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="WorkflowListColumn" Width="232" />
@@ -19,7 +69,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="本机工作流" FontSize="14" FontWeight="SemiBold" />
                     <TextBlock x:Name="WorkflowCountText" Text="0 项" Margin="0,3,0,0"
@@ -30,7 +80,12 @@
                         automation:AutomationProperties.Name="刷新工作流列表">
                     <Path Data="{StaticResource Long.Icon.Refresh}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
                 </Button>
-                <Button x:Name="NewWorkflowButton" Grid.Column="2" Style="{StaticResource LongIconButton}"
+                <Button x:Name="ImportWorkflowButton" Grid.Column="2" Style="{StaticResource LongIconButton}" Margin="0,0,6,0"
+                        Click="ImportWorkflow_Click" ToolTip="导入工作流"
+                        automation:AutomationProperties.Name="导入外部工作流">
+                    <Path Data="{StaticResource Long.Icon.Import}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                </Button>
+                <Button x:Name="NewWorkflowButton" Grid.Column="3" Style="{StaticResource LongIconButton}"
                         Click="NewWorkflow_Click" ToolTip="新建组合动作"
                         automation:AutomationProperties.Name="新建组合动作">
                     <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
@@ -66,7 +121,7 @@
         <Grid Grid.Column="3">
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
             <Grid x:Name="CompactWorkflowBar" Visibility="Collapsed" Margin="0,0,0,14">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <ComboBox x:Name="CompactWorkflowCombo" Style="{StaticResource LongComboBox}"
                           DisplayMemberPath="Name" SelectedValuePath="Id"
                           SelectionChanged="CompactWorkflowCombo_SelectionChanged"
@@ -76,12 +131,46 @@
                         automation:AutomationProperties.Name="刷新工作流列表">
                     <Path Data="{StaticResource Long.Icon.Refresh}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
                 </Button>
-                <Button x:Name="CompactNewButton" Grid.Column="2" Style="{StaticResource LongIconButton}"
+                <Button x:Name="CompactImportButton" Grid.Column="2" Style="{StaticResource LongIconButton}" Margin="0,0,6,0"
+                        Click="ImportWorkflow_Click" ToolTip="导入工作流"
+                        automation:AutomationProperties.Name="导入外部工作流">
+                    <Path Data="{StaticResource Long.Icon.Import}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                </Button>
+                <Button x:Name="CompactNewButton" Grid.Column="3" Style="{StaticResource LongIconButton}"
                         Click="NewWorkflow_Click" ToolTip="新建组合动作"
                         automation:AutomationProperties.Name="新建组合动作">
                     <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
                 </Button>
             </Grid>
+
+            <Border x:Name="ImportReviewPanel" Grid.Row="1" Visibility="Collapsed"
+                    CornerRadius="{DynamicResource Long.Radius.Control}" Padding="16"
+                    Background="{DynamicResource Long.Brush.Background.Raised}"
+                    BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="审查外部工作流" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock x:Name="ImportReviewName" Margin="0,12,0,0" FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock x:Name="ImportReviewSource" Margin="0,5,0,0" TextWrapping="Wrap"
+                               FontFamily="{DynamicResource Long.Font.Mono}" FontSize="10"
+                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                    <TextBlock x:Name="ImportReviewSummary" Margin="0,12,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    <Border Margin="0,12,0,0" Padding="12,10" CornerRadius="{DynamicResource Long.Radius.Control}"
+                            Background="{DynamicResource Long.Brush.Accent.Soft}">
+                        <StackPanel>
+                            <TextBlock x:Name="ImportReviewTrust" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ImportReviewPreflight" Margin="0,4,0,0" TextWrapping="Wrap" FontSize="11"
+                                       Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                        <Button Content="取消" Style="{StaticResource LongButton}" Margin="0,0,8,0"
+                                Click="CancelImport_Click" automation:AutomationProperties.Name="取消导入工作流" />
+                        <Button Content="采用为草稿" Style="{StaticResource LongButton.Primary}"
+                                Click="AdoptImport_Click" automation:AutomationProperties.Name="采用导入工作流为草稿" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
 
             <Grid x:Name="EmptyEditor" Grid.Row="1">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="320">
@@ -172,7 +261,7 @@
                         <DataTemplate>
                             <Border Style="{StaticResource LongCard}" Effect="{x:Null}" Margin="0,0,0,8" Padding="12">
                                 <Grid>
-                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition Width="*"/><ColumnDefinition Width="120"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <TextBlock Text="{Binding Position}" VerticalAlignment="Center" FontFamily="{DynamicResource Long.Font.Mono}"
                                                Foreground="{DynamicResource Long.Brush.Text.Muted}" />
@@ -210,6 +299,13 @@
                                                   SelectedValue="{Binding CompensationKey}" SelectionChanged="StepCompensation_SelectionChanged"
                                                   automation:AutomationProperties.Name="步骤补偿命令" />
                                     </Grid>
+                                    <ContentControl Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,9,0,0"
+                                                    Content="{Binding PrimaryInput}"
+                                                    ContentTemplate="{StaticResource WorkflowInvocationEditorTemplate}" />
+                                    <ContentControl Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,9,0,0"
+                                                    Visibility="{Binding HasCompensation, Converter={StaticResource BooleanToVisibility}}"
+                                                    Content="{Binding CompensationInput}"
+                                                    ContentTemplate="{StaticResource WorkflowInvocationEditorTemplate}" />
                                 </Grid>
                             </Border>
                         </DataTemplate>
