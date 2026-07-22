@@ -59,6 +59,10 @@ public class CommandContractTests
                     view_mode = "form",
                     keep_alive = true,
                     priority = 20,
+                    outputs = new[]
+                    {
+                        new { key = "translated-text", type = "text", description = "Translated text" },
+                    },
                 },
             },
             window = new
@@ -84,6 +88,9 @@ public class CommandContractTests
         var command = Assert.Single(result.Manifest!.Commands);
         Assert.Equal(AcceptedInputType.Text, command.AcceptedInputs[0]);
         Assert.Equal(AcceptedInputType.Clipboard, command.AcceptedInputs[1]);
+        var output = Assert.Single(command.Outputs);
+        Assert.Equal("translated-text", output.Key);
+        Assert.Equal(PluginCommandOutputType.Text, output.Type);
         Assert.Equal(PluginViewMode.Form, command.ViewMode);
         Assert.True(command.KeepAlive);
         Assert.Equal(PluginWindowMode.Standard, result.Manifest.Window!.Mode);
@@ -114,6 +121,39 @@ public class CommandContractTests
 
         Assert.False(result.IsSuccess);
         Assert.Contains("OPEN", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ManifestReader_InvalidAndDuplicateOutputKeysReturnFailure()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.outputs",
+            version = "1.0.0",
+            name = "Outputs",
+            entry_point = "outputs.dll",
+            commands = new[]
+            {
+                new
+                {
+                    id = "produce",
+                    title = "Produce",
+                    accepted_inputs = new[] { "none" },
+                    outputs = new[]
+                    {
+                        new { key = "same", type = "text" },
+                        new { key = "same", type = "path" },
+                        new { key = "not valid", type = "text" },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("重复 output key", result.Error);
+        Assert.Contains("output key 无效", result.Error);
     }
 
     [Fact]

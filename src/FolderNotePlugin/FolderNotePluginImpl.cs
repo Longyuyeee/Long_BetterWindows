@@ -161,7 +161,15 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
                 ? invocation.Paths.FirstOrDefault(Directory.Exists)
                 : null;
         await ShowNoteHudAsync(folderPath);
-        return LongBetterWindows.Host.Contracts.PluginCommandResult.Success();
+        return LongBetterWindows.Host.Contracts.PluginCommandResult.Success(
+            outputs: string.IsNullOrWhiteSpace(folderPath)
+                ? null
+                : new Dictionary<string, LongBetterWindows.Host.Contracts.PluginCommandOutput>
+                {
+                    ["selected-folder"] = new(
+                        LongBetterWindows.Host.Contracts.PluginCommandOutputType.Path,
+                        folderPath),
+                });
     }
 
     public void ShowMainUI() => OnHotkeyTriggered();

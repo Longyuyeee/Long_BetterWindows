@@ -425,7 +425,38 @@ public class CommandWorkflowExecutorTests
     }
 
     private static PluginCommand CommandManifest(string id)
-        => new()
+    {
+        var outputs = new List<PluginCommandOutputDeclaration>();
+        if (id == "write-one")
+        {
+            outputs.AddRange(
+            [
+                new PluginCommandOutputDeclaration
+                {
+                    Key = "selected-path",
+                    Type = PluginCommandOutputType.Path,
+                },
+                new PluginCommandOutputDeclaration
+                {
+                    Key = "restore-token",
+                    Type = PluginCommandOutputType.Text,
+                },
+                new PluginCommandOutputDeclaration
+                {
+                    Key = "secret",
+                    Type = PluginCommandOutputType.Text,
+                },
+            ]);
+        }
+        if (id == "undo-one")
+        {
+            outputs.Add(new PluginCommandOutputDeclaration
+            {
+                Key = "oversized",
+                Type = PluginCommandOutputType.Text,
+            });
+        }
+        return new PluginCommand
         {
             Id = id,
             Title = id,
@@ -435,7 +466,9 @@ public class CommandWorkflowExecutorTests
                 AcceptedInputType.File,
                 AcceptedInputType.Files,
             ],
+            Outputs = outputs,
         };
+    }
 
     private sealed class FakeRunner : IWorkflowCommandRunner
     {

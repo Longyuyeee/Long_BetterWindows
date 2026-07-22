@@ -113,4 +113,32 @@ public sealed class CommandWorkflowBindingResolverTests
         Assert.False(mismatch.IsSuccess);
         Assert.DoesNotContain("private-value", mismatch.Error);
     }
+
+    [Fact]
+    public void TrySnapshotDeclaredOutputs_RejectsUndeclaredAndWrongTypes()
+    {
+        var declarations = new[]
+        {
+            new PluginCommandOutputDeclaration
+            {
+                Key = "path",
+                Type = PluginCommandOutputType.Path,
+            },
+        };
+        var undeclared = PluginCommandResult.Success(outputs: new Dictionary<string, PluginCommandOutput>
+        {
+            ["other"] = new(PluginCommandOutputType.Path, "C:\\private.txt"),
+        });
+        var wrongType = PluginCommandResult.Success(outputs: new Dictionary<string, PluginCommandOutput>
+        {
+            ["path"] = new(PluginCommandOutputType.Text, "private"),
+        });
+
+        Assert.False(CommandWorkflowBindingResolver.TrySnapshotDeclaredOutputs(
+            undeclared, declarations, out _, out var undeclaredError));
+        Assert.False(CommandWorkflowBindingResolver.TrySnapshotDeclaredOutputs(
+            wrongType, declarations, out _, out var typeError));
+        Assert.Contains("undeclared", undeclaredError);
+        Assert.Contains("wrong declared type", typeError);
+    }
 }

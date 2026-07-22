@@ -230,6 +230,43 @@ public class CommandWorkflowPlannerTests
         Assert.Contains(result.Issues, issue => issue.Contains("duplicate text bindings"));
     }
 
+    [Fact]
+    public void Preflight_UndeclaredAndMismatchedOutputBindingsAreRejected()
+    {
+        var registry = CreateRegistry();
+        var original = Workflow();
+        var workflow = original with
+        {
+            Steps =
+            [
+                original.Steps[0],
+                original.Steps[1] with
+                {
+                    Command = original.Steps[1].Command! with
+                    {
+                        Bindings =
+                        [
+                            new WorkflowValueBinding(
+                                "inspect",
+                                "missing",
+                                WorkflowBindingTarget.Path),
+                            new WorkflowValueBinding(
+                                "inspect",
+                                "selected-path",
+                                WorkflowBindingTarget.Text),
+                        ],
+                    },
+                },
+            ],
+        };
+
+        var result = new CommandWorkflowPlanner(registry).Preflight(workflow);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Contains("not declared"));
+        Assert.Contains(result.Issues, issue => issue.Contains("output type is incompatible"));
+    }
+
     private static CommandWorkflowDefinition Workflow(
         IReadOnlyDictionary<string, string>? arguments = null)
         => new(
@@ -287,6 +324,14 @@ public class CommandWorkflowPlannerTests
                         Id = "inspect",
                         Title = "Inspect",
                         AcceptedInputs = [AcceptedInputType.File],
+                        Outputs =
+                        [
+                            new PluginCommandOutputDeclaration
+                            {
+                                Key = "selected-path",
+                                Type = PluginCommandOutputType.Path,
+                            },
+                        ],
                     },
                     new PluginCommand
                     {

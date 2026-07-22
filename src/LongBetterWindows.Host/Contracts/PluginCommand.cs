@@ -26,6 +26,18 @@ namespace LongBetterWindows.Host.Contracts
         Custom,
     }
 
+    public sealed class PluginCommandOutputDeclaration
+    {
+        [JsonPropertyName("key")]
+        public string Key { get; init; } = string.Empty;
+
+        [JsonPropertyName("type")]
+        public PluginCommandOutputType Type { get; init; }
+
+        [JsonPropertyName("description")]
+        public string Description { get; init; } = string.Empty;
+    }
+
     /// <summary>宿主为插件提供的标准窗口规格。</summary>
     public enum PluginWindowMode
     {
@@ -68,6 +80,9 @@ namespace LongBetterWindows.Host.Contracts
 
         [JsonPropertyName("accepted_inputs")]
         public List<AcceptedInputType> AcceptedInputs { get; init; } = new() { AcceptedInputType.None };
+
+        [JsonPropertyName("outputs")]
+        public List<PluginCommandOutputDeclaration> Outputs { get; init; } = new();
 
         [JsonPropertyName("view_mode")]
         public PluginViewMode ViewMode { get; init; } = PluginViewMode.Custom;

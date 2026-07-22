@@ -16,6 +16,13 @@
       "description": "为当前文件夹或 Explorer 选区编辑备注",
       "aliases": ["文件夹备注", "目录备注", "folder note", "wenjianjiabeizhu", "wjjbz"],
       "accepted_inputs": ["folder", "explorer_selection"],
+      "outputs": [
+        {
+          "key": "selected-folder",
+          "type": "path",
+          "description": "本次打开备注面板时使用的文件夹"
+        }
+      ],
       "view_mode": "form",
       "priority": 30
     }

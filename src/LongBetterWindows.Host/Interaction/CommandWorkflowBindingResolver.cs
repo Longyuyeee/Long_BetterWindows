@@ -53,6 +53,35 @@ namespace LongBetterWindows.Host.Interaction
             return true;
         }
 
+        public static bool TrySnapshotDeclaredOutputs(
+            PluginCommandResult result,
+            IReadOnlyList<PluginCommandOutputDeclaration> declarations,
+            out IReadOnlyDictionary<string, PluginCommandOutput> outputs,
+            out string? error)
+        {
+            ArgumentNullException.ThrowIfNull(declarations);
+            if (!TrySnapshotOutputs(result, out outputs, out error)) return false;
+            var declared = declarations
+                .GroupBy(item => item.Key, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First().Type, StringComparer.Ordinal);
+            foreach (var output in outputs)
+            {
+                if (!declared.TryGetValue(output.Key, out var type))
+                {
+                    outputs = new Dictionary<string, PluginCommandOutput>();
+                    error = "Command returned an undeclared structured output.";
+                    return false;
+                }
+                if (type != output.Value.Type)
+                {
+                    outputs = new Dictionary<string, PluginCommandOutput>();
+                    error = "Command returned a structured output with the wrong declared type.";
+                    return false;
+                }
+            }
+            return true;
+        }
+
         public static WorkflowBindingResolution Resolve(
             WorkflowCommand command,
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, PluginCommandOutput>> stepOutputs)

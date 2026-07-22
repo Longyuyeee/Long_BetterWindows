@@ -9,6 +9,7 @@ namespace LongBetterWindows.Host.Interaction
         private static readonly TimeSpan DefaultCompensationTimeout = TimeSpan.FromSeconds(30);
 
         private readonly CommandWorkflowPlanner _planner;
+        private readonly PluginRegistry _plugins;
         private readonly IWorkflowCommandRunner _runner;
         private readonly TimeSpan _compensationTimeout;
 
@@ -18,6 +19,7 @@ namespace LongBetterWindows.Host.Interaction
             TimeSpan? compensationTimeout = null)
         {
             ArgumentNullException.ThrowIfNull(plugins);
+            _plugins = plugins;
             _planner = new CommandWorkflowPlanner(plugins);
             _runner = runner ?? new CommandExecutor(plugins);
             _compensationTimeout = compensationTimeout ?? DefaultCompensationTimeout;
@@ -160,8 +162,25 @@ namespace LongBetterWindows.Host.Interaction
                         approvedAuthorization);
                 }
 
-                if (!CommandWorkflowBindingResolver.TrySnapshotOutputs(
+                var declaration = _plugins.Commands.Get(step.Command!.CommandKey);
+                if (declaration is null)
+                {
+                    const string error = "Command declaration is unavailable after execution.";
+                    AddEvent(WorkflowExecutionEventKind.StepFailed, step.Id, error);
+                    return await FinishFailureAsync(
+                        workflow,
+                        preflight.Fingerprint,
+                        completed,
+                        stepOutputs,
+                        WorkflowExecutionStatus.Failed,
+                        error,
+                        events,
+                        AddEvent,
+                        approvedAuthorization);
+                }
+                if (!CommandWorkflowBindingResolver.TrySnapshotDeclaredOutputs(
                     commandResult,
+                    declaration.Command.Outputs,
                     out var outputs,
                     out var outputError))
                 {
@@ -249,11 +268,18 @@ namespace LongBetterWindows.Host.Interaction
                     compensationResult = PluginCommandResult.Failure(ex.Message);
                 }
 
-                if (compensationResult.IsSuccess
-                    && !CommandWorkflowBindingResolver.TrySnapshotOutputs(
-                        compensationResult,
-                        out _,
-                        out var outputError))
+                var declaration = _plugins.Commands.Get(step.Compensation.CommandKey);
+                if (compensationResult.IsSuccess && declaration is null)
+                {
+                    compensationResult = PluginCommandResult.Failure(
+                        "Compensation command declaration is unavailable.");
+                }
+                else if (compensationResult.IsSuccess
+                    && !CommandWorkflowBindingResolver.TrySnapshotDeclaredOutputs(
+                            compensationResult,
+                            declaration!.Command.Outputs,
+                            out _,
+                            out var outputError))
                 {
                     compensationResult = PluginCommandResult.Failure(outputError!);
                 }

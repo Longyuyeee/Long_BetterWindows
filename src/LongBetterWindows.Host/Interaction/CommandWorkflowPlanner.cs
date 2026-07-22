@@ -33,7 +33,10 @@ namespace LongBetterWindows.Host.Interaction
                 issues.Add($"Workflow must contain between 1 and {MaximumStepCount} steps.");
 
             var stepIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var precedingStepIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var availableOutputs = new Dictionary<
+                string,
+                IReadOnlyDictionary<string, PluginCommandOutputType>>(
+                StringComparer.OrdinalIgnoreCase);
             foreach (var step in workflow.Steps)
             {
                 if (!IsValidIdentifier(step.Id))
@@ -45,19 +48,21 @@ namespace LongBetterWindows.Host.Interaction
                     step.Id,
                     "command",
                     step.Command,
-                    precedingStepIds,
+                    availableOutputs,
                     issues,
                     pluginIds);
-                var compensationSources = new HashSet<string>(
-                    precedingStepIds,
+                var compensationOutputs = new Dictionary<
+                    string,
+                    IReadOnlyDictionary<string, PluginCommandOutputType>>(
+                    availableOutputs,
                     StringComparer.OrdinalIgnoreCase);
-                compensationSources.Add(step.Id);
+                compensationOutputs[step.Id] = GetDeclaredOutputs(step.Command);
                 if (step.Compensation is not null)
                     ValidateCommand(
                         step.Id,
                         "compensation",
                         step.Compensation,
-                        compensationSources,
+                        compensationOutputs,
                         issues,
                         pluginIds);
                 if (workflow.FailureMode == WorkflowFailureMode.Compensate
@@ -66,7 +71,7 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     issues.Add($"Mutating workflow step requires compensation: {step.Id}");
                 }
-                precedingStepIds.Add(step.Id);
+                availableOutputs[step.Id] = GetDeclaredOutputs(step.Command);
             }
 
             var permissions = new List<WorkflowPermissionRequirement>();
@@ -100,7 +105,9 @@ namespace LongBetterWindows.Host.Interaction
             string stepId,
             string role,
             WorkflowCommand? command,
-            ISet<string> availableSourceSteps,
+            IReadOnlyDictionary<
+                string,
+                IReadOnlyDictionary<string, PluginCommandOutputType>> availableOutputs,
             ICollection<string> issues,
             ISet<string> pluginIds)
         {
@@ -142,8 +149,21 @@ namespace LongBetterWindows.Host.Interaction
                 role,
                 command.Bindings,
                 invocation.InputType,
-                availableSourceSteps,
+                availableOutputs,
                 issues);
+        }
+
+        private IReadOnlyDictionary<string, PluginCommandOutputType> GetDeclaredOutputs(
+            WorkflowCommand? command)
+        {
+            var descriptor = command is null ? null : _plugins.Commands.Get(command.CommandKey);
+            return descriptor?.Command.Outputs
+                .GroupBy(output => output.Key, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().Type,
+                    StringComparer.Ordinal)
+                ?? new Dictionary<string, PluginCommandOutputType>();
         }
 
         private static void ValidateBindings(
@@ -151,7 +171,9 @@ namespace LongBetterWindows.Host.Interaction
             string role,
             IReadOnlyList<WorkflowValueBinding>? bindings,
             AcceptedInputType inputType,
-            ISet<string> availableSourceSteps,
+            IReadOnlyDictionary<
+                string,
+                IReadOnlyDictionary<string, PluginCommandOutputType>> availableOutputs,
             ICollection<string> issues)
         {
             bindings ??= Array.Empty<WorkflowValueBinding>();
@@ -164,8 +186,19 @@ namespace LongBetterWindows.Host.Interaction
             var argumentTargets = new HashSet<string>(StringComparer.Ordinal);
             foreach (var binding in bindings)
             {
-                if (!availableSourceSteps.Contains(binding.SourceStepId))
+                PluginCommandOutputType? outputType = null;
+                if (!availableOutputs.TryGetValue(binding.SourceStepId, out var sourceOutputs))
+                {
                     issues.Add($"Workflow step {role} binding source must already be available: {stepId}");
+                }
+                else if (!sourceOutputs.TryGetValue(binding.OutputKey, out var declaredType))
+                {
+                    issues.Add($"Workflow step {role} binding output is not declared: {stepId}");
+                }
+                else
+                {
+                    outputType = declaredType;
+                }
                 if (!IsValidIdentifier(binding.OutputKey))
                     issues.Add($"Workflow step {role} binding output key is invalid: {stepId}");
                 if (!Enum.IsDefined(binding.Target))
@@ -180,6 +213,12 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     issues.Add($"Workflow step {role} text binding is incompatible with its input type: {stepId}");
                 }
+                if (binding.Target == WorkflowBindingTarget.Text
+                    && outputType.HasValue
+                    && outputType.Value != PluginCommandOutputType.Text)
+                {
+                    issues.Add($"Workflow step {role} text binding output type is incompatible: {stepId}");
+                }
                 if (binding.Target == WorkflowBindingTarget.Path
                     && inputType is not (AcceptedInputType.File
                         or AcceptedInputType.Files
@@ -187,6 +226,12 @@ namespace LongBetterWindows.Host.Interaction
                         or AcceptedInputType.ExplorerSelection))
                 {
                     issues.Add($"Workflow step {role} path binding is incompatible with its input type: {stepId}");
+                }
+                if (binding.Target == WorkflowBindingTarget.Path
+                    && outputType.HasValue
+                    && outputType.Value != PluginCommandOutputType.Path)
+                {
+                    issues.Add($"Workflow step {role} path binding output type is incompatible: {stepId}");
                 }
                 if (binding.Target == WorkflowBindingTarget.Argument)
                 {
@@ -198,6 +243,11 @@ namespace LongBetterWindows.Host.Interaction
                     else if (!argumentTargets.Add(binding.ArgumentKey))
                     {
                         issues.Add($"Workflow step {role} has duplicate argument bindings: {stepId}");
+                    }
+                    if (outputType.HasValue
+                        && outputType.Value != PluginCommandOutputType.Text)
+                    {
+                        issues.Add($"Workflow step {role} argument binding output type is incompatible: {stepId}");
                     }
                 }
                 else if (binding.ArgumentKey is not null)

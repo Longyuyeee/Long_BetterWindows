@@ -144,8 +144,27 @@ namespace LongBetterWindows.Host.Engine
 
                 if (command.AcceptedInputs.Count == 0)
                     errors.Add($"指令 '{command.Id}' 必须声明至少一种 accepted_inputs");
+
+                if (command.Outputs.Count > 64)
+                    errors.Add($"指令 '{command.Id}' 不能声明超过 64 个 outputs");
+                var outputKeys = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var output in command.Outputs)
+                {
+                    if (!IsIdentifier(output.Key))
+                        errors.Add($"指令 '{command.Id}' 的 output key 无效: '{output.Key}'");
+                    else if (!outputKeys.Add(output.Key))
+                        errors.Add($"指令 '{command.Id}' 存在重复 output key: '{output.Key}'");
+                    if (!Enum.IsDefined(output.Type))
+                        errors.Add($"指令 '{command.Id}' 的 output type 无效: '{output.Type}'");
+                }
             }
         }
+
+        private static bool IsIdentifier(string value)
+            => !string.IsNullOrWhiteSpace(value)
+                && value.Length <= 64
+                && value.All(character => char.IsAsciiLetterOrDigit(character)
+                    || character is '.' or '_' or '-');
 
         private static void ValidateWindowPreference(
             PluginWindowPreference? window,
