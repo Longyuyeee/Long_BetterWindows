@@ -43,8 +43,22 @@
       try {
         output.value = mode === 'decode' ? decodeURIComponent(input.value.replace(/\+/g, ' ')) : encodeURIComponent(input.value);
         stat.textContent = output.value.length.toLocaleString() + ' 字符';
-        announce(mode === 'decode' ? 'URL 解码完成' : 'URL 编码完成', 'success');
-      } catch (error) { announce('内容无法解码：' + error.message, 'danger'); }
+        const message = mode === 'decode' ? 'URL 解码完成' : 'URL 编码完成';
+        if (output.value.length > 65536) {
+          announce('处理结果超过 65,536 个字符，无法作为命令输出', 'danger');
+          return { success: false, message: 'URL 处理结果超过命令输出上限', outputs: {} };
+        }
+        announce(message, 'success');
+        return {
+          success: true,
+          message: message,
+          outputs: { result: { type: 'text', value: output.value } }
+        };
+      } catch (error) {
+        const message = '内容无法解码：' + error.message;
+        announce(message, 'danger');
+        return { success: false, message: message, outputs: {} };
+      }
     }
     async function paste() { try { const result = await long.clipboard.getText(); if (result.success) input.value = result.data || ''; } catch (_) { announce('无法读取剪贴板', 'danger'); } }
     async function copy() { if (!output.value) return; try { await long.clipboard.setText(output.value); announce('结果已复制', 'success'); } catch (_) { announce('复制失败', 'danger'); } }
@@ -53,7 +67,7 @@
     document.getElementById('pasteButton').addEventListener('click', paste);
     document.getElementById('copyButton').addEventListener('click', copy);
     document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); transform(event.shiftKey ? 'decode' : 'encode'); } });
-    window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) input.value = text; transform(command.command_id === 'url.decode' ? 'decode' : 'encode'); });
+    window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) input.value = text; return transform(command.command_id === 'url.decode' ? 'decode' : 'encode'); });
   </script>
 </body>
 </html>

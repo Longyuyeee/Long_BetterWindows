@@ -13,6 +13,13 @@
       "description": "对文本或剪贴板内容执行 URL 编码",
       "aliases": ["url", "网址编码", "encode uri", "wangzhibianma"],
       "accepted_inputs": ["text", "url", "clipboard"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "URL 编码后的文本"
+        }
+      ],
       "view_mode": "form",
       "priority": 16
     },
@@ -22,6 +29,13 @@
       "description": "还原 URL 编码后的文本",
       "aliases": ["网址解码", "decode uri", "wangzhijiema"],
       "accepted_inputs": ["text", "url", "clipboard"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "URL 解码后的文本"
+        }
+      ],
       "view_mode": "form",
       "priority": 15
     }

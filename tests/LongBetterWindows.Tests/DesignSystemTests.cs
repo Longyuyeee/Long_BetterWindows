@@ -317,6 +317,27 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public async Task UrlCommands_DeclareAndReturnBoundedTextResult()
+    {
+        var root = FindRepositoryRoot();
+        var pluginDirectory = Path.Combine(root, "src", "UrlToolkit");
+        var result = await ManifestReader.ReadAsync(pluginDirectory);
+        var page = File.ReadAllText(Path.Combine(pluginDirectory, "index.html"));
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(2, result.Manifest!.Commands.Count);
+        Assert.All(result.Manifest.Commands, command =>
+        {
+            var output = Assert.Single(command.Outputs);
+            Assert.Equal("result", output.Key);
+            Assert.Equal(PluginCommandOutputType.Text, output.Type);
+        });
+        Assert.Contains("outputs: { result: { type: 'text', value: output.value } }", page);
+        Assert.Contains("output.value.length > 65536", page);
+        Assert.Contains("return transform(command.command_id === 'url.decode'", page);
+    }
+
+    [Fact]
     public void WebRuntime_UsesPluginPermissionContextAndLowercaseResponseContract()
     {
         var root = FindRepositoryRoot();
