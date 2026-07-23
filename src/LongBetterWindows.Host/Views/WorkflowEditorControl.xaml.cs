@@ -414,23 +414,9 @@ namespace LongBetterWindows.Host.Views
             ExecutionReviewSummary.Text = presentation.Summary;
             ExecutionPermissionList.ItemsSource = presentation.Permissions;
             ExecutionResultPanel.Visibility = Visibility.Collapsed;
+            EditorConfigurationPanel.Visibility = Visibility.Collapsed;
             ExecutionReviewPanel.Visibility = Visibility.Visible;
-            FocusExecutionReview();
             return true;
-        }
-
-        internal void FocusExecutionReview()
-        {
-            if (ExecutionReviewPanel.Visibility != Visibility.Visible) return;
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                ExecutionReviewPanel.BringIntoView();
-                UpdateLayout();
-                var focusScope = FocusManager.GetFocusScope(CancelRunReviewButton);
-                FocusManager.SetFocusedElement(focusScope, CancelRunReviewButton);
-                CancelRunReviewButton.Focus();
-                Keyboard.Focus(CancelRunReviewButton);
-            }), DispatcherPriority.ContextIdle);
         }
 
         private void CancelRunReview_Click(object sender, RoutedEventArgs e)
@@ -442,6 +428,7 @@ namespace LongBetterWindows.Host.Views
             _runSession.CancelReview();
             _executionReview = null;
             ExecutionReviewPanel.Visibility = Visibility.Collapsed;
+            EditorConfigurationPanel.Visibility = Visibility.Visible;
             Dispatcher.BeginInvoke(new Action(() =>
                 Keyboard.Focus(PrepareRunButton)), DispatcherPriority.Input);
             ExecutionReviewClosed?.Invoke(this, EventArgs.Empty);
@@ -645,6 +632,7 @@ namespace LongBetterWindows.Host.Views
                 EmptyEditor.Visibility = draft is null ? Visibility.Visible : Visibility.Collapsed;
                 EditorBody.Visibility = draft is null ? Visibility.Collapsed : Visibility.Visible;
                 if (draft is null) return;
+                EditorConfigurationPanel.Visibility = Visibility.Visible;
 
                 EditorHeading.Text = draft.Name;
                 WorkflowIdBox.Text = draft.Id;
@@ -859,12 +847,12 @@ namespace LongBetterWindows.Host.Views
         private void ApplyResponsiveLayout(double width)
         {
             var compact = width < 700;
+            if (_isCompactLayout == compact) return;
+            _isCompactLayout = compact;
             WorkflowListColumn.Width = new GridLength(compact ? 0 : 232);
             WorkflowDividerColumn.Width = new GridLength(compact ? 0 : 1);
             WorkflowGapColumn.Width = new GridLength(compact ? 0 : 20);
             CompactWorkflowBar.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
-            if (_isCompactLayout == compact) return;
-            _isCompactLayout = compact;
             ResponsiveLayoutChanged?.Invoke(compact);
         }
 

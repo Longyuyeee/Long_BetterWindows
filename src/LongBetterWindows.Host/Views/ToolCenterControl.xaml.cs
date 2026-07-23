@@ -18,6 +18,7 @@ namespace LongBetterWindows.Host.Views
         private bool _contextMenuRegistered;
         private bool _startupEnabled;
         private bool _docsLoaded;
+        private bool? _isNarrowLayout;
 
         public ToolCenterControl()
         {
@@ -85,10 +86,9 @@ namespace LongBetterWindows.Host.Views
         private void ApplyResponsiveLayout(double width)
         {
             var isNarrow = width < 860;
+            if (_isNarrowLayout == isNarrow) return;
+            _isNarrowLayout = isNarrow;
             NavigationColumn.Width = new GridLength(isNarrow ? 160 : 220);
-            ContentBodyFrame.Width = Math.Max(
-                0,
-                width - NavigationColumn.Width.Value - 1);
             PageHeader.Margin = isNarrow
                 ? new Thickness(18, 16, 18, 12)
                 : new Thickness(32, 20, 32, 16);
@@ -153,12 +153,6 @@ namespace LongBetterWindows.Host.Views
             if (WorkflowEditorHost.Content is not WorkflowEditorControl editor)
                 return "组合动作编辑器当前不可用。";
             return await editor.OpenExecutionReviewAsync(workflowId, cancellationToken);
-        }
-
-        internal void FocusWorkflowReview()
-        {
-            if (WorkflowEditorHost.Content is WorkflowEditorControl editor)
-                editor.FocusExecutionReview();
         }
 
         internal bool CancelWorkflowReview()

@@ -20,6 +20,7 @@ namespace LongBetterWindows.Host.Services
         public bool UseLiveContextForQuality { get; private init; }
         public bool UseEmptyContextForQuality { get; private init; }
         public string? QualityWorkflowsDirectory { get; private init; }
+        public string? QualityWorkflowReviewId { get; private init; }
         public bool ForceHighContrast { get; private init; }
         public bool ForceReduceMotion { get; private init; }
         public int QualityIdleMilliseconds { get; private init; }
@@ -57,6 +58,7 @@ namespace LongBetterWindows.Host.Services
                 UseLiveContextForQuality = HasSwitch(arguments, "--quality-live-context"),
                 UseEmptyContextForQuality = HasSwitch(arguments, "--quality-empty-context"),
                 QualityWorkflowsDirectory = ReadArgument(arguments, "--quality-workflows-dir"),
+                QualityWorkflowReviewId = ReadArgument(arguments, "--quality-open-workflow"),
                 ForceHighContrast = HasSwitch(arguments, "--quality-high-contrast"),
                 ForceReduceMotion = HasSwitch(arguments, "--quality-reduce-motion"),
                 QualityIdleMilliseconds = ReadIntegerArgument(arguments, "--quality-idle-ms", 0, 60_000),

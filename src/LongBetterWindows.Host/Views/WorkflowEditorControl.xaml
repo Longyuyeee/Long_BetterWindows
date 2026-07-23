@@ -144,6 +144,7 @@
             </Grid>
 
             <StackPanel x:Name="EditorBody" Grid.Row="1" Visibility="Collapsed">
+                <StackPanel x:Name="EditorConfigurationPanel">
                 <Grid Margin="0,0,0,18">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -291,6 +292,8 @@
                                   automation:AutomationProperties.Name="允许保存敏感输入" />
                     </StackPanel>
                 </Border>
+
+                </StackPanel>
 
                 <Border x:Name="ExecutionReviewPanel" Visibility="Collapsed" Margin="0,10,0,0"
                         automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview"

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-23T02:09:20.7978518+00:00",
+  "classification": "desktop_ui_automation_smoke",
+  "workflow_output": {
+    "read_only_execution_confirmed": true,
+    "review_state_cleared_after_confirmation": true,
+    "execution_completed": true,
+    "terminal_output_approved": true,
+    "terminal_output_length": 3699,
+    "terminal_output_bounded_scroll": true,
+    "terminal_output_cleared": true,
+    "isolated_report_written": true
+  },
+  "passed": true,
+  "error": null
+}

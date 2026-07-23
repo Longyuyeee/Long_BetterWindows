@@ -1059,6 +1059,8 @@ public class QualityGateTests
         var appResources = Read("src", "LongBetterWindows.Host", "App.xaml");
         var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml");
         var mainCode = Read("src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
+        var mainAutomation = Read(
+            "src", "LongBetterWindows.Host", "Automation", "QualityWorkflowAutomation.cs");
         var plugin = Read("src", "LongBetterWindows.Host", "Views", "PluginWindowHost.xaml");
 
         Assert.Contains("Long.CommandPalette.Search", palette);
@@ -1095,6 +1097,7 @@ public class QualityGateTests
         Assert.Contains("escape_closed_detached_window", script);
         Assert.Contains("escape_closed_panel", script);
         Assert.Contains("--quality-workflows-dir", script);
+        Assert.Contains("--quality-open-workflow", script);
         Assert.Contains("palette_enter_opened_review", script);
         Assert.Contains("super_panel_enter_opened_review", script);
         Assert.Contains("Long.Workflow.ReviewCancel", script);
@@ -1112,6 +1115,16 @@ public class QualityGateTests
         Assert.Contains("Long.Workflow.TerminalOutput.ApproveTopLevel", main);
         Assert.Contains("Long.Workflow.ReviewConfirmTopLevel", main);
         Assert.Contains("Long.Workflow.TerminalOutput.ClearTopLevel", main);
+        Assert.Contains("EditorConfigurationPanel", workflow);
+        Assert.Contains("LongBetterWindows.Quality.WorkflowAction.v1", mainAutomation);
+        Assert.Contains("QualityWorkflowAutomationEnabled", mainCode);
+        Assert.Contains("WorkflowAutomationWndProc", mainCode);
+        Assert.Contains("Invoke-WindowWorkflowAction", script);
+        Assert.Contains("[LongDesktopInput]::WorkflowMessage", script);
+        Assert.Contains("SendMessageTimeout", script);
+        Assert.DoesNotContain("Click-AutomationElement $outputTerminalApproval", script);
+        Assert.DoesNotContain("Click-AutomationElement $outputReviewConfirm", script);
+        Assert.DoesNotContain("Click-AutomationElement $clearTerminalOutput", script);
         Assert.Contains(";layout:{(compact ? \"compact\" : \"wide\")};width:{Math.Round(width)}", mainCode);
         Assert.Contains("'--quality-width', '720'", script);
         Assert.Contains("execution_was_not_confirmed", script);

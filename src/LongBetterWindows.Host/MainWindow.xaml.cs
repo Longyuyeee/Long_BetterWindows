@@ -3,6 +3,7 @@ using System.Windows.Automation;
 using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Threading;
+using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
@@ -17,6 +18,8 @@ namespace LongBetterWindows.Host
         private Action? _embeddedDetachRequested;
         private string? _activeWorkflowReviewId;
         private bool _workflowTerminalOutputApproved;
+        private int _workflowTerminalOutputLength;
+        private bool _workflowTerminalOutputCleared;
 
         public MainWindow()
         {
@@ -36,6 +39,8 @@ namespace LongBetterWindows.Host
             };
             ToolCenter.WorkflowExecutionResultChanged += result =>
             {
+                _workflowTerminalOutputLength = result.TerminalOutputLength;
+                _workflowTerminalOutputCleared = false;
                 AutomationProperties.SetItemStatus(
                     this,
                     $"workflow-result:{result.Title};terminal-length:{result.TerminalOutputLength};bounded-scroll:{(result.TerminalOutputLength > 1024 ? "true" : "false")}");
@@ -45,6 +50,8 @@ namespace LongBetterWindows.Host
             };
             ToolCenter.WorkflowTerminalOutputsCleared += (_, _) =>
             {
+                _workflowTerminalOutputLength = 0;
+                _workflowTerminalOutputCleared = true;
                 AutomationProperties.SetItemStatus(this, "workflow-result:terminal-cleared");
                 WorkflowTerminalClearButton.Visibility = Visibility.Collapsed;
             };
@@ -106,11 +113,13 @@ namespace LongBetterWindows.Host
             if (error is null)
             {
                 await Dispatcher.InvokeAsync(
-                    () => ToolCenter.UpdateLayout(),
+                    () => { },
                     DispatcherPriority.Loaded,
                     cancellationToken);
                 _activeWorkflowReviewId = workflowId;
                 _workflowTerminalOutputApproved = false;
+                _workflowTerminalOutputLength = 0;
+                _workflowTerminalOutputCleared = false;
                 WorkflowTerminalClearButton.Visibility = Visibility.Collapsed;
                 WorkflowTerminalApprovalButton.Content = "允许终端输出";
                 SetWorkflowLayoutAutomationStatus(
@@ -118,7 +127,8 @@ namespace LongBetterWindows.Host
                     ToolCenter.WorkflowLayoutWidth);
                 SetWorkflowReviewChrome(true);
                 Activate();
-                ToolCenter.FocusWorkflowReview();
+                WorkflowReviewCancelButton.Focus();
+                Keyboard.Focus(WorkflowReviewCancelButton);
             }
             return error;
         }
@@ -222,14 +232,7 @@ namespace LongBetterWindows.Host
                 && modifiers.HasFlag(ModifierKeys.Control)
                 && modifiers.HasFlag(ModifierKeys.Shift))
             {
-                var approved = ToolCenter.ToggleWorkflowTerminalOutputApproval();
-                WorkflowTerminalApprovalButton.Content = approved
-                    ? "已允许终端输出 ✓"
-                    : "允许终端输出";
-                SetWorkflowLayoutAutomationStatus(
-                    ToolCenter.IsWorkflowLayoutCompact,
-                    ToolCenter.WorkflowLayoutWidth,
-                    approved);
+                ToggleWorkflowTerminalOutputApproval();
                 e.Handled = true;
                 return;
             }
@@ -261,6 +264,9 @@ namespace LongBetterWindows.Host
         }
 
         private void CancelWorkflowReview_Click(object sender, RoutedEventArgs e)
+            => CancelWorkflowReview();
+
+        private void CancelWorkflowReview()
         {
             AutomationProperties.SetItemStatus(this, string.Empty);
             SetWorkflowReviewChrome(false);
@@ -271,14 +277,26 @@ namespace LongBetterWindows.Host
         {
             if (_activeWorkflowReviewId is null) return;
             await Task.Delay(100);
+            ToggleWorkflowTerminalOutputApproval();
+        }
+
+        private void ToggleWorkflowTerminalOutputApproval()
+        {
             var approved = ToolCenter.ToggleWorkflowTerminalOutputApproval();
             _workflowTerminalOutputApproved = approved;
             WorkflowTerminalApprovalButton.Content = approved
                 ? "已允许终端输出 ✓"
                 : "允许终端输出";
+            SetWorkflowLayoutAutomationStatus(
+                ToolCenter.IsWorkflowLayoutCompact,
+                ToolCenter.WorkflowLayoutWidth,
+                approved);
         }
 
         private async void ConfirmWorkflowReview_Click(object sender, RoutedEventArgs e)
+            => await ConfirmWorkflowReviewAsync();
+
+        private async Task ConfirmWorkflowReviewAsync()
         {
             await Task.Delay(100);
             await ToolCenter.ConfirmWorkflowReviewAsync();
@@ -299,15 +317,67 @@ namespace LongBetterWindows.Host
         private void ClearWorkflowTerminalOutputs_Click(object sender, RoutedEventArgs e)
             => ToolCenter.ClearWorkflowTerminalOutputs();
 
+        private void QueueWorkflowAutomationAction(QualityWorkflowAction action)
+            => Dispatcher.BeginInvoke(new Action(async () =>
+            {
+                switch (action)
+                {
+                    case QualityWorkflowAction.CancelReview
+                        when WorkflowReviewCancelButton.IsVisible:
+                        CancelWorkflowReview();
+                        break;
+                    case QualityWorkflowAction.ApproveTerminalOutput
+                        when WorkflowTerminalApprovalButton.IsVisible:
+                        ToggleWorkflowTerminalOutputApproval();
+                        break;
+                    case QualityWorkflowAction.ConfirmReview
+                        when WorkflowReviewConfirmButton.IsVisible:
+                        await ConfirmWorkflowReviewAsync();
+                        break;
+                    case QualityWorkflowAction.ClearTerminalOutput
+                        when WorkflowTerminalClearButton.IsVisible:
+                        ToolCenter.ClearWorkflowTerminalOutputs();
+                        break;
+                }
+            }));
+
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
 
             var hwnd = new WindowInteropHelper(this).Handle;
+            HwndSource.FromHwnd(hwnd)?.AddHook(WorkflowAutomationWndProc);
             ServicesInitializer.HotKey.Initialize(hwnd);
             ServicesInitializer.MouseGestures.Start();
             _ = RegisterCommandPaletteHotkeyAsync();
             (Application.Current as App)?.StartPluginRuntime();
+        }
+
+        private IntPtr WorkflowAutomationWndProc(
+            IntPtr hwnd,
+            int message,
+            IntPtr wParam,
+            IntPtr lParam,
+            ref bool handled)
+        {
+            if (message != QualityWorkflowAutomation.MessageId
+                || (Application.Current as App)?.QualityWorkflowAutomationEnabled != true
+                || !Enum.IsDefined(typeof(QualityWorkflowAction), wParam.ToInt32()))
+            {
+                return IntPtr.Zero;
+            }
+
+            handled = true;
+            var action = (QualityWorkflowAction)wParam.ToInt32();
+            if (action == QualityWorkflowAction.QueryReviewReady)
+                return _activeWorkflowReviewId is null ? IntPtr.Zero : new IntPtr(1);
+            if (action == QualityWorkflowAction.QueryTerminalOutputLength)
+                return new IntPtr(_workflowTerminalOutputLength);
+            if (action == QualityWorkflowAction.QueryTerminalOutputCleared)
+                return _workflowTerminalOutputCleared ? new IntPtr(1) : IntPtr.Zero;
+
+            QueueWorkflowAutomationAction(action);
+            return new IntPtr(1);
         }
 
         private async Task RegisterCommandPaletteHotkeyAsync()

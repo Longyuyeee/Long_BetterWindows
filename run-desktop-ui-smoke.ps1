@@ -101,6 +101,16 @@ public static class LongDesktopInput {
     [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern uint RegisterWindowMessage(string name);
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern IntPtr SendMessageTimeout(
+        IntPtr window,
+        uint message,
+        IntPtr wParam,
+        IntPtr lParam,
+        uint flags,
+        uint timeout,
+        out UIntPtr result);
     const uint KeyUp = 0x0002;
     delegate bool EnumWindowsCallback(IntPtr window, IntPtr state);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr state);
@@ -229,6 +239,14 @@ public static class LongDesktopInput {
             keybd_event(key, 0, KeyUp, UIntPtr.Zero);
         }
     }
+    public static int WorkflowMessage(IntPtr window, int action) {
+        uint message = RegisterWindowMessage("LongBetterWindows.Quality.WorkflowAction.v1");
+        if (message == 0) return -1;
+        UIntPtr result;
+        IntPtr sent = SendMessageTimeout(
+            window, message, new IntPtr(action), IntPtr.Zero, 0x0002, 5000, out result);
+        return sent == IntPtr.Zero ? -1 : unchecked((int)result.ToUInt64());
+    }
 }
 '@
 
@@ -294,6 +312,16 @@ function Find-ProcessElementByAutomationId([int] $processId, [string] $automatio
         if ($null -ne $match) { return $match }
     }
     return $null
+}
+
+function Invoke-WindowWorkflowAction(
+    [IntPtr] $window,
+    [int] $action,
+    [string] $failureMessage) {
+    if ($window -eq [IntPtr]::Zero -or
+        [LongDesktopInput]::WorkflowMessage($window, $action) -ne 1) {
+        throw $failureMessage
+    }
 }
 
 function Find-RawSiblingByAutomationId(
@@ -768,73 +796,34 @@ try {
     }
 
     Write-Stage 'Starting approved long terminal-output workflow.'
-    $workflowOutputProcess = Start-QualityHost '--quality-open-palette'
-    $outputPalette = Wait-Until {
-        Find-WindowByAutomationId $workflowOutputProcess.Id 'Long.CommandPalette'
-    } 'Command Palette did not appear for the long-output workflow.'
-    $outputSearch = Wait-Until {
-        Find-DescendantByAutomationId $outputPalette 'Long.CommandPalette.Search'
-    } 'Long-output workflow search was not discoverable.'
-    $outputResults = Wait-Until {
-        Find-DescendantByAutomationId $outputPalette 'Long.CommandPalette.Results'
-    } 'Long-output workflow results were not discoverable.'
-    Write-Stage 'Long-output Command Palette search controls discovered.'
-    $outputSearchPattern = [Windows.Automation.ValuePattern]$outputSearch.GetCurrentPattern(
-        [Windows.Automation.ValuePattern]::Pattern)
-    $outputSearchPattern.SetValue('Quality Workflow Review')
-    Wait-Until {
-        Find-DescendantByName $outputResults 'Quality Workflow Review'
-    } 'The long-output workflow did not appear in Command Palette.' | Out-Null
-    Write-Stage 'Long-output workflow search result discovered.'
-    $outputSearch.SetFocus()
-    [LongDesktopInput]::Enter([IntPtr]$outputPalette.Current.NativeWindowHandle)
-    $outputMain = Wait-Until {
-        Find-WindowByAutomationId $workflowOutputProcess.Id 'Long.MainWindow'
+    $workflowOutputProcess = Start-QualityHost @(
+        '--quality-open-workflow',
+        'workflow.quality.review')
+    $outputMainHandle = Wait-Until {
+        [LongDesktopInput]::TopLevelWindows($workflowOutputProcess.Id) |
+            Select-Object -First 1
     } 'The main window did not appear for the long-output workflow.'
     Wait-Until {
-        $outputMain.Current.ItemStatus -like `
-            'workflow-review:workflow.quality.review;layout:*;width:*'
+        [LongDesktopInput]::WorkflowMessage($outputMainHandle, 10) -eq 1
     } 'The long-output workflow review did not appear.' | Out-Null
     Write-Stage 'Long-output workflow review opened.'
-    $outputMainHandle = [IntPtr]$outputMain.Current.NativeWindowHandle
-    $outputMainBounds = $outputMain.Current.BoundingRectangle
-    $outputTerminalApproval = Wait-Until {
-        Find-DescendantByAutomationId `
-            $outputMain 'Long.Workflow.TerminalOutput.ApproveTopLevel'
-    } 'The shallow title-bar terminal-output approval was not discoverable.'
-    $outputReviewConfirm = Wait-Until {
-        Find-RawSiblingByAutomationId `
-            $outputTerminalApproval 'Long.Workflow.ReviewConfirmTopLevel'
-    } 'The adjacent top-level workflow confirmation was not discoverable.'
-    Click-AutomationElement $outputTerminalApproval $outputMainHandle `
-        'The terminal-output approval could not be clicked.'
+    Invoke-WindowWorkflowAction $outputMainHandle 2 `
+        'The window-level terminal-output approval could not be invoked.'
     Start-Sleep -Milliseconds 500
     Write-Stage 'Long-output approval enabled with the visible review control.'
     Write-Stage 'Confirming the isolated read-only long-output workflow.'
-    Click-AutomationElement $outputReviewConfirm $outputMainHandle `
-        'The workflow confirmation could not be clicked.'
+    Invoke-WindowWorkflowAction $outputMainHandle 3 `
+        'The window-level workflow confirmation could not be invoked.'
     Start-Sleep -Milliseconds 500
-    $outputResultStatus = Wait-Until {
-        $status = [string]$outputMain.Current.ItemStatus
-        if ($status -match '^workflow-result:执行完成;terminal-length:\d+;bounded-scroll:true$') {
-            $status
-        }
+    $terminalOutputLength = Wait-Until {
+        $length = [LongDesktopInput]::WorkflowMessage($outputMainHandle, 11)
+        if ($length -ge 3600) { $length }
     } 'The isolated long-output workflow did not complete with bounded output.'
-    $terminalOutputLength = [int]([regex]::Match(
-        $outputResultStatus,
-        'terminal-length:(\d+)').Groups[1].Value)
-    if ($terminalOutputLength -lt 3600) {
-        throw "The terminal output was not long enough: $terminalOutputLength characters."
-    }
-    $clearTerminalOutput = Wait-Until {
-        Find-RawDescendantByAutomationId `
-            $outputMain 'Long.Workflow.TerminalOutput.ClearTopLevel'
-    } 'The shallow title-bar terminal output clear action was not discoverable.'
-    Click-AutomationElement $clearTerminalOutput $outputMainHandle `
-        'The terminal output clear action could not be clicked.'
+    Invoke-WindowWorkflowAction $outputMainHandle 4 `
+        'The window-level terminal output clear action could not be invoked.'
     Start-Sleep -Milliseconds 500
     Wait-Until {
-        $outputMain.Current.ItemStatus -eq 'workflow-result:terminal-cleared'
+        [LongDesktopInput]::WorkflowMessage($outputMainHandle, 12) -eq 1
     } 'Clearing terminal output did not clear the in-memory value.' | Out-Null
     $isolatedReportRoot = Join-Path $workflowRoot '.reports'
     $isolatedReport = Wait-Until {

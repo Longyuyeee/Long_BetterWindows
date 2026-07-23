@@ -39,6 +39,8 @@ namespace LongBetterWindows.Host
         internal bool ShowMarketForQualityRequested => _startupOptions.OpenMarketForQuality;
         internal bool ShowDiagnosticsForQualityRequested => _startupOptions.OpenDiagnosticsForQuality;
         internal bool ShowPluginsForQualityRequested => _startupOptions.OpenPluginsForQuality;
+        internal bool QualityWorkflowAutomationEnabled
+            => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId);
         internal string? QualityMarketplaceCatalogPath => _startupOptions.MarketplaceCatalogPath;
         internal string? QualityMarketplaceTrustStorePath => _startupOptions.MarketplaceTrustStorePath;
 
@@ -159,6 +161,16 @@ namespace LongBetterWindows.Host
                         SuperPanelWindow.ShowPanelForQuality(
                             _startupOptions.UseEmptyContextForQuality);
                 }
+                if (!string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId)
+                    && MainWindow is MainWindow workflowWindow)
+                {
+                    var workflowId = _startupOptions.QualityWorkflowReviewId;
+                    _ = Dispatcher.BeginInvoke(
+                        new Action(() => _ = OpenQualityWorkflowReviewAsync(
+                            workflowWindow,
+                            workflowId)),
+                        DispatcherPriority.ApplicationIdle);
+                }
 
                 if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath))
                     await _qualityRuntime!.CaptureAsync(
@@ -186,6 +198,24 @@ namespace LongBetterWindows.Host
                 await ServicesInitializer.Notification.ShowAsync(
                     "插件加载出错", "部分插件未能正确加载，请查看日志。");
             }
+        }
+
+        private static async Task OpenQualityWorkflowReviewAsync(
+            MainWindow workflowWindow,
+            string workflowId)
+        {
+            Log.Information("Opening quality workflow review: {WorkflowId}", workflowId);
+            var error = await workflowWindow.OpenWorkflowReviewAsync(workflowId);
+            if (error is null)
+            {
+                Log.Information("Quality workflow review opened: {WorkflowId}", workflowId);
+                return;
+            }
+
+            Log.Error(
+                "Quality workflow review could not be opened: {WorkflowId}; {Error}",
+                workflowId,
+                error);
         }
 
         protected override async void OnActivated(EventArgs e)

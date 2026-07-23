@@ -23,6 +23,7 @@ public class AppStartupOptionsTests
             "--quality-reduce-motion",
             "--quality-empty-context",
             "--quality-workflows-dir", "quality-workflows",
+            "--quality-open-workflow", "workflow.quality.review",
         ]);
 
         Assert.Equal("dark", options.ThemeOverride);
@@ -40,6 +41,7 @@ public class AppStartupOptionsTests
         Assert.True(options.ForceReduceMotion);
         Assert.True(options.UseEmptyContextForQuality);
         Assert.Equal("quality-workflows", options.QualityWorkflowsDirectory);
+        Assert.Equal("workflow.quality.review", options.QualityWorkflowReviewId);
     }
 
     [Fact]

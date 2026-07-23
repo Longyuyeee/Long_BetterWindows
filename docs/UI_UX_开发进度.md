@@ -482,7 +482,7 @@ WIP UI visual draft before audited implementation
 
 本批证据：`artifacts/quality/workflow-responsive-layout-full-smoke-20260723/desktop-ui-smoke.json`。下一批继续验证长输出、插件升级后的定义失效和终端输出文件导出拒绝。
 
-## 组合动作真实交互验收第三批：长终端输出（实现完成，UIA 待复验）
+## 组合动作真实交互验收第三批：长终端输出（已通过）
 
 - [x] 质量工作流改为生成 100 个 UUID，目标终端输出约 3.7K 字符。
 - [x] 终端输出文本框保持 `MaxHeight=120` 与垂直滚动，避免长值撑破结果页。
@@ -490,6 +490,8 @@ WIP UI visual draft before audited implementation
 - [x] 审批、确认和清除复用编辑器现有审查指纹、执行与内存清理路径；确认后审查态正确关闭。
 - [x] 质量工作流报告改写入工作流隔离根下的 `.reports`，不污染用户 `%LocalAppData%`。
 - [x] 增加结果长度、限高滚动、隔离报告、清除状态及顶层 UIA 语义门禁；Release 0 警告 / 0 错误，428 / 428 测试通过。
-- [ ] 当前机器为多显示器 250% 缩放，WPF UIAutomation 对自绘标题栏的深层 `FindFirst` 会超时，UIA 边界为物理像素而输入进程桌面尺寸受 DPI 虚拟化；多次运行均安全停在执行前或结果校验前，未形成通过报告。
+- [x] 将编辑配置区与审查/运行/结果区拆分，统一入口进入审查时不再物化整套命令编辑模板；响应式布局只在跨越阈值时重写列宽，避免重复布局。
+- [x] 增加仅在 `--quality-open-workflow` 下启用的注册窗口消息驱动，按窗口句柄执行批准、确认、状态查询和清除；使用 `SendMessageTimeout` 限制宿主无响应时的等待，不遍历长内容树且不使用坐标点击。
+- [x] 当前多显示器 250% 缩放环境通过完整场景：只读执行、3699 字符终端输出、限高滚动、内存清除和隔离报告均成立。
 
-本批不宣称桌面 UIA 已通过。失败诊断位于 `artifacts/quality/workflow-long-output-*-20260723/`；复验应优先使用单屏 100% 环境，或先为自绘标题栏建立不遍历内容树的专用 AutomationPeer/驱动。随后继续插件升级失效和文件导出拒绝路径。
+本批证据：`artifacts/quality/workflow-long-output-20260723/desktop-ui-smoke.json`。下一批继续插件升级失效和文件导出拒绝路径。
