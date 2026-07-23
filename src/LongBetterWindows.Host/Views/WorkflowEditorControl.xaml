@@ -24,7 +24,7 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="本机工作流" FontSize="14" FontWeight="SemiBold" />
                     <TextBlock x:Name="WorkflowCountText" Text="0 项" Margin="0,3,0,0"
@@ -40,7 +40,13 @@
                         automation:AutomationProperties.Name="导入外部工作流">
                     <Path Data="{StaticResource Long.Icon.Import}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
                 </Button>
-                <Button x:Name="NewWorkflowButton" Grid.Column="3" Style="{StaticResource LongIconButton}"
+                <Button x:Name="TemplateWorkflowButton" Grid.Column="3" Style="{StaticResource LongIconButton}" Margin="0,0,6,0"
+                        Click="TemplateWorkflow_Click" ToolTip="从模板创建"
+                        automation:AutomationProperties.AutomationId="Long.Workflow.Templates"
+                        automation:AutomationProperties.Name="选择组合动作模板">
+                    <Path Data="{StaticResource Long.Icon.Sparkle}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                </Button>
+                <Button x:Name="NewWorkflowButton" Grid.Column="4" Style="{StaticResource LongIconButton}"
                         Click="NewWorkflow_Click" ToolTip="新建组合动作"
                         automation:AutomationProperties.Name="新建组合动作">
                     <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
@@ -80,7 +86,7 @@
             <Grid x:Name="CompactWorkflowBar" Visibility="Collapsed" Margin="0,0,0,14"
                   automation:AutomationProperties.AutomationId="Long.Workflow.CompactNavigation"
                   automation:AutomationProperties.Name="组合动作紧凑导航">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <ComboBox x:Name="CompactWorkflowCombo" Style="{StaticResource LongComboBox}"
                           DisplayMemberPath="Name" SelectedValuePath="Id"
                           SelectionChanged="CompactWorkflowCombo_SelectionChanged"
@@ -95,7 +101,13 @@
                         automation:AutomationProperties.Name="导入外部工作流">
                     <Path Data="{StaticResource Long.Icon.Import}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
                 </Button>
-                <Button x:Name="CompactNewButton" Grid.Column="3" Style="{StaticResource LongIconButton}"
+                <Button x:Name="CompactTemplateButton" Grid.Column="3" Style="{StaticResource LongIconButton}" Margin="0,0,6,0"
+                        Click="TemplateWorkflow_Click" ToolTip="从模板创建"
+                        automation:AutomationProperties.AutomationId="Long.Workflow.Templates.Compact"
+                        automation:AutomationProperties.Name="选择组合动作模板">
+                    <Path Data="{StaticResource Long.Icon.Sparkle}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                </Button>
+                <Button x:Name="CompactNewButton" Grid.Column="4" Style="{StaticResource LongIconButton}"
                         Click="NewWorkflow_Click" ToolTip="新建组合动作"
                         automation:AutomationProperties.Name="新建组合动作">
                     <Path Data="{StaticResource Long.Icon.Add}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
@@ -107,7 +119,7 @@
                     Background="{DynamicResource Long.Brush.Background.Raised}"
                     BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
                 <StackPanel>
-                    <TextBlock Text="审查外部工作流" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock x:Name="ImportReviewHeading" Text="审查外部工作流" FontSize="17" FontWeight="SemiBold" />
                     <TextBlock x:Name="ImportReviewName" Margin="0,12,0,0" FontSize="14" FontWeight="SemiBold" />
                     <TextBlock x:Name="ImportReviewSource" Margin="0,5,0,0" TextWrapping="Wrap"
                                FontFamily="{DynamicResource Long.Font.Mono}" FontSize="10"

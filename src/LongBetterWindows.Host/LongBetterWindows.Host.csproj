@@ -8,6 +8,7 @@
     <Content Include="Assets\CodeMirror\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="WebAssets\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Marketplace\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="WorkflowTemplates\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

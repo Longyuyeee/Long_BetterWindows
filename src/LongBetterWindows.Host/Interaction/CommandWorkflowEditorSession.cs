@@ -36,14 +36,17 @@ namespace LongBetterWindows.Host.Interaction
     {
         private readonly PluginRegistry _plugins;
         private readonly CommandWorkflowRepository _repository;
+        private readonly CommandWorkflowTemplateCatalog? _templates;
         private readonly CommandWorkflowPlanner _planner;
 
         public CommandWorkflowEditorSession(
             PluginRegistry plugins,
-            CommandWorkflowRepository repository)
+            CommandWorkflowRepository repository,
+            CommandWorkflowTemplateCatalog? templates = null)
         {
             _plugins = plugins ?? throw new ArgumentNullException(nameof(plugins));
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+            _templates = templates;
             _planner = new CommandWorkflowPlanner(plugins);
             State = new CommandWorkflowEditorState(null, null, false, null, null);
         }
@@ -312,6 +315,47 @@ namespace LongBetterWindows.Host.Interaction
             CancellationToken cancellationToken = default)
         {
             var result = await _repository.ImportAsync(sourcePath, cancellationToken);
+            return CreateImportReview(sourcePath, result);
+        }
+
+        public Task<CommandWorkflowTemplateListResult> ListTemplatesAsync(
+            CancellationToken cancellationToken = default)
+            => _templates?.ListAsync(cancellationToken)
+                ?? Task.FromResult(new CommandWorkflowTemplateListResult(
+                    true,
+                    Array.Empty<CommandWorkflowTemplateSummary>(),
+                    Array.Empty<CommandWorkflowTemplateIssue>(),
+                    null));
+
+        public async Task<CommandWorkflowImportReview> PreviewTemplateAsync(
+            string templateKey,
+            string expectedDefinitionSha256,
+            CancellationToken cancellationToken = default)
+        {
+            if (_templates is null)
+            {
+                return CreateImportReview(
+                    templateKey,
+                    new WorkflowDocumentReadResult(
+                        false,
+                        null,
+                        null,
+                        WorkflowDocumentTrustLevel.Untrusted,
+                        string.Empty,
+                        null,
+                        "Workflow template catalog is not configured."));
+            }
+            var result = await _templates.OpenAsync(
+                templateKey,
+                expectedDefinitionSha256,
+                cancellationToken);
+            return CreateImportReview(templateKey, result);
+        }
+
+        private CommandWorkflowImportReview CreateImportReview(
+            string sourcePath,
+            WorkflowDocumentReadResult result)
+        {
             if (!result.IsSuccess)
             {
                 return new CommandWorkflowImportReview(

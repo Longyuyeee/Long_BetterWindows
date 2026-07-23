@@ -41,6 +41,7 @@ namespace LongBetterWindows.Host.Services
         public static ContextCaptureService ContextCapture { get; private set; } = null!;
         public static SearchCoordinator Search { get; private set; } = null!;
         public static CommandWorkflowRepository Workflows { get; private set; } = null!;
+        public static CommandWorkflowTemplateCatalog WorkflowTemplates { get; private set; } = null!;
         public static string WorkflowReportsDirectory { get; private set; } = string.Empty;
         public static SearchPreferenceService SearchPreferences { get; private set; } = null!;
         public static SuperPanelGroupService SuperPanelGroups { get; private set; } = null!;
@@ -100,6 +101,9 @@ namespace LongBetterWindows.Host.Services
             Workflows = new CommandWorkflowRepository(
                 workflowRoot,
                 "local-managed");
+            WorkflowTemplates = new CommandWorkflowTemplateCatalog(
+                Path.Combine(AppContext.BaseDirectory, "WorkflowTemplates"),
+                Workflows);
             Search = new SearchCoordinator(
                 new ISearchProvider[]
                 {

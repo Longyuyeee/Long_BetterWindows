@@ -69,6 +69,29 @@ public sealed class WorkflowExampleTests
             step => Assert.Equal("result", Assert.Single(step.Command!.Bindings!).OutputKey));
     }
 
+    [Fact]
+    public async Task BuiltInUuidTemplate_UsesRealManifestAndRemainsUntrustedUntilReviewed()
+    {
+        var root = FindRepositoryRoot();
+        var registry = new PluginRegistry();
+        await RegisterManifestAsync(registry, root, "UuidGenerator");
+        var json = await File.ReadAllTextAsync(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "WorkflowTemplates",
+            "uuid-batch.workflow.json"));
+
+        var document = CommandWorkflowDocumentCodec.Deserialize(json, isManagedFile: false);
+
+        Assert.True(document.IsSuccess, document.Error);
+        Assert.Equal("official.templates", document.Source!.SourceId);
+        Assert.Equal(WorkflowDocumentTrustLevel.Untrusted, document.TrustLevel);
+        Assert.True(CommandWorkflowDocumentCodec.ContainsSensitiveInputs(document.Workflow!));
+        var preflight = new CommandWorkflowPlanner(registry).Preflight(document.Workflow!);
+        Assert.True(preflight.IsValid, string.Join(Environment.NewLine, preflight.Issues));
+    }
+
     private static async Task RegisterManifestAsync(
         PluginRegistry registry,
         string root,

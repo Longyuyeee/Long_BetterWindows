@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
@@ -29,6 +30,7 @@ namespace LongBetterWindows.Host.Views
         internal bool IsCompactLayout => _isCompactLayout ?? ActualWidth < 700;
         internal double LayoutWidth => ActualWidth;
         private CommandWorkflowImportReview? _importReview;
+        private bool _reviewingTemplate;
         private int _reportListVersion;
         private int _reportLoadVersion;
         private bool _rendering = true;
@@ -38,7 +40,10 @@ namespace LongBetterWindows.Host.Views
         {
             InitializeComponent();
             _repository = ServicesInitializer.Workflows;
-            _session = new CommandWorkflowEditorSession(_plugins, _repository);
+            _session = new CommandWorkflowEditorSession(
+                _plugins,
+                _repository,
+                ServicesInitializer.WorkflowTemplates);
             _reports = new CommandWorkflowExecutionReportRepository(
                 ServicesInitializer.WorkflowReportsDirectory);
             _runSession = new CommandWorkflowRunSession(_plugins, _reports);
@@ -185,6 +190,86 @@ namespace LongBetterWindows.Host.Views
                     MessageBoxImage.Warning);
                 return;
             }
+            _reviewingTemplate = false;
+            _importReview = review;
+            RenderImportReview();
+        }
+
+        private async void TemplateWorkflow_Click(object sender, RoutedEventArgs e)
+        {
+            var result = await _session.ListTemplatesAsync();
+            if (!result.IsSuccess)
+            {
+                MessageBox.Show(
+                    result.Error ?? "工作流模板目录无法读取。",
+                    "工作流模板",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+            if (result.Templates.Count == 0)
+            {
+                MessageBox.Show(
+                    "当前没有可用的工作流模板。",
+                    "工作流模板",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var menu = new ContextMenu
+            {
+                PlacementTarget = sender as UIElement,
+                Placement = PlacementMode.Bottom,
+            };
+            foreach (var template in result.Templates)
+            {
+                var trust = template.TrustLevel == WorkflowDocumentTrustLevel.TrustedSource
+                    ? "已校验来源"
+                    : "采用前需审查";
+                var item = new MenuItem
+                {
+                    Header = template.Name,
+                    ToolTip = $"{template.StepCount} 个步骤 · {trust} · {template.Id}",
+                    Tag = template,
+                };
+                item.Click += TemplateMenuItem_Click;
+                menu.Items.Add(item);
+            }
+            if (result.Issues.Count > 0)
+            {
+                menu.Items.Add(new Separator());
+                menu.Items.Add(new MenuItem
+                {
+                    Header = $"{result.Issues.Count} 个模板未通过校验",
+                    IsEnabled = false,
+                });
+            }
+            menu.IsOpen = true;
+        }
+
+        private async void TemplateMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem
+                {
+                    Tag: CommandWorkflowTemplateSummary template,
+                })
+            {
+                return;
+            }
+            var review = await _session.PreviewTemplateAsync(
+                template.Key,
+                template.DefinitionSha256);
+            if (!review.IsSuccess)
+            {
+                MessageBox.Show(
+                    review.Error ?? "工作流模板无法读取，请刷新模板列表。",
+                    "工作流模板",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+            _reviewingTemplate = true;
             _importReview = review;
             RenderImportReview();
         }
@@ -192,6 +277,7 @@ namespace LongBetterWindows.Host.Views
         private void CancelImport_Click(object sender, RoutedEventArgs e)
         {
             _importReview = null;
+            _reviewingTemplate = false;
             RenderEditor();
         }
 
@@ -201,9 +287,10 @@ namespace LongBetterWindows.Host.Views
             if (review is null) return;
             if (_session.State.IsDirty)
             {
+                var sourceLabel = _reviewingTemplate ? "模板" : "外部工作流";
                 var answer = MessageBox.Show(
-                    "当前草稿有未保存的更改。采用外部工作流会替换当前草稿，是否继续？",
-                    "采用外部工作流",
+                    $"当前草稿有未保存的更改。采用{sourceLabel}会替换当前草稿，是否继续？",
+                    $"采用{sourceLabel}",
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning,
                     MessageBoxResult.No);
@@ -211,14 +298,16 @@ namespace LongBetterWindows.Host.Views
             }
             if (!_session.AdoptImport(review))
             {
+                var sourceLabel = _reviewingTemplate ? "模板" : "外部工作流";
                 MessageBox.Show(
-                    _session.State.Error ?? "外部工作流无法采用。",
-                    "导入工作流",
+                    _session.State.Error ?? $"{sourceLabel}无法采用。",
+                    $"采用{sourceLabel}",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
             }
             _importReview = null;
+            _reviewingTemplate = false;
             _rendering = true;
             WorkflowList.SelectedItem = null;
             CompactWorkflowCombo.SelectedItem = null;
@@ -746,6 +835,9 @@ namespace LongBetterWindows.Host.Views
             EmptyEditor.Visibility = Visibility.Collapsed;
             EditorBody.Visibility = Visibility.Collapsed;
             ImportReviewPanel.Visibility = Visibility.Visible;
+            ImportReviewHeading.Text = _reviewingTemplate
+                ? "审查工作流模板"
+                : "审查外部工作流";
             ImportReviewName.Text = $"{review.Workflow.Name}  ·  {review.Workflow.Id}";
             ImportReviewSource.Text = $"{review.SourcePath}\nSHA-256  {review.DefinitionSha256}";
             ImportReviewSummary.Text = $"{review.Workflow.Steps.Count} 个步骤 · "
@@ -772,8 +864,10 @@ namespace LongBetterWindows.Host.Views
             RefreshWorkflowButton.IsEnabled = !active;
             ImportWorkflowButton.IsEnabled = !active;
             NewWorkflowButton.IsEnabled = !active;
+            TemplateWorkflowButton.IsEnabled = !active;
             CompactRefreshButton.IsEnabled = !active;
             CompactImportButton.IsEnabled = !active;
+            CompactTemplateButton.IsEnabled = !active;
             CompactNewButton.IsEnabled = !active;
         }
 

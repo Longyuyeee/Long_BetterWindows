@@ -1103,9 +1103,16 @@ public class QualityGateTests
         Assert.Contains("Long.Workflow.TerminalOutput.Value", workflow);
         Assert.Contains("Long.Workflow.TerminalOutput.Clear", workflow);
         Assert.Contains("Long.Workflow.Duplicate", workflow);
+        Assert.Contains("Long.Workflow.Templates", workflow);
         Assert.Contains("Long.Workflow.Id", workflow);
         Assert.Contains("Long.Workflow.Name", workflow);
         Assert.Contains("Long.Icon.Copy", workflow);
+        Assert.Contains("CommandWorkflowTemplateCatalog", Read(
+            "src", "LongBetterWindows.Host", "Interaction",
+            "CommandWorkflowTemplateCatalog.cs"));
+        Assert.Contains("_session.PreviewTemplateAsync", workflowCode);
+        Assert.Contains("WorkflowTemplates\\**\\*", Read(
+            "src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj"));
         Assert.Contains("Long.Workflow.WideNavigation", workflow);
         Assert.Contains("Long.Workflow.CompactNavigation", workflow);
         Assert.Contains("Long.ToolCenter.ContentScroll", Read(

@@ -1,0 +1,35 @@
+{
+  "schema_version": 3,
+  "source": {
+    "kind": "imported",
+    "source_id": "official.templates"
+  },
+  "workflow": {
+    "id": "template.uuid.batch",
+    "name": "批量生成 UUID",
+    "failure_mode": "stop",
+    "steps": [
+      {
+        "id": "generate",
+        "effect": "read_only",
+        "command": {
+          "command_key": "com.long.uuid-generator:uuid.generate",
+          "invocation": {
+            "command_id": "uuid.generate",
+            "input_type": "none",
+            "text": null,
+            "paths": [],
+            "image_png": null,
+            "arguments": {
+              "amount": "10",
+              "uppercase": "false",
+              "compact": "false"
+            }
+          },
+          "bindings": []
+        },
+        "compensation": null
+      }
+    ]
+  }
+}
