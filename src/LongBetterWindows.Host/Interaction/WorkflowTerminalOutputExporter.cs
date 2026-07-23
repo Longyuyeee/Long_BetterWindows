@@ -17,7 +17,57 @@ namespace LongBetterWindows.Host.Interaction
         bool IsSuccess,
         string? Path,
         string? ValueSha256,
-        string? Error);
+        string? Error,
+        WorkflowTerminalOutputExportFailure Failure);
+
+    public enum WorkflowTerminalOutputExportFailure
+    {
+        None = 0,
+        ApprovalMissing = 1,
+        ReviewInvalid = 2,
+        ReviewChanged = 3,
+        DestinationChanged = 4,
+        Cancelled = 5,
+        AccessDenied = 6,
+        IoFailure = 7,
+    }
+
+    internal class WorkflowTerminalOutputFileSystem
+    {
+        internal virtual bool EntryExists(string path)
+            => File.Exists(path) || Directory.Exists(path);
+
+        internal virtual bool DirectoryExists(string path)
+            => Directory.Exists(path);
+
+        internal virtual FileAttributes GetDirectoryAttributes(string path)
+            => File.GetAttributes(path);
+
+        internal virtual async Task WriteNewAsync(
+            string path,
+            ReadOnlyMemory<byte> bytes,
+            CancellationToken cancellationToken)
+        {
+            await using var stream = new FileStream(
+                path,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                4096,
+                FileOptions.Asynchronous | FileOptions.WriteThrough);
+            await stream.WriteAsync(bytes, cancellationToken);
+            await stream.FlushAsync(cancellationToken);
+            stream.Flush(flushToDisk: true);
+        }
+
+        internal virtual void MoveNew(string sourcePath, string destinationPath)
+            => File.Move(sourcePath, destinationPath, overwrite: false);
+
+        internal virtual void DeleteIfExists(string path)
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
 
     /// <summary>Reviews and atomically creates a plaintext export without overwriting an existing path.</summary>
     public sealed class WorkflowTerminalOutputExporter
@@ -25,6 +75,17 @@ namespace LongBetterWindows.Host.Interaction
         private const int MaximumValueCharacters = 65_536;
         private const int MaximumValueBytes = MaximumValueCharacters * 4;
         private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+        private readonly WorkflowTerminalOutputFileSystem _fileSystem;
+
+        public WorkflowTerminalOutputExporter()
+            : this(new WorkflowTerminalOutputFileSystem())
+        {
+        }
+
+        internal WorkflowTerminalOutputExporter(WorkflowTerminalOutputFileSystem fileSystem)
+        {
+            _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+        }
 
         public WorkflowTerminalOutputExportReview Prepare(
             WorkflowTerminalOutput output,
@@ -70,13 +131,19 @@ namespace LongBetterWindows.Host.Interaction
         {
             ArgumentNullException.ThrowIfNull(output);
             if (string.IsNullOrWhiteSpace(reviewedFingerprint))
-                return Failure("Terminal output export approval is missing.");
+                return Failure(
+                    WorkflowTerminalOutputExportFailure.ApprovalMissing,
+                    "Terminal output export approval is missing.");
 
             var review = Prepare(output, destinationPath);
             if (!review.IsValid)
-                return Failure(string.Join(" ", review.Issues));
+                return Failure(
+                    WorkflowTerminalOutputExportFailure.ReviewInvalid,
+                    string.Join(" ", review.Issues));
             if (!string.Equals(review.Fingerprint, reviewedFingerprint, StringComparison.Ordinal))
-                return Failure("Terminal output or export destination changed after review.");
+                return Failure(
+                    WorkflowTerminalOutputExportFailure.ReviewChanged,
+                    "Terminal output or export destination changed after review.");
 
             var targetPath = review.DestinationPath!;
             var targetDirectory = Path.GetDirectoryName(targetPath)!;
@@ -87,41 +154,43 @@ namespace LongBetterWindows.Host.Interaction
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var bytes = StrictUtf8.GetBytes(output.Value);
-                await using (var stream = new FileStream(
-                    temporaryPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    4096,
-                    FileOptions.Asynchronous | FileOptions.WriteThrough))
-                {
-                    await stream.WriteAsync(bytes, cancellationToken);
-                    await stream.FlushAsync(cancellationToken);
-                    stream.Flush(flushToDisk: true);
-                }
+                await _fileSystem.WriteNewAsync(temporaryPath, bytes, cancellationToken);
 
                 var finalIssues = new List<string>();
                 if (!TryValidateDestination(targetPath, finalIssues, out var finalPath)
                     || !string.Equals(targetPath, finalPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    return Failure(string.Join(" ", finalIssues.DefaultIfEmpty(
-                        "Terminal output export destination changed during export.")));
+                    return Failure(
+                        WorkflowTerminalOutputExportFailure.DestinationChanged,
+                        string.Join(" ", finalIssues.DefaultIfEmpty(
+                            "Terminal output export destination changed during export.")));
                 }
 
-                File.Move(temporaryPath, targetPath);
+                _fileSystem.MoveNew(temporaryPath, targetPath);
                 return new WorkflowTerminalOutputExportResult(
                     true,
                     targetPath,
                     review.ValueSha256,
-                    null);
+                    null,
+                    WorkflowTerminalOutputExportFailure.None);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                return Failure("Terminal output export was cancelled.");
+                return Failure(
+                    WorkflowTerminalOutputExportFailure.Cancelled,
+                    "Terminal output export was cancelled.");
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            catch (UnauthorizedAccessException)
             {
-                return Failure($"Terminal output could not be exported: {exception.Message}");
+                return Failure(
+                    WorkflowTerminalOutputExportFailure.AccessDenied,
+                    "Terminal output export was denied by the destination.");
+            }
+            catch (IOException)
+            {
+                return Failure(
+                    WorkflowTerminalOutputExportFailure.IoFailure,
+                    "Terminal output could not be exported because the destination changed or an I/O operation failed.");
             }
             finally
             {
@@ -145,7 +214,7 @@ namespace LongBetterWindows.Host.Interaction
             return issues;
         }
 
-        private static bool TryValidateDestination(
+        private bool TryValidateDestination(
             string destinationPath,
             ICollection<string> issues,
             out string? targetPath)
@@ -164,20 +233,20 @@ namespace LongBetterWindows.Host.Interaction
                     issues.Add("Terminal output export target must be a file.");
                 else if (fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                     issues.Add("Terminal output export file name contains invalid characters.");
-                if (File.Exists(targetPath) || Directory.Exists(targetPath))
+                if (_fileSystem.EntryExists(targetPath))
                     issues.Add("Terminal output export target already exists and cannot be overwritten.");
 
                 var directoryPath = Path.GetDirectoryName(targetPath);
-                if (directoryPath is null || !Directory.Exists(directoryPath))
+                if (directoryPath is null || !_fileSystem.DirectoryExists(directoryPath))
                 {
                     issues.Add("Terminal output export directory does not exist.");
                     return false;
                 }
-                for (var directory = new DirectoryInfo(directoryPath);
+                for (var directory = directoryPath;
                      directory is not null;
-                     directory = directory.Parent)
+                     directory = Path.GetDirectoryName(directory))
                 {
-                    if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                    if ((_fileSystem.GetDirectoryAttributes(directory) & FileAttributes.ReparsePoint) != 0)
                     {
                         issues.Add("Terminal output export path must not contain reparse-point directories.");
                         break;
@@ -213,14 +282,16 @@ namespace LongBetterWindows.Host.Interaction
             return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
         }
 
-        private static WorkflowTerminalOutputExportResult Failure(string error)
-            => new(false, null, null, error);
+        private static WorkflowTerminalOutputExportResult Failure(
+            WorkflowTerminalOutputExportFailure failure,
+            string error)
+            => new(false, null, null, error, failure);
 
-        private static void TryDelete(string path)
+        private void TryDelete(string path)
         {
             try
             {
-                if (File.Exists(path)) File.Delete(path);
+                _fileSystem.DeleteIfExists(path);
             }
             catch
             {
