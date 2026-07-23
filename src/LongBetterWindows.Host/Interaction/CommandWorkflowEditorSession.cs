@@ -63,6 +63,25 @@ namespace LongBetterWindows.Host.Interaction
             SetDraft(draft, existingHash: null, isDirty: true);
         }
 
+        public bool DuplicateCurrent(string id, string name)
+        {
+            var source = RequireDraft();
+            var normalizedId = id?.Trim() ?? string.Empty;
+            if (string.Equals(source.Id, normalizedId, StringComparison.OrdinalIgnoreCase))
+            {
+                State = State with { Error = "A workflow copy must use a different id." };
+                return false;
+            }
+
+            var copy = new CommandWorkflowDefinition(
+                normalizedId,
+                name?.Trim() ?? string.Empty,
+                source.FailureMode,
+                source.Steps.Select(CloneStep).ToArray());
+            SetDraft(copy, existingHash: null, isDirty: true);
+            return true;
+        }
+
         public async Task<bool> LoadAsync(
             string workflowId,
             CancellationToken cancellationToken = default)
@@ -444,6 +463,36 @@ namespace LongBetterWindows.Host.Interaction
                     descriptor.Key,
                     new PluginCommandInvocation { CommandId = descriptor.Command.Id });
         }
+
+        private static CommandWorkflowStep CloneStep(CommandWorkflowStep step)
+            => new(
+                step.Id,
+                step.Effect,
+                CloneCommand(step.Command),
+                CloneCommand(step.Compensation));
+
+        private static WorkflowCommand? CloneCommand(WorkflowCommand? command)
+            => command is null
+                ? null
+                : new WorkflowCommand(
+                    command.CommandKey,
+                    CloneInvocation(command.Invocation),
+                    command.Bindings?.ToArray());
+
+        private static PluginCommandInvocation? CloneInvocation(PluginCommandInvocation? invocation)
+            => invocation is null
+                ? null
+                : new PluginCommandInvocation
+                {
+                    CommandId = invocation.CommandId,
+                    InputType = invocation.InputType,
+                    Text = invocation.Text,
+                    Paths = invocation.Paths.ToArray(),
+                    ImagePng = invocation.ImagePng?.ToArray(),
+                    Arguments = new Dictionary<string, string>(
+                        invocation.Arguments,
+                        StringComparer.Ordinal),
+                };
 
         private void SetDraft(
             CommandWorkflowDefinition draft,

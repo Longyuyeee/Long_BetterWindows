@@ -1102,6 +1102,8 @@ public class QualityGateTests
         Assert.Contains("Long.Workflow.ExecutionResult.Title", workflow);
         Assert.Contains("Long.Workflow.TerminalOutput.Value", workflow);
         Assert.Contains("Long.Workflow.TerminalOutput.Clear", workflow);
+        Assert.Contains("Long.Workflow.Duplicate", workflow);
+        Assert.Contains("Long.Icon.Copy", workflow);
         Assert.Contains("Long.Workflow.WideNavigation", workflow);
         Assert.Contains("Long.Workflow.CompactNavigation", workflow);
         Assert.Contains("Long.ToolCenter.ContentScroll", Read(

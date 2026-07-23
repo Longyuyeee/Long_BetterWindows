@@ -166,6 +166,12 @@
                                 automation:AutomationProperties.Name="导出组合动作">
                             <Path Data="{StaticResource Long.Icon.Export}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
                         </Button>
+                        <Button x:Name="DuplicateWorkflowButton" Style="{StaticResource LongIconButton}" Margin="0,0,8,0"
+                                Click="DuplicateWorkflow_Click" ToolTip="复制为新草稿"
+                                automation:AutomationProperties.AutomationId="Long.Workflow.Duplicate"
+                                automation:AutomationProperties.Name="复制组合动作为新草稿">
+                            <Path Data="{StaticResource Long.Icon.Copy}" Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                        </Button>
                         <Button x:Name="DeleteWorkflowButton" Style="{StaticResource LongIconButton}" Margin="0,0,8,0"
                                 Click="DeleteWorkflow_Click" ToolTip="删除组合动作"
                                 automation:AutomationProperties.Name="删除组合动作">

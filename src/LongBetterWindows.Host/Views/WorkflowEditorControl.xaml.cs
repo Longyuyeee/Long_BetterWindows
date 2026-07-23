@@ -350,6 +350,33 @@ namespace LongBetterWindows.Host.Views
                 result.IsSuccess ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
+        private void DuplicateWorkflow_Click(object sender, RoutedEventArgs e)
+        {
+            var source = _session.State.Draft;
+            if (source is null) return;
+            var suffix = $".copy-{Guid.NewGuid():N}";
+            var prefixLength = Math.Min(source.Id.Length, 64 - suffix.Length);
+            var copyId = source.Id[..prefixLength] + suffix;
+            const string copyNameSuffix = " 副本";
+            var nameLength = Math.Min(source.Name.Length, 120 - copyNameSuffix.Length);
+            var copyName = source.Name[..nameLength] + copyNameSuffix;
+            if (!_session.DuplicateCurrent(copyId, copyName))
+            {
+                RenderStatus();
+                return;
+            }
+
+            _rendering = true;
+            WorkflowList.SelectedItem = null;
+            CompactWorkflowCombo.SelectedItem = null;
+            _rendering = false;
+            ReportList.ItemsSource = null;
+            ReportTimeline.ItemsSource = null;
+            RenderEditor();
+            WorkflowNameBox.Focus();
+            WorkflowNameBox.SelectAll();
+        }
+
         private async void DeleteWorkflow_Click(object sender, RoutedEventArgs e)
         {
             var draft = _session.State.Draft;
@@ -888,6 +915,7 @@ namespace LongBetterWindows.Host.Views
             AddStepButton.IsEnabled = enabled;
             StepsList.IsEnabled = enabled;
             DeleteWorkflowButton.IsEnabled = enabled && _session.State.ExistingDefinitionSha256 is not null;
+            DuplicateWorkflowButton.IsEnabled = enabled && _session.State.Draft is not null;
             ExportWorkflowButton.IsEnabled = enabled
                 && _session.State.ExistingDefinitionSha256 is not null
                 && !_session.State.IsDirty

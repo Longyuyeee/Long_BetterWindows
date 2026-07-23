@@ -83,6 +83,92 @@ public sealed class CommandWorkflowEditorSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task DuplicateCurrent_CreatesIndependentUnsavedDraftWithoutChangingSource()
+    {
+        var repository = new CommandWorkflowRepository(_root, "local-user");
+        var session = Session(repository: repository);
+        session.StartNew("workflow.source", "Source workflow");
+        session.AddStep("editor:first");
+        session.AddStep("editor:second");
+        session.UpdateInvocation(
+            "step-1",
+            WorkflowCommandRole.Primary,
+            AcceptedInputType.Text,
+            text: "private input",
+            paths: ["C:\\source.txt"],
+            imagePng: [1, 2, 3],
+            arguments: new Dictionary<string, string> { ["mode"] = "safe" });
+        session.UpdateInvocation(
+            "step-2",
+            WorkflowCommandRole.Primary,
+            AcceptedInputType.Text);
+        session.UpdateBindings(
+            "step-2",
+            WorkflowCommandRole.Primary,
+            [new WorkflowValueBinding(
+                "step-1",
+                "result",
+                WorkflowBindingTarget.Text)]);
+        var sourceSave = await session.SaveAsync(allowSensitiveInputs: true);
+        var source = session.State.Draft!;
+
+        var duplicated = session.DuplicateCurrent("workflow.copy", "Source workflow copy");
+        var copy = session.State.Draft!;
+
+        Assert.True(sourceSave.IsSuccess, sourceSave.Error);
+        Assert.True(duplicated);
+        Assert.Null(session.State.ExistingDefinitionSha256);
+        Assert.True(session.State.IsDirty);
+        Assert.Equal("workflow.copy", copy.Id);
+        Assert.Equal("Source workflow copy", copy.Name);
+        Assert.NotSame(source.Steps, copy.Steps);
+        Assert.NotSame(source.Steps[0].Command, copy.Steps[0].Command);
+        Assert.NotSame(
+            source.Steps[0].Command!.Invocation,
+            copy.Steps[0].Command!.Invocation);
+        Assert.NotSame(
+            source.Steps[0].Command!.Invocation!.Paths,
+            copy.Steps[0].Command!.Invocation!.Paths);
+        Assert.NotSame(
+            source.Steps[0].Command!.Invocation!.ImagePng,
+            copy.Steps[0].Command!.Invocation!.ImagePng);
+        Assert.NotSame(
+            source.Steps[0].Command!.Invocation!.Arguments,
+            copy.Steps[0].Command!.Invocation!.Arguments);
+        Assert.NotSame(
+            source.Steps[1].Command!.Bindings,
+            copy.Steps[1].Command!.Bindings);
+        Assert.Equal("private input", copy.Steps[0].Command!.Invocation!.Text);
+        Assert.Equal("safe", copy.Steps[0].Command!.Invocation!.Arguments["mode"]);
+        Assert.Equal(
+            source.Steps[1].Command!.Bindings,
+            copy.Steps[1].Command!.Bindings);
+
+        var unapprovedSave = await session.SaveAsync(allowSensitiveInputs: false);
+        var copySave = await session.SaveAsync(allowSensitiveInputs: true);
+        var original = await repository.LoadManagedAsync("workflow.source");
+        Assert.False(unapprovedSave.IsSuccess);
+        Assert.Contains("explicit sensitive-input", unapprovedSave.Error);
+        Assert.True(copySave.IsSuccess, copySave.Error);
+        Assert.True(original.IsSuccess, original.Error);
+        Assert.Equal("Source workflow", original.Workflow!.Name);
+        Assert.Equal(2, (await repository.ListManagedAsync()).Workflows.Count);
+    }
+
+    [Fact]
+    public void DuplicateCurrent_RejectsSourceIdentity()
+    {
+        var session = Session();
+        session.StartNew("workflow.source", "Source workflow");
+
+        var duplicated = session.DuplicateCurrent("WORKFLOW.SOURCE", "Copy");
+
+        Assert.False(duplicated);
+        Assert.Equal("workflow.source", session.State.Draft!.Id);
+        Assert.Contains("different id", session.State.Error);
+    }
+
+    [Fact]
     public async Task UpdateIdentity_SavedWorkflowCannotChangeId()
     {
         var session = Session();
