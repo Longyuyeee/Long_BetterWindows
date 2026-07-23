@@ -370,6 +370,7 @@ namespace LongBetterWindows.Host.Views
 
         internal async Task<string?> OpenExecutionReviewAsync(
             string workflowId,
+            string? expectedStateFingerprint = null,
             CancellationToken cancellationToken = default)
         {
             _runSession.CancelReview();
@@ -381,15 +382,17 @@ namespace LongBetterWindows.Host.Views
             await RefreshListAsync(workflowId);
             RenderEditor();
             await RefreshReportsAsync(workflowId);
-            return PrepareRun()
+            return PrepareRun(expectedStateFingerprint)
                 ? null
-                : _session.State.Error ?? "组合动作未能通过实时预检。";
+                : _executionReview is not null
+                    ? string.Join(" ", _executionReview.Issues)
+                    : _session.State.Error ?? "组合动作未能通过实时预检。";
         }
 
         private void PrepareRun_Click(object sender, RoutedEventArgs e)
             => PrepareRun();
 
-        private bool PrepareRun()
+        private bool PrepareRun(string? expectedStateFingerprint = null)
         {
             var state = _session.State;
             if (state.Draft is null
@@ -397,7 +400,9 @@ namespace LongBetterWindows.Host.Views
                 || state.IsDirty) return false;
             ClearTerminalOutputs();
             TerminalOutputApprovalCheckBox.IsChecked = false;
-            _executionReview = _runSession.Prepare(state.Draft);
+            _executionReview = _runSession.Prepare(
+                state.Draft,
+                expectedStateFingerprint);
             if (!_executionReview.IsValid)
             {
                 var failure = WorkflowExecutionPresentation.DescribePrepareFailure(_executionReview);

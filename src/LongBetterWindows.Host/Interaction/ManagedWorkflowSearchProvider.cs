@@ -70,7 +70,8 @@ namespace LongBetterWindows.Host.Interaction
                     PrimaryAction = new SearchResultAction(
                         SearchActionKind.OpenWorkflowReview,
                         summary.Id,
-                        Label: "审查并运行"),
+                        Label: "审查并运行",
+                        ExpectedStateFingerprint: preflight.Fingerprint),
                     CanPin = true,
                 });
             }

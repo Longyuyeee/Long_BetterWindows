@@ -104,12 +104,16 @@ namespace LongBetterWindows.Host
 
         internal async Task<string?> OpenWorkflowReviewAsync(
             string workflowId,
+            string? expectedStateFingerprint = null,
             CancellationToken cancellationToken = default)
         {
             if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
                 await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
             ToolCenter.Visibility = Visibility.Visible;
-            var error = await ToolCenter.OpenWorkflowReviewAsync(workflowId, cancellationToken);
+            var error = await ToolCenter.OpenWorkflowReviewAsync(
+                workflowId,
+                expectedStateFingerprint,
+                cancellationToken);
             if (error is null)
             {
                 await Dispatcher.InvokeAsync(

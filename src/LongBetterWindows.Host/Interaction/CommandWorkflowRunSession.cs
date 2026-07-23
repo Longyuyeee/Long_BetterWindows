@@ -43,7 +43,9 @@ namespace LongBetterWindows.Host.Interaction
             get { lock (_sync) return _execution is not null; }
         }
 
-        public CommandWorkflowExecutionReview Prepare(CommandWorkflowDefinition workflow)
+        public CommandWorkflowExecutionReview Prepare(
+            CommandWorkflowDefinition workflow,
+            string? expectedStateFingerprint = null)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             ArgumentNullException.ThrowIfNull(workflow);
@@ -67,7 +69,22 @@ namespace LongBetterWindows.Host.Interaction
                     preflight.Permissions.ToList(),
                     workflow.Steps.Count,
                     workflow.Steps.Any(step => step.Effect == WorkflowStepEffect.Mutating));
-                _pendingReview = preflight.IsValid ? review : null;
+                if (expectedStateFingerprint is not null
+                    && !string.Equals(
+                        review.Fingerprint,
+                        expectedStateFingerprint,
+                        StringComparison.Ordinal))
+                {
+                    review = review with
+                    {
+                        IsValid = false,
+                        Issues =
+                        [
+                            "搜索结果已失效：组合动作定义或插件身份已发生变化，请重新搜索。",
+                        ],
+                    };
+                }
+                _pendingReview = review.IsValid ? review : null;
                 return review;
             }
         }

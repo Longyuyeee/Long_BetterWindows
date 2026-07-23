@@ -147,12 +147,16 @@ namespace LongBetterWindows.Host.Views
 
         internal async Task<string?> OpenWorkflowReviewAsync(
             string workflowId,
+            string? expectedStateFingerprint = null,
             CancellationToken cancellationToken = default)
         {
             ShowPage("workflows");
             if (WorkflowEditorHost.Content is not WorkflowEditorControl editor)
                 return "组合动作编辑器当前不可用。";
-            return await editor.OpenExecutionReviewAsync(workflowId, cancellationToken);
+            return await editor.OpenExecutionReviewAsync(
+                workflowId,
+                expectedStateFingerprint,
+                cancellationToken);
         }
 
         internal bool CancelWorkflowReview()

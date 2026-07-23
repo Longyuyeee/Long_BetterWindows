@@ -37,7 +37,8 @@ namespace LongBetterWindows.Host.Interaction
         SearchActionKind Kind,
         string Target,
         Contracts.PluginCommandInvocation? Invocation = null,
-        string Label = "");
+        string Label = "",
+        string? ExpectedStateFingerprint = null);
 
     public sealed record SearchResultItem
     {

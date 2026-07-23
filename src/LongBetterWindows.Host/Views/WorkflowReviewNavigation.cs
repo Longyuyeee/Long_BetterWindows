@@ -7,6 +7,7 @@ namespace LongBetterWindows.Host.Views
     {
         public static async Task<PluginCommandResult> OpenAsync(
             string workflowId,
+            string? expectedStateFingerprint,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(workflowId))
@@ -19,7 +20,10 @@ namespace LongBetterWindows.Host.Views
             if (!application.Dispatcher.CheckAccess())
             {
                 return await application.Dispatcher.InvokeAsync(
-                    () => OpenAsync(workflowId, cancellationToken)).Task.Unwrap();
+                    () => OpenAsync(
+                        workflowId,
+                        expectedStateFingerprint,
+                        cancellationToken)).Task.Unwrap();
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -33,7 +37,10 @@ namespace LongBetterWindows.Host.Views
                 mainWindow.WindowState = WindowState.Normal;
             mainWindow.Activate();
 
-            var error = await mainWindow.OpenWorkflowReviewAsync(workflowId, cancellationToken);
+            var error = await mainWindow.OpenWorkflowReviewAsync(
+                workflowId,
+                expectedStateFingerprint,
+                cancellationToken);
             return error is null
                 ? PluginCommandResult.Success("请审查权限后确认运行。")
                 : PluginCommandResult.Failure(error);

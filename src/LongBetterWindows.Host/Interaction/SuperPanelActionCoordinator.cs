@@ -19,7 +19,11 @@ namespace LongBetterWindows.Host.Interaction
         public SuperPanelActionCoordinator(
             PluginRegistry plugins,
             SearchPreferenceService preferences,
-            Func<string, CancellationToken, Task<PluginCommandResult>>? workflowReviewLauncher = null)
+            Func<
+                string,
+                string?,
+                CancellationToken,
+                Task<PluginCommandResult>>? workflowReviewLauncher = null)
         {
             _plugins = plugins;
             _executor = new SearchResultActionExecutor(plugins, workflowReviewLauncher);

@@ -31,6 +31,9 @@ public sealed class ManagedWorkflowSearchProviderTests : IDisposable
         Assert.Contains("运行前需批准", result.Subtitle);
         Assert.Equal(SearchActionKind.OpenWorkflowReview, result.PrimaryAction.Kind);
         Assert.Equal("workflow.organize", result.PrimaryAction.Target);
+        Assert.Equal(
+            new CommandWorkflowPlanner(registry).Preflight(Workflow()).Fingerprint,
+            result.PrimaryAction.ExpectedStateFingerprint);
         Assert.True(result.CanPin);
     }
 

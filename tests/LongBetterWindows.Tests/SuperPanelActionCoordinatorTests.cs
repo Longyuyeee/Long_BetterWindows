@@ -102,15 +102,17 @@ public class SuperPanelActionCoordinatorTests
         var coordinator = new SuperPanelActionCoordinator(
             new PluginRegistry(),
             preferences,
-            (workflowId, _) =>
+            (workflowId, expectedFingerprint, _) =>
             {
                 launcherCalled = workflowId == "workflow.safe";
+                Assert.Equal("expected-fingerprint", expectedFingerprint);
                 hiddenBeforeLaunch = hidden;
                 return Task.FromResult(PluginCommandResult.Success());
             });
         var selected = Result(new SearchResultAction(
             SearchActionKind.OpenWorkflowReview,
-            "workflow.safe"));
+            "workflow.safe",
+            ExpectedStateFingerprint: "expected-fingerprint"));
 
         var outcome = await coordinator.ExecuteAsync(
             selected,

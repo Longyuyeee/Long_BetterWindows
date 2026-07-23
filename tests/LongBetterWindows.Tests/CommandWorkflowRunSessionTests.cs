@@ -80,7 +80,7 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
     }
 
     [Fact]
-    public async Task ExecuteApproved_PluginReregisteredAfterReviewIsRejectedAndAudited()
+    public async Task ExecuteApproved_PluginUpgradedAfterReviewIsRejectedAndAudited()
     {
         var registry = Registry();
         var runner = new FakeRunner((_, _) => Task.FromResult(PluginCommandResult.Success()));
@@ -88,7 +88,7 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
         var workflow = Workflow();
         var review = session.Prepare(workflow);
         registry.Unregister("runner");
-        Register(registry);
+        Register(registry, "2.0.0");
 
         var result = await session.ExecuteApprovedAsync(workflow, review.Fingerprint);
 
@@ -96,6 +96,47 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
         Assert.Equal(WorkflowExecutionStatus.Rejected, result.Execution!.Status);
         Assert.Empty(runner.Calls);
         Assert.Single((await Reports().ListAsync(workflow.Id)).Reports);
+    }
+
+    [Fact]
+    public async Task Prepare_SearchResultCreatedBeforePluginUpgradeIsRejectedWithoutExecution()
+    {
+        var registry = Registry();
+        var runner = new FakeRunner((_, _) => Task.FromResult(PluginCommandResult.Success()));
+        using var session = Session(registry, runner);
+        var workflow = Workflow();
+        var searchedFingerprint = session.Prepare(workflow).Fingerprint;
+        session.CancelReview();
+        registry.Unregister("runner");
+        Register(registry, "2.0.0");
+
+        var review = session.Prepare(workflow, searchedFingerprint);
+        var result = await session.ExecuteApprovedAsync(workflow, searchedFingerprint);
+
+        Assert.False(review.IsValid);
+        Assert.NotEqual(searchedFingerprint, review.Fingerprint);
+        Assert.Equal("2.0.0", Assert.Single(review.Permissions).PluginVersion);
+        Assert.Contains(review.Issues, issue => issue.Contains("搜索结果已失效"));
+        Assert.False(result.IsAccepted);
+        Assert.Empty(runner.Calls);
+    }
+
+    [Fact]
+    public void Prepare_SearchResultCreatedBeforeDefinitionChangeIsRejected()
+    {
+        var registry = Registry();
+        using var session = Session(registry);
+        var workflow = Workflow();
+        var searchedFingerprint = session.Prepare(workflow).Fingerprint;
+        session.CancelReview();
+
+        var review = session.Prepare(
+            workflow with { Name = "Updated workflow" },
+            searchedFingerprint);
+
+        Assert.False(review.IsValid);
+        Assert.NotEqual(searchedFingerprint, review.Fingerprint);
+        Assert.Contains(review.Issues, issue => issue.Contains("搜索结果已失效"));
     }
 
     [Fact]
@@ -206,13 +247,13 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
         return registry;
     }
 
-    private static void Register(PluginRegistry registry)
+    private static void Register(PluginRegistry registry, string version = "1.0.0")
         => registry.Register(
             new PluginManifest
             {
                 Id = "runner",
                 Name = "Runner",
-                Version = "1.0.0",
+                Version = version,
                 EntryPoint = "runner.dll",
                 Capabilities = ["file.ops"],
                 Commands =
@@ -233,7 +274,7 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
                     },
                 ],
             },
-            new TestPlugin(),
+            new TestPlugin(version),
             null,
             "/runner");
 
@@ -267,9 +308,16 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
 
     private sealed class TestPlugin : ILongPlugin
     {
+        private readonly string _version;
+
+        public TestPlugin(string version)
+        {
+            _version = version;
+        }
+
         public string Id => "runner";
         public string Name => "Runner";
-        public string Version => "1.0.0";
+        public string Version => _version;
         public PluginState State => PluginState.Loaded;
         public Task<bool> InitializeAsync(IHostApi host) => Task.FromResult(true);
         public Task<bool> StartAsync() => Task.FromResult(true);
