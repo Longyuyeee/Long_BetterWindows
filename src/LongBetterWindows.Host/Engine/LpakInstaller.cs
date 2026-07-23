@@ -102,14 +102,18 @@ namespace LongBetterWindows.Host.Engine
                 if (Directory.Exists(targetDir))
                 {
                     await UnloadPluginAsync(manifest.Id);
+                    Log.Debug("插件旧版本运行时已释放: {PluginId}", manifest.Id);
                     await MoveDirectoryWithRetryAsync(targetDir, backupDir);
                     targetMovedToBackup = true;
+                    Log.Debug("插件旧版本已移动到事务备份: {PluginId}", manifest.Id);
                     await WriteJournalAsync(transactionDir, manifest.Id, TransactionPhase.BackedUp);
                 }
 
                 await MoveDirectoryWithRetryAsync(stagingDir, targetDir);
                 stagedMovedToTarget = true;
-                await _scanner.ScanAsync();
+                Log.Debug("插件新版本已从暂存区提交到目标目录: {PluginId}", manifest.Id);
+                await _scanner.ReloadPluginDirectoryAsync(targetDir);
+                Log.Debug("插件新版本运行时已重新加载: {PluginId}", manifest.Id);
                 await WriteJournalAsync(transactionDir, manifest.Id, TransactionPhase.Committed);
                 Directory.Delete(transactionDir, true);
 
@@ -132,7 +136,7 @@ namespace LongBetterWindows.Host.Engine
                     if (targetMovedToBackup && Directory.Exists(backupDir))
                         await MoveDirectoryWithRetryAsync(backupDir, targetDir);
                     if (targetMovedToBackup)
-                        await _scanner.ScanAsync();
+                        await _scanner.ReloadPluginDirectoryAsync(targetDir);
                 }
                 catch (Exception rollbackError)
                 {
@@ -184,7 +188,7 @@ namespace LongBetterWindows.Host.Engine
                 await UnloadPluginAsync(pluginId);
                 await MoveDirectoryWithRetryAsync(targetDir, backupDir);
                 await WriteJournalAsync(transactionDir, pluginId, TransactionPhase.BackedUp);
-                await _scanner.ScanAsync();
+                await _scanner.ReloadPluginDirectoryAsync(targetDir);
                 await WriteJournalAsync(transactionDir, pluginId, TransactionPhase.Committed);
                 Directory.Delete(transactionDir, true);
                 return InstallResult.Ok(
@@ -201,7 +205,7 @@ namespace LongBetterWindows.Host.Engine
                 {
                     if (!Directory.Exists(targetDir) && Directory.Exists(backupDir))
                         await MoveDirectoryWithRetryAsync(backupDir, targetDir);
-                    await _scanner.ScanAsync();
+                    await _scanner.ReloadPluginDirectoryAsync(targetDir);
                 }
                 catch (Exception rollbackError)
                 {
@@ -330,6 +334,8 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task UnloadPluginAsync(string pluginId)
         {
+            if (await _scanner.UnloadPluginAsync(pluginId)) return;
+
             var registry = HostProvider.Instance.PluginStore;
             var entry = registry.Get(pluginId);
             if (entry == null) return;
@@ -373,8 +379,20 @@ namespace LongBetterWindows.Host.Engine
                 PluginId = pluginId,
                 Phase = phase,
             });
+            Log.Debug(
+                "正在写入插件事务日志: {PluginId}; Phase={Phase}",
+                pluginId,
+                phase);
             await File.WriteAllTextAsync(temporary, json);
+            Log.Debug(
+                "插件事务临时日志已落盘: {PluginId}; Phase={Phase}",
+                pluginId,
+                phase);
             File.Move(temporary, path, true);
+            Log.Debug(
+                "插件事务日志已提交: {PluginId}; Phase={Phase}",
+                pluginId,
+                phase);
         }
 
         private static void TryDelete(string path)

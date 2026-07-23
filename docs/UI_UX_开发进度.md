@@ -495,3 +495,14 @@ WIP UI visual draft before audited implementation
 - [x] 当前多显示器 250% 缩放环境通过完整场景：只读执行、3699 字符终端输出、限高滚动、内存清除和隔离报告均成立。
 
 本批证据：`artifacts/quality/workflow-long-output-20260723/desktop-ui-smoke.json`。下一批继续插件升级失效和文件导出拒绝路径。
+
+## 组合动作真实交互验收第四批：插件升级失效（已通过）
+
+- [x] 托管工作流搜索结果携带工作流定义、插件版本、注册修订和权限计划生成的不可变状态指纹。
+- [x] 搜索后定义或插件发生变化时，打开审查前明确拒绝旧结果；审查后升级则在确认时由实时预检拒绝旧批准。
+- [x] 新增独立隔离脚本，使用 v1 Web 插件打开审查，通过正式 `LpakInstaller` 升级 v2，再确认旧审查。
+- [x] 真实桌面结果验证 `rejected`、无 `step_started`、报告消息脱敏、`.long-transaction-*` 清理和隔离根删除。
+- [x] 安装器改为通过 `PluginScanner` 释放受跟踪目录运行时并定点重载目标目录，避免全量扫描与文件监控竞争。
+- [x] 审查和执行期间的插件变化保持当前审查快照，不同步重建重型编辑配置区；跨线程插件通知改为 Dispatcher 排队更新。
+
+本批证据：`artifacts/quality/workflow-plugin-upgrade-20260723/workflow-plugin-upgrade.json`。下一批进入终端输出文件导出拒绝验收。

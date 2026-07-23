@@ -1056,6 +1056,9 @@ public class QualityGateTests
         var palette = Read("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml");
         var superPanel = Read("src", "LongBetterWindows.Host", "Views", "SuperPanelWindow.xaml");
         var workflow = Read("src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml");
+        var workflowCode = Read(
+            "src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml.cs");
+        var workflowUpgradeScript = Read("run-isolated-workflow-upgrade.ps1");
         var appResources = Read("src", "LongBetterWindows.Host", "App.xaml");
         var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml");
         var mainCode = Read("src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
@@ -1122,6 +1125,13 @@ public class QualityGateTests
         Assert.Contains("Invoke-WindowWorkflowAction", script);
         Assert.Contains("[LongDesktopInput]::WorkflowMessage", script);
         Assert.Contains("SendMessageTimeout", script);
+        Assert.Contains("UpgradePluginPackage", mainAutomation);
+        Assert.Contains("QueryPluginUpgradeStatus", mainAutomation);
+        Assert.Contains("QueryExecutionRejected", mainAutomation);
+        Assert.Contains("ExecutionReviewPanel.Visibility == Visibility.Visible", workflowCode);
+        Assert.Contains("--quality-workflow-upgrade-package", workflowUpgradeScript);
+        Assert.Contains("zero_steps_executed", workflowUpgradeScript);
+        Assert.Contains("transaction_directories_cleaned", workflowUpgradeScript);
         Assert.DoesNotContain("Click-AutomationElement $outputTerminalApproval", script);
         Assert.DoesNotContain("Click-AutomationElement $outputReviewConfirm", script);
         Assert.DoesNotContain("Click-AutomationElement $clearTerminalOutput", script);

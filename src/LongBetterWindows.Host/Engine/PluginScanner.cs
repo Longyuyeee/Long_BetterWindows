@@ -59,6 +59,44 @@ namespace LongBetterWindows.Host.Engine
         public void StartFileWatchers()
             => _changeMonitor.Start();
 
+        internal async Task<bool> UnloadPluginAsync(string pluginId)
+        {
+            await _reloadGate.WaitAsync();
+            try
+            {
+                var pluginDirectory = _directoryPlugins
+                    .Where(item => string.Equals(
+                        item.Value.Id,
+                        pluginId,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Select(item => item.Key)
+                    .FirstOrDefault();
+                if (pluginDirectory is null) return false;
+                await UnloadDirectoryPluginAsync(pluginDirectory);
+                return true;
+            }
+            finally
+            {
+                _reloadGate.Release();
+            }
+        }
+
+        internal async Task ReloadPluginDirectoryAsync(string pluginDirectory)
+        {
+            var fullPath = Path.GetFullPath(pluginDirectory);
+            await _reloadGate.WaitAsync();
+            try
+            {
+                await UnloadDirectoryPluginAsync(fullPath);
+                if (File.Exists(Path.Combine(fullPath, "manifest.json")))
+                    await TryLoadPluginAsync(fullPath);
+            }
+            finally
+            {
+                _reloadGate.Release();
+            }
+        }
+
         private async Task HandlePluginFileChangeAsync(PluginFileChange change)
         {
             await _reloadGate.WaitAsync();

@@ -41,6 +41,8 @@ namespace LongBetterWindows.Host
         internal bool ShowPluginsForQualityRequested => _startupOptions.OpenPluginsForQuality;
         internal bool QualityWorkflowAutomationEnabled
             => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId);
+        internal string? QualityWorkflowUpgradePackagePath
+            => _startupOptions.QualityWorkflowUpgradePackagePath;
         internal string? QualityMarketplaceCatalogPath => _startupOptions.MarketplaceCatalogPath;
         internal string? QualityMarketplaceTrustStorePath => _startupOptions.MarketplaceTrustStorePath;
 

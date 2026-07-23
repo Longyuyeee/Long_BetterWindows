@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-23T03:14:26.1349504+00:00",
+  "classification": "isolated_workflow_plugin_upgrade",
+  "plugin_id": "quality.workflow.upgrade",
+  "workflow_id": "workflow.quality.plugin-upgrade",
+  "v1_review_opened": true,
+  "upgrade_v2": true,
+  "old_review_rejected": true,
+  "zero_steps_executed": true,
+  "redacted_report_written": true,
+  "transaction_directories_cleaned": true,
+  "isolation_root_removed": true,
+  "passed": true,
+  "error": null,
+  "failed_stage": null
+}

@@ -20,6 +20,8 @@ namespace LongBetterWindows.Host
         private bool _workflowTerminalOutputApproved;
         private int _workflowTerminalOutputLength;
         private bool _workflowTerminalOutputCleared;
+        private int _qualityWorkflowPluginUpgradeStatus;
+        private bool _workflowExecutionRejected;
 
         public MainWindow()
         {
@@ -41,6 +43,10 @@ namespace LongBetterWindows.Host
             {
                 _workflowTerminalOutputLength = result.TerminalOutputLength;
                 _workflowTerminalOutputCleared = false;
+                _workflowExecutionRejected = string.Equals(
+                    result.Title,
+                    "执行已拒绝",
+                    StringComparison.Ordinal);
                 AutomationProperties.SetItemStatus(
                     this,
                     $"workflow-result:{result.Title};terminal-length:{result.TerminalOutputLength};bounded-scroll:{(result.TerminalOutputLength > 1024 ? "true" : "false")}");
@@ -124,6 +130,7 @@ namespace LongBetterWindows.Host
                 _workflowTerminalOutputApproved = false;
                 _workflowTerminalOutputLength = 0;
                 _workflowTerminalOutputCleared = false;
+                _workflowExecutionRejected = false;
                 WorkflowTerminalClearButton.Visibility = Visibility.Collapsed;
                 WorkflowTerminalApprovalButton.Content = "允许终端输出";
                 SetWorkflowLayoutAutomationStatus(
@@ -342,8 +349,35 @@ namespace LongBetterWindows.Host
                         when WorkflowTerminalClearButton.IsVisible:
                         ToolCenter.ClearWorkflowTerminalOutputs();
                         break;
+                    case QualityWorkflowAction.UpgradePluginPackage:
+                        await UpgradeQualityWorkflowPluginAsync();
+                        break;
                 }
             }));
+
+        private async Task UpgradeQualityWorkflowPluginAsync()
+        {
+            if (_qualityWorkflowPluginUpgradeStatus != 0) return;
+            var app = Application.Current as App;
+            var packagePath = app?.QualityWorkflowUpgradePackagePath;
+            var installer = App.PackageInstaller;
+            if (string.IsNullOrWhiteSpace(packagePath) || installer is null)
+            {
+                _qualityWorkflowPluginUpgradeStatus = -1;
+                return;
+            }
+
+            try
+            {
+                var result = await installer.InstallAsync(packagePath);
+                _qualityWorkflowPluginUpgradeStatus = result.IsSuccess ? 1 : -1;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Quality workflow plugin upgrade failed");
+                _qualityWorkflowPluginUpgradeStatus = -1;
+            }
+        }
 
         protected override void OnSourceInitialized(EventArgs e)
         {
@@ -379,6 +413,10 @@ namespace LongBetterWindows.Host
                 return new IntPtr(_workflowTerminalOutputLength);
             if (action == QualityWorkflowAction.QueryTerminalOutputCleared)
                 return _workflowTerminalOutputCleared ? new IntPtr(1) : IntPtr.Zero;
+            if (action == QualityWorkflowAction.QueryPluginUpgradeStatus)
+                return new IntPtr(_qualityWorkflowPluginUpgradeStatus);
+            if (action == QualityWorkflowAction.QueryExecutionRejected)
+                return _workflowExecutionRejected ? new IntPtr(1) : IntPtr.Zero;
 
             QueueWorkflowAutomationAction(action);
             return new IntPtr(1);

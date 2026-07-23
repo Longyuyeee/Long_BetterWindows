@@ -83,7 +83,12 @@ namespace LongBetterWindows.Host.Views
         {
             if (!Dispatcher.CheckAccess())
             {
-                Dispatcher.Invoke(PluginsChanged);
+                Dispatcher.BeginInvoke(PluginsChanged);
+                return;
+            }
+            if (ExecutionReviewPanel.Visibility == Visibility.Visible
+                || _runSession.IsRunning)
+            {
                 return;
             }
             RefreshCommandOptions();
