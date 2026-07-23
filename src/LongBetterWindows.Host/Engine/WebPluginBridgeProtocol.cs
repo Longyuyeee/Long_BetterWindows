@@ -1,3 +1,4 @@
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using System.Text.Json.Serialization;
 
@@ -108,6 +109,15 @@ namespace LongBetterWindows.Host.Engine
 
         internal static string SerializeHotkey(string hotkey) =>
             System.Text.Json.JsonSerializer.Serialize(new { type = "hotkey", hotkey });
+
+        internal static string SerializeClipboardChanged(ClipboardChangedEventArgs args) =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                type = "clipboard.changed",
+                content_type = args.ContentType.ToString().ToLowerInvariant(),
+                text = args.Text,
+                timestamp = args.Timestamp,
+            });
 
         internal static string? GetRequiredCapability(string method) => method switch
         {
@@ -221,7 +231,7 @@ namespace LongBetterWindows.Host.Engine
         {
             var js = @"
 (function() {
-var _id=0,_pending={},_hotkeys={};
+var _id=0,_pending={},_hotkeys={},_clipboardChanged=null;
 function call(method,args){
   return new Promise(function(resolve,reject){
     var id=++_id;
@@ -242,8 +252,8 @@ window.long = {
     getText: function(){return call('clipboard.getText',[]);},
     setText: function(t){return call('clipboard.setText',[t]);},
     clear: function(){return call('clipboard.clear',[]);},
-    startMonitoring: function(){return call('clipboard.startMonitoring',[]);},
-    stopMonitoring: function(){return call('clipboard.stopMonitoring',[]);}
+    startMonitoring: function(callback){if(typeof callback==='function')_clipboardChanged=callback;return call('clipboard.startMonitoring',[]);},
+    stopMonitoring: function(){_clipboardChanged=null;return call('clipboard.stopMonitoring',[]);}
   },
   shell: {
     getActiveFolder: function(){return call('shell.getActiveFolder',[]);},
@@ -419,6 +429,7 @@ window.chrome.webview.addEventListener('message',function(e){
       if(typeof _hotkeys[m.hotkey]==='function')_hotkeys[m.hotkey]();
       else console.log('[Long] key:',m.hotkey);
     }
+    if(m.type==='clipboard.changed'&&typeof _clipboardChanged==='function')_clipboardChanged(m);
   }catch(ex){}
 });
 console.log('[Long] Bridge ready · __PLUGIN_ID__');

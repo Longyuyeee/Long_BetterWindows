@@ -6,11 +6,12 @@ using Serilog;
 
 namespace LongBetterWindows.Host.Engine
 {
-    internal sealed class WebPluginHostDispatcher
+    internal sealed class WebPluginHostDispatcher : IDisposable
     {
         private readonly string _pluginId;
         private readonly IHostApi _host;
         private readonly Action<string> _postMessage;
+        private bool _clipboardSubscribed;
 
         internal WebPluginHostDispatcher(
             string pluginId,
@@ -39,8 +40,8 @@ namespace LongBetterWindows.Host.Engine
                 "clipboard.getText" => Ok(h.Clipboard.GetTextAsync()),
                 "clipboard.setText" => Ok(h.Clipboard.SetTextAsync(WebPluginArguments.GetString(args, 0))),
                 "clipboard.clear" => Ok(h.Clipboard.ClearAsync()),
-                "clipboard.startMonitoring" => Ok(h.Clipboard.StartMonitoringAsync()),
-                "clipboard.stopMonitoring" => Ok(h.Clipboard.StopMonitoringAsync()),
+                "clipboard.startMonitoring" => ClipboardStartMonitoringAsync(),
+                "clipboard.stopMonitoring" => ClipboardStopMonitoringAsync(),
 
                 // === long.shell ===
                 "shell.getActiveFolder" => Ok(h.ShellSelection.GetActiveExplorerFolderPathAsync()),
@@ -229,6 +230,53 @@ namespace LongBetterWindows.Host.Engine
         private static async Task<object?> OkList<T>(Task<HostApiResponse<List<T>>> t) { var r = await t; return new { success = r.IsSuccess, data = r.Data, error = r.ErrorMessage }; }
 
         private static object OkObj() => new { success = true };
+
+        private async Task<object?> ClipboardStartMonitoringAsync()
+        {
+            if (!_clipboardSubscribed)
+            {
+                _host.Clipboard.ClipboardChanged += OnClipboardChanged;
+                _clipboardSubscribed = true;
+            }
+
+            var result = await _host.Clipboard.StartMonitoringAsync();
+            if (!result.IsSuccess)
+                UnsubscribeClipboard();
+            return new { success = result.IsSuccess, error = result.ErrorMessage };
+        }
+
+        private async Task<object?> ClipboardStopMonitoringAsync()
+        {
+            UnsubscribeClipboard();
+            var result = await _host.Clipboard.StopMonitoringAsync();
+            return new { success = result.IsSuccess, error = result.ErrorMessage };
+        }
+
+        private void OnClipboardChanged(object? sender, ClipboardChangedEventArgs args)
+        {
+            try
+            {
+                _postMessage(WebPluginBridgeProtocol.SerializeClipboardChanged(args));
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[Web:{PluginId}] 剪贴板事件发送失败", _pluginId);
+            }
+        }
+
+        private void UnsubscribeClipboard()
+        {
+            if (!_clipboardSubscribed) return;
+            _host.Clipboard.ClipboardChanged -= OnClipboardChanged;
+            _clipboardSubscribed = false;
+        }
+
+        public void Dispose()
+        {
+            if (!_clipboardSubscribed) return;
+            UnsubscribeClipboard();
+            _ = _host.Clipboard.StopMonitoringAsync();
+        }
 
         private object PluginLog(object?[] args)
         {

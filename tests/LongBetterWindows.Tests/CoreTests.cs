@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
@@ -176,6 +177,8 @@ public class CoreTests
         Assert.Contains("input:", script);
         Assert.Contains("confirm: function", script);
         Assert.Contains("_pending[m.id].resolve", script);
+        Assert.Contains("startMonitoring: function(callback)", script);
+        Assert.Contains("m.type==='clipboard.changed'", script);
         Assert.Contains("com.test.bridge", script);
     }
 
@@ -271,6 +274,13 @@ public class CoreTests
             WebPluginBridgeProtocol.SerializeError(10, "denied"));
         using var hotkey = JsonDocument.Parse(
             WebPluginBridgeProtocol.SerializeHotkey("Alt+Space"));
+        using var clipboard = JsonDocument.Parse(
+            WebPluginBridgeProtocol.SerializeClipboardChanged(new ClipboardChangedEventArgs
+            {
+                Text = "copied",
+                ContentType = ClipboardContentType.Text,
+                Timestamp = new DateTime(2026, 7, 23, 12, 30, 0, DateTimeKind.Local),
+            }));
 
         Assert.Equal(9, success.RootElement.GetProperty("id").GetInt32());
         Assert.True(success.RootElement.GetProperty("result").GetProperty("success").GetBoolean());
@@ -278,6 +288,9 @@ public class CoreTests
         Assert.Equal("denied", failure.RootElement.GetProperty("error").GetString());
         Assert.Equal("hotkey", hotkey.RootElement.GetProperty("type").GetString());
         Assert.Equal("Alt+Space", hotkey.RootElement.GetProperty("hotkey").GetString());
+        Assert.Equal("clipboard.changed", clipboard.RootElement.GetProperty("type").GetString());
+        Assert.Equal("text", clipboard.RootElement.GetProperty("content_type").GetString());
+        Assert.Equal("copied", clipboard.RootElement.GetProperty("text").GetString());
     }
 
     [Fact]

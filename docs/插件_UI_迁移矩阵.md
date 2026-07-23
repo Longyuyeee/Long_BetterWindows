@@ -103,7 +103,9 @@
 |---|---|---|---|
 | T1 | HardwareMonitor | 无私有样式/硬编码颜色；真实性能 API；响应式指标、键值表、进程表；仅声明 `system.performance` | 已完成 |
 | T2 | PortManager | 真实端口 API、语义表格、搜索/筛选、端口查找和确认终止边界 | 已完成 |
-| T3 | ClipboardHistory | Long UI Kit 页面、历史列表和本地监听状态 | 待迁移 |
+| T3 | ClipboardHistory | Long UI Kit 页面、安全历史列表、事件驱动监听、串行持久化与失败回滚 | 已完成 |
+
+旧主题迁移阶段已关闭。`ClipboardHistory` 保留“后台持续采集、热键和大容量检索”职责，`ClipboardTool` 保留“前台文本处理、固定和短期历史”职责；两者不合并存储，也不互相声明未使用能力。下一阶段转入 Web 能力生命周期硬化，先覆盖共享监听、多消费者释放和插件重载恢复。
 
 ## 第五批实现基线
 

@@ -124,8 +124,8 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
 .long-page { width: min(100%, 980px); margin: 0 auto; padding: 24px; animation: long-page-in var(--long-motion-normal) ease-out; }
 .long-page--wide { width: min(100%, 1120px); }
 .long-page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-.long-page-title { margin: 3px 0 0; font-size: 24px; line-height: 1.25; letter-spacing: -.02em; }
-.long-eyebrow { color: var(--long-accent); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.long-page-title { margin: 3px 0 0; font-size: 24px; line-height: 1.25; letter-spacing: 0; }
+.long-eyebrow { color: var(--long-accent); font-size: 11px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
 .long-page-description { margin: 6px 0 0; color: var(--long-text-secondary); font-size: 13px; line-height: 1.55; }
 .long-stack { display: grid; gap: 14px; }
 .long-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }

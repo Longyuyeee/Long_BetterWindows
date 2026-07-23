@@ -128,6 +128,14 @@ public class DesignSystemTests
         Assert.Contains("LongUI?.renderState", clipboardHistory);
         Assert.Contains("kind: 'loading'", clipboardHistory);
         Assert.Contains("kind: 'empty'", clipboardHistory);
+        Assert.Contains("kind: 'error'", clipboardHistory);
+        Assert.Contains("long.clipboard.startMonitoring(handleClipboardChanged)", clipboardHistory);
+        Assert.Contains("mutationQueue", clipboardHistory);
+        Assert.Contains("history = previous", clipboardHistory);
+        Assert.Contains("long.hotkey.unregister(hotkey)", clipboardHistory);
+        Assert.DoesNotContain("<style", clipboardHistory);
+        Assert.DoesNotContain("innerHTML", clipboardHistory);
+        Assert.DoesNotContain("onclick=", clipboardHistory);
         Assert.DoesNotContain(".empty-state", clipboardHistory);
         Assert.DoesNotContain(".empty-icon", clipboardHistory);
     }

@@ -53,6 +53,7 @@ namespace LongBetterWindows.Host.Engine
         public void Dispose()
         {
             _commands.Dispose();
+            _hostDispatcher.Dispose();
             _viewLifecycle.Dispose();
         }
         private void HandleJsMessage(string json)

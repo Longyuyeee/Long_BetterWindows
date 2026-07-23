@@ -1,9 +1,9 @@
 {
   "id": "com.long.clipboardhistory",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "剪贴板历史",
   "author": "Long",
-  "description": "自动记录剪贴板历史，支持按关键词、时间、类型搜索，并可重新放回剪贴板",
+  "description": "在后台记录文本剪贴板历史，支持按关键词和时间检索并快速重新复制",
   "entry_point": "index.html",
   "runtime": "webview",
   "capabilities": [
@@ -16,7 +16,7 @@
     {
       "id": "clipboard-history.open",
       "title": "打开剪贴板历史",
-      "description": "搜索、固定并重新使用最近复制的内容",
+      "description": "搜索并重新使用最近复制的文本",
       "aliases": ["剪贴板历史", "历史剪贴板", "clipboard history", "jtbll"],
       "accepted_inputs": ["none", "text", "clipboard"],
       "view_mode": "list",
