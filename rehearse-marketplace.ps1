@@ -56,6 +56,8 @@ $summaryPath = Join-Path $evidenceRoot 'rehearsal-summary.json'
 $summary = [ordered]@{
     schema_version = 1
     started_at = [DateTimeOffset]::UtcNow.ToString('O')
+    classification = 'marketplace_https_rehearsal'
+    passed = $false
     destination = $Destination.AbsoluteUri
     preflight_only = [bool]$PreflightOnly
     release_id = $null
@@ -154,6 +156,16 @@ finally {
     if ($summary.rollback_verified -and [string]::IsNullOrWhiteSpace([string]$summary.completed_at)) {
         $summary.completed_at = [DateTimeOffset]::UtcNow.ToString('O')
     }
+    $summary.passed = -not $summary.preflight_only `
+        -and $summary.preflight_dry_run_verified `
+        -and $summary.baseline_verified `
+        -and $summary.deployment_completed `
+        -and $summary.deployment_verified `
+        -and $summary.rollback_completed `
+        -and $summary.rollback_verified `
+        -and [string]::IsNullOrWhiteSpace([string]$summary.failure) `
+        -and [string]::IsNullOrWhiteSpace([string]$summary.rollback_failure) `
+        -and [string]::IsNullOrWhiteSpace([string]$summary.rollback_verification_failure)
     $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
 }
 

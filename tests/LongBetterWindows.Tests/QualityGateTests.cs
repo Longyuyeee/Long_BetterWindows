@@ -160,6 +160,32 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void ExternalReleaseGate_BindsEveryApprovedGateToOneCandidateAndFullRollback()
+    {
+        var gate = Read("verify-external-release-gate.ps1");
+        var rehearsal = Read("rehearse-marketplace.ps1");
+
+        Assert.Contains("ExpectedSourceCommit", gate);
+        Assert.Contains("ExpectedDistributionChannel", gate);
+        Assert.Contains("approved_release_download_gate", gate);
+        Assert.Contains("approved_clean_windows_release_gate", gate);
+        Assert.Contains("approved_physical_device_dpi_matrix", gate);
+        Assert.Contains("approved_physical_accessibility_matrix", gate);
+        Assert.Contains("marketplace_https_rehearsal", gate);
+        Assert.Contains("Release Manifest source commit", gate);
+        Assert.Contains("refer to different packages", gate);
+        Assert.Contains("independent operator and reviewer", gate);
+        Assert.Contains("preflight_only", gate);
+        Assert.Contains("deployment_verified", gate);
+        Assert.Contains("rollback_verified", gate);
+        Assert.Contains("Get-FileHash", gate);
+        Assert.Contains("external_release_gate_decision", gate);
+        Assert.Contains("decision already exists", gate);
+        Assert.Contains("classification = 'marketplace_https_rehearsal'", rehearsal);
+        Assert.Contains("$summary.passed = -not $summary.preflight_only", rehearsal);
+    }
+
+    [Fact]
     public void VisualCapture_RendersDeterministicPngAndRecordsActualMonitorDpiSeparately()
     {
         var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
