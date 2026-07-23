@@ -412,7 +412,7 @@
                                                         Click="ExportTerminalOutput_Click"
                                                         automation:AutomationProperties.Name="导出终端输出值" />
                                             </StackPanel>
-                                            <TextBox Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Value}" IsReadOnly="True"
+                                            <TextBox Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Value, Mode=OneWay}" IsReadOnly="True"
                                                      automation:AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.Value"
                                                      automation:AutomationProperties.Name="终端输出值"
                                                      MaxHeight="120" TextWrapping="Wrap" AcceptsReturn="True"

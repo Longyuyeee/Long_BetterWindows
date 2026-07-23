@@ -22,6 +22,7 @@ namespace LongBetterWindows.Host.Services
         public string? QualityWorkflowsDirectory { get; private init; }
         public string? QualityWorkflowReviewId { get; private init; }
         public string? QualityWorkflowUpgradePackagePath { get; private init; }
+        public string? QualityTerminalExportDirectory { get; private init; }
         public bool ForceHighContrast { get; private init; }
         public bool ForceReduceMotion { get; private init; }
         public int QualityIdleMilliseconds { get; private init; }
@@ -63,6 +64,9 @@ namespace LongBetterWindows.Host.Services
                 QualityWorkflowUpgradePackagePath = ReadArgument(
                     arguments,
                     "--quality-workflow-upgrade-package"),
+                QualityTerminalExportDirectory = ReadArgument(
+                    arguments,
+                    "--quality-terminal-export-dir"),
                 ForceHighContrast = HasSwitch(arguments, "--quality-high-contrast"),
                 ForceReduceMotion = HasSwitch(arguments, "--quality-reduce-motion"),
                 QualityIdleMilliseconds = ReadIntegerArgument(arguments, "--quality-idle-ms", 0, 60_000),

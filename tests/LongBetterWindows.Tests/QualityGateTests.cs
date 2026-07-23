@@ -1109,6 +1109,7 @@ public class QualityGateTests
         Assert.Contains("terminal_output_length", script);
         Assert.Contains("terminal_output_bounded_scroll", script);
         Assert.Contains("MaxHeight=\"120\"", workflow);
+        Assert.Contains("Text=\"{Binding Value, Mode=OneWay}\"", workflow);
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", workflow);
         Assert.Contains("isolated_report_written", script);
         Assert.Contains("[switch] $WorkflowOutputOnly", script);
@@ -1128,8 +1129,15 @@ public class QualityGateTests
         Assert.Contains("UpgradePluginPackage", mainAutomation);
         Assert.Contains("QueryPluginUpgradeStatus", mainAutomation);
         Assert.Contains("QueryExecutionRejected", mainAutomation);
+        Assert.Contains("RunTerminalOutputExportMatrix", mainAutomation);
+        Assert.Contains("QueryTerminalOutputExportStatus", mainAutomation);
         Assert.Contains("ExecutionReviewPanel.Visibility == Visibility.Visible", workflowCode);
         Assert.Contains("--quality-workflow-upgrade-package", workflowUpgradeScript);
+        Assert.Contains("--quality-terminal-export-dir", script);
+        Assert.Contains("[switch] $WorkflowExportMatrix", script);
+        Assert.Contains("host-export-matrix.json", script);
+        Assert.Contains("icacls.exe", script);
+        Assert.Contains("-ItemType Junction", script);
         Assert.Contains("zero_steps_executed", workflowUpgradeScript);
         Assert.Contains("transaction_directories_cleaned", workflowUpgradeScript);
         Assert.DoesNotContain("Click-AutomationElement $outputTerminalApproval", script);

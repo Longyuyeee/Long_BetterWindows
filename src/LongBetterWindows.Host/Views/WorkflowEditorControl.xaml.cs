@@ -589,6 +589,11 @@ namespace LongBetterWindows.Host.Views
             return hadOutputs;
         }
 
+        internal WorkflowTerminalOutput? GetTerminalOutputForQuality()
+            => (TerminalOutputList.ItemsSource as IEnumerable<WorkflowTerminalOutputItem>)?
+                .FirstOrDefault()?
+                .Source;
+
         private async Task RefreshReportsAsync(string workflowId)
         {
             var version = Interlocked.Increment(ref _reportListVersion);

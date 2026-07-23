@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Interop;
@@ -21,6 +22,7 @@ namespace LongBetterWindows.Host
         private int _workflowTerminalOutputLength;
         private bool _workflowTerminalOutputCleared;
         private int _qualityWorkflowPluginUpgradeStatus;
+        private int _qualityTerminalOutputExportStatus;
         private bool _workflowExecutionRejected;
 
         public MainWindow()
@@ -352,6 +354,9 @@ namespace LongBetterWindows.Host
                     case QualityWorkflowAction.UpgradePluginPackage:
                         await UpgradeQualityWorkflowPluginAsync();
                         break;
+                    case QualityWorkflowAction.RunTerminalOutputExportMatrix:
+                        await RunQualityTerminalOutputExportMatrixAsync();
+                        break;
                 }
             }));
 
@@ -376,6 +381,35 @@ namespace LongBetterWindows.Host
             {
                 Log.Error(ex, "Quality workflow plugin upgrade failed");
                 _qualityWorkflowPluginUpgradeStatus = -1;
+            }
+        }
+
+        private async Task RunQualityTerminalOutputExportMatrixAsync()
+        {
+            if (_qualityTerminalOutputExportStatus != 0) return;
+            var app = Application.Current as App;
+            var output = ToolCenter.GetWorkflowTerminalOutputForQuality();
+            if (output is null
+                || string.IsNullOrWhiteSpace(app?.QualityTerminalExportDirectory)
+                || string.IsNullOrWhiteSpace(app.QualityWorkflowsDirectory))
+            {
+                _qualityTerminalOutputExportStatus = -1;
+                return;
+            }
+
+            _qualityTerminalOutputExportStatus = 2;
+            try
+            {
+                var passed = await QualityTerminalOutputExportMatrix.RunAsync(
+                    output,
+                    app.QualityTerminalExportDirectory,
+                    Path.Combine(app.QualityWorkflowsDirectory, ".reports"));
+                _qualityTerminalOutputExportStatus = passed ? 1 : -1;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Quality terminal output export matrix failed");
+                _qualityTerminalOutputExportStatus = -1;
             }
         }
 
@@ -417,6 +451,8 @@ namespace LongBetterWindows.Host
                 return new IntPtr(_qualityWorkflowPluginUpgradeStatus);
             if (action == QualityWorkflowAction.QueryExecutionRejected)
                 return _workflowExecutionRejected ? new IntPtr(1) : IntPtr.Zero;
+            if (action == QualityWorkflowAction.QueryTerminalOutputExportStatus)
+                return new IntPtr(_qualityTerminalOutputExportStatus);
 
             QueueWorkflowAutomationAction(action);
             return new IntPtr(1);

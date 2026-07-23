@@ -43,6 +43,10 @@ namespace LongBetterWindows.Host
             => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId);
         internal string? QualityWorkflowUpgradePackagePath
             => _startupOptions.QualityWorkflowUpgradePackagePath;
+        internal string? QualityTerminalExportDirectory
+            => _startupOptions.QualityTerminalExportDirectory;
+        internal string? QualityWorkflowsDirectory
+            => _startupOptions.QualityWorkflowsDirectory;
         internal string? QualityMarketplaceCatalogPath => _startupOptions.MarketplaceCatalogPath;
         internal string? QualityMarketplaceTrustStorePath => _startupOptions.MarketplaceTrustStorePath;
 

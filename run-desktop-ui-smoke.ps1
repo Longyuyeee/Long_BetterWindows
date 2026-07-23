@@ -5,7 +5,8 @@ param(
     [string] $ReleaseDirectory,
     [switch] $NoBuild,
     [switch] $WorkflowOnly,
-    [switch] $WorkflowOutputOnly
+    [switch] $WorkflowOutputOnly,
+    [switch] $WorkflowExportMatrix
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,6 +18,29 @@ if (Test-Path -LiteralPath $outputRoot) {
 [IO.Directory]::CreateDirectory($outputRoot) | Out-Null
 $workflowRoot = Join-Path $outputRoot 'workflows'
 [IO.Directory]::CreateDirectory($workflowRoot) | Out-Null
+$exportMatrixRoot = Join-Path $outputRoot 'terminal-export-matrix'
+$exportWritableRoot = Join-Path $exportMatrixRoot 'writable'
+$exportDeniedRoot = Join-Path $exportMatrixRoot 'denied'
+$exportReparseTarget = Join-Path $exportMatrixRoot 'reparse-target'
+$exportReparseRoot = Join-Path $exportMatrixRoot 'reparse'
+$exportAclIdentity = $null
+if ($WorkflowExportMatrix) {
+    [IO.Directory]::CreateDirectory($exportWritableRoot) | Out-Null
+    [IO.Directory]::CreateDirectory($exportDeniedRoot) | Out-Null
+    [IO.Directory]::CreateDirectory($exportReparseTarget) | Out-Null
+    [IO.File]::WriteAllText(
+        (Join-Path $exportWritableRoot 'existing.txt'),
+        'quality-original',
+        [Text.UTF8Encoding]::new($false))
+    New-Item -ItemType Junction -Path $exportReparseRoot `
+        -Target $exportReparseTarget | Out-Null
+    $exportAclIdentity = '*' + [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    & icacls.exe $exportDeniedRoot /deny `
+        ($exportAclIdentity + ':(OI)(CI)(W)') /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not create the terminal export permission-denied directory.'
+    }
+}
 $qualityWorkflow = @'
 {
   "schema_version": 3,
@@ -472,6 +496,7 @@ $report = [ordered]@{
     super_panel = [ordered]@{}
     workflow_review = [ordered]@{}
     workflow_output = [ordered]@{}
+    workflow_export = [ordered]@{}
     plugin_lifecycle = [ordered]@{}
     marketplace = [ordered]@{}
     automation_semantics = [ordered]@{}
@@ -796,9 +821,15 @@ try {
     }
 
     Write-Stage 'Starting approved long terminal-output workflow.'
-    $workflowOutputProcess = Start-QualityHost @(
+    $workflowOutputArguments = @(
         '--quality-open-workflow',
         'workflow.quality.review')
+    if ($WorkflowExportMatrix) {
+        $workflowOutputArguments += @(
+            '--quality-terminal-export-dir',
+            $exportMatrixRoot)
+    }
+    $workflowOutputProcess = Start-QualityHost $workflowOutputArguments
     $outputMainHandle = Wait-Until {
         [LongDesktopInput]::TopLevelWindows($workflowOutputProcess.Id) |
             Select-Object -First 1
@@ -819,6 +850,26 @@ try {
         $length = [LongDesktopInput]::WorkflowMessage($outputMainHandle, 11)
         if ($length -ge 3600) { $length }
     } 'The isolated long-output workflow did not complete with bounded output.'
+    if ($WorkflowExportMatrix) {
+        Write-Stage 'Running the isolated terminal-output export refusal matrix.'
+        Invoke-WindowWorkflowAction $outputMainHandle 6 `
+            'The window-level terminal-output export matrix could not be invoked.'
+        $exportMatrixStatus = Wait-Until {
+            $status = [LongDesktopInput]::WorkflowMessage($outputMainHandle, 15)
+            if ($status -eq 1 -or $status -eq -1) { $status }
+        } 'The terminal-output export matrix did not complete.'
+        if ($exportMatrixStatus -ne 1) {
+            throw 'The terminal-output export matrix reported a failure.'
+        }
+        $exportMatrixEvidencePath = Join-Path $exportMatrixRoot 'host-export-matrix.json'
+        $exportMatrixEvidence = Wait-Until {
+            if (Test-Path -LiteralPath $exportMatrixEvidencePath) {
+                Get-Content -LiteralPath $exportMatrixEvidencePath -Raw -Encoding utf8 |
+                    ConvertFrom-Json
+            }
+        } 'The terminal-output export matrix evidence was not written.'
+        $report.workflow_export = $exportMatrixEvidence
+    }
     Invoke-WindowWorkflowAction $outputMainHandle 4 `
         'The window-level terminal output clear action could not be invoked.'
     Start-Sleep -Milliseconds 500
@@ -1046,6 +1097,12 @@ finally {
     Stop-QualityHost $pluginProcess
     Stop-QualityHost $marketProcess
     Stop-QualityHost $accessibilityProcess
+    if ($WorkflowExportMatrix -and $null -ne $exportAclIdentity) {
+        & icacls.exe $exportDeniedRoot /remove:d $exportAclIdentity /Q | Out-Null
+    }
+    if (Test-Path -LiteralPath $exportReparseRoot) {
+        Remove-Item -LiteralPath $exportReparseRoot -Force
+    }
     $report | ConvertTo-Json -Depth 6 | Set-Content `
         -LiteralPath (Join-Path $outputRoot 'desktop-ui-smoke.json') -Encoding UTF8
 }

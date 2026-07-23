@@ -1,0 +1,57 @@
+﻿{
+    "schema_version":  1,
+    "generated_at":  "2026-07-23T03:41:44.8793196+00:00",
+    "classification":  "desktop_ui_automation_smoke",
+    "release_executable":  "E:\\Project\\AIProject\\GeminiProject\\Long_BetterWindows\\src\\LongBetterWindows.Host\\bin\\Release\\net8.0-windows\\LongBetterWindows.Host.exe",
+    "palette":  {
+
+                },
+    "super_panel":  {
+
+                    },
+    "workflow_review":  {
+
+                        },
+    "workflow_output":  {
+                            "isolated_report_root":  "E:\\Project\\AIProject\\GeminiProject\\Long_BetterWindows\\artifacts\\quality\\workflow-terminal-export-full-20260723\\workflows\\.reports",
+                            "read_only_execution_confirmed":  true,
+                            "review_state_cleared_after_confirmation":  true,
+                            "execution_completed":  true,
+                            "terminal_output_approved":  true,
+                            "terminal_output_length":  3699,
+                            "terminal_output_bounded_scroll":  true,
+                            "terminal_output_cleared":  true,
+                            "isolated_report_written":  true
+                        },
+    "workflow_export":  {
+                            "schema_version":  1,
+                            "classification":  "workflow_terminal_output_export_matrix",
+                            "value_sha256":  "22d8ad672e03dfa27e5b2e9ce578ae62c92e6a2f1a9768793ab0bd63d7c3b526",
+                            "utf8_byte_count":  3699,
+                            "cases":  {
+                                          "existing_target":  true,
+                                          "missing_directory":  true,
+                                          "reparse_point":  true,
+                                          "target_changed":  true,
+                                          "value_changed":  true,
+                                          "permission_denied":  true,
+                                          "success":  true
+                                      },
+                            "temporary_files_cleaned":  true,
+                            "reports_redacted":  true
+                        },
+    "plugin_lifecycle":  {
+
+                         },
+    "marketplace":  {
+
+                    },
+    "automation_semantics":  {
+
+                             },
+    "accessibility_modes":  [
+
+                            ],
+    "passed":  true,
+    "error":  null
+}

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using LongBetterWindows.Host.Interaction;
 using System.Windows.Input;
 using System.Windows.Media;
 using LongBetterWindows.Host.Engine;
@@ -173,6 +174,11 @@ namespace LongBetterWindows.Host.Views
         internal bool ClearWorkflowTerminalOutputs()
             => WorkflowEditorHost.Content is WorkflowEditorControl editor
                 && editor.ClearTerminalOutputs();
+
+        internal WorkflowTerminalOutput? GetWorkflowTerminalOutputForQuality()
+            => WorkflowEditorHost.Content is WorkflowEditorControl editor
+                ? editor.GetTerminalOutputForQuality()
+                : null;
 
         internal bool ToggleWorkflowTerminalOutputApproval()
             => WorkflowEditorHost.Content is WorkflowEditorControl editor

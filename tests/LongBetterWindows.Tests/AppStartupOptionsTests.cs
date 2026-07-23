@@ -25,6 +25,7 @@ public class AppStartupOptionsTests
             "--quality-workflows-dir", "quality-workflows",
             "--quality-open-workflow", "workflow.quality.review",
             "--quality-workflow-upgrade-package", "quality-v2.lpak",
+            "--quality-terminal-export-dir", "quality-exports",
         ]);
 
         Assert.Equal("dark", options.ThemeOverride);
@@ -44,6 +45,7 @@ public class AppStartupOptionsTests
         Assert.Equal("quality-workflows", options.QualityWorkflowsDirectory);
         Assert.Equal("workflow.quality.review", options.QualityWorkflowReviewId);
         Assert.Equal("quality-v2.lpak", options.QualityWorkflowUpgradePackagePath);
+        Assert.Equal("quality-exports", options.QualityTerminalExportDirectory);
     }
 
     [Fact]
