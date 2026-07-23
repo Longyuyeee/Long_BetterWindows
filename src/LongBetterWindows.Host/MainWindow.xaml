@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:LongBetterWindows.Host.Views"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="Long窗口·全能助手"
+        Title="{DynamicResource i18n.app.title}"
         MinWidth="720" MinHeight="560"
         Width="1120" Height="760"
         Style="{StaticResource LongWindowChrome}"
@@ -11,7 +11,7 @@
         Loaded="Window_Loaded"
         PreviewKeyDown="Window_PreviewKeyDown"
         AutomationProperties.AutomationId="Long.MainWindow"
-        AutomationProperties.Name="Long 窗口管理中心">
+        AutomationProperties.Name="{DynamicResource i18n.app.title}">
 
     <Border Background="{DynamicResource Long.Brush.Background.Base}"
             BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
@@ -45,9 +45,9 @@
                                   Width="15" Height="15" Stroke="White"
                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="Long窗口" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
+                        <TextBlock Text="{DynamicResource i18n.app.brand}" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
                                    Foreground="{DynamicResource Long.Brush.Text.Primary}" VerticalAlignment="Center" />
-                        <TextBlock Text="管理中心" Margin="8,0,0,0" FontSize="11"
+                        <TextBlock Text="{DynamicResource i18n.app.management}" Margin="8,0,0,0" FontSize="11"
                                    Foreground="{DynamicResource Long.Brush.Text.Muted}" VerticalAlignment="Center" />
                     </StackPanel>
 
@@ -86,17 +86,18 @@
                     <Button x:Name="OpenSuperPanelButton" Grid.Column="4" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                             Margin="0,0,6,0" Click="OpenSuperPanel_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            ToolTip="打开 Long 超级面板" AutomationProperties.Name="打开 Long 超级面板">
+                            ToolTip="{DynamicResource i18n.app.openSuperPanel}"
+                            AutomationProperties.Name="{DynamicResource i18n.app.openSuperPanel}">
                         <Path Data="{StaticResource Long.Icon.Command}" Style="{StaticResource LongIcon}" Width="14" Height="14" />
                     </Button>
 
                     <Button x:Name="OpenPaletteButton" Grid.Column="5" Style="{StaticResource LongButton}" Height="30" MinWidth="148"
                             Margin="0,0,10,0" Click="OpenPalette_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            AutomationProperties.Name="打开命令中心">
+                            AutomationProperties.Name="{DynamicResource i18n.app.openCommandCenter}">
                         <StackPanel Orientation="Horizontal">
                             <Path Data="{StaticResource Long.Icon.Search}" Style="{StaticResource LongIcon}" Width="14" Height="14" />
-                            <TextBlock Text="打开命令中心" Margin="7,0,12,0" FontSize="11" />
+                            <TextBlock Text="{DynamicResource i18n.app.openCommandCenter}" Margin="7,0,12,0" FontSize="11" />
                             <Border Style="{StaticResource LongHotkeyBadge}">
                                 <TextBlock Text="Alt Space" FontFamily="{DynamicResource Long.Font.Mono}" FontSize="9"
                                            Foreground="{DynamicResource Long.Brush.Text.Muted}" />
@@ -106,12 +107,13 @@
 
                     <Button Grid.Column="6" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                             Margin="0,0,4,0" Click="Minimize_Click"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True" AutomationProperties.Name="最小化">
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            AutomationProperties.Name="{DynamicResource i18n.app.minimize}">
                         <TextBlock Text="—" FontSize="14" />
                     </Button>
                     <Button Grid.Column="7" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                             Click="Close_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            AutomationProperties.Name="关闭">
+                            AutomationProperties.Name="{DynamicResource i18n.app.close}">
                         <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}" Width="13" Height="13" />
                     </Button>
                 </Grid>

@@ -1,79 +1,162 @@
 using System.IO;
 using System.Text.Json;
+using System.Windows;
 using Serilog;
 
-namespace LongBetterWindows.Host.Services
+namespace LongBetterWindows.Host.Services;
+
+public sealed class I18nService
 {
-    /// <summary>
-    /// 国际化服务——JSON 文件驱动的多语言支持。
-    /// 后续可通过设置界面切换语言。
-    /// </summary>
-    public static class I18nService
+    public const string DefaultLanguage = "zh-CN";
+    public static readonly IReadOnlyList<string> SupportedLanguages =
+        ["zh-CN", "en-US"];
+
+    private readonly string _resourceDirectory;
+    private readonly string _settingsPath;
+    private IReadOnlyDictionary<string, string> _strings =
+        new Dictionary<string, string>();
+
+    public I18nService(string? resourceDirectory = null, string? settingsPath = null)
     {
-        private static Dictionary<string, string> _strings = new();
-        public static string CurrentLang { get; private set; } = "zh-CN";
+        _resourceDirectory = resourceDirectory ?? Path.Combine(
+            AppContext.BaseDirectory,
+            "i18n");
+        _settingsPath = settingsPath ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "LongBetterWindows",
+            "language.json");
+    }
 
-        /// <summary>支持的语言列表</summary>
-        public static readonly string[] SupportedLanguages = { "zh-CN", "en-US" };
+    public string CurrentLanguage { get; private set; } = DefaultLanguage;
+    public event Action<string>? LanguageChanged;
 
-        public static void Initialize(string? lang = null)
+    public void Initialize(string? overrideLanguage = null)
+    {
+        var requested = string.IsNullOrWhiteSpace(overrideLanguage)
+            ? ReadPersistedLanguage()
+            : overrideLanguage;
+        Load(IsSupported(requested) ? requested! : DefaultLanguage);
+    }
+
+    public string T(string key, string? fallback = null)
+        => _strings.TryGetValue(key, out var value)
+            ? value
+            : fallback ?? key;
+
+    public void SetLanguage(string language, bool persist = true)
+    {
+        if (!IsSupported(language))
+            throw new ArgumentOutOfRangeException(
+                nameof(language),
+                language,
+                "Unsupported UI language.");
+        if (string.Equals(
+            CurrentLanguage,
+            language,
+            StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Load(language);
+        if (persist)
+            PersistLanguage(language);
+        LanguageChanged?.Invoke(language);
+        Log.Information("UI language changed: {Language}", language);
+    }
+
+    public void ApplyTo(ResourceDictionary resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+        foreach (var entry in _strings)
+            resources[$"i18n.{entry.Key}"] = entry.Value;
+        resources["i18n.currentLanguage"] = CurrentLanguage;
+    }
+
+    public static bool IsSupported(string? language)
+        => SupportedLanguages.Contains(
+            language ?? string.Empty,
+            StringComparer.OrdinalIgnoreCase);
+
+    private void Load(string language)
+    {
+        var fallback = ReadLanguageFile(DefaultLanguage);
+        var selected = string.Equals(
+            language,
+            DefaultLanguage,
+            StringComparison.OrdinalIgnoreCase)
+            ? fallback
+            : ReadLanguageFile(language);
+        var merged = new Dictionary<string, string>(
+            fallback,
+            StringComparer.Ordinal);
+        foreach (var entry in selected)
+            merged[entry.Key] = entry.Value;
+
+        CurrentLanguage = SupportedLanguages.First(item =>
+            string.Equals(item, language, StringComparison.OrdinalIgnoreCase));
+        _strings = merged;
+    }
+
+    private Dictionary<string, string> ReadLanguageFile(string language)
+    {
+        var path = Path.Combine(_resourceDirectory, $"{language}.json");
+        if (!File.Exists(path))
         {
-            CurrentLang = lang ?? "zh-CN";
-            Load(CurrentLang);
+            if (language == DefaultLanguage)
+                throw new FileNotFoundException(
+                    "Default localization resource was not found.",
+                    path);
+            return new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
-        public static string T(string key, string fallback = "")
+        var values = JsonSerializer.Deserialize<Dictionary<string, string>>(
+            File.ReadAllText(path)) ??
+            new Dictionary<string, string>();
+        values.Remove("_lang");
+        return new Dictionary<string, string>(values, StringComparer.Ordinal);
+    }
+
+    private string? ReadPersistedLanguage()
+    {
+        try
         {
-            return _strings.TryGetValue(key, out var val) ? val : fallback;
+            if (!File.Exists(_settingsPath))
+                return null;
+            using var document = JsonDocument.Parse(
+                File.ReadAllText(_settingsPath));
+            return document.RootElement.TryGetProperty("language", out var value)
+                ? value.GetString()
+                : null;
         }
-
-        public static void SetLanguage(string lang)
+        catch (Exception exception)
         {
-            CurrentLang = lang;
-            Load(lang);
-            Log.Information("语言切换为: {Lang}", lang);
+            Log.Warning(exception, "Could not read UI language settings.");
+            return null;
         }
+    }
 
-        /// <summary>在中英文之间切换</summary>
-        public static string ToggleLanguage()
+    private void PersistLanguage(string language)
+    {
+        var directory = Path.GetDirectoryName(_settingsPath)
+            ?? throw new InvalidOperationException(
+                "Language settings path has no parent directory.");
+        Directory.CreateDirectory(directory);
+        var temporaryPath = _settingsPath + "." +
+            Guid.NewGuid().ToString("N") + ".tmp";
+        try
         {
-            var next = CurrentLang == "zh-CN" ? "en-US" : "zh-CN";
-            SetLanguage(next);
-            return next;
+            File.WriteAllText(
+                temporaryPath,
+                JsonSerializer.Serialize(new
+                {
+                    schema_version = 1,
+                    language,
+                }));
+            File.Move(temporaryPath, _settingsPath, overwrite: true);
         }
-
-        private static void Load(string lang)
+        finally
         {
-            _strings.Clear();
-
-            // 查找 i18n 目录
-            var dir = AppContext.BaseDirectory;
-            string? i18nDir = null;
-            for (int i = 0; i < 6; i++)
-            {
-                var candidate = Path.Combine(dir, "i18n");
-                if (Directory.Exists(candidate)) { i18nDir = candidate; break; }
-                var parent = Directory.GetParent(dir);
-                if (parent == null) break;
-                dir = parent.FullName;
-            }
-
-            if (i18nDir == null) return;
-
-            var file = Path.Combine(i18nDir, $"{lang}.json");
-            if (!File.Exists(file)) file = Path.Combine(i18nDir, "zh-CN.json");
-            if (!File.Exists(file)) return;
-
-            try
-            {
-                var json = File.ReadAllText(file);
-                var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-                if (dict != null) _strings = dict;
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "加载语言文件失败: {Lang}", lang);
-            }
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
         }
     }
 }

@@ -6,6 +6,7 @@ namespace LongBetterWindows.Host.Services
         public bool IsDirectNoteMode => !string.IsNullOrWhiteSpace(DirectNotePath);
         public bool ShowDesignSystemPreview { get; private init; }
         public string? ThemeOverride { get; private init; }
+        public string? LanguageOverride { get; private init; }
         public string? RequestedCommandKey { get; private init; }
         public string? RequestedCommandText { get; private init; }
         public string? RequestedPluginsDirectory { get; private init; }
@@ -15,12 +16,17 @@ namespace LongBetterWindows.Host.Services
         public bool OpenMarketForQuality { get; private init; }
         public bool OpenDiagnosticsForQuality { get; private init; }
         public bool OpenPluginsForQuality { get; private init; }
+        public bool OpenSystemForQuality { get; private init; }
+        public bool OpenSettingsForQuality { get; private init; }
+        public bool ShowWelcomeForQuality { get; private init; }
+        public bool ShowMarketListForQuality { get; private init; }
         public string? MarketplaceCatalogPath { get; private init; }
         public string? MarketplaceTrustStorePath { get; private init; }
         public bool UseLiveContextForQuality { get; private init; }
         public bool UseEmptyContextForQuality { get; private init; }
         public string? QualityWorkflowsDirectory { get; private init; }
         public string? QualityWorkflowReviewId { get; private init; }
+        public string? QualityWorkflowEditorId { get; private init; }
         public string? QualityWorkflowUpgradePackagePath { get; private init; }
         public string? QualityTerminalExportDirectory { get; private init; }
         public bool ForceHighContrast { get; private init; }
@@ -38,6 +44,7 @@ namespace LongBetterWindows.Host.Services
             var captureView = ReadArgument(arguments, "--quality-capture-view")?
                 .ToLowerInvariant() ?? "main";
             var themeOverride = ReadArgument(arguments, "--theme")?.ToLowerInvariant();
+            var languageOverride = ReadArgument(arguments, "--language");
 
             return new AppStartupOptions
             {
@@ -45,6 +52,13 @@ namespace LongBetterWindows.Host.Services
                 ShowDesignSystemPreview = HasSwitch(arguments, "--design-system-preview"),
                 ThemeOverride = themeOverride is "light" or "dark" or "system"
                     ? themeOverride
+                    : null,
+                LanguageOverride = I18nService.IsSupported(languageOverride)
+                    ? I18nService.SupportedLanguages.First(language =>
+                        string.Equals(
+                            language,
+                            languageOverride,
+                            StringComparison.OrdinalIgnoreCase))
                     : null,
                 RequestedCommandKey = ReadArgument(arguments, "--run-command")?.ToLowerInvariant(),
                 RequestedCommandText = ReadArgument(arguments, "--command-text"),
@@ -55,12 +69,17 @@ namespace LongBetterWindows.Host.Services
                 OpenMarketForQuality = HasSwitch(arguments, "--quality-open-market") || captureView == "market",
                 OpenDiagnosticsForQuality = HasSwitch(arguments, "--quality-open-diagnostics") || captureView == "diagnostics",
                 OpenPluginsForQuality = HasSwitch(arguments, "--quality-open-plugins") || captureView == "plugins",
+                OpenSystemForQuality = HasSwitch(arguments, "--quality-open-system") || captureView == "system",
+                OpenSettingsForQuality = HasSwitch(arguments, "--quality-open-settings") || captureView == "settings",
+                ShowWelcomeForQuality = HasSwitch(arguments, "--quality-show-welcome"),
+                ShowMarketListForQuality = HasSwitch(arguments, "--quality-market-list"),
                 MarketplaceCatalogPath = ReadArgument(arguments, "--quality-market-catalog"),
                 MarketplaceTrustStorePath = ReadArgument(arguments, "--quality-market-trust-store"),
                 UseLiveContextForQuality = HasSwitch(arguments, "--quality-live-context"),
                 UseEmptyContextForQuality = HasSwitch(arguments, "--quality-empty-context"),
                 QualityWorkflowsDirectory = ReadArgument(arguments, "--quality-workflows-dir"),
                 QualityWorkflowReviewId = ReadArgument(arguments, "--quality-open-workflow"),
+                QualityWorkflowEditorId = ReadArgument(arguments, "--quality-edit-workflow"),
                 QualityWorkflowUpgradePackagePath = ReadArgument(
                     arguments,
                     "--quality-workflow-upgrade-package"),

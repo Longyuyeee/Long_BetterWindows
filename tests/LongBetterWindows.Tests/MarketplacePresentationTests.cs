@@ -26,7 +26,6 @@ public class MarketplacePresentationTests
         var card = Assert.Single(cards);
         Assert.Equal("dev.long.clipboard", card.Entry.Id);
         Assert.Equal(MarketplaceInstallState.UpdateAvailable, card.State);
-        Assert.Equal("可更新", card.StateLabel);
     }
 
     [Fact]
@@ -41,7 +40,7 @@ public class MarketplacePresentationTests
             "1.9.0");
 
         Assert.False(compatibility.IsCompatible);
-        Assert.Contains("Host >= 9.0.0", compatibility.Description);
+        Assert.Contains("Host >= 9.0.0", compatibility.Requirements);
     }
 
     [Fact]

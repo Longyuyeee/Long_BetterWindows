@@ -247,6 +247,359 @@ public class CommandContractTests
     }
 
     [Fact]
+    public async Task ManifestReader_ArgumentSchema_ParsesSupportedTypesAndConstraints()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.argument-schema",
+            version = "1.0.0",
+            name = "Argument schema",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "generate",
+                    title = "Generate",
+                    accepted_inputs = new[] { "none" },
+                    argument_schema = new object[]
+                    {
+                        new
+                        {
+                            key = "amount",
+                            name = "数量",
+                            description = "生成数量",
+                            type = "integer",
+                            required = true,
+                            default_value = "10",
+                            minimum = 1,
+                            maximum = 1000,
+                        },
+                        new
+                        {
+                            key = "format",
+                            name = "格式",
+                            type = "enum",
+                            default_value = "standard",
+                            enum_values = new[] { "standard", "compact" },
+                        },
+                        new
+                        {
+                            key = "secret",
+                            name = "访问令牌",
+                            type = "string",
+                            sensitive = true,
+                            min_length = 8,
+                            max_length = 128,
+                        },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.True(result.IsSuccess, result.Error);
+        var schema = Assert.Single(result.Manifest!.Commands).ArgumentSchema;
+        Assert.Equal(3, schema.Count);
+        Assert.Equal(PluginCommandArgumentType.Integer, schema[0].Type);
+        Assert.True(schema[0].Required);
+        Assert.Equal(1m, schema[0].Minimum);
+        Assert.Equal(1000m, schema[0].Maximum);
+        Assert.Equal(new[] { "standard", "compact" }, schema[1].EnumValues);
+        Assert.True(schema[2].Sensitive);
+        Assert.Equal(8, schema[2].MinLength);
+    }
+
+    [Fact]
+    public async Task ManifestReader_ArgumentSchema_RejectsDuplicateAndInvalidDeclarations()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.invalid-argument-schema",
+            version = "1.0.0",
+            name = "Invalid argument schema",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "run",
+                    title = "Run",
+                    accepted_inputs = new[] { "none" },
+                    argument_schema = new object[]
+                    {
+                        new { key = "same", name = "First", type = "string" },
+                        new { key = "same", name = "Second", type = "string" },
+                        new { key = "not valid", name = "", type = "string" },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("重复参数 key", result.Error);
+        Assert.Contains("参数 key 无效", result.Error);
+        Assert.Contains("显示名称无效", result.Error);
+    }
+
+    [Fact]
+    public async Task ManifestReader_ArgumentSchema_RejectsConstraintsForWrongTypes()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.invalid-constraints",
+            version = "1.0.0",
+            name = "Invalid constraints",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "run",
+                    title = "Run",
+                    accepted_inputs = new[] { "none" },
+                    argument_schema = new object[]
+                    {
+                        new { key = "text", name = "Text", type = "string", minimum = 1 },
+                        new { key = "flag", name = "Flag", type = "boolean", min_length = 1 },
+                        new
+                        {
+                            key = "count",
+                            name = "Count",
+                            type = "integer",
+                            minimum = 1.5m,
+                            maximum = 1m,
+                        },
+                        new
+                        {
+                            key = "mode",
+                            name = "Mode",
+                            type = "enum",
+                            enum_values = Array.Empty<string>(),
+                        },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("仅数值类型", result.Error);
+        Assert.Contains("仅 string 类型", result.Error);
+        Assert.Contains("minimum 不能大于 maximum", result.Error);
+        Assert.Contains("范围必须使用整数", result.Error);
+        Assert.Contains("必须声明 1 到 64 个 enum_values", result.Error);
+    }
+
+    [Fact]
+    public async Task ManifestReader_ArgumentSchema_RejectsInvalidEnumValuesAndStringRanges()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.invalid-enum",
+            version = "1.0.0",
+            name = "Invalid enum",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "run",
+                    title = "Run",
+                    accepted_inputs = new[] { "none" },
+                    argument_schema = new object[]
+                    {
+                        new
+                        {
+                            key = "mode",
+                            name = "Mode",
+                            type = "enum",
+                            enum_values = new[] { "same", "same", "" },
+                        },
+                        new
+                        {
+                            key = "query",
+                            name = "Query",
+                            type = "string",
+                            min_length = 20,
+                            max_length = 10,
+                        },
+                        new
+                        {
+                            key = "count",
+                            name = "Count",
+                            type = "integer",
+                            enum_values = new[] { "1" },
+                        },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("包含空值、重复值或超长值", result.Error);
+        Assert.Contains("min_length 不能大于 max_length", result.Error);
+        Assert.Contains("仅 enum 类型", result.Error);
+    }
+
+    [Fact]
+    public async Task ManifestReader_ArgumentSchema_EnforcesCountAndTextLimits()
+    {
+        var declarations = Enumerable.Range(0, 65)
+            .Select(index => new
+            {
+                key = $"value-{index}",
+                name = index == 0 ? new string('n', 121) : $"Value {index}",
+                description = index == 1 ? new string('d', 1001) : string.Empty,
+                type = "string",
+                default_value = index == 2 ? new string('x', 65537) : null,
+                max_length = index == 3 ? 65537 : (int?)null,
+            })
+            .ToArray();
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.argument-schema-limits",
+            version = "1.0.0",
+            name = "Argument schema limits",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "run",
+                    title = "Run",
+                    accepted_inputs = new[] { "none" },
+                    argument_schema = declarations,
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("不能声明超过 64 个 argument_schema 参数", result.Error);
+        Assert.Contains("显示名称无效", result.Error);
+        Assert.Contains("说明超过 1000 个字符", result.Error);
+        Assert.Contains("默认值超过限制", result.Error);
+        Assert.Contains("长度约束必须在 0 到 65536 之间", result.Error);
+    }
+
+    [Fact]
+    public async Task ManifestReader_ArgumentSchema_ValidatesDefaultsAndStaticPresets()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.argument-values",
+            version = "1.0.0",
+            name = "Argument values",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "run",
+                    title = "Run",
+                    accepted_inputs = new[] { "none" },
+                    argument_schema = new object[]
+                    {
+                        new
+                        {
+                            key = "amount",
+                            name = "Amount",
+                            type = "integer",
+                            required = true,
+                            minimum = 1,
+                            maximum = 100,
+                        },
+                        new
+                        {
+                            key = "compact",
+                            name = "Compact",
+                            type = "boolean",
+                            default_value = "false",
+                        },
+                    },
+                    argument_presets = new object[]
+                    {
+                        new
+                        {
+                            id = "valid",
+                            name = "Valid",
+                            arguments = new Dictionary<string, string>
+                            {
+                                ["amount"] = "10",
+                            },
+                        },
+                        new
+                        {
+                            id = "invalid",
+                            name = "Invalid",
+                            arguments = new Dictionary<string, string>
+                            {
+                                ["amount"] = "101",
+                                ["unknown"] = "sensitive-value",
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("参数预设 'invalid' 无效", result.Error);
+        Assert.Contains("amount", result.Error);
+        Assert.Contains("unknown", result.Error);
+        Assert.DoesNotContain("sensitive-value", result.Error);
+        Assert.DoesNotContain("参数预设 'valid' 无效", result.Error);
+    }
+
+    [Fact]
+    public async Task ManifestReader_ArgumentSchema_RejectsInvalidDeclaredDefault()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.invalid-default",
+            version = "1.0.0",
+            name = "Invalid default",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "run",
+                    title = "Run",
+                    accepted_inputs = new[] { "none" },
+                    argument_schema = new[]
+                    {
+                        new
+                        {
+                            key = "amount",
+                            name = "Amount",
+                            type = "integer",
+                            default_value = "not-an-integer",
+                        },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("参数默认值无效", result.Error);
+        Assert.Contains("amount", result.Error);
+        Assert.DoesNotContain("not-an-integer", result.Error);
+    }
+
+    [Fact]
     public async Task ManifestReader_PreferredWindowSmallerThanMinimum_ReturnsFailure()
     {
         var dir = CreateManifestDir(new
@@ -271,6 +624,7 @@ public class CommandContractTests
     [InlineData("ColorPickerPlugin")]
     [InlineData("FolderNotePlugin")]
     [InlineData("FileRenamerPlugin")]
+    [InlineData("UuidGenerator")]
     public async Task BuiltInManifest_CommandContract_IsValid(string pluginDirectory)
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -281,6 +635,48 @@ public class CommandContractTests
         Assert.True(result.IsSuccess, result.Error);
         Assert.NotEmpty(result.Manifest!.Commands);
         Assert.NotNull(result.Manifest.Window);
+    }
+
+    [Fact]
+    public async Task UuidGenerator_ArgumentSchema_MatchesRuntimeAndPresets()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var directory = Path.Combine(repositoryRoot, "src", "UuidGenerator");
+
+        var result = await ManifestReader.ReadAsync(directory);
+
+        Assert.True(result.IsSuccess, result.Error);
+        var command = Assert.Single(result.Manifest!.Commands);
+        Assert.Equal("uuid.generate", command.Id);
+        Assert.Collection(
+            command.ArgumentSchema,
+            amount =>
+            {
+                Assert.Equal("amount", amount.Key);
+                Assert.Equal(PluginCommandArgumentType.Integer, amount.Type);
+                Assert.Equal("10", amount.DefaultValue);
+                Assert.Equal(1m, amount.Minimum);
+                Assert.Equal(100m, amount.Maximum);
+            },
+            uppercase =>
+            {
+                Assert.Equal("uppercase", uppercase.Key);
+                Assert.Equal(PluginCommandArgumentType.Boolean, uppercase.Type);
+                Assert.Equal("false", uppercase.DefaultValue);
+            },
+            compact =>
+            {
+                Assert.Equal("compact", compact.Key);
+                Assert.Equal(PluginCommandArgumentType.Boolean, compact.Type);
+                Assert.Equal("false", compact.DefaultValue);
+            });
+        Assert.Equal(3, command.ArgumentPresets.Count);
+
+        var implementation = await File.ReadAllTextAsync(
+            Path.Combine(directory, "index.html"));
+        Assert.Contains("Math.min(100", implementation, StringComparison.Ordinal);
+        Assert.Contains("args.uppercase === 'true'", implementation, StringComparison.Ordinal);
+        Assert.Contains("args.compact === 'true'", implementation, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -558,6 +954,100 @@ public class CommandContractTests
 
         Assert.False(result.IsSuccess);
         Assert.Null(plugin.LastInvocation);
+    }
+
+    [Fact]
+    public async Task CommandExecutor_ValidatesDefaultsAndPassesCanonicalArguments()
+    {
+        var registry = new PluginRegistry();
+        var manifest = CreateManifest(
+            "handler",
+            new PluginCommand
+            {
+                Id = "handler.run",
+                Title = "Run",
+                AcceptedInputs = new List<AcceptedInputType> { AcceptedInputType.None },
+                ArgumentSchema =
+                [
+                    new PluginCommandArgumentDeclaration
+                    {
+                        Key = "count",
+                        Name = "Count",
+                        Type = PluginCommandArgumentType.Integer,
+                        DefaultValue = "0010",
+                    },
+                    new PluginCommandArgumentDeclaration
+                    {
+                        Key = "enabled",
+                        Name = "Enabled",
+                        Type = PluginCommandArgumentType.Boolean,
+                    },
+                ],
+            });
+        var plugin = new CommandTestPlugin();
+        registry.Register(manifest, plugin, null, "/handler-arguments");
+        var executor = new CommandExecutor(registry);
+
+        var result = await executor.ExecuteAsync(
+            "handler:handler.run",
+            new PluginCommandInvocation
+            {
+                CommandId = "handler.run",
+                Arguments = new Dictionary<string, string>
+                {
+                    ["enabled"] = "TRUE",
+                },
+            });
+
+        Assert.True(result.IsSuccess, result.Message);
+        Assert.Equal("10", plugin.LastInvocation!.Arguments["count"]);
+        Assert.Equal("true", plugin.LastInvocation.Arguments["enabled"]);
+    }
+
+    [Fact]
+    public async Task CommandExecutor_InvalidArgumentsFailBeforePluginStarts()
+    {
+        var registry = new PluginRegistry();
+        var manifest = CreateManifest(
+            "handler",
+            new PluginCommand
+            {
+                Id = "handler.run",
+                Title = "Run",
+                AcceptedInputs = new List<AcceptedInputType> { AcceptedInputType.None },
+                ArgumentSchema =
+                [
+                    new PluginCommandArgumentDeclaration
+                    {
+                        Key = "token",
+                        Name = "Token",
+                        Type = PluginCommandArgumentType.String,
+                        Required = true,
+                        Sensitive = true,
+                    },
+                ],
+            });
+        var plugin = new CommandTestPlugin();
+        registry.Register(manifest, plugin, null, "/handler-invalid-arguments");
+        var executor = new CommandExecutor(registry);
+
+        var result = await executor.ExecuteAsync(
+            "handler:handler.run",
+            new PluginCommandInvocation
+            {
+                CommandId = "handler.run",
+                Arguments = new Dictionary<string, string>
+                {
+                    ["unknown"] = "private-value",
+                },
+            });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("token", result.Message);
+        Assert.Contains("unknown", result.Message);
+        Assert.DoesNotContain("private-value", result.Message);
+        Assert.Null(plugin.LastInvocation);
+        Assert.Equal(PluginState.Loaded, plugin.State);
     }
 
     [Fact]

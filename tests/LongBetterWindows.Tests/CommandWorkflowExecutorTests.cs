@@ -397,6 +397,148 @@ public class CommandWorkflowExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_BoundArgumentIsValidatedBeforePrimaryRunner()
+    {
+        var registry = CreateRegistry();
+        registry.Commands.Get("workflow:write-two")!.Command.ArgumentSchema.Add(
+            IntegerArgument("count", required: true));
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.dynamic-argument",
+            "Dynamic argument",
+            WorkflowFailureMode.Stop,
+            [
+                new CommandWorkflowStep(
+                    "source",
+                    WorkflowStepEffect.ReadOnly,
+                    Command("write-one")),
+                new CommandWorkflowStep(
+                    "target",
+                    WorkflowStepEffect.ReadOnly,
+                    new WorkflowCommand(
+                        "workflow:write-two",
+                        new PluginCommandInvocation { CommandId = "write-two" },
+                        [
+                            new WorkflowValueBinding(
+                                "source",
+                                "restore-token",
+                                WorkflowBindingTarget.Argument,
+                                "count"),
+                        ])),
+            ]);
+        const string privateInvalidValue = "private-not-an-integer";
+        var runner = new CapturingRunner((command, _) => command == "workflow:write-one"
+            ? PluginCommandResult.Success(
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["restore-token"] = new(PluginCommandOutputType.Text, privateInvalidValue),
+                })
+            : PluginCommandResult.Success());
+
+        var result = await new CommandWorkflowExecutor(registry, runner)
+            .ExecuteAsync(workflow, Authorize(registry, workflow));
+
+        Assert.Equal(WorkflowExecutionStatus.Failed, result.Status);
+        Assert.Equal(["workflow:write-one"], runner.Calls);
+        Assert.DoesNotContain(result.Events, item =>
+            item.Message?.Contains(privateInvalidValue, StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BoundArgumentIsCanonicalizedBeforePrimaryRunner()
+    {
+        var registry = CreateRegistry();
+        registry.Commands.Get("workflow:write-two")!.Command.ArgumentSchema.Add(
+            IntegerArgument("count", required: true));
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.canonical-argument",
+            "Canonical argument",
+            WorkflowFailureMode.Stop,
+            [
+                new CommandWorkflowStep(
+                    "source",
+                    WorkflowStepEffect.ReadOnly,
+                    Command("write-one")),
+                new CommandWorkflowStep(
+                    "target",
+                    WorkflowStepEffect.ReadOnly,
+                    new WorkflowCommand(
+                        "workflow:write-two",
+                        new PluginCommandInvocation { CommandId = "write-two" },
+                        [
+                            new WorkflowValueBinding(
+                                "source",
+                                "restore-token",
+                                WorkflowBindingTarget.Argument,
+                                "count"),
+                        ])),
+            ]);
+        var runner = new CapturingRunner((command, _) => command == "workflow:write-one"
+            ? PluginCommandResult.Success(
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["restore-token"] = new(PluginCommandOutputType.Text, "0010"),
+                })
+            : PluginCommandResult.Success());
+
+        var result = await new CommandWorkflowExecutor(registry, runner)
+            .ExecuteAsync(workflow, Authorize(registry, workflow));
+
+        Assert.Equal(WorkflowExecutionStatus.Completed, result.Status);
+        Assert.Equal("10", runner.Invocations[1]!.Arguments["count"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_BoundArgumentIsValidatedBeforeCompensationRunner()
+    {
+        var registry = CreateRegistry();
+        registry.Commands.Get("workflow:undo-one")!.Command.ArgumentSchema.Add(
+            IntegerArgument("token", required: true));
+        var workflow = new CommandWorkflowDefinition(
+            "workflow.compensation-parameter",
+            "Compensation parameter",
+            WorkflowFailureMode.Compensate,
+            [
+                new CommandWorkflowStep(
+                    "write",
+                    WorkflowStepEffect.Mutating,
+                    Command("write-one"),
+                    new WorkflowCommand(
+                        "workflow:undo-one",
+                        new PluginCommandInvocation { CommandId = "undo-one" },
+                        [
+                            new WorkflowValueBinding(
+                                "write",
+                                "restore-token",
+                                WorkflowBindingTarget.Argument,
+                                "token"),
+                        ])),
+                new CommandWorkflowStep(
+                    "failure",
+                    WorkflowStepEffect.ReadOnly,
+                    Command("fail")),
+            ]);
+        const string privateInvalidValue = "private-invalid-token";
+        var runner = new CapturingRunner((command, _) => command switch
+        {
+            "workflow:write-one" => PluginCommandResult.Success(
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["restore-token"] = new(PluginCommandOutputType.Text, privateInvalidValue),
+                }),
+            "workflow:fail" => PluginCommandResult.Failure("expected failure"),
+            _ => PluginCommandResult.Success(),
+        });
+
+        var result = await new CommandWorkflowExecutor(registry, runner)
+            .ExecuteAsync(workflow, Authorize(registry, workflow));
+
+        Assert.Equal(WorkflowExecutionStatus.CompensationFailed, result.Status);
+        Assert.DoesNotContain("workflow:undo-one", runner.Calls);
+        Assert.DoesNotContain(result.Events, item =>
+            item.Message?.Contains(privateInvalidValue, StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_InvalidCompensationOutputsMarkCompensationFailed()
     {
         var registry = CreateRegistry();
@@ -603,6 +745,19 @@ public class CommandWorkflowExecutorTests
             Outputs = outputs,
         };
     }
+
+    private static PluginCommandArgumentDeclaration IntegerArgument(
+        string key,
+        bool required = false)
+        => new()
+        {
+            Key = key,
+            Name = key,
+            Type = PluginCommandArgumentType.Integer,
+            Required = required,
+            Minimum = 1,
+            Maximum = 100,
+        };
 
     private sealed class FakeRunner : IWorkflowCommandRunner
     {

@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
+using Microsoft.Win32;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -17,16 +18,21 @@ namespace LongBetterWindows.Host.Views
         internal event EventHandler? WorkflowTerminalOutputsCleared;
         private bool _columnEnabled;
         private bool _contextMenuRegistered;
+        private bool _sparsePackageInstalled;
+        private bool _sparsePackageBusy;
         private bool _startupEnabled;
         private bool _docsLoaded;
         private bool? _isNarrowLayout;
+        private bool _languageSelectorReady;
 
         public ToolCenterControl()
         {
             InitializeComponent();
+            InitializeLanguageSelector();
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             RefreshColumnStatus();
             RefreshContextMenuStatus();
+            Loaded += async (_, _) => await RefreshSparsePackageStatusAsync();
             RefreshStartupStatus();
             RefreshMouseGestureControls();
             ShowPage("overview");
@@ -65,9 +71,11 @@ namespace LongBetterWindows.Host.Views
             }
             MouseGestureStatusText.Text = mode switch
             {
-                MouseGestureMode.MiddleButton => "已启用：按下鼠标中键呼出",
-                MouseGestureMode.LongRightPress => $"已启用：静止长按右键 {LongRightPressRecognizer.HoldMilliseconds}ms 呼出",
-                _ => "当前关闭，不监听全局鼠标按键",
+                MouseGestureMode.MiddleButton => I18n("settings.gesture.status.middle"),
+                MouseGestureMode.LongRightPress => string.Format(
+                    I18n("settings.gesture.status.longRight"),
+                    LongRightPressRecognizer.HoldMilliseconds),
+                _ => I18n("settings.gesture.status.disabled"),
             };
         }
 
@@ -96,6 +104,7 @@ namespace LongBetterWindows.Host.Views
             ContentBodyFrame.Padding = isNarrow
                 ? new Thickness(18, 0, 18, 18)
                 : new Thickness(32, 0, 32, 32);
+            SystemIntegrationGrid.Columns = isNarrow ? 1 : 2;
 
             if (isNarrow)
             {
@@ -105,6 +114,18 @@ namespace LongBetterWindows.Host.Views
                 Grid.SetRow(OverviewStatusCard, 1);
                 Grid.SetColumn(OverviewStatusCard, 0);
                 OverviewStatusCard.Margin = new Thickness(0, 12, 0, 0);
+                WelcomeTextColumn.Width = new GridLength(1, GridUnitType.Star);
+                WelcomeActionColumn.Width = new GridLength(0);
+                Grid.SetRow(WelcomeDismissButton, 1);
+                Grid.SetColumn(WelcomeDismissButton, 0);
+                WelcomeDismissButton.HorizontalAlignment = HorizontalAlignment.Left;
+                WelcomeDismissButton.Margin = new Thickness(0, 12, 0, 0);
+                OverviewLaunchTextColumn.Width = new GridLength(1, GridUnitType.Star);
+                OverviewLaunchActionColumn.Width = new GridLength(0);
+                Grid.SetRow(OverviewLaunchButton, 1);
+                Grid.SetColumn(OverviewLaunchButton, 0);
+                OverviewLaunchButton.HorizontalAlignment = HorizontalAlignment.Left;
+                OverviewLaunchButton.Margin = new Thickness(0, 14, 0, 0);
             }
             else
             {
@@ -114,6 +135,18 @@ namespace LongBetterWindows.Host.Views
                 Grid.SetRow(OverviewStatusCard, 0);
                 Grid.SetColumn(OverviewStatusCard, 2);
                 OverviewStatusCard.Margin = new Thickness(0);
+                WelcomeTextColumn.Width = new GridLength(1, GridUnitType.Star);
+                WelcomeActionColumn.Width = GridLength.Auto;
+                Grid.SetRow(WelcomeDismissButton, 0);
+                Grid.SetColumn(WelcomeDismissButton, 1);
+                WelcomeDismissButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+                WelcomeDismissButton.Margin = new Thickness(0);
+                OverviewLaunchTextColumn.Width = new GridLength(1, GridUnitType.Star);
+                OverviewLaunchActionColumn.Width = GridLength.Auto;
+                Grid.SetRow(OverviewLaunchButton, 0);
+                Grid.SetColumn(OverviewLaunchButton, 1);
+                OverviewLaunchButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+                OverviewLaunchButton.Margin = new Thickness(0);
             }
         }
 
@@ -145,6 +178,19 @@ namespace LongBetterWindows.Host.Views
         internal void OpenMarketForQuality() => ShowPage("market");
         internal void OpenDiagnosticsForQuality() => ShowPage("diagnostics");
         internal void OpenPluginsForQuality() => ShowPage("plugins");
+        internal void OpenSystemForQuality() => ShowPage("system");
+        internal void OpenSettingsForQuality() => ShowPage("settings");
+        internal void ShowWelcomeForQuality()
+        {
+            ShowPage("overview");
+            WelcomeBanner.Visibility = Visibility.Visible;
+        }
+
+        internal void ShowMarketplaceListForQuality()
+        {
+            if (MarketHost.Content is MarketplaceControl marketplace)
+                marketplace.ShowListForQuality();
+        }
 
         internal async Task<string?> OpenWorkflowReviewAsync(
             string workflowId,
@@ -158,6 +204,16 @@ namespace LongBetterWindows.Host.Views
                 workflowId,
                 expectedStateFingerprint,
                 cancellationToken);
+        }
+
+        internal async Task<string?> OpenWorkflowEditorAsync(
+            string workflowId,
+            CancellationToken cancellationToken = default)
+        {
+            ShowPage("workflows");
+            if (WorkflowEditorHost.Content is not WorkflowEditorControl editor)
+                return "组合动作编辑器当前不可用。";
+            return await editor.OpenEditorAsync(workflowId, cancellationToken);
         }
 
         internal bool CancelWorkflowReview()
@@ -203,14 +259,14 @@ namespace LongBetterWindows.Host.Views
         {
             (string Key, FrameworkElement Panel, RadioButton Navigation, string Title, string Subtitle)[] pages =
             {
-                ("overview", PanelOverview, NavOverview, "概览", "平台状态、关键能力和下一步操作"),
-                ("workflows", PanelWorkflows, NavWorkflows, "组合动作", "编排、预检并安全保存跨插件工作流"),
-                ("plugins", PanelPlugins, NavPlugins, "插件", "管理已安装插件、运行状态、权限和设置"),
-                ("market", PanelMarket, NavMarket, "插件市场", "发现、审查并安装可信的 Long 原生插件"),
-                ("system", PanelSystem, NavSystem, "系统集成", "配置 Explorer、启动项和全局快捷键"),
-                ("diagnostics", PanelDiagnostics, NavDiagnostics, "平台诊断", "查看宿主资源、插件调用和能力使用情况"),
-                ("developer", PanelDev, NavDeveloper, "开发者", "创建、调试、打包插件并查阅开发资源"),
-                ("settings", PanelSettings, NavSettings, "设置", "外观、动效、本地数据与隐私"),
+                ("overview", PanelOverview, NavOverview, I18n("page.overview.title"), I18n("page.overview.subtitle")),
+                ("workflows", PanelWorkflows, NavWorkflows, I18n("page.workflows.title"), I18n("page.workflows.subtitle")),
+                ("plugins", PanelPlugins, NavPlugins, I18n("page.plugins.title"), I18n("page.plugins.subtitle")),
+                ("market", PanelMarket, NavMarket, I18n("page.market.title"), I18n("page.market.subtitle")),
+                ("system", PanelSystem, NavSystem, I18n("page.system.title"), I18n("page.system.subtitle")),
+                ("diagnostics", PanelDiagnostics, NavDiagnostics, I18n("page.diagnostics.title"), I18n("page.diagnostics.subtitle")),
+                ("developer", PanelDev, NavDeveloper, I18n("page.developer.title"), I18n("page.developer.subtitle")),
+                ("settings", PanelSettings, NavSettings, I18n("page.settings.title"), I18n("page.settings.subtitle")),
             };
 
             foreach (var (key, panel, navigation, title, subtitle) in pages)
@@ -223,6 +279,7 @@ namespace LongBetterWindows.Host.Views
                 _activePage = key;
                 PageTitle.Text = title;
                 PageSubtitle.Text = subtitle;
+                ContentScrollViewer.ScrollToTop();
                 if (key == "plugins")
                     PluginManagementHost.Refresh();
                 else if (key == "workflows" && WorkflowEditorHost.Content == null)
@@ -248,6 +305,9 @@ namespace LongBetterWindows.Host.Views
                     _docsLoaded = true;
                 }
                 Helpers.AnimationHelper.FadeInElement(panel, durationMs: 160);
+                _ = Dispatcher.BeginInvoke(
+                    new Action(ContentScrollViewer.ScrollToTop),
+                    System.Windows.Threading.DispatcherPriority.ContextIdle);
             }
         }
 
@@ -311,7 +371,9 @@ namespace LongBetterWindows.Host.Views
             App.UpdateThemeResources(_isLightMode);
 
             if (sender is Button btn)
-                btn.Content = _isLightMode ? "暗色" : "亮色";
+                btn.Content = _isLightMode
+                    ? I18n("action.darkMode")
+                    : I18n("action.lightMode");
         }
 
         private void RefreshDocLinks()
@@ -382,16 +444,18 @@ namespace LongBetterWindows.Host.Views
         private void RefreshStartupStatus()
         {
             _startupEnabled = ServicesInitializer.Startup.IsAutoStartEnabled;
-            StartupButton.Content = _startupEnabled ? "禁用" : "启用";
+            StartupButton.Content = _startupEnabled
+                ? I18n("action.disable")
+                : I18n("action.enable");
 
             if (_startupEnabled)
             {
-                StartupStatusText.Text = "已启用";
+                StartupStatusText.Text = I18n("status.enabled");
                 StartupStatusText.Foreground = GreenBrush;
             }
             else
             {
-                StartupStatusText.Text = "未启用";
+                StartupStatusText.Text = I18n("status.disabled");
                 StartupStatusText.Foreground = GrayBrush;
             }
         }
@@ -482,19 +546,182 @@ namespace LongBetterWindows.Host.Views
             ContextMenuButton.IsEnabled = true;
         }
 
+        private async void SparsePackageButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_sparsePackageBusy) return;
+
+            var dialog = new OpenFileDialog
+            {
+                Title = _sparsePackageInstalled
+                    ? "选择已签名的 Long Sparse Package 升级包"
+                    : "选择已签名的 Long Sparse Package",
+                Filter = "Long Sparse Package (*.msix;*.appx)|*.msix;*.appx",
+                CheckFileExists = true,
+                Multiselect = false,
+            };
+            if (dialog.ShowDialog() != true) return;
+
+            var action = _sparsePackageInstalled ? "升级" : "注册";
+            var answer = MessageBox.Show(
+                $"将为当前 Windows 用户{action} Win11 一级右键菜单。\n\n" +
+                "系统会验证包签名、Publisher、x64 架构和当前安装目录，" +
+                "不会修改兼容旧右键菜单。是否继续？",
+                $"确认{action} Win11 一级菜单",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+            if (answer != MessageBoxResult.Yes) return;
+
+            await RunSparsePackageOperationAsync(
+                () => ServicesInitializer.SparsePackage.RegisterOrUpgradeAsync(
+                    dialog.FileName));
+        }
+
+        private async void SparsePackageRemoveButton_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_sparsePackageBusy || !_sparsePackageInstalled) return;
+            var answer = MessageBox.Show(
+                "将卸载当前用户的 Win11 一级右键菜单包身份。\n\n" +
+                "兼容旧右键菜单不会被修改。是否继续？",
+                "确认卸载 Win11 一级菜单",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.Yes) return;
+
+            await RunSparsePackageOperationAsync(
+                () => ServicesInitializer.SparsePackage.UnregisterAsync());
+        }
+
+        private async Task RunSparsePackageOperationAsync(
+            Func<Task<SparsePackageOperationResult>> operation)
+        {
+            SetSparsePackageBusy(true, I18n("status.processing"));
+            var result = await operation();
+            if (result.State is { } state)
+                ApplySparsePackageState(state);
+            else
+                await RefreshSparsePackageStatusAsync();
+
+            if (!result.IsSuccess)
+            {
+                SparsePackageStatusText.Text = string.Format(
+                    I18n("status.operationFailed"),
+                    result.Message);
+                SparsePackageStatusText.Foreground = RedBrush;
+            }
+            SetSparsePackageBusy(false);
+        }
+
+        private async Task RefreshSparsePackageStatusAsync()
+        {
+            if (_sparsePackageBusy) return;
+            SetSparsePackageBusy(true, I18n("status.checking"));
+            var result = await ServicesInitializer.SparsePackage.GetStatusAsync();
+            if (result.State is { } state)
+                ApplySparsePackageState(state);
+            else
+            {
+                _sparsePackageInstalled = false;
+                SparsePackageStatusText.Text = string.Format(
+                    I18n("status.unavailable"),
+                    result.Message);
+                SparsePackageStatusText.Foreground = RedBrush;
+            }
+            SetSparsePackageBusy(false);
+        }
+
+        private void ApplySparsePackageState(SparsePackageState state)
+        {
+            _sparsePackageInstalled = state.Installed;
+            if (state.Installed)
+            {
+                var locationState = string.IsNullOrWhiteSpace(state.ExternalLocation)
+                    ? I18n("status.locationPending")
+                    : I18n("status.locationVerified");
+                SparsePackageStatusText.Text = string.Format(
+                    I18n("status.sparseRegistered"),
+                    state.Version ?? "—",
+                    state.Architecture ?? "—",
+                    locationState);
+                SparsePackageStatusText.Foreground = GreenBrush;
+            }
+            else
+            {
+                SparsePackageStatusText.Text = I18n("status.notRegistered");
+                SparsePackageStatusText.Foreground = GrayBrush;
+            }
+        }
+
+        private void InitializeLanguageSelector()
+        {
+            var language = ServicesInitializer.I18n.CurrentLanguage;
+            LanguageSelector.SelectedItem = LanguageSelector.Items
+                .OfType<ComboBoxItem>()
+                .FirstOrDefault(item => string.Equals(
+                    item.Tag?.ToString(),
+                    language,
+                    StringComparison.OrdinalIgnoreCase));
+            _languageSelectorReady = true;
+        }
+
+        private void LanguageSelector_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
+        {
+            if (!_languageSelectorReady ||
+                LanguageSelector.SelectedItem is not ComboBoxItem
+                {
+                    Tag: string language,
+                } ||
+                string.Equals(
+                    language,
+                    ServicesInitializer.I18n.CurrentLanguage,
+                    StringComparison.OrdinalIgnoreCase))
+                return;
+
+            ServicesInitializer.I18n.SetLanguage(language);
+            ServicesInitializer.I18n.ApplyTo(Application.Current.Resources);
+            ShowPage(_activePage);
+            RefreshColumnStatus();
+            RefreshContextMenuStatus();
+            RefreshStartupStatus();
+            _ = RefreshSparsePackageStatusAsync();
+        }
+
+        private void SetSparsePackageBusy(bool busy, string? status = null)
+        {
+            _sparsePackageBusy = busy;
+            SparsePackageButton.IsEnabled = !busy;
+            SparsePackageRemoveButton.IsEnabled = !busy;
+            SparsePackageButton.Content = _sparsePackageInstalled
+                ? I18n("action.chooseUpgrade")
+                : I18n("action.chooseRegister");
+            SparsePackageRemoveButton.Visibility = _sparsePackageInstalled
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                SparsePackageStatusText.Text = status;
+                SparsePackageStatusText.Foreground = GrayBrush;
+            }
+        }
+
         private void RefreshColumnStatus()
         {
             _columnEnabled = ServicesInitializer.ColumnInjection.IsCommentColumnEnabled;
-            ColumnButton.Content = _columnEnabled ? "移除" : "一键开启";
+            ColumnButton.Content = _columnEnabled
+                ? I18n("action.remove")
+                : I18n("action.enable");
 
             if (_columnEnabled)
             {
-                ColumnStatusText.Text = "已启用";
+                ColumnStatusText.Text = I18n("status.enabled");
                 ColumnStatusText.Foreground = GreenBrush;
             }
             else
             {
-                ColumnStatusText.Text = "未启用";
+                ColumnStatusText.Text = I18n("status.disabled");
                 ColumnStatusText.Foreground = GrayBrush;
             }
         }
@@ -502,19 +729,24 @@ namespace LongBetterWindows.Host.Views
         private void RefreshContextMenuStatus()
         {
             _contextMenuRegistered = ServicesInitializer.ContextMenu.IsRegistered;
-            ContextMenuButton.Content = _contextMenuRegistered ? "移除" : "注册";
+            ContextMenuButton.Content = _contextMenuRegistered
+                ? I18n("action.remove")
+                : I18n("action.register");
 
             if (_contextMenuRegistered)
             {
-                ContextMenuStatusText.Text = "已注册";
+                ContextMenuStatusText.Text = I18n("status.registered");
                 ContextMenuStatusText.Foreground = GreenBrush;
             }
             else
             {
-                ContextMenuStatusText.Text = "未注册";
+                ContextMenuStatusText.Text = I18n("status.notRegistered");
                 ContextMenuStatusText.Foreground = GrayBrush;
             }
         }
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
 
     }
 }

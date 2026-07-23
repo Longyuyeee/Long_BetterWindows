@@ -9,6 +9,11 @@
     <Content Include="WebAssets\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Marketplace\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="WorkflowTemplates\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="i18n\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\manage-sparse-package.ps1"
+             Link="Scripts\manage-sparse-package.ps1"
+             CopyToOutputDirectory="PreserveNewest"
+             Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

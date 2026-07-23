@@ -26,27 +26,52 @@
     </UserControl.Resources>
 
     <StackPanel>
-        <Grid Margin="0,0,0,16">
+        <Grid x:Name="PluginToolbar" Margin="0,0,0,16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="280" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="PluginHeaderColumn" Width="*" />
+                <ColumnDefinition x:Name="PluginSearchColumn" Width="280" />
+                <ColumnDefinition x:Name="PluginRefreshColumn" Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock x:Name="PluginsHeader" Text="已安装插件" FontSize="16" FontWeight="SemiBold"
+            <TextBlock x:Name="PluginsHeader" Text="{DynamicResource i18n.plugins.installed}" FontSize="16" FontWeight="SemiBold"
                        VerticalAlignment="Center" />
-            <TextBox x:Name="PluginSearchBox" Grid.Column="1" Style="{StaticResource LongTextBox}"
-                     Margin="0,0,10,0" TextChanged="PluginSearch_TextChanged"
-                     automation:AutomationProperties.Name="搜索插件" />
-            <Button Grid.Column="2" Content="刷新" Style="{StaticResource LongButton}"
+            <Grid x:Name="PluginSearchHost" Grid.Column="1" Margin="0,0,10,0">
+                <TextBox x:Name="PluginSearchBox" Style="{StaticResource LongTextBox}"
+                         TextChanged="PluginSearch_TextChanged"
+                         automation:AutomationProperties.AutomationId="Long.Plugins.Search"
+                         automation:AutomationProperties.Name="{DynamicResource i18n.plugins.search}" />
+                <TextBlock Text="{DynamicResource i18n.plugins.searchHint}"
+                           Margin="12,0,8,0" VerticalAlignment="Center"
+                           IsHitTestVisible="False"
+                           Foreground="{DynamicResource Long.Brush.Text.Muted}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=PluginSearchBox}" Value="">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+            <Button x:Name="RefreshPluginsButton" Grid.Column="2"
+                    Content="{DynamicResource i18n.action.refresh}"
+                    automation:AutomationProperties.Name="{DynamicResource i18n.action.refresh}"
+                    Style="{StaticResource LongButton}"
                     Click="RefreshPlugins_Click" />
         </Grid>
 
-        <TextBlock x:Name="EmptyStateText" Text="暂无已安装插件"
+        <TextBlock x:Name="EmptyStateText" Text="{DynamicResource i18n.plugins.empty}"
                    Style="{StaticResource LongEmptyState}" Visibility="Collapsed"
                    automation:AutomationProperties.LiveSetting="Polite" />
 
         <ListBox x:Name="PluginsPanel" MaxHeight="640"
-                 automation:AutomationProperties.Name="已安装插件列表"
+                 automation:AutomationProperties.Name="{DynamicResource i18n.plugins.list}"
                  Background="Transparent" BorderThickness="0"
                  ScrollViewer.CanContentScroll="True"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -71,9 +96,12 @@
                 <DataTemplate>
                     <Border Style="{StaticResource LongPluginCard}" Margin="0,0,0,12">
                         <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
                             <StackPanel>
@@ -121,27 +149,31 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Content="打开" MinWidth="62" Margin="0,0,6,0"
+                            <WrapPanel Grid.Row="1" Margin="16,14,0,0"
+                                       HorizontalAlignment="Right">
+                                <Button Content="{DynamicResource i18n.action.open}" MinWidth="62" Margin="0,0,6,0"
                                         Style="{StaticResource LongButton.Primary}" Tag="{Binding}"
+                                        automation:AutomationProperties.Name="{DynamicResource i18n.plugins.open}"
                                         Click="OpenPlugin_Click"
                                         Visibility="{Binding CanOpen, Converter={StaticResource BooleanToVisibility}}" />
                                 <Button Width="38" Margin="0,0,6,0" Style="{StaticResource LongIconButton}"
-                                        Tag="{Binding}" Click="PluginSettings_Click" ToolTip="插件设置"
-                                        automation:AutomationProperties.Name="打开插件设置"
+                                        Tag="{Binding}" Click="PluginSettings_Click"
+                                        ToolTip="{DynamicResource i18n.plugins.settings}"
+                                        automation:AutomationProperties.Name="{DynamicResource i18n.plugins.openSettings}"
                                         Visibility="{Binding CanOpenSettings, Converter={StaticResource BooleanToVisibility}}">
                                     <Path Data="{StaticResource Long.Icon.Settings}" Style="{StaticResource LongIcon}"
                                           Width="17" Height="17" />
                                 </Button>
                                 <Button Width="38" Margin="0,0,6,0" Style="{StaticResource LongIconButton}"
-                                        Tag="{Binding}" Click="CapabilityDetails_Click" ToolTip="查看权限与调用记录"
-                                        automation:AutomationProperties.Name="查看插件权限">
+                                        Tag="{Binding}" Click="CapabilityDetails_Click"
+                                        ToolTip="{DynamicResource i18n.plugins.capabilities}"
+                                        automation:AutomationProperties.Name="{DynamicResource i18n.plugins.openCapabilities}">
                                     <Path Data="{StaticResource Long.Icon.Shield}" Style="{StaticResource LongIcon}"
                                           Width="17" Height="17" />
                                 </Button>
                                 <Button Content="{Binding ToggleText}" MinWidth="62" Tag="{Binding}"
                                         Style="{StaticResource PluginToggleButton}" Click="PluginToggle_Click" />
-                            </StackPanel>
+                            </WrapPanel>
                         </Grid>
                     </Border>
                 </DataTemplate>

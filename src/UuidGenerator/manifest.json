@@ -13,6 +13,31 @@
       "description": "使用安全随机源批量生成 UUID v4",
       "aliases": ["uuid", "guid", "唯一标识", "weiyibiaoshi"],
       "accepted_inputs": ["none"],
+      "argument_schema": [
+        {
+          "key": "amount",
+          "name": "生成数量",
+          "description": "一次生成的 UUID 数量",
+          "type": "integer",
+          "default_value": "10",
+          "minimum": 1,
+          "maximum": 100
+        },
+        {
+          "key": "uppercase",
+          "name": "使用大写字母",
+          "description": "将 UUID 中的十六进制字母转换为大写",
+          "type": "boolean",
+          "default_value": "false"
+        },
+        {
+          "key": "compact",
+          "name": "移除连字符",
+          "description": "输出不包含连字符的紧凑 UUID",
+          "type": "boolean",
+          "default_value": "false"
+        }
+      ],
       "argument_presets": [
         {
           "id": "quick-10",

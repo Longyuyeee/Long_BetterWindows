@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Interaction;
+using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -26,19 +27,26 @@ namespace LongBetterWindows.Host.Views
     {
         private const int MaximumBindings = 64;
         private readonly IReadOnlyList<WorkflowBindingOutputOption> _availableOutputs;
+        private readonly IReadOnlyList<string> _declaredArgumentKeys;
         private AcceptedInputType _inputType;
         private string? _error;
 
         public WorkflowBindingEditorModel(
             IReadOnlyList<WorkflowBindingOutputOption> availableOutputs,
-            AcceptedInputType inputType)
+            AcceptedInputType inputType,
+            IReadOnlyList<string>? declaredArgumentKeys = null)
         {
             _availableOutputs = availableOutputs ?? throw new ArgumentNullException(nameof(availableOutputs));
             _inputType = inputType;
+            _declaredArgumentKeys = (declaredArgumentKeys ?? Array.Empty<string>())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
         }
 
         public ObservableCollection<WorkflowBindingEditorItem> Bindings { get; } = new();
-        public string Summary => Bindings.Count == 0 ? "步骤输出绑定" : $"步骤输出绑定 · {Bindings.Count}";
+        public string Summary => Bindings.Count == 0
+            ? I18n("workflow.binding.summary")
+            : string.Format(I18n("workflow.binding.summaryCount"), Bindings.Count);
         public string? Error
         {
             get => _error;
@@ -52,7 +60,8 @@ namespace LongBetterWindows.Host.Views
         }
         public bool HasError => Error is not null;
         public bool CanAdd => Bindings.Count < MaximumBindings
-            && _availableOutputs.Any(output => TargetOptions(output.Type).Count > 0);
+            && _availableOutputs.Any(output =>
+                TargetOptions(output.Type).Any(CanUseTarget));
 
         public void SetInputType(AcceptedInputType inputType)
         {
@@ -79,7 +88,7 @@ namespace LongBetterWindows.Host.Views
                         binding.Target == WorkflowBindingTarget.Path
                             ? PluginCommandOutputType.Path
                             : PluginCommandOutputType.Text,
-                        "声明已不可用",
+                        I18n("workflow.binding.outputUnavailable"),
                         IsAvailable: false);
                 }
                 Bindings.Add(new WorkflowBindingEditorItem(
@@ -95,12 +104,10 @@ namespace LongBetterWindows.Host.Views
         public bool AddBinding()
         {
             if (!CanAdd) return false;
-            var output = _availableOutputs.First(candidate => TargetOptions(candidate.Type).Count > 0);
-            var targets = TargetOptions(output.Type);
-            var target = targets.FirstOrDefault(option =>
-                    option.Value != WorkflowBindingTarget.Text
-                    || Bindings.All(binding => binding.Target != WorkflowBindingTarget.Text))
-                ?? targets[0];
+            var output = _availableOutputs.First(candidate =>
+                TargetOptions(candidate.Type).Any(CanUseTarget));
+            var targets = TargetOptions(output.Type).Where(CanUseTarget).ToArray();
+            var target = targets[0];
             Bindings.Add(new WorkflowBindingEditorItem(
                 this,
                 output,
@@ -140,21 +147,27 @@ namespace LongBetterWindows.Host.Views
         public void RefreshValidation()
         {
             if (Bindings.Any(binding => !binding.Output.IsAvailable))
-                Error = "绑定来源已不再由可用命令声明。";
+                Error = I18n("workflow.binding.error.sourceUnavailable");
             else if (Bindings.Any(binding => !binding.TargetOptions.Any(option => option.Value == binding.Target)))
-                Error = "绑定目标与当前输入类型不兼容。";
+                Error = I18n("workflow.binding.error.incompatibleTarget");
             else if (Bindings.Count(binding => binding.Target == WorkflowBindingTarget.Text) > 1)
-                Error = "文本目标只能绑定一次。";
+                Error = I18n("workflow.binding.error.textOnce");
             else if (Bindings.Any(binding => binding.Target == WorkflowBindingTarget.Argument
                 && string.IsNullOrWhiteSpace(binding.ArgumentKey)))
-                Error = "参数绑定键不能为空。";
+                Error = I18n("workflow.binding.error.keyRequired");
             else if (Bindings.Any(binding => binding.Target == WorkflowBindingTarget.Argument
                 && binding.ArgumentKey.Length > 128))
-                Error = "参数绑定键不能超过 128 个字符。";
+                Error = I18n("workflow.binding.error.keyTooLong");
             else if (Bindings.Where(binding => binding.Target == WorkflowBindingTarget.Argument)
                 .GroupBy(binding => binding.ArgumentKey, StringComparer.Ordinal)
                 .Any(group => group.Count() > 1))
-                Error = "参数绑定键不能重复。";
+                Error = I18n("workflow.binding.error.keyDuplicate");
+            else if (_declaredArgumentKeys.Count > 0
+                && Bindings.Any(binding => binding.Target == WorkflowBindingTarget.Argument
+                    && !_declaredArgumentKeys.Contains(
+                        binding.ArgumentKey,
+                        StringComparer.Ordinal)))
+                Error = I18n("workflow.binding.error.schemaRequired");
             else
                 Error = null;
         }
@@ -179,21 +192,41 @@ namespace LongBetterWindows.Host.Views
                     or AcceptedInputType.Files
                     or AcceptedInputType.Folder
                     or AcceptedInputType.ExplorerSelection)
-                    ? [new WorkflowBindingTargetOption(WorkflowBindingTarget.Path, "路径输入")]
+                    ? [new WorkflowBindingTargetOption(
+                        WorkflowBindingTarget.Path,
+                        I18n("workflow.binding.target.path"))]
                     : Array.Empty<WorkflowBindingTargetOption>();
             }
             var options = new List<WorkflowBindingTargetOption>();
             if (_inputType is not (AcceptedInputType.None or AcceptedInputType.Image))
-                options.Add(new WorkflowBindingTargetOption(WorkflowBindingTarget.Text, "文本输入"));
-            options.Add(new WorkflowBindingTargetOption(WorkflowBindingTarget.Argument, "命令参数"));
+                options.Add(new WorkflowBindingTargetOption(
+                    WorkflowBindingTarget.Text,
+                    I18n("workflow.binding.target.text")));
+            options.Add(new WorkflowBindingTargetOption(
+                WorkflowBindingTarget.Argument,
+                I18n("workflow.binding.target.argument")));
             return options;
         }
+
+        internal IReadOnlyList<string> ArgumentKeyOptions => _declaredArgumentKeys;
 
         internal void ItemChanged()
         {
             RefreshValidation();
             NotifyCollectionState();
         }
+
+        private bool CanUseTarget(WorkflowBindingTargetOption option)
+            => option.Value switch
+            {
+                WorkflowBindingTarget.Text =>
+                    Bindings.All(binding => binding.Target != WorkflowBindingTarget.Text),
+                WorkflowBindingTarget.Argument when _declaredArgumentKeys.Count > 0 =>
+                    _declaredArgumentKeys.Any(key => Bindings.All(binding =>
+                        binding.Target != WorkflowBindingTarget.Argument
+                        || !string.Equals(binding.ArgumentKey, key, StringComparison.Ordinal))),
+                _ => true,
+            };
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -202,6 +235,8 @@ namespace LongBetterWindows.Host.Views
             var used = Bindings.Where(binding => binding.Target == WorkflowBindingTarget.Argument)
                 .Select(binding => binding.ArgumentKey)
                 .ToHashSet(StringComparer.Ordinal);
+            var declared = _declaredArgumentKeys.FirstOrDefault(key => !used.Contains(key));
+            if (declared is not null) return declared;
             var key = "output";
             for (var number = 2; used.Contains(key); number++) key = $"output-{number}";
             return key;
@@ -215,6 +250,9 @@ namespace LongBetterWindows.Host.Views
 
         private void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
     }
 
     public sealed class WorkflowBindingEditorItem : INotifyPropertyChanged
@@ -259,10 +297,13 @@ namespace LongBetterWindows.Host.Views
                 _target = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(ShowArgumentKey));
+                OnPropertyChanged(nameof(ShowArgumentKeyTextBox));
+                OnPropertyChanged(nameof(ShowArgumentKeyOptions));
                 _owner.ItemChanged();
             }
         }
         public IReadOnlyList<WorkflowBindingTargetOption> TargetOptions => _owner.TargetOptions(Output.Type);
+        public IReadOnlyList<string> ArgumentKeyOptions => _owner.ArgumentKeyOptions;
         public string ArgumentKey
         {
             get => _argumentKey;
@@ -275,6 +316,8 @@ namespace LongBetterWindows.Host.Views
             }
         }
         public bool ShowArgumentKey => Target == WorkflowBindingTarget.Argument;
+        public bool ShowArgumentKeyOptions => ShowArgumentKey && ArgumentKeyOptions.Count > 0;
+        public bool ShowArgumentKeyTextBox => ShowArgumentKey && ArgumentKeyOptions.Count == 0;
 
         internal void RefreshTargetOptions(bool selectCompatibleTarget = false)
         {
@@ -287,6 +330,8 @@ namespace LongBetterWindows.Host.Views
                 Target = options[0].Value;
             }
             OnPropertyChanged(nameof(ShowArgumentKey));
+            OnPropertyChanged(nameof(ShowArgumentKeyTextBox));
+            OnPropertyChanged(nameof(ShowArgumentKeyOptions));
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

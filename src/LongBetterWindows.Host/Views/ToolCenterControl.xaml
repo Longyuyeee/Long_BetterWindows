@@ -23,26 +23,27 @@
                 <StackPanel Margin="8,0,8,18">
                     <TextBlock Text="TOOLCENTER" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                    <TextBlock Text="平台管理与配置" FontSize="12" Margin="0,4,0,0"
+                    <TextBlock Text="{DynamicResource i18n.shell.managementConfig}" FontSize="12" Margin="0,4,0,0"
+                               TextWrapping="Wrap"
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                 </StackPanel>
 
                 <StackPanel Grid.Row="1">
-                    <RadioButton x:Name="NavOverview" Content="概览" GroupName="MainNav" IsChecked="True"
+                    <RadioButton x:Name="NavOverview" Content="{DynamicResource i18n.nav.overview}" GroupName="MainNav" IsChecked="True"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="overview" />
-                    <RadioButton x:Name="NavWorkflows" Content="组合动作" GroupName="MainNav"
+                    <RadioButton x:Name="NavWorkflows" Content="{DynamicResource i18n.nav.workflows}" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="workflows" />
-                    <RadioButton x:Name="NavPlugins" Content="插件" GroupName="MainNav"
+                    <RadioButton x:Name="NavPlugins" Content="{DynamicResource i18n.nav.plugins}" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="plugins" />
-                    <RadioButton x:Name="NavMarket" Content="插件市场" GroupName="MainNav"
+                    <RadioButton x:Name="NavMarket" Content="{DynamicResource i18n.nav.market}" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="market" />
-                    <RadioButton x:Name="NavSystem" Content="系统集成" GroupName="MainNav"
+                    <RadioButton x:Name="NavSystem" Content="{DynamicResource i18n.nav.system}" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="system" />
-                    <RadioButton x:Name="NavDiagnostics" Content="平台诊断" GroupName="MainNav"
+                    <RadioButton x:Name="NavDiagnostics" Content="{DynamicResource i18n.nav.diagnostics}" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="diagnostics" />
-                    <RadioButton x:Name="NavDeveloper" Content="开发者" GroupName="MainNav"
+                    <RadioButton x:Name="NavDeveloper" Content="{DynamicResource i18n.nav.developer}" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="developer" />
-                    <RadioButton x:Name="NavSettings" Content="设置" GroupName="MainNav"
+                    <RadioButton x:Name="NavSettings" Content="{DynamicResource i18n.nav.settings}" GroupName="MainNav"
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="settings" />
                 </StackPanel>
 
@@ -50,10 +51,11 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="7" Height="7" Fill="{DynamicResource Long.Brush.State.Success}" VerticalAlignment="Center" />
-                            <TextBlock Text="宿主运行正常" Margin="7,0,0,0" FontSize="11"
+                            <TextBlock Text="{DynamicResource i18n.shell.hostHealthy}" Margin="7,0,0,0" FontSize="11"
                                        Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                         </StackPanel>
-                        <TextBlock Text="Ctrl + Tab 切换页面" FontSize="9" Margin="14,5,0,0"
+                        <TextBlock Text="{DynamicResource i18n.shell.switchPages}" FontSize="9" Margin="14,5,0,0"
+                                   TextWrapping="Wrap"
                                    Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                     </StackPanel>
                 </Border>
@@ -70,17 +72,17 @@
 
             <Grid x:Name="PageHeader" Grid.Row="0" Margin="32,20,32,16">
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock x:Name="PageTitle" Text="概览" FontSize="{DynamicResource Long.Type.Display}"
+                    <TextBlock x:Name="PageTitle" Text="{DynamicResource i18n.page.overview.title}" FontSize="{DynamicResource Long.Type.Display}"
                                FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.Primary}" />
-                    <TextBlock x:Name="PageSubtitle" Text="平台状态、关键能力和下一步操作"
+                    <TextBlock x:Name="PageSubtitle" Text="{DynamicResource i18n.page.overview.subtitle}"
                                FontSize="{DynamicResource Long.Type.Body}" Margin="0,5,0,0"
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                 </StackPanel>
             </Grid>
 
-            <ScrollViewer Grid.Row="1" Style="{StaticResource DarkScrollViewerStyle}"
+            <ScrollViewer x:Name="ContentScrollViewer" Grid.Row="1" Style="{StaticResource DarkScrollViewerStyle}"
                           automation:AutomationProperties.AutomationId="Long.ToolCenter.ContentScroll"
-                          automation:AutomationProperties.Name="Tool Center 页面内容"
+                          automation:AutomationProperties.Name="{DynamicResource i18n.shell.pageContent}"
                           HorizontalContentAlignment="Stretch"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto">
@@ -92,15 +94,20 @@
                         <Border x:Name="WelcomeBanner" Visibility="Collapsed" Margin="0,0,0,18"
                                 CornerRadius="{DynamicResource Long.Radius.Card}"
                                 Background="{DynamicResource Long.Brush.Accent.Gradient}" Padding="22,18">
-                            <Grid>
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <Grid x:Name="WelcomeGrid">
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition x:Name="WelcomeTextColumn" Width="*"/>
+                                    <ColumnDefinition x:Name="WelcomeActionColumn" Width="Auto"/>
+                                </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="欢迎来到 Long窗口" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.OnAccent}" />
-                                    <TextBlock Text="日常执行请使用命令中心；ToolCenter 专注平台管理、插件和系统集成。"
+                                    <TextBlock Text="{DynamicResource i18n.overview.welcome.title}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.OnAccent}" />
+                                    <TextBlock Text="{DynamicResource i18n.overview.welcome.desc}"
                                                Margin="0,6,10,0" FontSize="12" TextWrapping="Wrap"
                                                Foreground="{DynamicResource Long.Brush.Text.OnAccentMuted}" />
                                 </StackPanel>
-                                <Button Grid.Column="1" Content="知道了" Style="{StaticResource LongButton}"
+                                <Button x:Name="WelcomeDismissButton" Grid.Column="1"
+                                        Content="{DynamicResource i18n.overview.welcome.dismiss}" Style="{StaticResource LongButton}"
                                         Background="{DynamicResource Long.Brush.Surface.OnAccent}"
                                         BorderBrush="{DynamicResource Long.Brush.Stroke.OnAccent}" Foreground="{DynamicResource Long.Brush.Text.OnAccent}"
                                         Click="WelcomeDismiss_Click" />
@@ -109,15 +116,15 @@
 
                         <UniformGrid Columns="3" Margin="0,0,0,20">
                             <Border Style="{StaticResource LongCard}" Margin="0,0,12,0">
-                                <StackPanel><TextBlock Text="已加载插件" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.plugins}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     <TextBlock x:Name="OverviewPluginCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
                             </Border>
                             <Border Style="{StaticResource LongCard}" Margin="0,0,12,0">
-                                <StackPanel><TextBlock Text="可用命令" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.commands}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     <TextBlock x:Name="OverviewCommandCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
                             </Border>
                             <Border Style="{StaticResource LongCard}">
-                                <StackPanel><TextBlock Text="原子能力" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.capabilities}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     <TextBlock x:Name="OverviewCapabilityCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
                             </Border>
                         </UniformGrid>
@@ -130,17 +137,26 @@
                                 <ColumnDefinition x:Name="OverviewStatusColumn" Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Border Style="{StaticResource LongCard}">
-                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <StackPanel><TextBlock Text="随时开始一次操作" FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock Text="搜索插件功能、粘贴内容或处理当前 Explorer 选区。" Margin="0,7,0,0"
+                                <Grid x:Name="OverviewLaunchGrid">
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition x:Name="OverviewLaunchTextColumn" Width="*"/>
+                                        <ColumnDefinition x:Name="OverviewLaunchActionColumn" Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel><TextBlock Text="{DynamicResource i18n.overview.action.title}" FontSize="16" FontWeight="SemiBold" />
+                                        <TextBlock Text="{DynamicResource i18n.overview.action.desc}" Margin="0,7,12,0"
                                                    TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}" /></StackPanel>
-                                    <Button Grid.Column="1" Content="打开命令中心" Style="{StaticResource LongButton.Primary}"
-                                            Click="OpenPalette_Click" /></Grid>
+                                    <Button x:Name="OverviewLaunchButton" Grid.Column="1"
+                                            Content="{DynamicResource i18n.app.openCommandCenter}"
+                                            automation:AutomationProperties.Name="{DynamicResource i18n.app.openCommandCenter}"
+                                            Style="{StaticResource LongButton.Primary}"
+                                            Click="OpenPalette_Click" />
+                                </Grid>
                             </Border>
                             <Border x:Name="OverviewStatusCard" Grid.Column="2" Style="{StaticResource LongCard}">
-                                <StackPanel><TextBlock Text="平台状态" FontSize="16" FontWeight="SemiBold" />
-                                    <TextBlock Text="命令协议与设计系统已启用" Margin="0,7,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.State.Success}" />
-                                    <TextBlock Text="阶段 5 本机基线通过 · 发布矩阵待复核" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" /></StackPanel>
+                                <StackPanel><TextBlock Text="{DynamicResource i18n.overview.status.title}" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Text="{DynamicResource i18n.overview.status.ready}" Margin="0,7,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.State.Success}" />
+                                    <TextBlock Text="{DynamicResource i18n.overview.status.releasePending}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" /></StackPanel>
                             </Border>
                         </Grid>
                     </StackPanel>
@@ -166,11 +182,31 @@
 
                     <!-- 系统集成 -->
                     <StackPanel x:Name="PanelSystem" Visibility="Collapsed">
-                        <UniformGrid Columns="2">
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Explorer 备注列" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="在资源管理器中显示文件夹备注" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ColumnStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="ColumnButton" Grid.Column="1" Content="启用" Style="{StaticResource LongButton.Primary}" Click="ColumnButton_Click"/></Grid></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Explorer 右键菜单" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="添加“备注此文件夹”系统入口" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ContextMenuStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="ContextMenuButton" Grid.Column="1" Content="注册" Style="{StaticResource LongButton.Primary}" Click="ContextMenuButton_Click"/></Grid></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="开机自启" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="登录 Windows 后自动启动宿主" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="StartupStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="StartupButton" Grid.Column="1" Content="启用" Style="{StaticResource LongButton.Primary}" Click="StartupButton_Click"/></Grid></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><StackPanel><TextBlock Text="全局命令热键" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="首选 Alt + Space，冲突时使用 Ctrl + Alt + Space" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><Border Style="{StaticResource LongHotkeyBadge}" HorizontalAlignment="Left" Margin="0,10,0,0"><TextBlock Text="Alt + Space" FontFamily="{DynamicResource Long.Font.Mono}"/></Border></StackPanel></Border>
+                        <UniformGrid x:Name="SystemIntegrationGrid" Columns="2">
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.column.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.column.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ColumnStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="ColumnButton" Grid.Column="1" Content="{DynamicResource i18n.action.enable}" Style="{StaticResource LongButton.Primary}" Click="ColumnButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <TextBlock Text="{DynamicResource i18n.system.sparse.title}" FontSize="14" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{DynamicResource i18n.system.sparse.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
+                                        <TextBlock x:Name="SparsePackageStatusText" Margin="0,8,0,0" TextWrapping="Wrap"
+                                                   automation:AutomationProperties.LiveSetting="Polite"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <Button x:Name="SparsePackageButton" Content="{DynamicResource i18n.action.chooseRegister}"
+                                                Style="{StaticResource LongButton.Primary}"
+                                                Click="SparsePackageButton_Click"/>
+                                        <Button x:Name="SparsePackageRemoveButton" Content="{DynamicResource i18n.action.uninstall}" Margin="0,6,0,0"
+                                                Visibility="Collapsed"
+                                                Style="{StaticResource LongButton}"
+                                                Click="SparsePackageRemoveButton_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.legacy.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.legacy.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ContextMenuStatusText" Margin="0,8,0,0" automation:AutomationProperties.LiveSetting="Polite"/></StackPanel><Button x:Name="ContextMenuButton" Grid.Column="1" Content="{DynamicResource i18n.action.register}" Style="{StaticResource LongButton.Primary}" Click="ContextMenuButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.startup.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.startup.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="StartupStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="StartupButton" Grid.Column="1" Content="{DynamicResource i18n.action.enable}" Style="{StaticResource LongButton.Primary}" Click="StartupButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><StackPanel><TextBlock Text="{DynamicResource i18n.system.hotkey.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.hotkey.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><Border Style="{StaticResource LongHotkeyBadge}" HorizontalAlignment="Left" Margin="0,10,0,0"><TextBlock Text="Alt + Space" FontFamily="{DynamicResource Long.Font.Mono}"/></Border></StackPanel></Border>
                         </UniformGrid>
                     </StackPanel>
 
@@ -191,31 +227,43 @@
 
                     <!-- 设置 -->
                     <StackPanel x:Name="PanelSettings" Visibility="Collapsed">
-                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="外观主题" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="在亮色与暗色界面之间切换" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="切换主题" Style="{StaticResource LongButton}" Click="ThemeToggle_Click"/></Grid></Border>
-                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="减少动画" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="当前跟随 Windows 辅助功能设置" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><ToggleButton Grid.Column="1" Style="{StaticResource LongToggle}" IsChecked="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}, Mode=OneWay}" IsEnabled="False"/></Grid></Border>
                         <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="超级面板鼠标手势" FontSize="14" FontWeight="SemiBold"/>
-                                    <TextBlock Text="默认关闭；短右键始终保留应用原有菜单，只有长按达到阈值才触发。"
-                                               Margin="0,5,12,0" TextWrapping="Wrap"
-                                               Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
-                                    <TextBlock x:Name="MouseGestureStatusText" Margin="0,8,0,0"
-                                               Foreground="{DynamicResource Long.Brush.Text.Muted}"/>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="{DynamicResource i18n.settings.language.title}" FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{DynamicResource i18n.settings.language.desc}" Margin="0,5,0,0"
+                                               TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
                                 </StackPanel>
-                                <StackPanel x:Name="MouseGestureButtons" Grid.Column="1" Orientation="Horizontal"
-                                            VerticalAlignment="Center">
-                                    <Button Content="关闭" Tag="Disabled" Style="{StaticResource LongButton}"
-                                            Click="MouseGestureMode_Click"/>
-                                    <Button Content="中键" Tag="MiddleButton" Style="{StaticResource LongButton}"
-                                            Margin="6,0,0,0" Click="MouseGestureMode_Click"/>
-                                    <Button Content="长按右键" Tag="LongRightPress" Style="{StaticResource LongButton}"
-                                            Margin="6,0,0,0" Click="MouseGestureMode_Click"/>
-                                </StackPanel>
+                                <ComboBox x:Name="LanguageSelector" Grid.Column="1" Width="156"
+                                          VerticalAlignment="Center"
+                                          SelectionChanged="LanguageSelector_SelectionChanged">
+                                    <ComboBoxItem Tag="zh-CN" Content="{DynamicResource i18n.settings.language.zh}"/>
+                                    <ComboBoxItem Tag="en-US" Content="{DynamicResource i18n.settings.language.en}"/>
+                                </ComboBox>
                             </Grid>
                         </Border>
-                        <Border Style="{StaticResource LongCard}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="数据与隐私" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="固定和最近使用只保存结果 ID、次数与时间，不保存查询、文本或路径。" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="SearchPreferenceStatusText" Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel><Button Grid.Column="1" Content="清除搜索偏好" Style="{StaticResource LongButton}" Click="ClearSearchPreferences_Click"/></Grid></Border>
+                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.theme.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.theme.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.theme.action}" Style="{StaticResource LongButton}" Click="ThemeToggle_Click"/></Grid></Border>
+                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.motion.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.motion.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><ToggleButton Grid.Column="1" Style="{StaticResource LongToggle}" IsChecked="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}, Mode=OneWay}" IsEnabled="False"/></Grid></Border>
+                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource i18n.settings.gesture.title}" FontSize="14" FontWeight="SemiBold"/>
+                                <TextBlock Text="{DynamicResource i18n.settings.gesture.desc}"
+                                           Margin="0,5,0,0" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
+                                <TextBlock x:Name="MouseGestureStatusText" Margin="0,8,0,0" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Long.Brush.Text.Muted}"/>
+                                <WrapPanel x:Name="MouseGestureButtons" Margin="0,12,0,0">
+                                    <Button Content="{DynamicResource i18n.settings.gesture.disabled}" Tag="Disabled" Style="{StaticResource LongButton}"
+                                            Click="MouseGestureMode_Click"/>
+                                    <Button Content="{DynamicResource i18n.settings.gesture.middle}" Tag="MiddleButton" Style="{StaticResource LongButton}"
+                                            Margin="6,0,0,0" Click="MouseGestureMode_Click"/>
+                                    <Button Content="{DynamicResource i18n.settings.gesture.longRight}" Tag="LongRightPress" Style="{StaticResource LongButton}"
+                                            Margin="6,0,0,0" Click="MouseGestureMode_Click"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource LongCard}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.privacy.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.privacy.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="SearchPreferenceStatusText" Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.privacy.clear}" Style="{StaticResource LongButton}" Click="ClearSearchPreferences_Click"/></Grid></Border>
                     </StackPanel>
                 </Grid>
                 </Border>

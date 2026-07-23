@@ -89,7 +89,29 @@ public sealed class WorkflowBindingEditorModelTests
         Assert.False(model.HasError);
     }
 
-    private static WorkflowBindingEditorModel Model(AcceptedInputType inputType)
+    [Fact]
+    public void DeclaredArgumentTargets_UseAvailableSchemaKeysAndRejectUnknownValues()
+    {
+        var model = Model(AcceptedInputType.None, ["count", "mode"]);
+
+        Assert.True(model.AddBinding());
+        Assert.True(model.AddBinding());
+
+        Assert.Equal("count", model.Bindings[0].ArgumentKey);
+        Assert.Equal("mode", model.Bindings[1].ArgumentKey);
+        Assert.True(model.Bindings[0].ShowArgumentKeyOptions);
+        Assert.False(model.Bindings[0].ShowArgumentKeyTextBox);
+        Assert.False(model.HasError);
+        Assert.False(model.CanAdd);
+
+        model.Bindings[1].ArgumentKey = "unknown";
+        Assert.True(model.HasError);
+        Assert.Contains("Schema", model.Error);
+    }
+
+    private static WorkflowBindingEditorModel Model(
+        AcceptedInputType inputType,
+        IReadOnlyList<string>? declaredArgumentKeys = null)
         => new(
         [
             new WorkflowBindingOutputOption(
@@ -103,5 +125,6 @@ public sealed class WorkflowBindingEditorModelTests
                 PluginCommandOutputType.Path,
                 "Selected folder"),
         ],
-        inputType);
+        inputType,
+        declaredArgumentKeys);
 }

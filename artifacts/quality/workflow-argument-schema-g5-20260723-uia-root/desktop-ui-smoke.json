@@ -1,0 +1,81 @@
+﻿{
+    "schema_version":  1,
+    "generated_at":  "2026-07-23T14:26:17.6786139+00:00",
+    "classification":  "desktop_ui_automation_smoke",
+    "release_executable":  "E:\\ProjectSave\\GeminiProject\\Long_BetterWindows\\repo\\src\\LongBetterWindows.Host\\bin\\Release\\net8.0-windows\\LongBetterWindows.Host.exe",
+    "palette":  {
+
+                },
+    "super_panel":  {
+
+                    },
+    "workflow_review":  {
+
+                        },
+    "workflow_argument_schema":  {
+                                     "wide":  {
+                                                  "editor_discovered":  true,
+                                                  "layout_status":  "layout:wide;width:993",
+                                                  "amount":  {
+                                                                 "name":  "生成数量",
+                                                                 "control_type":  "ControlType.Edit",
+                                                                 "enabled":  true,
+                                                                 "keyboard_focusable":  true
+                                                             },
+                                                  "uppercase":  {
+                                                                    "name":  "使用大写字母",
+                                                                    "control_type":  "ControlType.CheckBox",
+                                                                    "enabled":  true,
+                                                                    "keyboard_focusable":  true
+                                                                },
+                                                  "compact":  {
+                                                                  "name":  "移除连字符",
+                                                                  "control_type":  "ControlType.CheckBox",
+                                                                  "enabled":  true,
+                                                                  "keyboard_focusable":  true
+                                                              },
+                                                  "amount_value_changed":  true,
+                                                  "uppercase_toggled":  true,
+                                                  "preset_selector_discovered":  true,
+                                                  "preset_apply_discovered":  true
+                                              },
+                                     "compact":  {
+                                                     "editor_discovered":  true,
+                                                     "layout_status":  "layout:compact;width:502",
+                                                     "amount":  {
+                                                                    "name":  "生成数量",
+                                                                    "control_type":  "ControlType.Edit",
+                                                                    "enabled":  true,
+                                                                    "keyboard_focusable":  true
+                                                                },
+                                                     "compact":  {
+                                                                     "name":  "移除连字符",
+                                                                     "control_type":  "ControlType.CheckBox",
+                                                                     "enabled":  true,
+                                                                     "keyboard_focusable":  true
+                                                                 },
+                                                     "maximum_value_changed":  true,
+                                                     "compact_toggled":  true
+                                                 }
+                                 },
+    "workflow_output":  {
+
+                        },
+    "workflow_export":  {
+
+                        },
+    "plugin_lifecycle":  {
+
+                         },
+    "marketplace":  {
+
+                    },
+    "automation_semantics":  {
+
+                             },
+    "accessibility_modes":  [
+
+                            ],
+    "passed":  true,
+    "error":  null
+}

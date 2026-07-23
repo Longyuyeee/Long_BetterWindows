@@ -6,6 +6,7 @@ param(
     [switch] $NoBuild,
     [switch] $WorkflowOnly,
     [switch] $WorkflowOutputOnly,
+    [switch] $WorkflowSchemaOnly,
     [switch] $WorkflowExportMatrix
 )
 
@@ -508,6 +509,7 @@ $report = [ordered]@{
     palette = [ordered]@{}
     super_panel = [ordered]@{}
     workflow_review = [ordered]@{}
+    workflow_argument_schema = [ordered]@{}
     workflow_output = [ordered]@{}
     workflow_export = [ordered]@{}
     plugin_lifecycle = [ordered]@{}
@@ -523,13 +525,15 @@ $superPanelProcess = $null
 $superPanelTransitionProcess = $null
 $workflowPaletteProcess = $null
 $workflowPanelProcess = $null
+$workflowSchemaWideProcess = $null
+$workflowSchemaCompactProcess = $null
 $workflowOutputProcess = $null
 $pluginProcess = $null
 $marketProcess = $null
 $accessibilityProcess = $null
 
 try {
-    if (-not $WorkflowOnly -and -not $WorkflowOutputOnly) {
+    if (-not $WorkflowOnly -and -not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting Command Palette host.'
     Set-Clipboard -Value 'long-ui-smoke-pending'
     $paletteProcess = Start-QualityHost '--quality-open-palette'
@@ -714,7 +718,7 @@ try {
     $superPanelTransitionProcess = $null
     }
 
-    if (-not $WorkflowOutputOnly) {
+    if (-not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting managed workflow review from Command Palette.'
     $workflowPaletteProcess = Start-QualityHost '--quality-open-palette'
     $workflowPalette = Wait-Until {
@@ -862,6 +866,123 @@ try {
     $workflowPanelProcess = $null
     }
 
+    if (-not $WorkflowOutputOnly) {
+    Write-Stage 'Validating UUID argument schema in the wide workflow editor.'
+    $workflowSchemaWideProcess = Start-QualityHost @(
+        '--quality-edit-workflow',
+        'workflow.quality.review',
+        '--quality-width', '1280',
+        '--quality-height', '800')
+    $schemaWideMain = Wait-Until {
+        Find-WindowByAutomationId $workflowSchemaWideProcess.Id 'Long.MainWindow'
+    } 'The wide workflow schema host did not appear.'
+    $schemaWideEditor = Wait-Until {
+        Find-RawDescendantByAutomationId `
+            $schemaWideMain 'Long.Workflow.Editor' 14
+    } 'The wide workflow editor was not discoverable.'
+    $schemaWideLayout = Wait-Until {
+        if ($schemaWideEditor.Current.ItemStatus -like 'layout:wide;width:*') {
+            $schemaWideEditor.Current.ItemStatus
+        }
+    } 'The wide workflow layout was not announced.'
+    $schemaInvocation = Wait-Until {
+        Find-RawDescendantByAutomationId `
+            $schemaWideEditor 'Long.Workflow.Invocation.Primary' 12
+    } 'The primary workflow invocation editor was not discoverable.'
+    $schemaAmount = Wait-Until {
+        Find-DescendantByAutomationId $schemaWideEditor 'amount'
+    } 'The UUID integer schema editor was not discoverable.'
+    $schemaUppercase = Wait-Until {
+        Find-DescendantByAutomationId $schemaWideEditor 'uppercase'
+    } 'The UUID uppercase boolean editor was not discoverable.'
+    $schemaCompact = Wait-Until {
+        Find-DescendantByAutomationId $schemaWideEditor 'compact'
+    } 'The UUID compact boolean editor was not discoverable.'
+    $schemaAmountValue = [Windows.Automation.ValuePattern]$schemaAmount.GetCurrentPattern(
+        [Windows.Automation.ValuePattern]::Pattern)
+    $schemaAmount.SetFocus()
+    $schemaAmountValue.SetValue('25')
+    Wait-Until { $schemaAmountValue.Current.Value -eq '25' } `
+        'The UUID integer schema editor did not accept a valid value.' | Out-Null
+    Set-AutomationToggleOn $schemaUppercase `
+        'The UUID uppercase schema toggle did not accept input.'
+    $schemaPreset = Wait-Until {
+        Find-RawDescendantByAutomationId `
+            $schemaInvocation 'Long.Workflow.ArgumentPreset' 8
+    } 'The UUID argument preset selector was not discoverable.'
+    $schemaPresetApply = Wait-Until {
+        Find-RawDescendantByAutomationId `
+            $schemaInvocation 'Long.Workflow.ArgumentPreset.Apply' 8
+    } 'The UUID argument preset apply action was not discoverable.'
+    $report.workflow_argument_schema['wide'] = [ordered]@{
+        editor_discovered = $true
+        layout_status = $schemaWideLayout
+        amount = Get-AutomationSemantics $schemaAmount 'ControlType.Edit' `
+            'UUID amount schema semantics failed.'
+        uppercase = Get-AutomationSemantics $schemaUppercase 'ControlType.CheckBox' `
+            'UUID uppercase schema semantics failed.'
+        compact = Get-AutomationSemantics $schemaCompact 'ControlType.CheckBox' `
+            'UUID compact schema semantics failed.'
+        amount_value_changed = $schemaAmountValue.Current.Value -eq '25'
+        uppercase_toggled = $true
+        preset_selector_discovered = $null -ne $schemaPreset
+        preset_apply_discovered = $null -ne $schemaPresetApply
+    }
+    Stop-QualityHost $workflowSchemaWideProcess
+    $workflowSchemaWideProcess = $null
+
+    Write-Stage 'Validating UUID argument schema in the compact workflow editor.'
+    $workflowSchemaCompactProcess = Start-QualityHost @(
+        '--quality-edit-workflow',
+        'workflow.quality.review',
+        '--quality-width', '720',
+        '--quality-height', '560')
+    $schemaCompactMain = Wait-Until {
+        Find-WindowByAutomationId $workflowSchemaCompactProcess.Id 'Long.MainWindow'
+    } 'The compact workflow schema host did not appear.'
+    $schemaCompactEditor = Wait-Until {
+        Find-RawDescendantByAutomationId `
+            $schemaCompactMain 'Long.Workflow.Editor' 14
+    } 'The compact workflow editor was not discoverable.'
+    $schemaCompactLayout = Wait-Until {
+        if ($schemaCompactEditor.Current.ItemStatus -like 'layout:compact;width:*') {
+            $schemaCompactEditor.Current.ItemStatus
+        }
+    } 'The compact workflow layout was not announced.'
+    $schemaCompactInvocation = Wait-Until {
+        Find-RawDescendantByAutomationId `
+            $schemaCompactEditor 'Long.Workflow.Invocation.Primary' 12
+    } 'The compact primary workflow invocation editor was not discoverable.'
+    $schemaCompactAmount = Wait-Until {
+        Find-DescendantByAutomationId $schemaCompactEditor 'amount'
+    } 'The compact UUID integer schema editor was not discoverable.'
+    $schemaCompactAmountValue = [Windows.Automation.ValuePattern]`
+        $schemaCompactAmount.GetCurrentPattern(
+            [Windows.Automation.ValuePattern]::Pattern)
+    $schemaCompactAmount.SetFocus()
+    $schemaCompactAmountValue.SetValue('100')
+    Wait-Until { $schemaCompactAmountValue.Current.Value -eq '100' } `
+        'The compact UUID schema editor did not accept its maximum value.' | Out-Null
+    $schemaCompactToggle = Wait-Until {
+        Find-DescendantByAutomationId $schemaCompactEditor 'compact'
+    } 'The compact UUID boolean schema editor was not discoverable.'
+    Set-AutomationToggleOn $schemaCompactToggle `
+        'The compact UUID schema toggle did not accept input.'
+    $report.workflow_argument_schema['compact'] = [ordered]@{
+        editor_discovered = $true
+        layout_status = $schemaCompactLayout
+        amount = Get-AutomationSemantics $schemaCompactAmount 'ControlType.Edit' `
+            'Compact UUID amount schema semantics failed.'
+        compact = Get-AutomationSemantics $schemaCompactToggle 'ControlType.CheckBox' `
+            'Compact UUID boolean schema semantics failed.'
+        maximum_value_changed = $schemaCompactAmountValue.Current.Value -eq '100'
+        compact_toggled = $true
+    }
+    Stop-QualityHost $workflowSchemaCompactProcess
+    $workflowSchemaCompactProcess = $null
+    }
+
+    if (-not $WorkflowSchemaOnly) {
     Write-Stage 'Starting approved long terminal-output workflow.'
     $workflowOutputArguments = @(
         '--quality-open-workflow',
@@ -938,8 +1059,9 @@ try {
     }
     Stop-QualityHost $workflowOutputProcess
     $workflowOutputProcess = $null
+    }
 
-    if (-not $WorkflowOnly -and -not $WorkflowOutputOnly) {
+    if (-not $WorkflowOnly -and -not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting embedded Base64 plugin workflow.'
     $pluginProcess = Start-QualityHost @(
         '--run-command', 'com.long.base64:base64.encode',
@@ -1135,6 +1257,8 @@ finally {
     Stop-QualityHost $superPanelTransitionProcess
     Stop-QualityHost $workflowPaletteProcess
     Stop-QualityHost $workflowPanelProcess
+    Stop-QualityHost $workflowSchemaWideProcess
+    Stop-QualityHost $workflowSchemaCompactProcess
     Stop-QualityHost $workflowOutputProcess
     Stop-QualityHost $pluginProcess
     Stop-QualityHost $marketProcess

@@ -59,19 +59,7 @@ namespace LongBetterWindows.Host.Interaction
 
             return new MarketplaceCompatibility(
                 compatible,
-                requirements.Count == 0
-                    ? "使用当前稳定协议，无额外最低版本要求。"
-                    : string.Join(" · ", requirements));
-        }
-
-        public static IReadOnlyList<string> FormatPermissionDiff(PermissionDiff diff)
-        {
-            var lines = new List<string>();
-            lines.AddRange(diff.Added.Select(capability => $"＋ 新增权限  {capability}"));
-            lines.AddRange(diff.Removed.Select(capability => $"− 移除权限  {capability}"));
-            lines.AddRange(diff.Unchanged.Select(capability => $"• 保持权限  {capability}"));
-            if (lines.Count == 0) lines.Add("• 无需额外能力权限");
-            return lines;
+                requirements);
         }
 
         public static MarketplacePackageMetadata CreatePackageMetadata(
@@ -102,7 +90,7 @@ namespace LongBetterWindows.Host.Interaction
 
     internal sealed record MarketplaceCompatibility(
         bool IsCompatible,
-        string Description);
+        IReadOnlyList<string> Requirements);
 
     internal sealed class MarketCardModel
     {
@@ -125,13 +113,5 @@ namespace LongBetterWindows.Host.Interaction
             ? "L"
             : Name[..1].ToUpperInvariant();
         public string Meta => $"{Entry.Category} · {Entry.Publisher}";
-        public string StateLabel => State switch
-        {
-            MarketplaceInstallState.Installed => "已安装",
-            MarketplaceInstallState.UpdateAvailable => "可更新",
-            MarketplaceInstallState.DowngradeAvailable => "可降级",
-            MarketplaceInstallState.Incompatible => "不兼容",
-            _ => "获取",
-        };
     }
 }

@@ -271,6 +271,8 @@ public class DesignSystemTests
             root, "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs"));
         var pluginManagementView = File.ReadAllText(Path.Combine(
             root, "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml"));
+        var zhResources = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "i18n", "zh-CN.json"));
         var performance = File.ReadAllText(Path.Combine(
             root, "src", "LongBetterWindows.Host", "Views", "PerformancePanel.xaml.cs"));
         var coordinator = File.ReadAllText(Path.Combine(
@@ -283,7 +285,8 @@ public class DesignSystemTests
         Assert.Contains("OpenDiagnosticsForQuality", toolCenter);
         Assert.Contains("CapabilityDetails_Click", pluginManagement);
         Assert.Contains("Long.Icon.Shield", pluginManagementView);
-        Assert.Contains("查看插件权限", pluginManagementView);
+        Assert.Contains("i18n.plugins.openCapabilities", pluginManagementView);
+        Assert.Contains("查看插件权限", zhResources);
         Assert.DoesNotContain("CapabilityDetails_Click", toolCenter);
         Assert.DoesNotContain("DispatcherTimer", performance);
         Assert.DoesNotContain("new SolidColorBrush", performance);

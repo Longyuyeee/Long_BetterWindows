@@ -50,6 +50,58 @@ namespace LongBetterWindows.Host.Contracts
         public Dictionary<string, string> Arguments { get; init; } = new();
     }
 
+    /// <summary>插件命令参数的基础值类型；调用协议仍使用字符串承载规范化值。</summary>
+    public enum PluginCommandArgumentType
+    {
+        String,
+        Integer,
+        Number,
+        Boolean,
+        Enum,
+    }
+
+    /// <summary>
+    /// 插件命令公开的只读参数契约。旧命令可不声明，继续使用自由键值参数。
+    /// </summary>
+    public sealed class PluginCommandArgumentDeclaration
+    {
+        [JsonPropertyName("key")]
+        public string Key { get; init; } = string.Empty;
+
+        [JsonPropertyName("name")]
+        public string Name { get; init; } = string.Empty;
+
+        [JsonPropertyName("description")]
+        public string Description { get; init; } = string.Empty;
+
+        [JsonPropertyName("type")]
+        public PluginCommandArgumentType Type { get; init; } = PluginCommandArgumentType.String;
+
+        [JsonPropertyName("required")]
+        public bool Required { get; init; }
+
+        [JsonPropertyName("default_value")]
+        public string? DefaultValue { get; init; }
+
+        [JsonPropertyName("sensitive")]
+        public bool Sensitive { get; init; }
+
+        [JsonPropertyName("minimum")]
+        public decimal? Minimum { get; init; }
+
+        [JsonPropertyName("maximum")]
+        public decimal? Maximum { get; init; }
+
+        [JsonPropertyName("min_length")]
+        public int? MinLength { get; init; }
+
+        [JsonPropertyName("max_length")]
+        public int? MaxLength { get; init; }
+
+        [JsonPropertyName("enum_values")]
+        public List<string> EnumValues { get; init; } = new();
+    }
+
     /// <summary>宿主为插件提供的标准窗口规格。</summary>
     public enum PluginWindowMode
     {
@@ -98,6 +150,12 @@ namespace LongBetterWindows.Host.Contracts
 
         [JsonPropertyName("argument_presets")]
         public List<PluginCommandArgumentPreset> ArgumentPresets { get; init; } = new();
+
+        /// <summary>
+        /// 命令参数的可选结构化契约；缺省为空以兼容现有 Manifest。
+        /// </summary>
+        [JsonPropertyName("argument_schema")]
+        public List<PluginCommandArgumentDeclaration> ArgumentSchema { get; init; } = new();
 
         [JsonPropertyName("view_mode")]
         public PluginViewMode ViewMode { get; init; } = PluginViewMode.Custom;

@@ -16,8 +16,13 @@ namespace LongBetterWindows.Host.Views
         private readonly MarketplaceRuntimeService _marketplace;
         private readonly MarketplaceSessionCoordinator _session;
         private bool _pluginEventsSubscribed;
+        private bool _languageEventsSubscribed;
+        private bool _isCompactLayout;
+        private bool _forceListForQuality;
         private MarketplaceEntry? _selectedEntry;
         private MarketplacePackageVersion? _selectedVersion;
+        private IReadOnlyList<MarketplacePackageVersion> _displayedVersions =
+            Array.Empty<MarketplacePackageVersion>();
 
         public MarketplaceControl()
         {
@@ -46,6 +51,7 @@ namespace LongBetterWindows.Host.Views
             _session = new MarketplaceSessionCoordinator(
                 _marketplace,
                 pluginId => HostProvider.Instance.PluginStore.Get(pluginId)?.Manifest);
+            SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             Loaded += MarketplaceControl_Loaded;
             Unloaded += MarketplaceControl_Unloaded;
             Dispatcher.ShutdownStarted += (_, _) =>
@@ -57,10 +63,16 @@ namespace LongBetterWindows.Host.Views
 
         private async void MarketplaceControl_Loaded(object sender, RoutedEventArgs e)
         {
+            ApplyResponsiveLayout(ActualWidth);
             if (!_pluginEventsSubscribed)
             {
                 HostProvider.Instance.PluginStore.PluginsChanged += OnPluginsChanged;
                 _pluginEventsSubscribed = true;
+            }
+            if (!_languageEventsSubscribed)
+            {
+                ServicesInitializer.I18n.LanguageChanged += OnLanguageChanged;
+                _languageEventsSubscribed = true;
             }
 
             await LoadCatalogAsync();
@@ -72,20 +84,112 @@ namespace LongBetterWindows.Host.Views
             if (!_pluginEventsSubscribed) return;
             HostProvider.Instance.PluginStore.PluginsChanged -= OnPluginsChanged;
             _pluginEventsSubscribed = false;
+            if (_languageEventsSubscribed)
+            {
+                ServicesInitializer.I18n.LanguageChanged -= OnLanguageChanged;
+                _languageEventsSubscribed = false;
+            }
         }
+
+        private void OnLanguageChanged(string language)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => OnLanguageChanged(language));
+                return;
+            }
+            _ = LoadCatalogAsync();
+        }
+
+        private void ApplyResponsiveLayout(double width)
+        {
+            var hostWidth = Window.GetWindow(this)?.ActualWidth ?? double.PositiveInfinity;
+            var compact = width < 760 || hostWidth < 900;
+            _isCompactLayout = compact;
+
+            if (compact)
+            {
+                MarketHeroTextColumn.Width = new GridLength(1, GridUnitType.Star);
+                MarketHeroActionColumn.Width = new GridLength(0);
+                Grid.SetRow(ImportLocalPackageButton, 1);
+                Grid.SetColumn(ImportLocalPackageButton, 0);
+                ImportLocalPackageButton.HorizontalAlignment = HorizontalAlignment.Left;
+                ImportLocalPackageButton.Margin = new Thickness(0, 14, 0, 0);
+
+                MarketSearchColumn.Width = new GridLength(1, GridUnitType.Star);
+                MarketCategoryColumn.Width = new GridLength(1, GridUnitType.Star);
+                MarketRefreshColumn.Width = GridLength.Auto;
+                Grid.SetRow(MarketSearchHost, 0);
+                Grid.SetColumn(MarketSearchHost, 0);
+                Grid.SetColumnSpan(MarketSearchHost, 3);
+                Grid.SetRow(CategoryBox, 1);
+                Grid.SetColumn(CategoryBox, 0);
+                Grid.SetColumnSpan(CategoryBox, 2);
+                CategoryBox.Margin = new Thickness(0, 10, 10, 0);
+                Grid.SetRow(RefreshCatalogButton, 1);
+                Grid.SetColumn(RefreshCatalogButton, 2);
+                RefreshCatalogButton.Margin = new Thickness(0, 10, 0, 0);
+
+                MarketListColumn.Width = new GridLength(1, GridUnitType.Star);
+                MarketBodyGapColumn.Width = new GridLength(0);
+                MarketDetailColumn.Width = new GridLength(0);
+                Grid.SetColumn(MarketDetailCard, 0);
+                Grid.SetColumnSpan(MarketDetailCard, 3);
+                MarketBackButton.Visibility = Visibility.Visible;
+                MarketListCard.Visibility = _forceListForQuality || _selectedEntry == null
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                MarketDetailCard.Visibility = _forceListForQuality || _selectedEntry == null
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+            }
+            else
+            {
+                MarketHeroTextColumn.Width = new GridLength(1, GridUnitType.Star);
+                MarketHeroActionColumn.Width = GridLength.Auto;
+                Grid.SetRow(ImportLocalPackageButton, 0);
+                Grid.SetColumn(ImportLocalPackageButton, 1);
+                ImportLocalPackageButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+                ImportLocalPackageButton.Margin = new Thickness(0);
+
+                MarketSearchColumn.Width = new GridLength(1, GridUnitType.Star);
+                MarketCategoryColumn.Width = new GridLength(190);
+                MarketRefreshColumn.Width = GridLength.Auto;
+                Grid.SetRow(MarketSearchHost, 0);
+                Grid.SetColumn(MarketSearchHost, 0);
+                Grid.SetColumnSpan(MarketSearchHost, 1);
+                Grid.SetRow(CategoryBox, 0);
+                Grid.SetColumn(CategoryBox, 1);
+                Grid.SetColumnSpan(CategoryBox, 1);
+                CategoryBox.Margin = new Thickness(10, 0, 10, 0);
+                Grid.SetRow(RefreshCatalogButton, 0);
+                Grid.SetColumn(RefreshCatalogButton, 2);
+                RefreshCatalogButton.Margin = new Thickness(0);
+
+                MarketListColumn.Width = new GridLength(330);
+                MarketBodyGapColumn.Width = new GridLength(14);
+                MarketDetailColumn.Width = new GridLength(1, GridUnitType.Star);
+                Grid.SetColumn(MarketDetailCard, 2);
+                Grid.SetColumnSpan(MarketDetailCard, 1);
+                MarketBackButton.Visibility = Visibility.Collapsed;
+                MarketListCard.Visibility = Visibility.Visible;
+                MarketDetailCard.Visibility = Visibility.Visible;
+            }
+        }
+
         private async Task LoadCatalogAsync()
         {
-            CatalogStatusText.Text = "正在读取可信目录…";
+            CatalogStatusText.Text = I18n("market.status.loading");
             var load = await _session.LoadCatalogAsync();
             if (load.IsSuperseded || load.Result == null) return;
             var result = load.Result;
             if (!result.IsSuccess)
             {
                 MarketList.ItemsSource = Array.Empty<MarketCardModel>();
-                ResultCountText.Text = "市场暂时离线";
+                ResultCountText.Text = I18n("market.status.offline");
                 CatalogStatusText.Text = result.Error;
-                MarketSourceBadge.Text = "离线 · 本地插件不受影响";
-                CategoryBox.ItemsSource = new[] { "全部分类" };
+                MarketSourceBadge.Text = I18n("market.source.offline");
+                CategoryBox.ItemsSource = new[] { I18n("market.allCategories") };
                 CategoryBox.SelectedIndex = 0;
                 ShowEmptyDetail();
                 return;
@@ -93,24 +197,31 @@ namespace LongBetterWindows.Host.Views
 
             var catalog = _session.Catalog!;
             MarketSourceBadge.Text = catalog.Source == MarketplaceSourceKind.RemoteRegistry
-                ? "远程 Registry · 强制签名"
-                : "内置可信目录 · 本地优先";
-            CategoryBox.ItemsSource = new[] { "全部分类" }
+                ? I18n("market.source.remote")
+                : I18n("market.source.local");
+            CategoryBox.ItemsSource = new[] { I18n("market.allCategories") }
                 .Concat(MarketplacePresentation.GetCategories(catalog))
                 .ToArray();
             CategoryBox.SelectedIndex = 0;
             CatalogStatusText.Text = string.IsNullOrWhiteSpace(result.Status)
-                ? $"目录生成于 {catalog.GeneratedAt:yyyy-MM-dd} · Schema {catalog.SchemaVersion}"
+                ? string.Format(
+                    I18n("market.status.generated"),
+                    catalog.GeneratedAt.ToString("yyyy-MM-dd"),
+                    catalog.SchemaVersion)
                 : result.Status;
             await ApplyFiltersAsync();
+            _ = Dispatcher.BeginInvoke(
+                new Action(() => BringIntoView(new Rect(0, 0, 1, 1))),
+                System.Windows.Threading.DispatcherPriority.ContextIdle);
         }
 
         private Task ApplyFiltersAsync()
         {
             var catalog = _session.Catalog;
             if (catalog == null) return Task.CompletedTask;
-            var category = CategoryBox.SelectedItem?.ToString();
-            if (category == "全部分类") category = null;
+            var category = CategoryBox.SelectedIndex <= 0
+                ? null
+                : CategoryBox.SelectedItem?.ToString();
             var cards = MarketplacePresentation.ProjectEntries(
                 catalog,
                 MarketSearchBox.Text,
@@ -118,7 +229,9 @@ namespace LongBetterWindows.Host.Views
                 pluginId => HostProvider.Instance.PluginStore
                     .Get(pluginId)?.Manifest.Version);
             MarketList.ItemsSource = cards;
-            ResultCountText.Text = $"发现 {cards.Count} 个插件";
+            ResultCountText.Text = string.Format(
+                I18n("market.results.count"),
+                cards.Count);
             if (_selectedEntry != null)
             {
                 var selected = cards.FirstOrDefault(x => string.Equals(
@@ -126,9 +239,13 @@ namespace LongBetterWindows.Host.Views
                 if (selected != null) MarketList.SelectedItem = selected;
                 else ShowEmptyDetail();
             }
-            else if (cards.Count > 0)
+            else if (cards.Count > 0 && !_isCompactLayout)
             {
                 MarketList.SelectedIndex = 0;
+            }
+            else if (_isCompactLayout)
+            {
+                ShowEmptyDetail();
             }
             return Task.CompletedTask;
         }
@@ -138,17 +255,24 @@ namespace LongBetterWindows.Host.Views
             _selectedEntry = card.Entry;
             MarketEmptyDetail.Visibility = Visibility.Collapsed;
             MarketDetail.Visibility = Visibility.Visible;
+            if (_isCompactLayout)
+            {
+                MarketListCard.Visibility = Visibility.Collapsed;
+                MarketDetailCard.Visibility = Visibility.Visible;
+            }
             DetailMonogram.Text = card.Monogram;
             DetailName.Text = card.Name;
             DetailPublisher.Text = $"{card.Entry.Publisher} · {card.Entry.Category}";
             DetailDescription.Text = string.IsNullOrWhiteSpace(card.Entry.Description)
                 ? card.Entry.Summary
                 : card.Entry.Description;
-            DetailState.Text = card.StateLabel;
-            VersionBox.ItemsSource = card.Entry.Versions
+            DetailState.Text = StateLabel(card.State);
+            _displayedVersions = card.Entry.Versions
                 .OrderByDescending(x => MarketplacePresentation.ParseVersion(x.Version))
                 .ToArray();
-            VersionBox.DisplayMemberPath = nameof(MarketplacePackageVersion.Version);
+            VersionBox.ItemsSource = _displayedVersions
+                .Select(version => version.Version)
+                .ToArray();
             VersionBox.SelectedIndex = VersionBox.Items.Count > 0 ? 0 : -1;
             UninstallButton.Visibility = card.InstalledVersion == null
                 ? Visibility.Collapsed
@@ -166,33 +290,41 @@ namespace LongBetterWindows.Host.Views
             }
 
             CapabilityItems.ItemsSource = version.Capabilities.Count == 0
-                ? new[] { "无需额外能力" }
+                ? new[] { I18n("market.permissions.none") }
                 : version.Capabilities;
             DetailTrust.Text = !string.IsNullOrWhiteSpace(version.PublisherKeyId)
-                ? $"发布者签名 · {version.PublisherKeyId}"
-                : "目录已收录 · 安装包待审查";
+                ? string.Format(
+                    I18n("market.trust.publisherSigned"),
+                    version.PublisherKeyId)
+                : I18n("market.trust.catalogOnly");
             ReleaseNotesText.Text = string.IsNullOrWhiteSpace(version.ReleaseNotes)
-                ? "此版本未提供更新说明。"
+                ? I18n("market.releaseNotes.empty")
                 : version.ReleaseNotes;
 
             var compatibility = MarketplacePresentation.GetCompatibility(
                 version, App.ProductVersion);
-            CompatibilityTitle.Text = compatibility.IsCompatible ? "✓ 与当前 Long 兼容" : "此版本暂不兼容";
+            CompatibilityTitle.Text = compatibility.IsCompatible
+                ? I18n("market.compat.compatible")
+                : I18n("market.compat.incompatible");
             CompatibilityTitle.SetResourceReference(
                 ForegroundProperty,
                 compatibility.IsCompatible ? "Long.Brush.State.Success" : "Long.Brush.State.Danger");
-            CompatibilityText.Text = compatibility.Description;
+            CompatibilityText.Text = compatibility.Requirements.Count == 0
+                ? I18n("market.compat.default")
+                : string.Join(" · ", compatibility.Requirements);
             InstallButton.IsEnabled = compatibility.IsCompatible;
             InstallButton.Content = version.PackageUri?.Scheme == Uri.UriSchemeHttps
-                ? "下载并审查"
-                : version.PackageUri?.IsFile == true ? "审查并安装" : "选择安装包";
+                ? I18n("market.action.downloadReview")
+                : version.PackageUri?.IsFile == true
+                    ? I18n("market.action.reviewInstall")
+                    : I18n("market.choosePackage");
             DetailHint.Text = version.PackageUri == null
-                ? "目录仅提供版本信息，请选择对应的本地 .lpak。"
+                ? I18n("market.hint.chooseLocal")
                 : version.PackageUri.IsFile
-                    ? "安装前将验证包哈希、发布者与权限变化。"
-                : !_marketplace.CanDownload
-                        ? "远程下载通道未配置，可先导入已下载的 .lpak。"
-                        : "将从允许的 HTTPS 主机下载，并在缓存前核对 SHA-256。";
+                    ? I18n("market.hint.verifyBeforeInstall")
+                    : !_marketplace.CanDownload
+                        ? I18n("market.hint.downloadUnavailable")
+                        : I18n("market.hint.secureDownload");
         }
 
         private async Task PreviewPackageAsync(
@@ -200,29 +332,29 @@ namespace LongBetterWindows.Host.Views
             MarketplacePackageMetadata metadata)
         {
             var preparation = await _session.PrepareLocalPackageAsync(path, metadata);
-            ShowPreparation(preparation, "插件包被拒绝");
+            ShowPreparation(preparation, I18n("market.error.packageRejected"));
         }
 
         private void ShowInstallConfirmation(MarketplacePendingAction pending)
         {
             var validation = pending.Validation!;
             var manifest = validation.Manifest!;
-            ConfirmTitle.Text = "安装前审查";
+            ConfirmTitle.Text = I18n("market.confirm.installTitle");
             ConfirmSubtitle.Text = $"{manifest.Name} · v{manifest.Version}";
             ConfirmTrustText.Text = validation.TrustLevel == PackageTrustLevel.PublisherSigned
-                ? "✓ 发布者签名验证通过"
-                : "本地未签名包 · 来源由你确认";
+                ? I18n("market.confirm.publisherVerified")
+                : I18n("market.confirm.localUnsigned");
             AutomationProperties.SetItemStatus(
                 ConfirmTrustText, validation.TrustLevel.ToString());
             ConfirmHashText.Text = $"SHA-256  {validation.Sha256}";
-            ConfirmCompatibilityText.Text = "✓ 包结构、入口文件与最低版本兼容检查通过";
-            PermissionDiffItems.ItemsSource = MarketplacePresentation.FormatPermissionDiff(
+            ConfirmCompatibilityText.Text = I18n("market.confirm.compatibilityPassed");
+            PermissionDiffItems.ItemsSource = FormatPermissionDiff(
                 validation.PermissionDiff);
             HighTrustWarning.Visibility = validation.RequiresHighTrustWarning
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             ConfirmErrorText.Text = string.Empty;
-            ConfirmActionButton.Content = "确认安装";
+            ConfirmActionButton.Content = I18n("market.confirm.installAction");
             ConfirmActionButton.IsEnabled = true;
             ConfirmActionButton.SetResourceReference(StyleProperty, "LongButton.Primary");
             ConfirmOverlay.Visibility = Visibility.Visible;
@@ -240,17 +372,22 @@ namespace LongBetterWindows.Host.Views
                 DetailHint.Text = preparation.Error;
                 return;
             }
-            ConfirmTitle.Text = "确认卸载";
+            ConfirmTitle.Text = I18n("market.confirm.uninstallTitle");
             ConfirmSubtitle.Text = $"{installed.Name} · v{installed.Version}";
-            ConfirmTrustText.Text = "插件文件将通过可回滚事务移除";
+            ConfirmTrustText.Text = I18n("market.confirm.rollbackRemoval");
             ConfirmHashText.Text = installed.Id;
-            ConfirmCompatibilityText.Text = "若卸载或重新扫描失败，Long 会恢复当前版本。";
+            ConfirmCompatibilityText.Text = I18n("market.confirm.rollbackGuarantee");
             PermissionDiffItems.ItemsSource = installed.Capabilities.Count == 0
-                ? new[] { "• 不涉及已授权能力" }
-                : installed.Capabilities.OrderBy(x => x).Select(x => $"− 移除权限  {x}").ToArray();
+                ? new[] { I18n("market.permission.noAuthorized") }
+                : installed.Capabilities
+                    .OrderBy(x => x)
+                    .Select(x => string.Format(
+                        I18n("market.permission.removed"),
+                        x))
+                    .ToArray();
             HighTrustWarning.Visibility = Visibility.Collapsed;
             ConfirmErrorText.Text = string.Empty;
-            ConfirmActionButton.Content = "确认卸载";
+            ConfirmActionButton.Content = I18n("market.confirm.uninstallAction");
             ConfirmActionButton.IsEnabled = true;
             ConfirmActionButton.SetResourceReference(StyleProperty, "LongButton.Danger");
             ConfirmOverlay.Visibility = Visibility.Visible;
@@ -260,8 +397,8 @@ namespace LongBetterWindows.Host.Views
         private void ShowConfirmationError(string title, string error)
         {
             ConfirmTitle.Text = title;
-            ConfirmSubtitle.Text = "Long 已阻止此次操作";
-            ConfirmTrustText.Text = "校验未通过";
+            ConfirmSubtitle.Text = I18n("market.confirm.blocked");
+            ConfirmTrustText.Text = I18n("market.confirm.validationFailed");
             AutomationProperties.SetItemStatus(
                 ConfirmTrustText,
                 error.Contains("超时", StringComparison.OrdinalIgnoreCase)
@@ -288,7 +425,7 @@ namespace LongBetterWindows.Host.Views
             var installer = App.PackageInstaller;
             if (installer == null)
             {
-                ConfirmErrorText.Text = "插件引擎仍在启动，请稍后再试。";
+                ConfirmErrorText.Text = I18n("market.error.engineStarting");
                 return;
             }
 
@@ -304,14 +441,14 @@ namespace LongBetterWindows.Host.Views
                 });
                 if (execution.IsBusy)
                 {
-                    ConfirmErrorText.Text = "已有市场操作正在进行。";
+                    ConfirmErrorText.Text = I18n("market.error.busy");
                     return;
                 }
                 if (execution.IsCanceled || execution.IsMissing || execution.Result == null)
                 {
                     ConfirmErrorText.Text = execution.IsCanceled
-                        ? "操作已取消。"
-                        : "确认状态已失效，请重新选择插件版本。";
+                        ? I18n("market.status.canceled")
+                        : I18n("market.error.confirmationExpired");
                     return;
                 }
                 var result = execution.Result;
@@ -324,8 +461,13 @@ namespace LongBetterWindows.Host.Views
 
                 ConfirmOverlay.Visibility = Visibility.Collapsed;
                 CatalogStatusText.Text = result.Action == InstallAction.Uninstall
-                    ? $"已卸载 {result.PluginName}"
-                    : $"已安装 {result.PluginName} v{result.PluginVersion}";
+                    ? string.Format(
+                        I18n("market.status.uninstalled"),
+                        result.PluginName)
+                    : string.Format(
+                        I18n("market.status.installed"),
+                        result.PluginName,
+                        result.PluginVersion);
                 await ApplyFiltersAsync();
             }
             finally
@@ -359,11 +501,13 @@ namespace LongBetterWindows.Host.Views
             else if (_selectedVersion.PackageUri is { Scheme: "https" })
             {
                 InstallButton.IsEnabled = false;
-                DetailHint.Text = "正在安全下载并核对 SHA-256…";
+                DetailHint.Text = I18n("market.status.downloading");
                 try
                 {
                     var preparation = await _session.PrepareRemotePackageAsync(entry, version);
-                    ShowPreparation(preparation, "插件包下载失败");
+                    ShowPreparation(
+                        preparation,
+                        I18n("market.error.downloadFailed"));
                 }
                 finally { ShowVersion(_selectedVersion); }
                 return;
@@ -382,29 +526,34 @@ namespace LongBetterWindows.Host.Views
         {
             if (preparation.IsBusy)
             {
-                DetailHint.Text = "已有市场操作正在进行，请等待当前操作完成。";
+                DetailHint.Text = I18n("market.error.busyWait");
                 return;
             }
             if (preparation.IsCanceled)
             {
-                DetailHint.Text = "操作已取消。";
+                DetailHint.Text = I18n("market.status.canceled");
                 return;
             }
             if (!preparation.IsSuccess || preparation.PendingAction == null)
             {
                 ShowConfirmationError(
                     rejectionTitle,
-                    preparation.Error ?? "未知市场操作错误。");
+                    preparation.Error ?? I18n("market.error.unknown"));
                 return;
             }
 
             if (preparation.Download is { } download)
             {
                 DetailHint.Text = download.FromCache
-                    ? "已使用通过哈希复核的本地缓存。"
+                    ? I18n("market.status.cacheVerified")
                     : download.Attempts > 1
-                        ? $"网络恢复后第 {download.Attempts} 次下载成功，已核对 {download.Bytes / 1024d:F1} KB。"
-                        : $"已下载 {download.Bytes / 1024d:F1} KB，等待安装审查。";
+                        ? string.Format(
+                            I18n("market.status.downloadRetried"),
+                            download.Attempts,
+                            download.Bytes / 1024d)
+                        : string.Format(
+                            I18n("market.status.downloaded"),
+                            download.Bytes / 1024d);
             }
             ShowInstallConfirmation(preparation.PendingAction);
         }
@@ -413,8 +562,8 @@ namespace LongBetterWindows.Host.Views
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择 Long 插件包",
-                Filter = "Long 插件包 (*.lpak)|*.lpak",
+                Title = I18n("market.filePicker.title"),
+                Filter = I18n("market.filePicker.filter"),
                 CheckFileExists = true,
                 Multiselect = false,
             };
@@ -437,14 +586,54 @@ namespace LongBetterWindows.Host.Views
 
         private void MarketList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isCompactLayout) return;
             if (MarketList.SelectedItem is MarketCardModel card) ShowEntry(card);
         }
 
+        private void MarketList_PreviewMouseLeftButtonUp(
+            object sender,
+            MouseButtonEventArgs e)
+        {
+            if (_isCompactLayout &&
+                MarketList.SelectedItem is MarketCardModel card)
+                ShowEntry(card);
+        }
+
+        private void MarketBackButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_isCompactLayout) return;
+            MarketDetailCard.Visibility = Visibility.Collapsed;
+            MarketListCard.Visibility = Visibility.Visible;
+            MarketList.Focus();
+        }
+
         private void VersionBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-            => ShowVersion(VersionBox.SelectedItem as MarketplacePackageVersion);
+            => ShowVersion(
+                VersionBox.SelectedIndex >= 0
+                && VersionBox.SelectedIndex < _displayedVersions.Count
+                    ? _displayedVersions[VersionBox.SelectedIndex]
+                    : null);
+
+        internal void ShowListForQuality()
+        {
+            _forceListForQuality = true;
+            ApplyResponsiveLayout(0);
+            MarketDetailCard.Visibility = Visibility.Collapsed;
+            MarketListCard.Visibility = Visibility.Visible;
+        }
 
         private void MarketplaceControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (_isCompactLayout
+                && ConfirmOverlay.Visibility != Visibility.Visible
+                && e.Key is Key.Enter or Key.Space
+                && MarketList.IsKeyboardFocusWithin
+                && MarketList.SelectedItem is MarketCardModel selected)
+            {
+                ShowEntry(selected);
+                e.Handled = true;
+                return;
+            }
             if (e.Key == Key.Escape && ConfirmOverlay.Visibility == Visibility.Visible
                 && InstallProgress.Visibility != Visibility.Visible)
             {
@@ -469,7 +658,40 @@ namespace LongBetterWindows.Host.Views
             _selectedEntry = null;
             MarketDetail.Visibility = Visibility.Collapsed;
             MarketEmptyDetail.Visibility = Visibility.Visible;
+            if (_isCompactLayout)
+            {
+                MarketDetailCard.Visibility = Visibility.Collapsed;
+                MarketListCard.Visibility = Visibility.Visible;
+            }
         }
+
+        private static IReadOnlyList<string> FormatPermissionDiff(
+            PermissionDiff diff)
+        {
+            var lines = new List<string>();
+            lines.AddRange(diff.Added.Select(capability =>
+                string.Format(I18n("market.permission.added"), capability)));
+            lines.AddRange(diff.Removed.Select(capability =>
+                string.Format(I18n("market.permission.removed"), capability)));
+            lines.AddRange(diff.Unchanged.Select(capability =>
+                string.Format(I18n("market.permission.unchanged"), capability)));
+            if (lines.Count == 0)
+                lines.Add(I18n("market.permission.none"));
+            return lines;
+        }
+
+        private static string StateLabel(MarketplaceInstallState state)
+            => I18n(state switch
+            {
+                MarketplaceInstallState.Installed => "market.state.installed",
+                MarketplaceInstallState.UpdateAvailable => "market.state.update",
+                MarketplaceInstallState.DowngradeAvailable => "market.state.downgrade",
+                MarketplaceInstallState.Incompatible => "market.state.incompatible",
+                _ => "market.state.get",
+            });
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
 
     }
 }

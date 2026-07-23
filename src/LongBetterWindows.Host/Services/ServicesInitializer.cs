@@ -15,6 +15,20 @@ namespace LongBetterWindows.Host.Services
         public static ShellSelectionService ShellSelection { get; private set; } = null!;
         public static ColumnInjectionService ColumnInjection { get; private set; } = null!;
         public static ContextMenuService ContextMenu { get; private set; } = null!;
+        public static SparsePackageService SparsePackage { get; private set; } = null!;
+        private static I18nService? _i18n;
+        public static I18nService I18n
+        {
+            get
+            {
+                if (_i18n is not null) return _i18n;
+                var service = new I18nService();
+                service.Initialize(I18nService.DefaultLanguage);
+                _i18n = service;
+                return service;
+            }
+            private set => _i18n = value;
+        }
         public static ClipboardService Clipboard { get; private set; } = null!;
         public static NotificationService Notification { get; private set; } = null!;
         public static FileOpsService FileOps { get; private set; } = null!;
@@ -79,6 +93,8 @@ namespace LongBetterWindows.Host.Services
             ColumnInjection = new ColumnInjectionService();
 
             ContextMenu = new ContextMenuService();
+            SparsePackage = new SparsePackageService();
+            I18n = new I18nService();
 
             Clipboard = new ClipboardService();
             provider.RegisterService<IClipboardService>(Clipboard);
@@ -177,9 +193,6 @@ namespace LongBetterWindows.Host.Services
 
             NetworkMonitor = new NetworkMonitorService();
             provider.RegisterService<INetworkMonitorService>(NetworkMonitor);
-
-            // I18nService 预留，待国际化时启用
-            // I18nService.Initialize();
 
             Startup = new StartupService();
         }

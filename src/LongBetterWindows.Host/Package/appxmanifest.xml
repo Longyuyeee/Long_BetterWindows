@@ -1,38 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Sparse Package 清单 —— Win11 一级右键菜单支持
-  状态: 预留配置，待代码签名证书就绪后启用
-
-  使用步骤:
-  1. 获取代码签名证书 (.pfx)
-  2. 修改 Identity Name 和 Publisher
-  3. 运行: dotnet build -c Release
-  4. 注册稀疏包:
-     Add-AppxPackage -Path "Package\LongBetterWindows.appxmanifest.xml"
-     -ExternalLocation "bin\Release\net8.0-windows\"
-  5. 右键菜单自动出现在 Win11 一级菜单
--->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10">
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  IgnorableNamespaces="uap uap10 rescap com desktop4 desktop5">
 
   <Identity
     Name="Long.LongBetterWindows"
-    Publisher="CN=Long"
-    Version="0.2.0.0" />
+    Publisher="CN=Long-Development"
+    Version="1.9.0.0"
+    ProcessorArchitecture="x64" />
 
   <Properties>
     <DisplayName>Long窗口·全能助手</DisplayName>
     <PublisherDisplayName>Long</PublisherDisplayName>
     <Description>打造极致优雅、深度集成的 Windows 效率增强中枢。</Description>
-    <Logo>assets\app_icon.png</Logo>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <uap10:AllowExternalContent>true</uap10:AllowExternalContent>
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22621.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
 
   <Resources>
@@ -42,24 +34,46 @@
   <Applications>
     <Application Id="LongBetterWindows"
                  Executable="LongBetterWindows.Host.exe"
-                 EntryPoint="Windows.FullTrustApplication">
+                 uap10:TrustLevel="mediumIL"
+                 uap10:RuntimeBehavior="win32App">
       <uap:VisualElements
         DisplayName="Long窗口·全能助手"
         Description="Windows 效率增强中枢"
-        Square150x150Logo="assets\app_icon.png"
-        Square44x44Logo="assets\app_icon.png"
+        AppListEntry="none"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
         BackgroundColor="transparent" />
       <Extensions>
-        <!-- Win11 右键菜单扩展——文件夹备注 -->
-        <desktop:Extension Category="windows.contextMenuHandler">
-          <desktop:ContextMenuHandler>
-            <desktop:Verb Id="LongNote"
-                          Clsid="{00000000-0000-0000-0000-000000000000}"
-                          SampleData="备注此文件夹" />
-          </desktop:ContextMenuHandler>
-        </desktop:Extension>
-        <!-- 更多插件菜单通过此扩展注册 -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer DisplayName="Long Explorer commands">
+              <com:Class
+                Id="A17F41AD-74BC-47F8-984B-2DF6F22263A1"
+                Path="ShellExtension\LongBetterWindows.ShellExtension.dll"
+                ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb
+                Id="LongFolderNote"
+                Clsid="A17F41AD-74BC-47F8-984B-2DF6F22263A1" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory\Background">
+              <desktop5:Verb
+                Id="LongFolderNoteBackground"
+                Clsid="A17F41AD-74BC-47F8-984B-2DF6F22263A1" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
       </Extensions>
     </Application>
   </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
+  </Capabilities>
 </Package>

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -35,6 +36,7 @@ namespace LongBetterWindows.Host.Views
         private int _reportLoadVersion;
         private bool _rendering = true;
         private bool _subscribed;
+        private bool _languageSubscribed;
 
         public WorkflowEditorControl()
         {
@@ -47,21 +49,21 @@ namespace LongBetterWindows.Host.Views
             _reports = new CommandWorkflowExecutionReportRepository(
                 ServicesInitializer.WorkflowReportsDirectory);
             _runSession = new CommandWorkflowRunSession(_plugins, _reports);
-            FailureModeCombo.ItemsSource = FailureOptions;
+            FailureModeCombo.ItemsSource = CreateFailureOptions();
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             _rendering = false;
         }
 
-        private static IReadOnlyList<EnumOption<WorkflowFailureMode>> FailureOptions { get; } =
+        private static IReadOnlyList<EnumOption<WorkflowFailureMode>> CreateFailureOptions() =>
         [
-            new(WorkflowFailureMode.Stop, "失败时停止"),
-            new(WorkflowFailureMode.Compensate, "失败时回滚"),
+            new(WorkflowFailureMode.Stop, I18n("workflow.failure.stop")),
+            new(WorkflowFailureMode.Compensate, I18n("workflow.failure.compensate")),
         ];
 
-        private static IReadOnlyList<EnumOption<WorkflowStepEffect>> EffectOptions { get; } =
+        private static IReadOnlyList<EnumOption<WorkflowStepEffect>> CreateEffectOptions() =>
         [
-            new(WorkflowStepEffect.ReadOnly, "只读"),
-            new(WorkflowStepEffect.Mutating, "会修改"),
+            new(WorkflowStepEffect.ReadOnly, I18n("workflow.effect.readOnly")),
+            new(WorkflowStepEffect.Mutating, I18n("workflow.effect.mutating")),
         ];
 
         private async void WorkflowEditorControl_Loaded(object sender, RoutedEventArgs e)
@@ -71,6 +73,11 @@ namespace LongBetterWindows.Host.Views
                 _plugins.PluginsChanged += PluginsChanged;
                 _subscribed = true;
             }
+            if (!_languageSubscribed)
+            {
+                ServicesInitializer.I18n.LanguageChanged += OnLanguageChanged;
+                _languageSubscribed = true;
+            }
             await RefreshListAsync();
             RefreshCommandOptions();
         }
@@ -79,9 +86,30 @@ namespace LongBetterWindows.Host.Views
         {
             _runSession.CancelReview();
             _runSession.CancelExecution();
-            if (!_subscribed) return;
-            _plugins.PluginsChanged -= PluginsChanged;
-            _subscribed = false;
+            if (_subscribed)
+            {
+                _plugins.PluginsChanged -= PluginsChanged;
+                _subscribed = false;
+            }
+            if (_languageSubscribed)
+            {
+                ServicesInitializer.I18n.LanguageChanged -= OnLanguageChanged;
+                _languageSubscribed = false;
+            }
+        }
+
+        private async void OnLanguageChanged(string language)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => OnLanguageChanged(language));
+                return;
+            }
+            var selectedFailureMode = FailureModeCombo.SelectedValue;
+            FailureModeCombo.ItemsSource = CreateFailureOptions();
+            FailureModeCombo.SelectedValue = selectedFailureMode;
+            await RefreshListAsync(_session.State.Draft?.Id);
+            RenderEditor();
         }
 
         private void PluginsChanged()
@@ -106,16 +134,18 @@ namespace LongBetterWindows.Host.Views
             var result = await _repository.ListManagedAsync();
             if (!result.IsSuccess)
             {
-                SetListStatus(result.Error ?? "无法读取本机工作流", isError: true);
+                SetListStatus(result.Error ?? I18n("workflow.list.readError"), isError: true);
                 return;
             }
             var items = result.Workflows.Select(WorkflowListItem.From).ToList();
             _rendering = true;
             WorkflowList.ItemsSource = items;
             CompactWorkflowCombo.ItemsSource = items;
-            WorkflowCountText.Text = $"{items.Count} 项";
+            WorkflowCountText.Text = string.Format(I18n("workflow.list.count"), items.Count);
             SetListStatus(
-                result.Issues.Count == 0 ? "本机托管 · 原子保存" : $"{result.Issues.Count} 个文件未能载入",
+                result.Issues.Count == 0
+                    ? I18n("workflow.list.localManaged")
+                    : string.Format(I18n("workflow.list.loadIssues"), result.Issues.Count),
                 result.Issues.Count > 0);
             if (selectWorkflowId is not null)
             {
@@ -158,7 +188,7 @@ namespace LongBetterWindows.Host.Views
         {
             _importReview = null;
             var suffix = DateTimeOffset.Now.ToString("yyyyMMdd-HHmmss");
-            _session.StartNew($"workflow.{suffix}", "新组合动作");
+            _session.StartNew($"workflow.{suffix}", I18n("workflow.new.defaultName"));
             _rendering = true;
             WorkflowList.SelectedItem = null;
             CompactWorkflowCombo.SelectedItem = null;
@@ -371,7 +401,12 @@ namespace LongBetterWindows.Host.Views
 
         private void UpdateStep(object sender)
         {
-            if (_rendering || sender is not FrameworkElement { DataContext: StepEditorItem item }) return;
+            if (_rendering
+                || sender is not ComboBox
+                {
+                    DataContext: StepEditorItem item,
+                    IsKeyboardFocusWithin: true,
+                }) return;
             _session.UpdateStep(
                 item.Id,
                 item.Effect,
@@ -512,6 +547,22 @@ namespace LongBetterWindows.Host.Views
                 : _executionReview is not null
                     ? string.Join(" ", _executionReview.Issues)
                     : _session.State.Error ?? "组合动作未能通过实时预检。";
+        }
+
+        internal async Task<string?> OpenEditorAsync(
+            string workflowId,
+            CancellationToken cancellationToken = default)
+        {
+            _runSession.CancelReview();
+            _executionReview = null;
+            ExecutionReviewPanel.Visibility = Visibility.Collapsed;
+            if (!await _session.LoadAsync(workflowId, cancellationToken))
+                return _session.State.Error ?? "组合动作已经失效。";
+
+            await RefreshListAsync(workflowId);
+            RenderEditor();
+            await RefreshReportsAsync(workflowId);
+            return null;
         }
 
         private void PrepareRun_Click(object sender, RoutedEventArgs e)
@@ -775,7 +826,9 @@ namespace LongBetterWindows.Host.Views
                 WorkflowNameBox.Text = draft.Name;
                 FailureModeCombo.SelectedValue = draft.FailureMode;
                 var commands = _session.AvailableCommands.Select(CommandOption.From).ToList();
-                var compensationOptions = new[] { new CommandOption(string.Empty, "不设置") }
+                var compensationOptions = new[] { new CommandOption(
+                        string.Empty,
+                        I18n("workflow.step.noCompensation")) }
                     .Concat(commands)
                     .ToList();
                 var stepEditors = new List<StepEditorItem>();
@@ -795,17 +848,17 @@ namespace LongBetterWindows.Host.Views
                         CanMoveDown = index < draft.Steps.Count - 1,
                         CommandOptions = commands,
                         CompensationOptions = compensationOptions,
-                        EffectOptions = EffectOptions,
+                        EffectOptions = CreateEffectOptions(),
                         PrimaryInput = CreateInvocationEditor(
                             step.Id,
                             WorkflowCommandRole.Primary,
-                            "命令输入",
+                            I18n("workflow.step.primaryInput"),
                             step.Command,
                             priorOutputs),
                         CompensationInput = CreateInvocationEditor(
                             step.Id,
                             WorkflowCommandRole.Compensation,
-                            "补偿输入",
+                            I18n("workflow.step.compensationInput"),
                             step.Compensation,
                             priorOutputs.Concat(primaryOutputs).ToArray()),
                     });
@@ -889,7 +942,13 @@ namespace LongBetterWindows.Host.Views
                 StepId = stepId,
                 Role = role,
                 RoleLabel = roleLabel,
-                BindingEditor = new WorkflowBindingEditorModel(availableOutputs, invocation.InputType),
+                BindingEditor = new WorkflowBindingEditorModel(
+                    availableOutputs,
+                    invocation.InputType,
+                    descriptor?.Command.ArgumentSchema
+                        .Select(declaration => declaration.Key)
+                        .ToArray()),
+                ArgumentSchema = SnapshotArgumentSchema(descriptor?.Command.ArgumentSchema),
                 ArgumentPresets = descriptor?.Command.ArgumentPresets
                     .Select(preset => new WorkflowArgumentPresetOption(
                         preset.Id,
@@ -907,8 +966,29 @@ namespace LongBetterWindows.Host.Views
             };
             editor.LoadArguments(invocation.Arguments);
             editor.BindingEditor.LoadBindings(command?.Bindings);
+            editor.RefreshArgumentValidation();
             return editor;
         }
+
+        private static IReadOnlyList<PluginCommandArgumentDeclaration> SnapshotArgumentSchema(
+            IReadOnlyList<PluginCommandArgumentDeclaration>? schema)
+            => schema?.Select(declaration => new PluginCommandArgumentDeclaration
+                {
+                    Key = declaration.Key,
+                    Name = declaration.Name,
+                    Description = declaration.Description,
+                    Type = declaration.Type,
+                    Required = declaration.Required,
+                    DefaultValue = declaration.DefaultValue,
+                    Sensitive = declaration.Sensitive,
+                    Minimum = declaration.Minimum,
+                    Maximum = declaration.Maximum,
+                    MinLength = declaration.MinLength,
+                    MaxLength = declaration.MaxLength,
+                    EnumValues = declaration.EnumValues.ToList(),
+                })
+                .ToArray()
+                ?? Array.Empty<PluginCommandArgumentDeclaration>();
 
         private IReadOnlyList<WorkflowBindingOutputOption> GetDeclaredOutputOptions(
             string stepId,
@@ -926,8 +1006,8 @@ namespace LongBetterWindows.Host.Views
 
         private bool ApplyInvocation(WorkflowInvocationEditorModel item)
         {
-            if (!item.TryBuildArguments(out var arguments)
-                || !item.BindingEditor.TryBuildBindings(out var bindings)) return false;
+            if (!item.BindingEditor.TryBuildBindings(out var bindings)
+                || !item.TryBuildArguments(out var arguments)) return false;
             if (!_session.UpdateInvocation(
                 item.StepId,
                 item.Role,
@@ -944,8 +1024,10 @@ namespace LongBetterWindows.Host.Views
             var state = _session.State;
             var hasInvalidEditors = HasInvalidInvocationEditors();
             EditorDirtyText.Text = state.ExistingDefinitionSha256 is null
-                ? "尚未保存"
-                : state.IsDirty ? "有未保存的更改" : "已保存到本机";
+                ? I18n("workflow.status.notSaved")
+                : state.IsDirty
+                    ? I18n("workflow.status.unsavedChanges")
+                    : I18n("workflow.status.savedLocally");
             SaveWorkflowButton.IsEnabled = state.CanSave && state.IsDirty && !hasInvalidEditors;
             ExportWorkflowButton.IsEnabled = state.ExistingDefinitionSha256 is not null
                 && !state.IsDirty
@@ -957,22 +1039,24 @@ namespace LongBetterWindows.Host.Views
                 && !_runSession.IsRunning;
             if (hasInvalidEditors)
             {
-                PreflightTitle.Text = "输入或绑定需要修正";
+                PreflightTitle.Text = I18n("workflow.preflight.invalidInput");
                 PreflightTitle.Foreground = (System.Windows.Media.Brush)FindResource("Long.Brush.State.Danger");
-                PreflightDetail.Text = "检查高级参数和步骤输出绑定；修正后才能保存或执行。";
+                PreflightDetail.Text = I18n("workflow.preflight.invalidInputDetail");
                 return;
             }
             if (state.Preflight?.IsValid == true)
             {
-                PreflightTitle.Text = "预检通过";
+                PreflightTitle.Text = I18n("workflow.preflight.passed");
                 PreflightTitle.Foreground = (System.Windows.Media.Brush)FindResource("Long.Brush.State.Success");
                 PreflightDetail.Text = state.Preflight.Permissions.Count == 0
-                    ? "不需要插件能力授权"
-                    : $"执行前将复核 {state.Preflight.Permissions.Count} 个插件及其能力";
+                    ? I18n("workflow.preflight.noPermissions")
+                    : string.Format(
+                        I18n("workflow.preflight.permissionCount"),
+                        state.Preflight.Permissions.Count);
             }
             else
             {
-                PreflightTitle.Text = "需要修正";
+                PreflightTitle.Text = I18n("workflow.preflight.needsFix");
                 PreflightTitle.Foreground = (System.Windows.Media.Brush)FindResource("Long.Brush.State.Danger");
                 PreflightDetail.Text = state.Error
                     ?? string.Join(Environment.NewLine, state.Preflight?.Issues ?? Array.Empty<string>());
@@ -1002,6 +1086,15 @@ namespace LongBetterWindows.Host.Views
             WorkflowDividerColumn.Width = new GridLength(compact ? 0 : 1);
             WorkflowGapColumn.Width = new GridLength(compact ? 0 : 20);
             CompactWorkflowBar.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            Grid.SetRow(EditorHeaderActions, compact ? 1 : 0);
+            Grid.SetColumn(EditorHeaderActions, compact ? 0 : 1);
+            Grid.SetColumnSpan(EditorHeaderActions, compact ? 2 : 1);
+            EditorHeaderActions.Margin = compact
+                ? new Thickness(0, 10, 0, 0)
+                : new Thickness(0);
+            AutomationProperties.SetItemStatus(
+                this,
+                $"layout:{(compact ? "compact" : "wide")};width:{Math.Round(width)}");
             ResponsiveLayoutChanged?.Invoke(compact);
         }
 
@@ -1044,18 +1137,21 @@ namespace LongBetterWindows.Host.Views
             => WorkflowExecutionPresentation.FailureLabel(mode);
 
         private static string InputTypeLabel(AcceptedInputType inputType)
-            => inputType switch
+            => I18n(inputType switch
             {
-                AcceptedInputType.None => "无输入",
-                AcceptedInputType.Text => "文本",
-                AcceptedInputType.Url => "URL",
-                AcceptedInputType.Image => "PNG 图片",
-                AcceptedInputType.File => "单个文件",
-                AcceptedInputType.Files => "多个文件",
-                AcceptedInputType.Folder => "文件夹",
-                AcceptedInputType.Clipboard => "剪贴板文本快照",
-                _ => "资源管理器选区",
-            };
+                AcceptedInputType.None => "workflow.input.none",
+                AcceptedInputType.Text => "workflow.input.text",
+                AcceptedInputType.Url => "workflow.input.url",
+                AcceptedInputType.Image => "workflow.input.image",
+                AcceptedInputType.File => "workflow.input.file",
+                AcceptedInputType.Files => "workflow.input.files",
+                AcceptedInputType.Folder => "workflow.input.folder",
+                AcceptedInputType.Clipboard => "workflow.input.clipboard",
+                _ => "workflow.input.explorerSelection",
+            });
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
 
         private sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum;
         private sealed record CommandOption(string Key, string Display)
@@ -1069,7 +1165,12 @@ namespace LongBetterWindows.Host.Views
                 => new(
                     summary.Id,
                     summary.Name,
-                    $"{summary.StepCount} 步 · {(summary.FailureMode == WorkflowFailureMode.Compensate ? "回滚" : "停止")}");
+                    string.Format(
+                        I18n("workflow.list.detail"),
+                        summary.StepCount,
+                        I18n(summary.FailureMode == WorkflowFailureMode.Compensate
+                            ? "workflow.failure.rollbackShort"
+                            : "workflow.failure.stopShort")));
         }
         private sealed class StepEditorItem
         {

@@ -144,11 +144,25 @@ namespace LongBetterWindows.Host.Interaction
             {
                 issues.Add($"Workflow step {role} input type is not accepted: {stepId}");
             }
+            var deferredArgumentKeys = (command.Bindings ?? Array.Empty<WorkflowValueBinding>())
+                .Where(binding => binding.Target == WorkflowBindingTarget.Argument
+                    && !string.IsNullOrWhiteSpace(binding.ArgumentKey))
+                .Select(binding => binding.ArgumentKey!);
+            var parameterResult = PluginCommandArgumentValidator.ValidateForWorkflowPreflight(
+                descriptor.Command.ArgumentSchema,
+                invocation.Arguments,
+                deferredArgumentKeys);
+            foreach (var issue in parameterResult.Issues)
+            {
+                issues.Add(
+                    $"Workflow step {role} parameters are invalid: {stepId}. {issue}");
+            }
             ValidateBindings(
                 stepId,
                 role,
                 command.Bindings,
                 invocation.InputType,
+                descriptor.Command.ArgumentSchema,
                 availableOutputs,
                 issues);
         }
@@ -171,6 +185,7 @@ namespace LongBetterWindows.Host.Interaction
             string role,
             IReadOnlyList<WorkflowValueBinding>? bindings,
             AcceptedInputType inputType,
+            IReadOnlyList<PluginCommandArgumentDeclaration>? argumentSchema,
             IReadOnlyDictionary<
                 string,
                 IReadOnlyDictionary<string, PluginCommandOutputType>> availableOutputs,
@@ -184,6 +199,10 @@ namespace LongBetterWindows.Host.Interaction
             }
             var textTargets = 0;
             var argumentTargets = new HashSet<string>(StringComparer.Ordinal);
+            var declaredArgumentKeys = (argumentSchema
+                    ?? Array.Empty<PluginCommandArgumentDeclaration>())
+                .Select(declaration => declaration.Key)
+                .ToHashSet(StringComparer.Ordinal);
             foreach (var binding in bindings)
             {
                 PluginCommandOutputType? outputType = null;
@@ -244,6 +263,12 @@ namespace LongBetterWindows.Host.Interaction
                     {
                         issues.Add($"Workflow step {role} has duplicate argument bindings: {stepId}");
                     }
+                    else if (declaredArgumentKeys.Count > 0
+                        && !declaredArgumentKeys.Contains(binding.ArgumentKey))
+                    {
+                        issues.Add(
+                            $"Workflow step {role} binding argument target is not declared: {stepId}");
+                    }
                     if (outputType.HasValue
                         && outputType.Value != PluginCommandOutputType.Text)
                     {
@@ -264,14 +289,14 @@ namespace LongBetterWindows.Host.Interaction
                 || character is '.' or '_' or '-');
         }
 
-        private static string ComputeFingerprint(
+        private string ComputeFingerprint(
             CommandWorkflowDefinition workflow,
             IReadOnlyList<WorkflowPermissionRequirement> permissions)
         {
             using var stream = new MemoryStream();
             using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
             {
-                WriteField(writer, "long-command-workflow-v1");
+                WriteField(writer, "long-command-workflow-v2");
                 WriteField(writer, workflow.Id);
                 WriteField(writer, workflow.Name);
                 writer.Write((int)workflow.FailureMode);
@@ -299,7 +324,7 @@ namespace LongBetterWindows.Host.Interaction
             return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
         }
 
-        private static void WriteCommand(BinaryWriter writer, WorkflowCommand? command)
+        private void WriteCommand(BinaryWriter writer, WorkflowCommand? command)
         {
             writer.Write(command is not null);
             if (command is null) return;
@@ -332,6 +357,47 @@ namespace LongBetterWindows.Host.Interaction
                 writer.Write((int)binding.Target);
                 WriteField(writer, binding.ArgumentKey ?? string.Empty);
             }
+            var descriptor = _plugins.Commands.Get(command.CommandKey);
+            WriteArgumentSchema(writer, descriptor?.Command.ArgumentSchema);
+        }
+
+        private static void WriteArgumentSchema(
+            BinaryWriter writer,
+            IReadOnlyList<PluginCommandArgumentDeclaration>? schema)
+        {
+            schema ??= Array.Empty<PluginCommandArgumentDeclaration>();
+            writer.Write(schema.Count);
+            foreach (var declaration in schema)
+            {
+                WriteField(writer, declaration.Key);
+                WriteField(writer, declaration.Name);
+                WriteField(writer, declaration.Description ?? string.Empty);
+                writer.Write((int)declaration.Type);
+                writer.Write(declaration.Required);
+                writer.Write(declaration.DefaultValue is not null);
+                if (declaration.DefaultValue is not null)
+                    WriteField(writer, declaration.DefaultValue);
+                writer.Write(declaration.Sensitive);
+                WriteNullableDecimal(writer, declaration.Minimum);
+                WriteNullableDecimal(writer, declaration.Maximum);
+                WriteNullableInt32(writer, declaration.MinLength);
+                WriteNullableInt32(writer, declaration.MaxLength);
+                var values = declaration.EnumValues ?? new List<string>();
+                writer.Write(values.Count);
+                foreach (var value in values) WriteField(writer, value);
+            }
+        }
+
+        private static void WriteNullableDecimal(BinaryWriter writer, decimal? value)
+        {
+            writer.Write(value.HasValue);
+            if (value.HasValue) writer.Write(value.Value);
+        }
+
+        private static void WriteNullableInt32(BinaryWriter writer, int? value)
+        {
+            writer.Write(value.HasValue);
+            if (value.HasValue) writer.Write(value.Value);
         }
 
         private static void WriteField(BinaryWriter writer, string value)

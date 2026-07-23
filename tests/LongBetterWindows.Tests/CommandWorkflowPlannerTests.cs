@@ -267,6 +267,116 @@ public class CommandWorkflowPlannerTests
         Assert.Contains(result.Issues, issue => issue.Contains("output type is incompatible"));
     }
 
+    [Fact]
+    public void Preflight_ValidatesPrimaryAndCompensationLiteralArguments()
+    {
+        var registry = CreateRegistry();
+        registry.Commands.Get("files:rename")!.Command.ArgumentSchema.Add(
+            Argument("count", required: true, maximum: 100));
+        var workflow = Workflow(
+            new Dictionary<string, string> { ["count"] = "not-an-integer" });
+
+        var result = new CommandWorkflowPlanner(registry).Preflight(workflow);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue =>
+            issue.Contains("command parameters", StringComparison.Ordinal)
+            && issue.Contains("count", StringComparison.Ordinal));
+        Assert.Contains(result.Issues, issue =>
+            issue.Contains("compensation parameters", StringComparison.Ordinal)
+            && issue.Contains("count", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Issues, issue =>
+            issue.Contains("not-an-integer", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Preflight_ArgumentBindingMustTargetSchemaAndCanSatisfyRequiredValue()
+    {
+        var registry = CreateRegistry();
+        registry.Commands.Get("files:inspect")!.Command.Outputs.Add(
+            new PluginCommandOutputDeclaration
+            {
+                Key = "count-text",
+                Type = PluginCommandOutputType.Text,
+            });
+        registry.Commands.Get("files:rename")!.Command.ArgumentSchema.Add(
+            Argument("count", required: true, maximum: 100));
+        var valid = new CommandWorkflowDefinition(
+            "workflow.bound-argument",
+            "Bound argument",
+            WorkflowFailureMode.Stop,
+            [
+                new CommandWorkflowStep(
+                    "inspect",
+                    WorkflowStepEffect.ReadOnly,
+                    Command("files:inspect", "inspect")),
+                new CommandWorkflowStep(
+                    "rename",
+                    WorkflowStepEffect.ReadOnly,
+                    new WorkflowCommand(
+                        "files:rename",
+                        new PluginCommandInvocation
+                        {
+                            CommandId = "rename",
+                            InputType = AcceptedInputType.File,
+                        },
+                        [
+                            new WorkflowValueBinding(
+                                "inspect",
+                                "count-text",
+                                WorkflowBindingTarget.Argument,
+                                "count"),
+                        ])),
+            ]);
+        var invalid = valid with
+        {
+            Steps =
+            [
+                valid.Steps[0],
+                valid.Steps[1] with
+                {
+                    Command = valid.Steps[1].Command! with
+                    {
+                        Bindings =
+                        [
+                            new WorkflowValueBinding(
+                                "inspect",
+                                "count-text",
+                                WorkflowBindingTarget.Argument,
+                                "missing"),
+                        ],
+                    },
+                },
+            ],
+        };
+
+        var validResult = new CommandWorkflowPlanner(registry).Preflight(valid);
+        var invalidResult = new CommandWorkflowPlanner(registry).Preflight(invalid);
+
+        Assert.True(validResult.IsValid, string.Join(Environment.NewLine, validResult.Issues));
+        Assert.False(invalidResult.IsValid);
+        Assert.Contains(invalidResult.Issues, issue =>
+            issue.Contains("target is not declared", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Preflight_SchemaConstraintChangeInvalidatesFingerprint()
+    {
+        var originalRegistry = CreateRegistry();
+        var changedRegistry = CreateRegistry();
+        originalRegistry.Commands.Get("files:rename")!.Command.ArgumentSchema.Add(
+            Argument("count", defaultValue: "10", maximum: 100));
+        changedRegistry.Commands.Get("files:rename")!.Command.ArgumentSchema.Add(
+            Argument("count", defaultValue: "10", maximum: 200));
+
+        var original = new CommandWorkflowPlanner(originalRegistry).Preflight(Workflow());
+        var changed = new CommandWorkflowPlanner(changedRegistry).Preflight(Workflow());
+
+        Assert.True(original.IsValid, string.Join(Environment.NewLine, original.Issues));
+        Assert.True(changed.IsValid, string.Join(Environment.NewLine, changed.Issues));
+        Assert.NotEqual(original.Fingerprint, changed.Fingerprint);
+    }
+
     private static CommandWorkflowDefinition Workflow(
         IReadOnlyDictionary<string, string>? arguments = null)
         => new(
@@ -305,6 +415,22 @@ public class CommandWorkflowPlannerTests
                 InputType = AcceptedInputType.File,
                 Text = text,
             });
+
+    private static PluginCommandArgumentDeclaration Argument(
+        string key,
+        bool required = false,
+        string? defaultValue = null,
+        decimal? maximum = null)
+        => new()
+        {
+            Key = key,
+            Name = key,
+            Type = PluginCommandArgumentType.Integer,
+            Required = required,
+            DefaultValue = defaultValue,
+            Minimum = 1,
+            Maximum = maximum,
+        };
 
     private static PluginRegistry CreateRegistry(string version = "1.0.0")
     {

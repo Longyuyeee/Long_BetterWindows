@@ -567,23 +567,50 @@ public class QualityGateTests
         Assert.Contains("_runSession.CancelExecution", view);
         Assert.Contains("_reports.ListAsync", view);
         Assert.Contains("ApplyResponsiveLayout", view);
+        Assert.Contains("AutomationProperties.SetItemStatus", view);
         Assert.Contains("CompactWorkflowCombo", xaml);
         Assert.Contains("WorkflowInvocationEditorControl", xaml);
-        Assert.Contains("AutomationProperties.Name=\"导入外部工作流\"", xaml);
-        Assert.Contains("AutomationProperties.Name=\"采用导入工作流为草稿\"", xaml);
-        Assert.Contains("AutomationProperties.Name=\"导出组合动作\"", xaml);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.workflow.action.importExternal}\"",
+            xaml);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.workflow.import.adoptDraft}\"",
+            xaml);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.workflow.action.export}\"",
+            xaml);
         Assert.Contains("AutomationProperties.Name=\"确认并执行组合动作\"", xaml);
         Assert.Contains("ReportTimeline", xaml);
         Assert.DoesNotContain("File.WriteAllText", view);
         Assert.DoesNotContain("OpenFolderDialog", view);
         Assert.Contains("OpenFolderDialog", invocationEditor);
         Assert.Contains("MaximumImageBytes", invocationEditor);
-        Assert.Contains("AutomationProperties.Name=\"参数键\"", invocationEditorXaml);
-        Assert.Contains("AutomationProperties.Name=\"添加命令参数\"", invocationEditorXaml);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.workflow.invocation.argumentKey}\"",
+            invocationEditorXaml);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.workflow.invocation.addArgumentA11y}\"",
+            invocationEditorXaml);
         Assert.Contains("Long.Workflow.ArgumentPreset", invocationEditorXaml);
         Assert.Contains("Long.Workflow.ArgumentPreset.Apply", invocationEditorXaml);
-        Assert.Contains("argument_presets", Read("src", "UuidGenerator", "manifest.json"));
-        Assert.Contains("AutomationProperties.Name=\"保存组合动作\"", xaml);
+        Assert.Contains("SchemaArguments", invocationEditorXaml);
+        Assert.Contains("RelativeSource AncestorType={x:Type UserControl}", invocationEditorXaml);
+        Assert.Contains("AutomationProperties.AutomationId=\"{Binding Key}\"", invocationEditorXaml);
+        Assert.Contains("LongPasswordBox", invocationEditorXaml);
+        Assert.Contains("SchemaSensitive_PasswordChanged", invocationEditorXaml);
+        Assert.Contains("BindingArgumentKey_SelectionChanged", invocationEditorXaml);
+        Assert.Contains("ShowArgumentKeyOptions", invocationEditorXaml);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", invocationEditorXaml);
+        Assert.Contains("SnapshotArgumentSchema", view);
+        Assert.Contains("IsKeyboardFocusWithin: true", view);
+        Assert.Contains("IsKeyboardFocusWithin: true", invocationEditor);
+        Assert.Contains("PluginCommandArgumentValidator.ValidateForWorkflowPreflight", invocationEditor);
+        var uuidManifest = Read("src", "UuidGenerator", "manifest.json");
+        Assert.Contains("argument_schema", uuidManifest);
+        Assert.Contains("argument_presets", uuidManifest);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.workflow.action.save}\"",
+            xaml);
         Assert.Contains("CommandWorkflowPlanner", session);
         Assert.Contains("CommandWorkflowBindingResolver.Resolve", Read(
             "src", "LongBetterWindows.Host", "Interaction", "CommandWorkflowExecutor.cs"));
@@ -729,6 +756,7 @@ public class QualityGateTests
         var presentation = Read(
             "src", "LongBetterWindows.Host", "Engine", "WebPluginPresentationCoordinator.cs");
         var settings = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
+        var zhResources = Read("src", "LongBetterWindows.Host", "i18n", "zh-CN.json");
         var gestures = Read("src", "LongBetterWindows.Host", "Services", "MouseGestureService.cs");
 
         Assert.Contains("EmbeddedPluginSurface", mainXaml);
@@ -740,7 +768,8 @@ public class QualityGateTests
         Assert.Contains("Key.Escape", pluginSource);
         Assert.Contains("DefaultPresentation", presentation);
         Assert.Contains("ShowDetachedWindow", presentation);
-        Assert.Contains("超级面板鼠标手势", settings);
+        Assert.Contains("i18n.settings.gesture.title", settings);
+        Assert.Contains("超级面板鼠标手势", zhResources);
         Assert.Contains("MouseGestureMode.LongRightPress", gestures);
         Assert.Contains("WmRButtonUp", gestures);
         Assert.Contains("Mode { get; private set; }", gestures);

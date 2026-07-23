@@ -74,6 +74,12 @@ namespace LongBetterWindows.Host
                 ToolCenter.OpenDiagnosticsForQuality();
             if ((Application.Current as App)?.ShowPluginsForQualityRequested == true)
                 ToolCenter.OpenPluginsForQuality();
+            if ((Application.Current as App)?.ShowSystemForQualityRequested == true)
+                ToolCenter.OpenSystemForQuality();
+            if ((Application.Current as App)?.ShowSettingsForQualityRequested == true)
+                ToolCenter.OpenSettingsForQuality();
+            if ((Application.Current as App)?.ShowWelcomeForQualityRequested == true)
+                ToolCenter.ShowWelcomeForQuality();
 
             if ((Application.Current as App)?.ShowDesignSystemPreviewRequested == true)
             {
@@ -147,6 +153,18 @@ namespace LongBetterWindows.Host
             return error;
         }
 
+        internal async Task<string?> OpenWorkflowEditorAsync(
+            string workflowId,
+            CancellationToken cancellationToken = default)
+        {
+            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
+                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
+            ToolCenter.Visibility = Visibility.Visible;
+            return await ToolCenter.OpenWorkflowEditorAsync(
+                workflowId,
+                cancellationToken);
+        }
+
         private void SetWorkflowLayoutAutomationStatus(
             bool compact,
             double width,
@@ -174,6 +192,9 @@ namespace LongBetterWindows.Host
         internal bool IsHostingEmbedded(FrameworkElement content)
             => EmbeddedPluginSurface.Visibility == Visibility.Visible
                && ReferenceEquals(EmbeddedPluginContent.Content, content);
+
+        internal void ShowMarketplaceListForQuality()
+            => ToolCenter.ShowMarketplaceListForQuality();
 
         internal void ShowEmbeddedPlugin(
             string title,

@@ -129,12 +129,31 @@ namespace LongBetterWindows.Host.Interaction
                         AddEvent,
                         approvedAuthorization);
                 }
+                if (!TryValidateResolvedInvocation(
+                        step.Command!.CommandKey,
+                        binding.Invocation!,
+                        out var resolvedInvocation,
+                        out var parameterError))
+                {
+                    AddEvent(WorkflowExecutionEventKind.StepFailed, step.Id, parameterError);
+                    return await FinishFailureAsync(
+                        workflow,
+                        preflight.Fingerprint,
+                        completed,
+                        stepOutputs,
+                        outputSummaries,
+                        WorkflowExecutionStatus.Failed,
+                        parameterError,
+                        events,
+                        AddEvent,
+                        approvedAuthorization);
+                }
                 PluginCommandResult commandResult;
                 try
                 {
                     commandResult = await _runner.ExecuteAsync(
                         step.Command!.CommandKey,
-                        binding.Invocation,
+                        resolvedInvocation,
                         cancellationToken);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -274,13 +293,26 @@ namespace LongBetterWindows.Host.Interaction
                         binding.Error);
                     continue;
                 }
+                if (!TryValidateResolvedInvocation(
+                        step.Compensation.CommandKey,
+                        binding.Invocation!,
+                        out var resolvedInvocation,
+                        out var parameterError))
+                {
+                    compensationFailed = true;
+                    addEvent(
+                        WorkflowExecutionEventKind.CompensationFailed,
+                        step.Id,
+                        parameterError);
+                    continue;
+                }
                 PluginCommandResult compensationResult;
                 using var timeout = new CancellationTokenSource(_compensationTimeout);
                 try
                 {
                     compensationResult = await _runner.ExecuteAsync(
                         step.Compensation.CommandKey,
-                        binding.Invocation,
+                        resolvedInvocation,
                         timeout.Token);
                 }
                 catch (Exception ex)
@@ -338,6 +370,44 @@ namespace LongBetterWindows.Host.Interaction
                 originalMessage,
                 events,
                 outputSummaries);
+        }
+
+        private bool TryValidateResolvedInvocation(
+            string commandKey,
+            PluginCommandInvocation invocation,
+            out PluginCommandInvocation normalizedInvocation,
+            out string? error)
+        {
+            var descriptor = _plugins.Commands.Get(commandKey);
+            if (descriptor is null)
+            {
+                normalizedInvocation = invocation;
+                error = "Command declaration is unavailable before execution.";
+                return false;
+            }
+
+            var validation = PluginCommandArgumentValidator.Validate(
+                descriptor.Command.ArgumentSchema,
+                invocation.Arguments);
+            if (!validation.IsSuccess)
+            {
+                normalizedInvocation = invocation;
+                error = "Workflow command parameters are invalid: "
+                    + string.Join(" ", validation.Issues);
+                return false;
+            }
+
+            normalizedInvocation = new PluginCommandInvocation
+            {
+                CommandId = invocation.CommandId,
+                InputType = invocation.InputType,
+                Text = invocation.Text,
+                Paths = invocation.Paths,
+                ImagePng = invocation.ImagePng,
+                Arguments = validation.Arguments,
+            };
+            error = null;
+            return true;
         }
 
         private static bool IsAuthorized(

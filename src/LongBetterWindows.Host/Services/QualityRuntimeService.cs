@@ -36,7 +36,9 @@ namespace LongBetterWindows.Host.Services
                     .FirstOrDefault(window => window.IsVisible),
                 "plugin" => _application.Windows.OfType<PluginWindowHost>()
                     .FirstOrDefault(window => window.IsVisible) ?? _application.MainWindow,
-                "main" or "market" or "diagnostics" or "plugins" => _application.MainWindow,
+                "main" or "market" or "diagnostics" or "plugins" or "system"
+                    or "settings"
+                    => _application.MainWindow,
                 _ => throw new InvalidDataException(
                     $"Unsupported quality capture view: {options.QualityCaptureView}"),
             } ?? throw new InvalidDataException(
@@ -47,6 +49,15 @@ namespace LongBetterWindows.Host.Services
             target.WindowState = WindowState.Normal;
             target.UpdateLayout();
             await _application.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            if (options.ShowMarketListForQuality &&
+                target is MainWindow marketplaceWindow)
+            {
+                marketplaceWindow.ShowMarketplaceListForQuality();
+                target.UpdateLayout();
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.Render);
+            }
 
             var logicalWidth = Math.Max(1, target.ActualWidth);
             var logicalHeight = Math.Max(1, target.ActualHeight);

@@ -48,6 +48,24 @@ namespace LongBetterWindows.Host.Interaction
                     $"命令不接受 {invocation.InputType} 类型的输入。");
             }
 
+            var argumentValidation = PluginCommandArgumentValidator.Validate(
+                descriptor.Command.ArgumentSchema,
+                invocation.Arguments);
+            if (!argumentValidation.IsSuccess)
+            {
+                return PluginCommandResult.Failure(
+                    "命令参数无效：" + string.Join(" ", argumentValidation.Issues));
+            }
+            invocation = new PluginCommandInvocation
+            {
+                CommandId = invocation.CommandId,
+                InputType = invocation.InputType,
+                Text = invocation.Text,
+                Paths = invocation.Paths,
+                ImagePng = invocation.ImagePng,
+                Arguments = argumentValidation.Arguments,
+            };
+
             try
             {
                 if (entry.State != PluginState.Running)

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="LongBetterWindows.Host"/>
+  <msix xmlns="urn:schemas-microsoft-com:msix.v1"
+        publisher="CN=Long-Development"
+        packageName="Long.LongBetterWindows"
+        applicationId="LongBetterWindows"/>
 
   <!-- Windows 10/11 多显示器 DPI 感知：PerMonitorV2 -->
   <application xmlns="urn:schemas-microsoft-com:asm.v3">

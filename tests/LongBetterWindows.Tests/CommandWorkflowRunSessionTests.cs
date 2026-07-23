@@ -99,6 +99,34 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task ExecuteApproved_ArgumentSchemaChangedAfterReviewIsRejectedWithoutExecution()
+    {
+        var registry = Registry();
+        var runner = new FakeRunner((_, _) => Task.FromResult(PluginCommandResult.Success()));
+        using var session = Session(registry, runner);
+        var workflow = Workflow();
+        var review = session.Prepare(workflow);
+        registry.Commands.Get("runner:run")!.Command.ArgumentSchema.Add(
+            new PluginCommandArgumentDeclaration
+            {
+                Key = "count",
+                Name = "Count",
+                Type = PluginCommandArgumentType.Integer,
+                DefaultValue = "10",
+                Minimum = 1,
+                Maximum = 100,
+            });
+
+        var result = await session.ExecuteApprovedAsync(workflow, review.Fingerprint);
+
+        Assert.True(result.IsAccepted);
+        Assert.Equal(WorkflowExecutionStatus.Rejected, result.Execution!.Status);
+        Assert.NotEqual(review.Fingerprint, result.Execution.Fingerprint);
+        Assert.Empty(runner.Calls);
+        Assert.Single((await Reports().ListAsync(workflow.Id)).Reports);
+    }
+
+    [Fact]
     public async Task Prepare_SearchResultCreatedBeforePluginUpgradeIsRejectedWithoutExecution()
     {
         var registry = Registry();

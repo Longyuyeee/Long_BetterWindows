@@ -10,6 +10,7 @@ public class AppStartupOptionsTests
         var options = AppStartupOptions.Parse(
         [
             "--theme", "DARK",
+            "--language", "EN-us",
             "--run-command", "SAMPLE.HELLO",
             "--command-text", "hello",
             "--plugins-dir", "test-plugins",
@@ -24,11 +25,15 @@ public class AppStartupOptionsTests
             "--quality-empty-context",
             "--quality-workflows-dir", "quality-workflows",
             "--quality-open-workflow", "workflow.quality.review",
+            "--quality-edit-workflow", "workflow.quality.editor",
             "--quality-workflow-upgrade-package", "quality-v2.lpak",
             "--quality-terminal-export-dir", "quality-exports",
+            "--quality-show-welcome",
+            "--quality-market-list",
         ]);
 
         Assert.Equal("dark", options.ThemeOverride);
+        Assert.Equal("en-US", options.LanguageOverride);
         Assert.Equal("sample.hello", options.RequestedCommandKey);
         Assert.Equal("hello", options.RequestedCommandText);
         Assert.Equal("test-plugins", options.RequestedPluginsDirectory);
@@ -44,8 +49,11 @@ public class AppStartupOptionsTests
         Assert.True(options.UseEmptyContextForQuality);
         Assert.Equal("quality-workflows", options.QualityWorkflowsDirectory);
         Assert.Equal("workflow.quality.review", options.QualityWorkflowReviewId);
+        Assert.Equal("workflow.quality.editor", options.QualityWorkflowEditorId);
         Assert.Equal("quality-v2.lpak", options.QualityWorkflowUpgradePackagePath);
         Assert.Equal("quality-exports", options.QualityTerminalExportDirectory);
+        Assert.True(options.ShowWelcomeForQuality);
+        Assert.True(options.ShowMarketListForQuality);
     }
 
     [Fact]
@@ -60,6 +68,7 @@ public class AppStartupOptionsTests
         ]);
 
         Assert.Null(options.ThemeOverride);
+        Assert.Null(options.LanguageOverride);
         Assert.Equal("main", options.QualityCaptureView);
         Assert.Equal(384, options.QualityRenderDpi);
         Assert.Equal(100, options.QualityCaptureDelayMilliseconds);
@@ -75,5 +84,9 @@ public class AppStartupOptionsTests
             ["--quality-capture-view", "diagnostics"]).OpenDiagnosticsForQuality);
         Assert.True(AppStartupOptions.Parse(
             ["--quality-capture-view", "plugins"]).OpenPluginsForQuality);
+        Assert.True(AppStartupOptions.Parse(
+            ["--quality-capture-view", "system"]).OpenSystemForQuality);
+        Assert.True(AppStartupOptions.Parse(
+            ["--quality-capture-view", "settings"]).OpenSettingsForQuality);
     }
 }

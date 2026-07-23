@@ -158,6 +158,17 @@ namespace LongBetterWindows.Host.Engine
                         errors.Add($"指令 '{command.Id}' 的 output type 无效: '{output.Type}'");
                 }
 
+                var schemaErrorCount = errors.Count;
+                ValidateArgumentSchema(command, errors);
+                var schemaIsStructurallyValid = errors.Count == schemaErrorCount;
+                if (schemaIsStructurallyValid)
+                {
+                    var defaultResult =
+                        PluginCommandArgumentValidator.ValidateDeclaredDefaults(command.ArgumentSchema);
+                    foreach (var issue in defaultResult.Issues)
+                        errors.Add($"指令 '{command.Id}' 的参数默认值无效: {issue}");
+                }
+
                 var argumentPresets = command.ArgumentPresets
                     ?? new List<PluginCommandArgumentPreset>();
                 if (argumentPresets.Count > 32)
@@ -190,7 +201,140 @@ namespace LongBetterWindows.Host.Engine
                     }
                     if (arguments.Values.Sum(value => (long)(value?.Length ?? 0)) > 65536)
                         errors.Add($"指令 '{command.Id}' 的参数预设 '{preset.Id}' 参数总长度超过限制");
+                    if (schemaIsStructurallyValid
+                        && (command.ArgumentSchema?.Count ?? 0) > 0)
+                    {
+                        var presetResult = PluginCommandArgumentValidator.Validate(
+                            command.ArgumentSchema,
+                            arguments);
+                        foreach (var issue in presetResult.Issues)
+                        {
+                            errors.Add(
+                                $"指令 '{command.Id}' 的参数预设 '{preset.Id}' 无效: {issue}");
+                        }
+                    }
                 }
+            }
+        }
+
+        private static void ValidateArgumentSchema(PluginCommand command, List<string> errors)
+        {
+            const int maximumTextLength = 65536;
+            var declarations = command.ArgumentSchema
+                ?? new List<PluginCommandArgumentDeclaration>();
+            if (declarations.Count > 64)
+                errors.Add($"指令 '{command.Id}' 不能声明超过 64 个 argument_schema 参数");
+
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var declaration in declarations)
+            {
+                if (declaration is null)
+                {
+                    errors.Add($"指令 '{command.Id}' 的 argument_schema 包含空参数声明");
+                    continue;
+                }
+
+                var label = string.IsNullOrWhiteSpace(declaration.Key)
+                    ? "<empty>"
+                    : declaration.Key;
+                if (!IsIdentifier(declaration.Key))
+                    errors.Add($"指令 '{command.Id}' 的参数 key 无效: '{declaration.Key}'");
+                else if (!keys.Add(declaration.Key))
+                    errors.Add($"指令 '{command.Id}' 存在重复参数 key: '{declaration.Key}'");
+
+                if (string.IsNullOrWhiteSpace(declaration.Name) || declaration.Name.Length > 120)
+                    errors.Add($"指令 '{command.Id}' 的参数 '{label}' 显示名称无效");
+                if ((declaration.Description?.Length ?? 0) > 1000)
+                    errors.Add($"指令 '{command.Id}' 的参数 '{label}' 说明超过 1000 个字符");
+                if (!Enum.IsDefined(declaration.Type))
+                    errors.Add($"指令 '{command.Id}' 的参数 '{label}' 类型无效");
+                if ((declaration.DefaultValue?.Length ?? 0) > maximumTextLength)
+                    errors.Add($"指令 '{command.Id}' 的参数 '{label}' 默认值超过限制");
+
+                ValidateArgumentNumericConstraints(command.Id, label, declaration, errors);
+                ValidateArgumentLengthConstraints(command.Id, label, declaration, errors);
+                ValidateArgumentEnumValues(command.Id, label, declaration, errors);
+            }
+        }
+
+        private static void ValidateArgumentNumericConstraints(
+            string commandId,
+            string label,
+            PluginCommandArgumentDeclaration declaration,
+            List<string> errors)
+        {
+            var hasNumericConstraint = declaration.Minimum.HasValue || declaration.Maximum.HasValue;
+            var isNumeric = declaration.Type is PluginCommandArgumentType.Integer
+                or PluginCommandArgumentType.Number;
+            if (hasNumericConstraint && !isNumeric)
+            {
+                errors.Add($"指令 '{commandId}' 的参数 '{label}' 仅数值类型可声明 minimum/maximum");
+                return;
+            }
+
+            if (declaration.Minimum > declaration.Maximum)
+                errors.Add($"指令 '{commandId}' 的参数 '{label}' minimum 不能大于 maximum");
+
+            if (declaration.Type == PluginCommandArgumentType.Integer
+                && ((declaration.Minimum.HasValue
+                        && decimal.Truncate(declaration.Minimum.Value) != declaration.Minimum.Value)
+                    || (declaration.Maximum.HasValue
+                        && decimal.Truncate(declaration.Maximum.Value) != declaration.Maximum.Value)))
+            {
+                errors.Add($"指令 '{commandId}' 的整数参数 '{label}' 范围必须使用整数");
+            }
+        }
+
+        private static void ValidateArgumentLengthConstraints(
+            string commandId,
+            string label,
+            PluginCommandArgumentDeclaration declaration,
+            List<string> errors)
+        {
+            const int maximumTextLength = 65536;
+            var hasLengthConstraint = declaration.MinLength.HasValue || declaration.MaxLength.HasValue;
+            if (hasLengthConstraint && declaration.Type != PluginCommandArgumentType.String)
+            {
+                errors.Add($"指令 '{commandId}' 的参数 '{label}' 仅 string 类型可声明 min_length/max_length");
+                return;
+            }
+
+            if (declaration.MinLength is < 0 or > maximumTextLength
+                || declaration.MaxLength is < 0 or > maximumTextLength)
+            {
+                errors.Add($"指令 '{commandId}' 的参数 '{label}' 长度约束必须在 0 到 65536 之间");
+            }
+            if (declaration.MinLength > declaration.MaxLength)
+                errors.Add($"指令 '{commandId}' 的参数 '{label}' min_length 不能大于 max_length");
+        }
+
+        private static void ValidateArgumentEnumValues(
+            string commandId,
+            string label,
+            PluginCommandArgumentDeclaration declaration,
+            List<string> errors)
+        {
+            var values = declaration.EnumValues ?? new List<string>();
+            if (declaration.Type != PluginCommandArgumentType.Enum)
+            {
+                if (values.Count > 0)
+                    errors.Add($"指令 '{commandId}' 的参数 '{label}' 仅 enum 类型可声明 enum_values");
+                return;
+            }
+
+            if (values.Count is < 1 or > 64)
+            {
+                errors.Add($"指令 '{commandId}' 的枚举参数 '{label}' 必须声明 1 到 64 个 enum_values");
+                return;
+            }
+
+            var uniqueValues = new HashSet<string>(StringComparer.Ordinal);
+            if (values.Any(value =>
+                    string.IsNullOrWhiteSpace(value)
+                    || value.Length > 1024
+                    || !uniqueValues.Add(value)))
+            {
+                errors.Add($"指令 '{commandId}' 的枚举参数 '{label}' 包含空值、重复值或超长值");
             }
         }
 

@@ -39,6 +39,9 @@ namespace LongBetterWindows.Host
         internal bool ShowMarketForQualityRequested => _startupOptions.OpenMarketForQuality;
         internal bool ShowDiagnosticsForQualityRequested => _startupOptions.OpenDiagnosticsForQuality;
         internal bool ShowPluginsForQualityRequested => _startupOptions.OpenPluginsForQuality;
+        internal bool ShowSystemForQualityRequested => _startupOptions.OpenSystemForQuality;
+        internal bool ShowSettingsForQualityRequested => _startupOptions.OpenSettingsForQuality;
+        internal bool ShowWelcomeForQualityRequested => _startupOptions.ShowWelcomeForQuality;
         internal bool QualityWorkflowAutomationEnabled
             => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId)
                 || !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowsDirectory);
@@ -64,6 +67,8 @@ namespace LongBetterWindows.Host
 
             _startupOptions = AppStartupOptions.Parse(e.Args);
             ServicesInitializer.Initialize(_startupOptions.QualityWorkflowsDirectory);
+            ServicesInitializer.I18n.Initialize(_startupOptions.LanguageOverride);
+            ServicesInitializer.I18n.ApplyTo(Resources);
             Log.Information("所有服务已初始化。");
 
             _qualityRuntime = new QualityRuntimeService(this);
@@ -178,6 +183,16 @@ namespace LongBetterWindows.Host
                             workflowId)),
                         DispatcherPriority.ApplicationIdle);
                 }
+                else if (!string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowEditorId)
+                    && MainWindow is MainWindow workflowEditorWindow)
+                {
+                    var workflowId = _startupOptions.QualityWorkflowEditorId;
+                    _ = Dispatcher.BeginInvoke(
+                        new Action(() => _ = OpenQualityWorkflowEditorAsync(
+                            workflowEditorWindow,
+                            workflowId)),
+                        DispatcherPriority.ApplicationIdle);
+                }
 
                 if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath))
                     await _qualityRuntime!.CaptureAsync(
@@ -221,6 +236,24 @@ namespace LongBetterWindows.Host
 
             Log.Error(
                 "Quality workflow review could not be opened: {WorkflowId}; {Error}",
+                workflowId,
+                error);
+        }
+
+        private static async Task OpenQualityWorkflowEditorAsync(
+            MainWindow workflowWindow,
+            string workflowId)
+        {
+            Log.Information("Opening quality workflow editor: {WorkflowId}", workflowId);
+            var error = await workflowWindow.OpenWorkflowEditorAsync(workflowId);
+            if (error is null)
+            {
+                Log.Information("Quality workflow editor opened: {WorkflowId}", workflowId);
+                return;
+            }
+
+            Log.Error(
+                "Quality workflow editor could not be opened: {WorkflowId}; {Error}",
                 workflowId,
                 error);
         }

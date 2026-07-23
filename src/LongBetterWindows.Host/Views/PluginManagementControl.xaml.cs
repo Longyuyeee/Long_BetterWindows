@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -12,12 +13,15 @@ namespace LongBetterWindows.Host.Views
         {
             InitializeComponent();
             HostProvider.Instance.PluginStore.PluginsChanged += OnPluginsChanged;
+            SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
         }
 
         public void Refresh()
         {
             var plugins = HostProvider.Instance.PluginStore.GetAll();
-            PluginsHeader.Text = $"已安装插件 ({plugins.Count})";
+            PluginsHeader.Text = string.Format(
+                I18n("plugins.installedCount"),
+                plugins.Count);
 
             var filter = PluginSearchBox.Text.Trim();
             var filtered = string.IsNullOrEmpty(filter)
@@ -31,8 +35,8 @@ namespace LongBetterWindows.Host.Views
             PluginsPanel.ItemsSource = items;
             PluginsPanel.Visibility = items.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
             EmptyStateText.Text = plugins.Count == 0
-                ? "暂无已安装插件"
-                : $"没有找到匹配“{filter}”的插件";
+                ? I18n("plugins.empty")
+                : string.Format(I18n("plugins.noMatch"), filter);
             EmptyStateText.Visibility = items.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -44,6 +48,43 @@ namespace LongBetterWindows.Host.Views
                 return;
             }
             Refresh();
+        }
+
+        private void ApplyResponsiveLayout(double width)
+        {
+            var compact = width < 620;
+            if (compact)
+            {
+                PluginHeaderColumn.Width = new GridLength(1, GridUnitType.Star);
+                PluginSearchColumn.Width = new GridLength(1, GridUnitType.Star);
+                PluginRefreshColumn.Width = GridLength.Auto;
+                Grid.SetRow(PluginsHeader, 0);
+                Grid.SetColumn(PluginsHeader, 0);
+                Grid.SetColumnSpan(PluginsHeader, 3);
+                Grid.SetRow(PluginSearchHost, 1);
+                Grid.SetColumn(PluginSearchHost, 0);
+                Grid.SetColumnSpan(PluginSearchHost, 2);
+                PluginSearchHost.Margin = new Thickness(0, 12, 10, 0);
+                Grid.SetRow(RefreshPluginsButton, 1);
+                Grid.SetColumn(RefreshPluginsButton, 2);
+                RefreshPluginsButton.Margin = new Thickness(0, 12, 0, 0);
+            }
+            else
+            {
+                PluginHeaderColumn.Width = new GridLength(1, GridUnitType.Star);
+                PluginSearchColumn.Width = new GridLength(280);
+                PluginRefreshColumn.Width = GridLength.Auto;
+                Grid.SetRow(PluginsHeader, 0);
+                Grid.SetColumn(PluginsHeader, 0);
+                Grid.SetColumnSpan(PluginsHeader, 1);
+                Grid.SetRow(PluginSearchHost, 0);
+                Grid.SetColumn(PluginSearchHost, 1);
+                Grid.SetColumnSpan(PluginSearchHost, 1);
+                PluginSearchHost.Margin = new Thickness(0, 0, 10, 0);
+                Grid.SetRow(RefreshPluginsButton, 0);
+                Grid.SetColumn(RefreshPluginsButton, 2);
+                RefreshPluginsButton.Margin = new Thickness(0);
+            }
         }
 
         private void PluginSearch_TextChanged(object sender, TextChangedEventArgs e) => Refresh();
@@ -96,7 +137,10 @@ namespace LongBetterWindows.Host.Views
                 var content = settingsUi.CreateSettingsUI();
                 if (content is null) return;
 
-                new PluginWindowHost($"{entry.Manifest.Name} · 设置", content, entry.Manifest.Window)
+                new PluginWindowHost(
+                    string.Format(I18n("plugins.settingsTitle"), entry.Manifest.Name),
+                    content,
+                    entry.Manifest.Window)
                 {
                     Owner = Window.GetWindow(this),
                     Width = 520,
@@ -118,7 +162,7 @@ namespace LongBetterWindows.Host.Views
             var panel = new CapabilityDetailPanel();
             panel.LoadCapabilities(entry.Id, entry.Manifest.Name, entry.Manifest.Capabilities);
             new PluginWindowHost(
-                $"{entry.Manifest.Name} · 权限详情",
+                string.Format(I18n("plugins.capabilitiesTitle"), entry.Manifest.Name),
                 panel,
                 new PluginWindowPreference
                 {
@@ -147,8 +191,14 @@ namespace LongBetterWindows.Host.Views
                     _ => "DLL",
                 };
                 IsRunning = entry.State == PluginState.Running;
-                StatusText = $"{(IsRunning ? "运行中" : "已停止")} · v{entry.Manifest.Version}";
-                ToggleText = IsRunning ? "禁用" : "启用";
+                StatusText = string.Format(
+                    I18n(IsRunning
+                        ? "plugins.status.runningVersion"
+                        : "plugins.status.stoppedVersion"),
+                    entry.Manifest.Version);
+                ToggleText = I18n(IsRunning
+                    ? "action.disable"
+                    : "action.enable");
                 Hotkey = PluginRegistry.GetPluginHotkey(entry) ?? string.Empty;
                 HasHotkey = !string.IsNullOrEmpty(Hotkey);
                 VisibleCapabilities = entry.Manifest.Capabilities.Take(3).ToArray();
@@ -174,5 +224,8 @@ namespace LongBetterWindows.Host.Views
 
             public static PluginCardItem Create(PluginEntry entry) => new(entry);
         }
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
     }
 }
