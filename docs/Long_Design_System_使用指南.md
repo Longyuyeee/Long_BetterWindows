@@ -78,6 +78,9 @@ LongUI.renderState(container, {
 - `long-progress`、`long-progress__fill`：指标进度条；业务代码同步维护 `aria-valuenow`。
 - `long-key-value`、`long-key-value__row`：系统属性等键值信息。
 - `long-data-grid`、`long-data-grid__*`：高密度数据表；小屏隐藏表头并使用单元格 `data-label`。
+- `long-badge--neutral|success|warning|danger`：协议、连接状态和风险等级等短标签。
+- `long-code`：端口、路径、PID 等机器标识。
+- `long-dialog`、`long-dialog__*`：基于原生 `dialog` 的确认层；破坏性操作必须在对话框中明确目标和风险。
 
 主题通过 `data-long-theme="dark|light"` 同步，减少动画遵循系统的 `prefers-reduced-motion` 设置。
 

@@ -110,6 +110,10 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
   border-radius: 6px; background: var(--long-accent-soft); color: var(--long-text-primary);
   font-size: 10px; font-weight: 600;
 }
+.long-badge--neutral { background: var(--long-bg-raised); color: var(--long-text-secondary); }
+.long-badge--success { background: color-mix(in srgb, var(--long-success) 15%, transparent); color: var(--long-success); }
+.long-badge--warning { background: color-mix(in srgb, var(--long-warning) 15%, transparent); color: var(--long-warning); }
+.long-badge--danger { background: color-mix(in srgb, var(--long-danger) 15%, transparent); color: var(--long-danger); }
 .long-empty, body .empty { color: var(--long-text-muted) !important; text-align: center; padding: 24px; }
 .long-status--success, .status.ok { color: var(--long-success) !important; }
 .long-status--warning { color: var(--long-warning) !important; }
@@ -132,6 +136,7 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
 .long-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .long-toolbar--spaced { margin-top: 14px; }
 .long-toolbar__spacer { flex: 1; }
+.long-toolbar__field { min-width: min(260px, 100%); flex: 1 1 260px; }
 .long-status { min-height: 20px; color: var(--long-text-muted); font-size: 12px; }
 .long-state {
   display: grid;
@@ -211,6 +216,13 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
 .long-data-grid__row:hover { background: var(--long-surface-hover); }
 .long-data-grid__cell { min-width: 0; overflow-wrap: anywhere; }
 .long-data-grid__cell::before { display: none; content: attr(data-label); }
+.long-code { color: var(--long-text-primary); font: 12px/1.5 "Cascadia Code", Consolas, monospace; overflow-wrap: anywhere; }
+.long-dialog { width: min(440px, calc(100% - 32px)); padding: 0; border: 1px solid var(--long-stroke); border-radius: var(--long-radius-flyout); background: var(--long-surface-card); color: var(--long-text-primary); box-shadow: var(--long-shadow-2); }
+.long-dialog::backdrop { background: color-mix(in srgb, var(--long-bg-base) 72%, transparent); }
+.long-dialog__header { padding: 18px 20px 12px; border-bottom: 1px solid var(--long-stroke); }
+.long-dialog__title { margin: 0; font-size: 16px; font-weight: 600; }
+.long-dialog__body { padding: 18px 20px; color: var(--long-text-secondary); font-size: 13px; line-height: 1.6; }
+.long-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 18px; }
 .long-result { padding: 16px; border: 1px solid var(--long-stroke); border-radius: var(--long-radius-control); background: var(--long-bg-raised); color: var(--long-text-primary); font: 600 17px/1.55 "Cascadia Code", Consolas, monospace; overflow-wrap: anywhere; }
 .long-option-list { display: grid; gap: 4px; }
 .long-option { display: flex; align-items: center; gap: 10px; min-height: 38px; color: var(--long-text-secondary); font-size: 13px; cursor: pointer; }

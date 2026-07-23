@@ -102,7 +102,7 @@
 | 批次 | 插件 | 主题与数据结果 | 状态 |
 |---|---|---|---|
 | T1 | HardwareMonitor | 无私有样式/硬编码颜色；真实性能 API；响应式指标、键值表、进程表；仅声明 `system.performance` | 已完成 |
-| T2 | PortManager | 真实端口 API、语义表格、搜索/筛选和高权限终止边界 | 待迁移 |
+| T2 | PortManager | 真实端口 API、语义表格、搜索/筛选、端口查找和确认终止边界 | 已完成 |
 | T3 | ClipboardHistory | Long UI Kit 页面、历史列表和本地监听状态 | 待迁移 |
 
 ## 第五批实现基线

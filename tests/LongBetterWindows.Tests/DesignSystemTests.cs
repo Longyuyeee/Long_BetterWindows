@@ -298,6 +298,7 @@ public class DesignSystemTests
             "RegexTester",
             "UuidGenerator",
             "HardwareMonitor",
+            "PortManager",
         };
 
         Assert.All(plugins, plugin =>
@@ -332,6 +333,7 @@ public class DesignSystemTests
             "RegexTester",
             "UuidGenerator",
             "HardwareMonitor",
+            "PortManager",
         };
 
         Assert.All(plugins, plugin =>
@@ -441,6 +443,48 @@ public class DesignSystemTests
         Assert.Contains(".long-progress__fill", uiKit);
         Assert.Contains(".long-key-value__row", uiKit);
         Assert.Contains(".long-data-grid__row", uiKit);
+    }
+
+    [Fact]
+    public void PortManager_UsesRealHostApisAndControlledProcessTermination()
+    {
+        var root = FindRepositoryRoot();
+        var page = File.ReadAllText(Path.Combine(
+            root, "src", "PortManager", "index.html"));
+        var uiKit = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "WebAssets", "long-ui.css"));
+        using var manifest = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root, "src", "PortManager", "manifest.json")));
+
+        Assert.DoesNotContain("<style", page, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotMatch("#[0-9A-Fa-f]{3,8}", page);
+        Assert.DoesNotContain("innerHTML", page);
+        Assert.DoesNotContain("onclick=", page, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Math.random", page);
+        Assert.DoesNotContain("模拟数据", page);
+        Assert.DoesNotContain("confirm(", page);
+        Assert.DoesNotContain("alert(", page);
+        Assert.Contains("long.networkPort.getTcpListeners()", page);
+        Assert.Contains("long.networkPort.getTcpConnections()", page);
+        Assert.Contains("long.networkPort.getUdpEndpoints()", page);
+        Assert.Contains("long.networkPort.findOwner(port, protocol)", page);
+        Assert.Contains("long.clipboard.setText(text)", page);
+        Assert.Contains("long.process.kill(target.id)", page);
+        Assert.Contains("killDialog.showModal()", page);
+        Assert.Contains("LongUI?.onCommand", page);
+        Assert.Contains("visibilitychange", page);
+
+        var capabilities = manifest.RootElement.GetProperty("capabilities")
+            .EnumerateArray()
+            .Select(element => element.GetString())
+            .ToArray();
+        Assert.Equal(
+            ["network.ports", "system.process", "system.clipboard"],
+            capabilities);
+
+        Assert.Contains(".long-dialog", uiKit);
+        Assert.Contains(".long-badge--success", uiKit);
+        Assert.Contains(".long-code", uiKit);
     }
 
     [Fact]
