@@ -71,6 +71,14 @@ LongUI.renderState(container, {
 
 `kind` 只接受 `empty`、`loading`、`error`。组件使用 `textContent` 写入标题和详情；加载态为容器设置 `aria-busy`，错误态使用 `role="alert"`，空态和加载态使用礼貌播报。调用 `LongUI.clearState(container)` 可清空状态并移除忙碌语义。
 
+数据密集型插件优先复用以下组合，不在业务页面复制颜色、断点和表格样式：
+
+- `long-page--wide`：宽屏数据工作区，仍受视口宽度约束。
+- `long-metric-grid`、`long-metric`、`long-metric__*`：三列指标概览，小屏自动切为单列。
+- `long-progress`、`long-progress__fill`：指标进度条；业务代码同步维护 `aria-valuenow`。
+- `long-key-value`、`long-key-value__row`：系统属性等键值信息。
+- `long-data-grid`、`long-data-grid__*`：高密度数据表；小屏隐藏表头并使用单元格 `data-label`。
+
 主题通过 `data-long-theme="dark|light"` 同步，减少动画遵循系统的 `prefers-reduced-motion` 设置。
 
 ## 约束

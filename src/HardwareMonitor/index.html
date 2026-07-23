@@ -1,309 +1,120 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>硬件监控</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: 'Segoe UI', -apple-system, sans-serif;
-      background: #1e1e1e;
-      color: #d4d4d4;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .header {
-      padding: 16px 20px;
-      background: #252526;
-      border-bottom: 1px solid #333;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    h1 {
-      font-size: 18px;
-      font-weight: 600;
-      color: #fff;
-    }
-
-    .refresh-info {
-      font-size: 12px;
-      color: #888;
-    }
-
-    .content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-
-    .card {
-      background: #252526;
-      border: 1px solid #3c3c3c;
-      border-radius: 8px;
-      padding: 20px;
-      transition: all 0.2s;
-    }
-
-    .card:hover {
-      border-color: #C4612F;
-      transform: translateY(-2px);
-    }
-
-    .card-title {
-      font-size: 13px;
-      color: #888;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .card-value {
-      font-size: 32px;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 8px;
-    }
-
-    .card-value.warning {
-      color: #f48771;
-    }
-
-    .card-label {
-      font-size: 12px;
-      color: #888;
-    }
-
-    .progress-bar {
-      height: 6px;
-      background: #3c3c3c;
-      border-radius: 3px;
-      overflow: hidden;
-      margin-top: 12px;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: #C4612F;
-      transition: width 0.3s ease;
-    }
-
-    .progress-fill.warning {
-      background: #f48771;
-    }
-
-    .system-info {
-      background: #252526;
-      border: 1px solid #3c3c3c;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid #2d2d30;
-      font-size: 13px;
-    }
-
-    .info-row:last-child {
-      border-bottom: none;
-    }
-
-    .info-label {
-      color: #888;
-    }
-
-    .info-value {
-      color: #d4d4d4;
-      font-family: 'Consolas', monospace;
-    }
-
-    .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 16px;
-    }
-
-    .disk-list {
-      display: grid;
-      gap: 12px;
-    }
-
-    .disk-item {
-      background: #252526;
-      border: 1px solid #3c3c3c;
-      border-radius: 8px;
-      padding: 16px;
-    }
-
-    .disk-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .disk-name {
-      font-size: 14px;
-      font-weight: 500;
-      color: #fff;
-    }
-
-    .disk-usage {
-      font-size: 12px;
-      color: #888;
-    }
-
-    .disk-size {
-      margin-bottom: 8px;
-      color: #888;
-      font-size: 12px;
-    }
-
-    .process-table {
-      background: #252526;
-      border: 1px solid #3c3c3c;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .table-header {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr;
-      padding: 12px 16px;
-      background: #2d2d30;
-      font-size: 12px;
-      color: #888;
-      font-weight: 500;
-    }
-
-    .table-row {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr 1fr;
-      padding: 12px 16px;
-      border-top: 1px solid #2d2d30;
-      font-size: 13px;
-      transition: background 0.2s;
-    }
-
-    .table-row:hover {
-      background: #2d2d30;
-    }
-
-    ::-webkit-scrollbar {
-      width: 10px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: #1e1e1e;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: #3c3c3c;
-      border-radius: 5px;
-    }
-  </style>
 </head>
 <body>
-  <div class="header">
-    <h1>硬件监控</h1>
-    <div class="refresh-info">每 <span id="refreshInterval">2</span> 秒自动刷新</div>
-  </div>
+  <main class="long-page long-page--wide">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">SYSTEM PERFORMANCE</div>
+        <h1 class="long-page-title">硬件监控</h1>
+        <p class="long-page-description">查看当前 CPU、内存、磁盘与高占用进程，页面隐藏时自动暂停轮询。</p>
+      </div>
+      <div class="long-toolbar">
+        <span class="long-badge" id="refreshBadge">每 2 秒刷新</span>
+        <button class="long-button long-button--primary btn-primary" id="refreshButton" type="button">立即刷新</button>
+      </div>
+    </header>
 
-  <div class="content">
-    <!-- 实时监控卡片 -->
-    <div class="grid">
-      <div class="card">
-        <div class="card-title">CPU 使用率</div>
-        <div class="card-value" id="cpuValue">0%</div>
-        <div class="card-label">处理器负载</div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="cpuBar" style="width: 0%"></div>
+    <div class="long-stack">
+      <section class="long-stack" aria-labelledby="overviewTitle">
+        <h2 class="long-section-title" id="overviewTitle">实时概览</h2>
+        <div class="long-metric-grid">
+          <article class="long-card long-metric">
+            <div class="long-metric__label">CPU 使用率</div>
+            <div class="long-metric__value" id="cpuValue">--</div>
+            <div class="long-metric__detail">处理器总负载</div>
+            <div class="long-progress" id="cpuProgress" role="progressbar" aria-label="CPU 使用率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="long-progress__fill" id="cpuBar"></div>
+            </div>
+          </article>
+
+          <article class="long-card long-metric">
+            <div class="long-metric__label">内存使用率</div>
+            <div class="long-metric__value" id="memValue">--</div>
+            <div class="long-metric__detail" id="memLabel">等待数据</div>
+            <div class="long-progress" id="memProgress" role="progressbar" aria-label="内存使用率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="long-progress__fill" id="memBar"></div>
+            </div>
+          </article>
+
+          <article class="long-card long-metric">
+            <div class="long-metric__label">系统运行时间</div>
+            <div class="long-metric__value" id="uptimeValue">--</div>
+            <div class="long-metric__detail">自上次启动</div>
+          </article>
         </div>
-      </div>
+      </section>
 
-      <div class="card">
-        <div class="card-title">内存使用率</div>
-        <div class="card-value" id="memValue">0%</div>
-        <div class="card-label" id="memLabel">0 GB / 0 GB</div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="memBar" style="width: 0%"></div>
+      <section class="long-stack" aria-labelledby="systemTitle">
+        <h2 class="long-section-title" id="systemTitle">系统信息</h2>
+        <div class="long-card long-key-value">
+          <div class="long-key-value__row">
+            <span class="long-key-value__label">操作系统</span>
+            <span class="long-key-value__value" id="osName">--</span>
+          </div>
+          <div class="long-key-value__row">
+            <span class="long-key-value__label">计算机名</span>
+            <span class="long-key-value__value" id="machineName">--</span>
+          </div>
+          <div class="long-key-value__row">
+            <span class="long-key-value__label">处理器</span>
+            <span class="long-key-value__value" id="processorName">--</span>
+          </div>
+          <div class="long-key-value__row">
+            <span class="long-key-value__label">逻辑处理器</span>
+            <span class="long-key-value__value" id="processorCount">--</span>
+          </div>
+          <div class="long-key-value__row">
+            <span class="long-key-value__label">总内存</span>
+            <span class="long-key-value__value" id="totalRam">--</span>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="card">
-        <div class="card-title">系统运行时间</div>
-        <div class="card-value" id="uptimeValue">0h</div>
-        <div class="card-label">自上次启动</div>
-      </div>
+      <section class="long-stack" aria-labelledby="diskTitle">
+        <h2 class="long-section-title" id="diskTitle">磁盘使用情况</h2>
+        <div class="long-grid" id="diskList"></div>
+      </section>
+
+      <section class="long-stack" aria-labelledby="processTitle">
+        <h2 class="long-section-title" id="processTitle">内存占用 Top 10</h2>
+        <div class="long-data-grid" role="table" aria-label="内存占用最高的进程" style="--long-data-columns: 2fr 1fr 1fr 1fr">
+          <div role="rowgroup">
+            <div class="long-data-grid__header" role="row">
+              <div role="columnheader">进程名称</div>
+              <div role="columnheader">PID</div>
+              <div role="columnheader">内存</div>
+              <div role="columnheader">线程数</div>
+            </div>
+          </div>
+          <div id="processList" role="rowgroup"></div>
+        </div>
+      </section>
+
+      <div class="long-status" id="status" role="status" aria-live="polite"></div>
     </div>
-
-    <!-- 系统信息 -->
-    <div class="system-info">
-      <div class="section-title">系统信息</div>
-      <div class="info-row">
-        <span class="info-label">操作系统</span>
-        <span class="info-value" id="osName">加载中...</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">计算机名</span>
-        <span class="info-value" id="machineName">加载中...</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">处理器</span>
-        <span class="info-value" id="processorName">加载中...</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">逻辑处理器</span>
-        <span class="info-value" id="processorCount">0 核心</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">总内存</span>
-        <span class="info-value" id="totalRam">0 GB</span>
-      </div>
-    </div>
-
-    <!-- 磁盘信息 -->
-    <div class="section-title">磁盘使用情况</div>
-    <div class="disk-list" id="diskList"></div>
-
-    <!-- 进程资源占用 Top 10 -->
-    <div class="section-title" style="margin-top: 24px;">资源占用 Top 10</div>
-    <div class="process-table">
-      <div class="table-header">
-        <div>进程名称</div>
-        <div>PID</div>
-        <div>内存 (MB)</div>
-        <div>线程数</div>
-      </div>
-      <div id="processList"></div>
-    </div>
-  </div>
+  </main>
 
   <script>
-    let refreshInterval = 2000;
-    let cpuWarningThreshold = 80;
-    let memWarningThreshold = 85;
+    const refreshInterval = 2000;
+    const cpuWarningThreshold = 80;
+    const memWarningThreshold = 85;
+    const refreshButton = document.getElementById('refreshButton');
+    const status = document.getElementById('status');
+    let refreshTimer = 0;
+    let refreshPromise = null;
 
-    // 初始化
-    async function init() {
+    async function initialize() {
+      renderLoadingStates();
+      await Promise.all([loadSystemInfo(), updateMetrics()]);
+      startPolling();
+    }
+
+    function renderLoadingStates() {
       window.LongUI?.renderState(document.getElementById('diskList'), {
         kind: 'loading',
         title: '正在加载磁盘信息'
@@ -312,204 +123,248 @@
         kind: 'loading',
         title: '正在加载进程信息'
       });
-      await loadSystemInfo();
-      await updateMetrics();
-      setInterval(updateMetrics, refreshInterval);
     }
 
-    // 加载系统信息（只加载一次）
     async function loadSystemInfo() {
       try {
-        // 模拟数据（实际应调用 long.performance.getSystemInfo()）
-        const sysInfo = {
-          osName: 'Windows 11 Home China',
-          machineName: 'DESKTOP-ABC123',
-          processorName: 'Intel Core i7-12700H',
-          processorCount: 20,
-          totalRam: 17042284544,
-          uptime: { hours: 5, minutes: 23 }
-        };
-
-        document.getElementById('osName').textContent = sysInfo.osName;
-        document.getElementById('machineName').textContent = sysInfo.machineName;
-        document.getElementById('processorName').textContent = sysInfo.processorName;
-        document.getElementById('processorCount').textContent = sysInfo.processorCount + ' 核心';
-        document.getElementById('totalRam').textContent = formatBytes(sysInfo.totalRam);
-      } catch (e) {
-        console.error('加载系统信息失败:', e);
+        const info = unwrap(await long.performance.getSystemInfo(), '系统信息加载失败');
+        document.getElementById('osName').textContent =
+          [info.OsName, info.OsVersion].filter(Boolean).join(' · ') || '未知';
+        document.getElementById('machineName').textContent = info.MachineName || '未知';
+        document.getElementById('processorName').textContent = info.ProcessorName || '未知';
+        document.getElementById('processorCount').textContent = Number(info.ProcessorCount || 0) + ' 核心';
+        document.getElementById('totalRam').textContent = formatBytes(info.TotalRam);
+        document.getElementById('uptimeValue').textContent = formatUptime(info.Uptime);
+        return true;
+      } catch (error) {
         ['osName', 'machineName', 'processorName', 'processorCount', 'totalRam'].forEach(function (id) {
           document.getElementById(id).textContent = '不可用';
         });
-        window.LongUI?.announce('系统信息加载失败');
+        document.getElementById('uptimeValue').textContent = '--';
+        setStatus(errorMessage(error, '系统信息加载失败'), 'danger');
+        return false;
       }
     }
 
-    // 更新实时监控数据
-    async function updateMetrics() {
+    function updateMetrics(manual) {
+      if (refreshPromise) return refreshPromise;
+      refreshPromise = performMetricsUpdate(!!manual).finally(function () {
+        refreshPromise = null;
+      });
+      return refreshPromise;
+    }
+
+    async function performMetricsUpdate(manual) {
+      window.LongUI?.setBusy(refreshButton, true);
       try {
-        // 模拟 CPU 数据
-        const cpuUsage = Math.random() * 60 + 10; // 10-70%
+        const results = await Promise.all([
+          long.performance.getCpuUsage(),
+          long.performance.getMemoryInfo(),
+          long.performance.getDiskInfo(),
+          long.performance.getTopByMemory(10)
+        ]);
+        const cpuUsage = unwrap(results[0], 'CPU 数据加载失败');
+        const memory = unwrap(results[1], '内存数据加载失败');
+        const disks = unwrap(results[2], '磁盘数据加载失败');
+        const processes = unwrap(results[3], '进程数据加载失败');
+
         updateCpu(cpuUsage);
-
-        // 模拟内存数据
-        const memInfo = {
-          totalPhysicalMemory: 17042284544,
-          usedPhysicalMemory: 10737418240,
-          usagePercentage: 63
-        };
-        updateMemory(memInfo);
-
-        // 模拟运行时间
-        const uptime = { hours: 5, minutes: 23 };
-        document.getElementById('uptimeValue').textContent = `${uptime.hours}h ${uptime.minutes}m`;
-
-        // 模拟磁盘数据
-        const disks = [
-          { name: 'C:\\', totalSize: 256060514304, usedSpace: 198765432100, usagePercentage: 77.6 },
-          { name: 'D:\\', totalSize: 1000204886016, usedSpace: 523456789012, usagePercentage: 52.3 }
-        ];
-        updateDisks(disks);
-
-        // 模拟进程数据
-        const processes = [
-          { processName: 'chrome', processId: 12345, memoryUsage: 524288000, threadCount: 48 },
-          { processName: 'Code', processId: 23456, memoryUsage: 314572800, threadCount: 32 },
-          { processName: 'LongBetterWindows.Host', processId: 34567, memoryUsage: 104857600, threadCount: 16 },
-        ];
-        updateProcesses(processes);
-
-      } catch (e) {
-        console.error('更新监控数据失败:', e);
-        const detail = e && e.message ? e.message : String(e);
-        window.LongUI?.renderState(document.getElementById('diskList'), {
-          kind: 'error',
-          title: '磁盘信息加载失败',
-          detail: detail,
-          actionLabel: '重试',
-          onAction: updateMetrics
-        });
-        window.LongUI?.renderState(document.getElementById('processList'), {
-          kind: 'error',
-          title: '进程信息加载失败',
-          detail: detail
-        });
+        updateMemory(memory);
+        updateDisks(Array.isArray(disks) ? disks : []);
+        updateProcesses(Array.isArray(processes) ? processes : []);
+        document.getElementById('refreshBadge').textContent =
+          '更新于 ' + new Date().toLocaleTimeString([], { hour12: false });
+        if (manual) setStatus('硬件信息已刷新', 'success');
+        return true;
+      } catch (error) {
+        const detail = errorMessage(error, '性能数据加载失败');
+        renderMetricsError(detail);
+        setStatus(detail, 'danger');
+        return false;
+      } finally {
+        window.LongUI?.setBusy(refreshButton, false);
       }
     }
 
-    // 更新 CPU
-    function updateCpu(usage) {
-      const valueEl = document.getElementById('cpuValue');
-      const barEl = document.getElementById('cpuBar');
-
-      valueEl.textContent = Math.round(usage) + '%';
-      barEl.style.width = usage + '%';
-
-      if (usage >= cpuWarningThreshold) {
-        valueEl.classList.add('warning');
-        barEl.classList.add('warning');
-      } else {
-        valueEl.classList.remove('warning');
-        barEl.classList.remove('warning');
-      }
+    function renderMetricsError(detail) {
+      window.LongUI?.renderState(document.getElementById('diskList'), {
+        kind: 'error',
+        title: '磁盘信息加载失败',
+        detail: detail,
+        actionLabel: '重试',
+        onAction: function () { void updateMetrics(true); }
+      });
+      window.LongUI?.renderState(document.getElementById('processList'), {
+        kind: 'error',
+        title: '进程信息加载失败',
+        detail: detail
+      });
     }
 
-    // 更新内存
+    function updateCpu(value) {
+      const usage = percentage(value);
+      const isWarning = usage >= cpuWarningThreshold;
+      document.getElementById('cpuValue').textContent = Math.round(usage) + '%';
+      document.getElementById('cpuValue').classList.toggle('long-metric__value--warning', isWarning);
+      document.getElementById('cpuBar').style.width = usage + '%';
+      document.getElementById('cpuBar').classList.toggle('long-progress__fill--warning', isWarning);
+      document.getElementById('cpuProgress').setAttribute('aria-valuenow', String(Math.round(usage)));
+    }
+
     function updateMemory(info) {
-      const valueEl = document.getElementById('memValue');
-      const barEl = document.getElementById('memBar');
-      const labelEl = document.getElementById('memLabel');
-
-      valueEl.textContent = Math.round(info.usagePercentage) + '%';
-      barEl.style.width = info.usagePercentage + '%';
-      labelEl.textContent = `${formatBytes(info.usedPhysicalMemory)} / ${formatBytes(info.totalPhysicalMemory)}`;
-
-      if (info.usagePercentage >= memWarningThreshold) {
-        valueEl.classList.add('warning');
-        barEl.classList.add('warning');
-      } else {
-        valueEl.classList.remove('warning');
-        barEl.classList.remove('warning');
-      }
+      const usage = percentage(info.UsagePercentage);
+      const isWarning = usage >= memWarningThreshold;
+      document.getElementById('memValue').textContent = Math.round(usage) + '%';
+      document.getElementById('memValue').classList.toggle('long-metric__value--warning', isWarning);
+      document.getElementById('memLabel').textContent =
+        formatBytes(info.UsedPhysicalMemory) + ' / ' + formatBytes(info.TotalPhysicalMemory);
+      document.getElementById('memBar').style.width = usage + '%';
+      document.getElementById('memBar').classList.toggle('long-progress__fill--warning', isWarning);
+      document.getElementById('memProgress').setAttribute('aria-valuenow', String(Math.round(usage)));
     }
 
-    // 更新磁盘列表
     function updateDisks(disks) {
-      const listEl = document.getElementById('diskList');
-      listEl.replaceChildren();
+      const list = document.getElementById('diskList');
+      list.replaceChildren();
       if (!disks.length) {
-        window.LongUI?.renderState(listEl, {
-          kind: 'empty',
-          title: '暂无磁盘信息'
-        });
+        window.LongUI?.renderState(list, { kind: 'empty', title: '暂无磁盘信息' });
         return;
       }
 
       disks.forEach(function (disk) {
-        const usage = Math.max(0, Math.min(100, Number(disk.usagePercentage) || 0));
-        const item = document.createElement('div');
-        item.className = 'disk-item';
-        const header = document.createElement('div');
-        header.className = 'disk-header';
-        appendText(header, 'span', 'disk-name', String(disk.name || '未知磁盘'));
-        appendText(header, 'span', 'disk-usage', Math.round(usage) + '% 已用');
-        const size = appendText(
-          item,
+        const usage = percentage(disk.UsagePercentage);
+        const card = document.createElement('article');
+        card.className = 'long-card long-metric';
+        appendText(card, 'div', 'long-metric__label', disk.DriveType || '磁盘');
+        appendText(card, 'div', 'long-metric__value', disk.Name || '未知磁盘');
+        appendText(
+          card,
           'div',
-          'disk-size',
-          formatBytes(disk.usedSpace) + ' / ' + formatBytes(disk.totalSize));
+          'long-metric__detail',
+          formatBytes(disk.UsedSpace) + ' / ' + formatBytes(disk.TotalSize) + ' · ' + Math.round(usage) + '% 已用');
         const progress = document.createElement('div');
-        progress.className = 'progress-bar';
+        progress.className = 'long-progress';
+        progress.setAttribute('role', 'progressbar');
+        progress.setAttribute('aria-label', (disk.Name || '磁盘') + ' 使用率');
+        progress.setAttribute('aria-valuemin', '0');
+        progress.setAttribute('aria-valuemax', '100');
+        progress.setAttribute('aria-valuenow', String(Math.round(usage)));
         const fill = document.createElement('div');
-        fill.className = 'progress-fill' + (usage > 90 ? ' warning' : '');
+        fill.className = 'long-progress__fill' + (usage > 90 ? ' long-progress__fill--warning' : '');
         fill.style.width = usage + '%';
         progress.appendChild(fill);
-        item.append(header, size, progress);
-        listEl.appendChild(item);
+        card.appendChild(progress);
+        list.appendChild(card);
       });
     }
 
-    // 更新进程列表
     function updateProcesses(processes) {
-      const listEl = document.getElementById('processList');
-      listEl.replaceChildren();
+      const list = document.getElementById('processList');
+      list.replaceChildren();
       if (!processes.length) {
-        window.LongUI?.renderState(listEl, {
-          kind: 'empty',
-          title: '暂无进程信息'
-        });
+        window.LongUI?.renderState(list, { kind: 'empty', title: '暂无进程信息' });
         return;
       }
 
       processes.forEach(function (process) {
         const row = document.createElement('div');
-        row.className = 'table-row';
-        appendText(row, 'div', '', String(process.processName || '未知进程'));
-        appendText(row, 'div', '', String(process.processId));
-        appendText(row, 'div', '', Math.round(process.memoryUsage / 1024 / 1024) + ' MB');
-        appendText(row, 'div', '', String(process.threadCount));
-        listEl.appendChild(row);
+        row.className = 'long-data-grid__row';
+        row.setAttribute('role', 'row');
+        appendDataCell(row, '进程名称', process.ProcessName || '未知进程');
+        appendDataCell(row, 'PID', process.ProcessId);
+        appendDataCell(row, '内存', formatBytes(process.MemoryUsage));
+        appendDataCell(row, '线程数', process.ThreadCount);
+        list.appendChild(row);
       });
+    }
+
+    function appendDataCell(parent, label, value) {
+      const cell = appendText(parent, 'div', 'long-data-grid__cell', String(value ?? ''));
+      cell.dataset.label = label;
+      cell.setAttribute('role', 'cell');
+      return cell;
     }
 
     function appendText(parent, tagName, className, text) {
       const element = document.createElement(tagName);
       if (className) element.className = className;
-      element.textContent = text;
+      element.textContent = String(text ?? '');
       parent.appendChild(element);
       return element;
     }
 
-    // 格式化字节
-    function formatBytes(bytes) {
-      if (bytes === 0) return '0 B';
-      const k = 1024;
-      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    function unwrap(response, fallback) {
+      if (!response || !response.success) {
+        throw new Error(response && response.error ? response.error : fallback);
+      }
+      return response.data;
     }
 
-    // 启动
-    init();
+    function percentage(value) {
+      return Math.max(0, Math.min(100, Number(value) || 0));
+    }
+
+    function formatBytes(value) {
+      const bytes = Number(value);
+      if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+      return (bytes / Math.pow(1024, index)).toFixed(index > 2 ? 1 : 0) + ' ' + units[index];
+    }
+
+    function formatUptime(value) {
+      const match = typeof value === 'string'
+        ? /^(?:(\d+)\.)?(\d+):(\d+)/.exec(value)
+        : null;
+      if (!match) return '--';
+      const hours = Number(match[1] || 0) * 24 + Number(match[2] || 0);
+      return hours + 'h ' + Number(match[3] || 0) + 'm';
+    }
+
+    function errorMessage(error, fallback) {
+      return error && error.message ? error.message : fallback;
+    }
+
+    function setStatus(message, kind) {
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      window.LongUI?.announce(message);
+    }
+
+    function startPolling() {
+      stopPolling();
+      if (!document.hidden) {
+        refreshTimer = window.setInterval(function () { void updateMetrics(false); }, refreshInterval);
+      }
+    }
+
+    function stopPolling() {
+      window.clearInterval(refreshTimer);
+      refreshTimer = 0;
+    }
+
+    refreshButton.addEventListener('click', function () { void updateMetrics(true); });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'F5') {
+        event.preventDefault();
+        void updateMetrics(true);
+      }
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) stopPolling();
+      else {
+        void updateMetrics(false);
+        startPolling();
+      }
+    });
+    window.LongUI?.onCommand(async function () {
+      const success = await updateMetrics(true);
+      return {
+        success: success,
+        message: success ? '硬件信息已刷新' : '硬件信息刷新失败'
+      };
+    });
+    initialize();
   </script>
 </body>
 </html>

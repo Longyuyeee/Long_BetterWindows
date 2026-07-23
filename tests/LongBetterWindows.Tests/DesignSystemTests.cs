@@ -297,6 +297,7 @@ public class DesignSystemTests
             "TimestampConverter",
             "RegexTester",
             "UuidGenerator",
+            "HardwareMonitor",
         };
 
         Assert.All(plugins, plugin =>
@@ -304,7 +305,7 @@ public class DesignSystemTests
             var html = File.ReadAllText(Path.Combine(root, "src", plugin, "index.html"));
             Assert.DoesNotContain("<style", html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotMatch("#[0-9A-Fa-f]{3,8}", html);
-            Assert.Contains("class=\"long-page\"", html);
+            Assert.Contains("class=\"long-page", html);
             Assert.Contains("LongUI?.onCommand", html);
             Assert.Contains("addEventListener('keydown'", html);
             Assert.Contains("aria-live=\"polite\"", html);
@@ -330,6 +331,7 @@ public class DesignSystemTests
             "TimestampConverter",
             "RegexTester",
             "UuidGenerator",
+            "HardwareMonitor",
         };
 
         Assert.All(plugins, plugin =>
@@ -405,6 +407,40 @@ public class DesignSystemTests
         Assert.Contains("long:command", script);
         Assert.Contains("long.command-result", script);
         Assert.Contains("request_id", script);
+    }
+
+    [Fact]
+    public void HardwareMonitor_UsesRealPerformanceApisAndUiKit()
+    {
+        var root = FindRepositoryRoot();
+        var page = File.ReadAllText(Path.Combine(
+            root, "src", "HardwareMonitor", "index.html"));
+        var uiKit = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "WebAssets", "long-ui.css"));
+        using var manifest = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root, "src", "HardwareMonitor", "manifest.json")));
+
+        Assert.DoesNotContain("<style", page, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotMatch("#[0-9A-Fa-f]{3,8}", page);
+        Assert.Contains("long.performance.getCpuUsage()", page);
+        Assert.Contains("long.performance.getMemoryInfo()", page);
+        Assert.Contains("long.performance.getDiskInfo()", page);
+        Assert.Contains("long.performance.getSystemInfo()", page);
+        Assert.Contains("long.performance.getTopByMemory(10)", page);
+        Assert.DoesNotContain("Math.random", page);
+        Assert.Contains("visibilitychange", page);
+        Assert.Contains("LongUI?.onCommand", page);
+        Assert.Contains("event.key === 'F5'", page);
+        var capabilities = manifest.RootElement.GetProperty("capabilities")
+            .EnumerateArray()
+            .Select(element => element.GetString())
+            .ToArray();
+        Assert.Equal(["system.performance"], capabilities);
+
+        Assert.Contains(".long-metric-grid", uiKit);
+        Assert.Contains(".long-progress__fill", uiKit);
+        Assert.Contains(".long-key-value__row", uiKit);
+        Assert.Contains(".long-data-grid__row", uiKit);
     }
 
     [Fact]

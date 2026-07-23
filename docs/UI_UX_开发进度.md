@@ -570,3 +570,15 @@ WIP UI visual draft before audited implementation
 - [x] 6 个改动页面的内联脚本语法检查通过，设计系统定向测试 34 / 34 通过。
 
 插件内容状态统一已完成。下一项内部体验工作转向仍保留硬编码旧主题样式的 `HardwareMonitor`、`PortManager` 和 `ClipboardHistory`，逐个迁移到 Long UI Kit 令牌和布局；按钮操作结果继续使用轻量 `long-status`，不与内容区三态混用。
+
+## 旧 Web 插件主题迁移第一批：HardwareMonitor
+
+- [x] 删除整页私有 `<style>` 和全部硬编码颜色，页面改用 Long UI Kit 的宽页、指标卡、进度、键值表和数据表组件。
+- [x] Web UI Kit 新增可复用的数据密集型组件及 `700px` 响应式规则；桌面三列指标在小屏切为单列，进程表切为带字段标签的双列布局。
+- [x] 移除随机 CPU 与固定内存、磁盘、进程模拟数据，正式接通 `getCpuUsage`、`getMemoryInfo`、`getDiskInfo`、`getSystemInfo` 和 `getTopByMemory`。
+- [x] 增加手动刷新、F5、统一命令刷新、请求防重入、页面隐藏暂停轮询和恢复后立即刷新。
+- [x] CPU、内存和磁盘进度同步维护 `aria-valuenow`；进程区域使用 table/rowgroup/row/cell 语义，动态文本继续通过 `textContent` 写入。
+- [x] 移除未使用的高权限 `system.process`，插件只声明实际使用的安全级 `system.performance`。
+- [x] 本地真实浏览器预览验证桌面无横向溢出，`390 × 844` 无元素越界；手动刷新成功状态和性能服务失败/重试状态均通过。
+
+下一批迁移 `PortManager`：接通真实 `long.networkPort` 数据，移除固定端口模拟数据、硬编码主题和字符串模板渲染，并保留终止进程所需的独立高权限审查。

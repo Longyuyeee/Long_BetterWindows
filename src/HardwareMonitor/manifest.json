@@ -7,8 +7,7 @@
   "entry_point": "index.html",
   "runtime": "webview",
   "capabilities": [
-    "system.performance",
-    "system.process"
+    "system.performance"
   ],
   "commands": [
     {
