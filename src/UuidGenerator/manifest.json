@@ -13,6 +13,35 @@
       "description": "使用安全随机源批量生成 UUID v4",
       "aliases": ["uuid", "guid", "唯一标识", "weiyibiaoshi"],
       "accepted_inputs": ["none"],
+      "argument_presets": [
+        {
+          "id": "quick-10",
+          "name": "快速生成 10 个",
+          "arguments": {
+            "amount": "10",
+            "uppercase": "false",
+            "compact": "false"
+          }
+        },
+        {
+          "id": "batch-100",
+          "name": "批量生成 100 个",
+          "arguments": {
+            "amount": "100",
+            "uppercase": "false",
+            "compact": "false"
+          }
+        },
+        {
+          "id": "compact-uppercase",
+          "name": "紧凑大写 10 个",
+          "arguments": {
+            "amount": "10",
+            "uppercase": "true",
+            "compact": "true"
+          }
+        }
+      ],
       "outputs": [
         {
           "key": "result",

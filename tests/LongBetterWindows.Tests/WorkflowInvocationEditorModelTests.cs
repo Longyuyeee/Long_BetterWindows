@@ -69,7 +69,34 @@ public sealed class WorkflowInvocationEditorModelTests
         Assert.Equal(64, model.Arguments.Select(item => item.Key).Distinct().Count());
     }
 
-    private static WorkflowInvocationEditorModel Model()
+    [Fact]
+    public void ApplyArgumentPreset_ReplacesArgumentsWithRegisteredDefensiveCopy()
+    {
+        var presetArguments = new Dictionary<string, string>
+        {
+            ["amount"] = "100",
+            ["compact"] = "true",
+        };
+        var model = Model(
+            [new WorkflowArgumentPresetOption("batch", "Batch", presetArguments)]);
+        model.LoadArguments(new Dictionary<string, string> { ["old"] = "value" });
+        model.SelectedArgumentPreset = new WorkflowArgumentPresetOption(
+            "BATCH",
+            "Forged",
+            new Dictionary<string, string> { ["amount"] = "1" });
+
+        var applied = model.ApplySelectedArgumentPreset();
+        presetArguments["amount"] = "999";
+
+        Assert.True(applied);
+        Assert.DoesNotContain(model.Arguments, item => item.Key == "old");
+        Assert.Equal("100", model.Arguments.Single(item => item.Key == "amount").Value);
+        Assert.True(model.TryBuildArguments(out var arguments));
+        Assert.Equal("true", arguments["compact"]);
+    }
+
+    private static WorkflowInvocationEditorModel Model(
+        IReadOnlyList<WorkflowArgumentPresetOption>? presets = null)
         => new()
         {
             StepId = "step-1",
@@ -80,5 +107,6 @@ public sealed class WorkflowInvocationEditorModelTests
                 new WorkflowInputTypeOption(AcceptedInputType.None, "无输入"),
                 new WorkflowInputTypeOption(AcceptedInputType.Files, "多个文件"),
             ],
+            ArgumentPresets = presets ?? Array.Empty<WorkflowArgumentPresetOption>(),
         };
 }

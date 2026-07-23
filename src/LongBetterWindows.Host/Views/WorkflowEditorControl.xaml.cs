@@ -890,6 +890,15 @@ namespace LongBetterWindows.Host.Views
                 Role = role,
                 RoleLabel = roleLabel,
                 BindingEditor = new WorkflowBindingEditorModel(availableOutputs, invocation.InputType),
+                ArgumentPresets = descriptor?.Command.ArgumentPresets
+                    .Select(preset => new WorkflowArgumentPresetOption(
+                        preset.Id,
+                        preset.Name,
+                        new Dictionary<string, string>(
+                            preset.Arguments,
+                            StringComparer.Ordinal)))
+                    .ToArray()
+                    ?? Array.Empty<WorkflowArgumentPresetOption>(),
                 InputType = invocation.InputType,
                 InputOptions = options,
                 Text = invocation.Text ?? string.Empty,

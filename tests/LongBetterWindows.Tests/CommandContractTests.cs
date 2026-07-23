@@ -157,6 +157,96 @@ public class CommandContractTests
     }
 
     [Fact]
+    public async Task ManifestReader_ValidArgumentPresetsAreStructured()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.presets",
+            version = "1.0.0",
+            name = "Presets",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "run",
+                    title = "Run",
+                    accepted_inputs = new[] { "none" },
+                    argument_presets = new[]
+                    {
+                        new
+                        {
+                            id = "quick",
+                            name = "Quick",
+                            arguments = new Dictionary<string, string>
+                            {
+                                ["amount"] = "10",
+                                ["compact"] = "true",
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.True(result.IsSuccess, result.Error);
+        var preset = Assert.Single(Assert.Single(result.Manifest!.Commands).ArgumentPresets);
+        Assert.Equal("quick", preset.Id);
+        Assert.Equal("10", preset.Arguments["amount"]);
+    }
+
+    [Fact]
+    public async Task ManifestReader_InvalidArgumentPresetsRejectPlugin()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.invalid-presets",
+            version = "1.0.0",
+            name = "Invalid presets",
+            entry_point = "index.html",
+            commands = new[]
+            {
+                new
+                {
+                    id = "run",
+                    title = "Run",
+                    accepted_inputs = new[] { "none" },
+                    argument_presets = new object[]
+                    {
+                        new
+                        {
+                            id = "same",
+                            name = "First",
+                            arguments = new Dictionary<string, string>
+                            {
+                                [""] = "invalid",
+                            },
+                        },
+                        new
+                        {
+                            id = "SAME",
+                            name = "Second",
+                            arguments = new Dictionary<string, string>
+                            {
+                                ["value"] = new string('x', 65537),
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        var result = await ManifestReader.ReadAsync(dir);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("重复参数预设 id", result.Error);
+        Assert.Contains("包含无效参数", result.Error);
+        Assert.Contains("参数总长度超过限制", result.Error);
+    }
+
+    [Fact]
     public async Task ManifestReader_PreferredWindowSmallerThanMinimum_ReturnsFailure()
     {
         var dir = CreateManifestDir(new

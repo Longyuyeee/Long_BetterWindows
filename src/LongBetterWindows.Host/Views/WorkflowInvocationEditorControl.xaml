@@ -51,6 +51,25 @@
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
             </Expander.Header>
             <StackPanel Margin="0,7,0,0">
+                <Grid Margin="0,0,0,8"
+                      Visibility="{Binding HasArgumentPresets, Converter={StaticResource BooleanToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox Style="{StaticResource LongComboBox}"
+                              ItemsSource="{Binding ArgumentPresets}"
+                              DisplayMemberPath="Name"
+                              SelectedItem="{Binding SelectedArgumentPreset}"
+                              automation:AutomationProperties.AutomationId="Long.Workflow.ArgumentPreset"
+                              automation:AutomationProperties.Name="选择命令参数预设" />
+                    <Button Grid.Column="1" Content="应用" Style="{StaticResource LongButton}"
+                            Margin="8,0,0,0"
+                            IsEnabled="{Binding CanApplyArgumentPreset}"
+                            Click="ApplyArgumentPreset_Click"
+                            automation:AutomationProperties.AutomationId="Long.Workflow.ArgumentPreset.Apply"
+                            automation:AutomationProperties.Name="应用命令参数预设" />
+                </Grid>
                 <ItemsControl ItemsSource="{Binding Arguments}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>

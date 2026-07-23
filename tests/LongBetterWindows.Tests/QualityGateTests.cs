@@ -580,6 +580,9 @@ public class QualityGateTests
         Assert.Contains("MaximumImageBytes", invocationEditor);
         Assert.Contains("AutomationProperties.Name=\"参数键\"", invocationEditorXaml);
         Assert.Contains("AutomationProperties.Name=\"添加命令参数\"", invocationEditorXaml);
+        Assert.Contains("Long.Workflow.ArgumentPreset", invocationEditorXaml);
+        Assert.Contains("Long.Workflow.ArgumentPreset.Apply", invocationEditorXaml);
+        Assert.Contains("argument_presets", Read("src", "UuidGenerator", "manifest.json"));
         Assert.Contains("AutomationProperties.Name=\"保存组合动作\"", xaml);
         Assert.Contains("CommandWorkflowPlanner", session);
         Assert.Contains("CommandWorkflowBindingResolver.Resolve", Read(

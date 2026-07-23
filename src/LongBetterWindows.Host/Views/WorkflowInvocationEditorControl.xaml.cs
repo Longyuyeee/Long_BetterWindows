@@ -133,6 +133,12 @@ namespace LongBetterWindows.Host.Views
             RaiseInvocationChanged();
         }
 
+        private void ApplyArgumentPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (Editor is null || !Editor.ApplySelectedArgumentPreset()) return;
+            RaiseInvocationChanged();
+        }
+
         private void RemoveArgument_Click(object sender, RoutedEventArgs e)
         {
             if (Editor is null
@@ -229,12 +235,15 @@ namespace LongBetterWindows.Host.Views
         private IReadOnlyList<string> _paths = Array.Empty<string>();
         private byte[]? _imagePng;
         private string? _argumentError;
+        private WorkflowArgumentPresetOption? _selectedArgumentPreset;
 
         public required string StepId { get; init; }
         public WorkflowCommandRole Role { get; init; }
         public required string RoleLabel { get; init; }
         public required IReadOnlyList<WorkflowInputTypeOption> InputOptions { get; init; }
         public ObservableCollection<WorkflowArgumentEditorItem> Arguments { get; } = new();
+        public IReadOnlyList<WorkflowArgumentPresetOption> ArgumentPresets { get; init; } =
+            Array.Empty<WorkflowArgumentPresetOption>();
         public WorkflowBindingEditorModel BindingEditor { get; set; } = new(
             Array.Empty<WorkflowBindingOutputOption>(),
             AcceptedInputType.None);
@@ -303,7 +312,18 @@ namespace LongBetterWindows.Host.Views
             }
         }
         public bool HasArgumentError => ArgumentError is not null;
+        public bool HasArgumentPresets => ArgumentPresets.Count > 0;
         public bool CanAddArgument => Arguments.Count < 64;
+        public WorkflowArgumentPresetOption? SelectedArgumentPreset
+        {
+            get => _selectedArgumentPreset;
+            set
+            {
+                if (!SetField(ref _selectedArgumentPreset, value)) return;
+                OnPropertyChanged(nameof(CanApplyArgumentPreset));
+            }
+        }
+        public bool CanApplyArgumentPreset => SelectedArgumentPreset is not null;
 
         public void LoadArguments(IReadOnlyDictionary<string, string> arguments)
         {
@@ -323,6 +343,21 @@ namespace LongBetterWindows.Host.Views
             Arguments.Add(new WorkflowArgumentEditorItem(key, string.Empty));
             RefreshArgumentValidation();
             NotifyArgumentCollectionChanged();
+            return true;
+        }
+
+        public bool ApplySelectedArgumentPreset()
+        {
+            var selected = SelectedArgumentPreset;
+            if (selected is null) return false;
+            var registered = ArgumentPresets.FirstOrDefault(preset => string.Equals(
+                preset.Id,
+                selected.Id,
+                StringComparison.OrdinalIgnoreCase));
+            if (registered is null) return false;
+            LoadArguments(new Dictionary<string, string>(
+                registered.Arguments,
+                StringComparer.Ordinal));
             return true;
         }
 
@@ -378,6 +413,11 @@ namespace LongBetterWindows.Host.Views
     }
 
     public sealed record WorkflowInputTypeOption(AcceptedInputType Value, string Label);
+
+    public sealed record WorkflowArgumentPresetOption(
+        string Id,
+        string Name,
+        IReadOnlyDictionary<string, string> Arguments);
 
     public sealed class WorkflowArgumentEditorItem
     {

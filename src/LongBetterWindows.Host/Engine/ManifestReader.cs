@@ -157,6 +157,40 @@ namespace LongBetterWindows.Host.Engine
                     if (!Enum.IsDefined(output.Type))
                         errors.Add($"指令 '{command.Id}' 的 output type 无效: '{output.Type}'");
                 }
+
+                var argumentPresets = command.ArgumentPresets
+                    ?? new List<PluginCommandArgumentPreset>();
+                if (argumentPresets.Count > 32)
+                    errors.Add($"指令 '{command.Id}' 不能声明超过 32 个 argument_presets");
+                var presetIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var preset in argumentPresets)
+                {
+                    if (preset is null)
+                    {
+                        errors.Add($"指令 '{command.Id}' 包含空参数预设");
+                        continue;
+                    }
+                    var arguments = preset.Arguments
+                        ?? new Dictionary<string, string>();
+                    if (!IsIdentifier(preset.Id))
+                        errors.Add($"指令 '{command.Id}' 的参数预设 id 无效: '{preset.Id}'");
+                    else if (!presetIds.Add(preset.Id))
+                        errors.Add($"指令 '{command.Id}' 存在重复参数预设 id: '{preset.Id}'");
+                    if (string.IsNullOrWhiteSpace(preset.Name) || preset.Name.Length > 120)
+                        errors.Add($"指令 '{command.Id}' 的参数预设名称无效: '{preset.Name}'");
+                    if (arguments.Count > 64)
+                        errors.Add($"指令 '{command.Id}' 的参数预设 '{preset.Id}' 不能包含超过 64 个参数");
+                    if (arguments.Any(argument =>
+                        string.IsNullOrWhiteSpace(argument.Key)
+                        || argument.Key.Length > 128
+                        || argument.Value is null
+                        || argument.Value.Length > 65536))
+                    {
+                        errors.Add($"指令 '{command.Id}' 的参数预设 '{preset.Id}' 包含无效参数");
+                    }
+                    if (arguments.Values.Sum(value => (long)(value?.Length ?? 0)) > 65536)
+                        errors.Add($"指令 '{command.Id}' 的参数预设 '{preset.Id}' 参数总长度超过限制");
+                }
             }
         }
 
