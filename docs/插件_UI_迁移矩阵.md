@@ -90,10 +90,12 @@
 | S1 | Long Web UI Kit | `empty`、`loading`、`error`、可选重试、`aria-live`、`aria-busy`、减少动画 | 已完成 |
 | S1 | PortManager | 初始加载、空列表、搜索无结果、加载失败、重试 | 已完成 |
 | S1 | ClipboardHistory | 初始加载、无历史、筛选无结果 | 已完成 |
-| S2 | HardwareMonitor、异步翻译与文件工具 | 系统信息、列表和操作结果状态 | 待迁移 |
-| S3 | 剩余内置 Web 插件 | 私有 `.empty-state/.loading` 清理与一致性复核 | 待迁移 |
+| S2 | HardwareMonitor、ClipboardTool、RegexTester | 系统/列表加载、空结果、失败详情、重试、安全动态文本 | 已完成 |
+| S3 | FileRenamerPlugin、QuickNotePlugin、MarkdownPreview | Explorer 选区、便签历史和预览空态；全仓私有状态清理 | 已完成 |
 
 状态组件由宿主注入的 `LongUI.renderState` 创建，动态文本只通过 DOM `textContent` 写入。插件可以提供标题、详情和重试动作，但不得覆盖三态的角色、播报优先级或忙碌语义。
+
+完成门禁：所有内置 Web `index.html` 均不得包含 `long-empty`、`.empty-state` 或私有 `.loading` 内容状态。翻译、复制、保存等按钮触发的短时结果继续使用 `long-status`，避免把操作反馈误建模为占据内容区的加载页。
 
 ## 第五批实现基线
 

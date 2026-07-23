@@ -37,7 +37,6 @@
       </div>
 
       <div class="long-file-list" id="fileList"></div>
-      <div class="long-empty" id="emptyState">请先在 Explorer 中选择需要重命名的文件</div>
 
       <div class="long-toolbar">
         <button class="long-button long-button--primary btn-primary" id="renameButton" type="button" disabled>执行重命名</button>
@@ -63,21 +62,40 @@
     }
 
     async function loadSelection() {
+      if (!files.length) {
+        window.LongUI?.renderState(list, {
+          kind: 'loading',
+          title: '正在读取 Explorer 选区'
+        });
+      }
       try {
         const response = await long.shell.getSelectedItems();
-        if (!response.success || !response.data || !response.data.length) {
+        if (!response.success) throw new Error(response.error || 'Explorer 选区读取失败');
+        if (!response.data || !response.data.length) {
           setFiles([]); setStatus('Explorer 当前没有明确选中的文件', 'warning'); return;
         }
         setFiles(response.data);
         setStatus('已读取 ' + files.length + ' 个选中项', 'success');
-      } catch (error) { setStatus('读取 Explorer 选区失败：' + error.message, 'danger'); }
+      } catch (error) {
+        if (!files.length) {
+          window.LongUI?.renderState(list, {
+            kind: 'error',
+            title: 'Explorer 选区读取失败',
+            detail: error && error.message ? error.message : String(error),
+            actionLabel: '重试',
+            onAction: loadSelection
+          });
+        }
+        setStatus(
+          '读取 Explorer 选区失败：' + (error && error.message ? error.message : String(error)),
+          'danger');
+      }
     }
 
     function setFiles(paths) {
       files = paths.filter(function (path) { return typeof path === 'string' && path.length > 0; });
       previewNames = files.map(fileName);
       document.getElementById('fileBadge').textContent = files.length + ' 个文件';
-      document.getElementById('emptyState').hidden = files.length > 0;
       applyRule();
     }
 
@@ -101,6 +119,15 @@
 
     function renderFiles() {
       list.replaceChildren();
+      if (!files.length) {
+        window.LongUI?.renderState(list, {
+          kind: 'empty',
+          title: '等待文件选区',
+          detail: '请先在 Explorer 中选择需要重命名的文件'
+        });
+        updateValidation();
+        return;
+      }
       files.forEach(function (path, index) {
         const row = document.createElement('div'); row.className = 'long-file-row';
         const oldName = document.createElement('span'); oldName.className = 'long-file-row__old'; oldName.textContent = fileName(path); oldName.title = path;
@@ -171,6 +198,7 @@
       if (paths.length) { setFiles(paths); setStatus('已从命令上下文读取 ' + paths.length + ' 个文件', 'success'); }
       else loadSelection();
     });
+    renderFiles();
   </script>
 </body>
 </html>

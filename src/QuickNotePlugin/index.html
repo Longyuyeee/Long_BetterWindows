@@ -38,7 +38,6 @@
           <span class="long-secondary">最多保留 30 条</span>
         </div>
         <div class="long-list" id="noteList"></div>
-        <div class="long-empty" id="emptyState">还没有便签</div>
       </section>
     </section>
   </main>
@@ -48,20 +47,40 @@
     const preview = document.getElementById('preview');
     const status = document.getElementById('status');
     const list = document.getElementById('noteList');
-    const empty = document.getElementById('emptyState');
     let notes = [];
 
     async function initialize() {
+      window.LongUI?.renderState(list, {
+        kind: 'loading',
+        title: '正在加载历史便签'
+      });
       try {
         const result = await long.storage.get('quick_notes');
+        if (!result.success) throw new Error(result.error || '历史便签读取失败');
         if (result.success && result.data) notes = JSON.parse(result.data);
-      } catch (_) { setStatus('历史便签读取失败', 'danger'); }
+      } catch (error) {
+        window.LongUI?.renderState(list, {
+          kind: 'error',
+          title: '历史便签读取失败',
+          detail: error && error.message ? error.message : String(error),
+          actionLabel: '重试',
+          onAction: initialize
+        });
+        setStatus('历史便签读取失败', 'danger');
+        return;
+      }
       renderNotes();
     }
 
     async function persist() {
-      try { await long.storage.set('quick_notes', JSON.stringify(notes)); }
-      catch (_) { setStatus('便签保存失败', 'danger'); }
+      try {
+        const result = await long.storage.set('quick_notes', JSON.stringify(notes));
+        if (!result.success) throw new Error(result.error || '便签保存失败');
+        return true;
+      } catch (_) {
+        setStatus('便签保存失败', 'danger');
+        return false;
+      }
     }
 
     function setStatus(message, kind) {
@@ -73,11 +92,19 @@
     async function saveNote() {
       const text = input.value.trim();
       if (!text) { setStatus('请输入便签内容', 'warning'); input.focus(); return; }
+      const previousNotes = notes.slice();
       notes.unshift({ text: text, time: Date.now() });
       notes = notes.slice(0, 30);
       input.value = '';
       preview.hidden = true;
-      await persist();
+      const saved = await persist();
+      if (!saved) {
+        notes = previousNotes;
+        input.value = text;
+        renderNotes();
+        input.focus();
+        return;
+      }
       renderNotes();
       setStatus('便签已保存 · ' + text.length + ' 字符', 'success');
     }
@@ -97,8 +124,15 @@
 
     function renderNotes() {
       list.replaceChildren();
-      empty.hidden = notes.length > 0;
       document.getElementById('countBadge').textContent = notes.length + ' 条便签';
+      if (!notes.length) {
+        window.LongUI?.renderState(list, {
+          kind: 'empty',
+          title: '还没有便签',
+          detail: '新建的便签会显示在这里'
+        });
+        return;
+      }
       notes.forEach(function (note, index) {
         const item = document.createElement('article');
         item.className = 'long-list-item';
@@ -121,7 +155,11 @@
         remove.textContent = '删除';
         remove.setAttribute('aria-label', '删除此便签');
         remove.addEventListener('click', async function () {
-          notes.splice(index, 1); await persist(); renderNotes(); setStatus('便签已删除', 'success');
+          const removed = notes.splice(index, 1)[0];
+          const saved = await persist();
+          if (!saved) notes.splice(index, 0, removed);
+          renderNotes();
+          if (saved) setStatus('便签已删除', 'success');
         });
         meta.append(time, remove);
         item.append(content, meta);

@@ -133,6 +133,73 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void SecondBatchWebPlugins_UseSafeUnifiedContentStates()
+    {
+        var root = FindRepositoryRoot();
+        var hardwareMonitor = File.ReadAllText(Path.Combine(
+            root, "src", "HardwareMonitor", "index.html"));
+        var clipboardTool = File.ReadAllText(Path.Combine(
+            root, "src", "ClipboardTool", "index.html"));
+        var regexTester = File.ReadAllText(Path.Combine(
+            root, "src", "RegexTester", "index.html"));
+
+        Assert.Contains("kind: 'loading'", hardwareMonitor);
+        Assert.Contains("kind: 'empty'", hardwareMonitor);
+        Assert.Contains("kind: 'error'", hardwareMonitor);
+        Assert.Contains("appendText", hardwareMonitor);
+        Assert.DoesNotContain("innerHTML", hardwareMonitor);
+
+        Assert.Contains("kind: 'loading'", clipboardTool);
+        Assert.Contains("kind: 'empty'", clipboardTool);
+        Assert.Contains("kind: 'error'", clipboardTool);
+        Assert.Contains("if (!historyResult.success) throw", clipboardTool);
+        Assert.DoesNotContain("id=\"emptyState\"", clipboardTool);
+        Assert.DoesNotContain("class=\"long-empty\"", clipboardTool);
+
+        Assert.Contains("kind: 'empty'", regexTester);
+        Assert.Contains("kind: 'error'", regexTester);
+        Assert.DoesNotContain("innerHTML", regexTester);
+        Assert.DoesNotContain("class=\"long-empty\"", regexTester);
+    }
+
+    [Fact]
+    public void BuiltInWebPlugins_DoNotReintroducePrivateContentStates()
+    {
+        var root = FindRepositoryRoot();
+        var source = Path.Combine(root, "src");
+        var pages = Directory.GetFiles(source, "index.html", SearchOption.AllDirectories)
+            .Where(path => !path.Contains(
+                $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        Assert.NotEmpty(pages);
+        Assert.All(pages, path =>
+        {
+            var html = File.ReadAllText(path);
+            Assert.DoesNotContain("class=\"long-empty", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("empty-state", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("class=\"loading", html, StringComparison.OrdinalIgnoreCase);
+        });
+
+        foreach (var plugin in new[] { "FileRenamerPlugin", "QuickNotePlugin", "MarkdownPreview" })
+        {
+            var html = File.ReadAllText(Path.Combine(root, "src", plugin, "index.html"));
+            Assert.Contains("LongUI?.renderState", html);
+            Assert.Contains("kind: 'empty'", html);
+        }
+
+        var fileRenamer = File.ReadAllText(Path.Combine(
+            root, "src", "FileRenamerPlugin", "index.html"));
+        var quickNote = File.ReadAllText(Path.Combine(
+            root, "src", "QuickNotePlugin", "index.html"));
+        Assert.Contains("if (!response.success) throw", fileRenamer);
+        Assert.Contains("if (!result.success) throw", quickNote);
+        Assert.Contains("notes = previousNotes", quickNote);
+    }
+
+    [Fact]
     public void CoreStageThreeViews_UseSemanticColorsOnly()
     {
         var root = FindRepositoryRoot();

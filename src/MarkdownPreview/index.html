@@ -81,7 +81,11 @@
       });
       if (codeBlock) preview.appendChild(codeBlock);
       if (!preview.childNodes.length) {
-        const empty = document.createElement('div'); empty.className = 'long-empty'; empty.textContent = '在左侧输入 Markdown'; preview.appendChild(empty);
+        window.LongUI?.renderState(preview, {
+          kind: 'empty',
+          title: '等待 Markdown 内容',
+          detail: '在左侧输入内容后，这里会显示预览'
+        });
       }
     }
 

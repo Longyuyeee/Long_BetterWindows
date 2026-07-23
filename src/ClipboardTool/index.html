@@ -25,7 +25,6 @@
     <section class="long-panel long-stack long-toolbar--spaced" id="listPanel">
       <input id="searchInput" type="search" placeholder="搜索剪贴板历史…" aria-label="搜索剪贴板历史">
       <div class="long-list" id="clipList"></div>
-      <div class="long-empty" id="emptyState">暂无剪贴板记录</div>
     </section>
 
     <section class="long-panel long-stack long-toolbar--spaced" id="toolsPanel" hidden>
@@ -48,7 +47,6 @@
     const historyKey = 'clip_history';
     const pinnedKey = 'clip_pinned';
     const listElement = document.getElementById('clipList');
-    const emptyState = document.getElementById('emptyState');
     const searchInput = document.getElementById('searchInput');
     const content = document.getElementById('content');
     const status = document.getElementById('status');
@@ -59,12 +57,29 @@
     let monitor = 0;
 
     async function initialize() {
+      window.LongUI?.renderState(listElement, {
+        kind: 'loading',
+        title: '正在加载剪贴板记录'
+      });
       try {
         const historyResult = await long.storage.get(historyKey);
         const pinnedResult = await long.storage.get(pinnedKey);
+        if (!historyResult.success) throw new Error(historyResult.error || '历史记录读取失败');
+        if (!pinnedResult.success) throw new Error(pinnedResult.error || '固定记录读取失败');
         if (historyResult.success && historyResult.data) history = JSON.parse(historyResult.data);
         if (pinnedResult.success && pinnedResult.data) pinned = JSON.parse(pinnedResult.data);
-      } catch (_) { setStatus('历史记录读取失败', 'danger'); }
+      } catch (error) {
+        window.LongUI?.renderState(listElement, {
+          kind: 'error',
+          title: '剪贴板记录读取失败',
+          detail: error && error.message ? error.message : String(error),
+          actionLabel: '重试',
+          onAction: initialize
+        });
+        setStatus('历史记录读取失败', 'danger');
+        startMonitor();
+        return;
+      }
       render();
       startMonitor();
     }
@@ -122,8 +137,18 @@
       const source = currentTab === 'pinned' ? pinned : history;
       const visible = source.filter(function (item) { return !query || item.text.toLocaleLowerCase().includes(query); });
       listElement.replaceChildren();
-      emptyState.hidden = visible.length > 0;
       document.getElementById('historyBadge').textContent = history.length + ' 条记录 · ' + pinned.length + ' 条固定';
+      if (!visible.length) {
+        const title = query
+          ? '没有匹配的剪贴板记录'
+          : currentTab === 'pinned' ? '暂无固定记录' : '暂无剪贴板记录';
+        window.LongUI?.renderState(listElement, {
+          kind: 'empty',
+          title: title,
+          detail: query ? '请尝试其他搜索词' : ''
+        });
+        return;
+      }
       visible.forEach(function (item) {
         const row = document.createElement('article');
         row.className = 'long-list-item';

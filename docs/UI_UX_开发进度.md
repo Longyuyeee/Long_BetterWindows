@@ -558,3 +558,15 @@ WIP UI visual draft before audited implementation
 - [x] 新增设计系统架构门禁；共享脚本语法检查通过，定向测试 32 / 32 通过。
 
 下一批迁移 `HardwareMonitor` 的系统/磁盘加载失败、异步翻译与文件工具的结果失败状态，并盘点剩余 `.empty-state/.loading` 私有实现；本阶段保持进行中，直到内置 Web 插件状态面完成迁移。
+
+## 插件内容状态统一第二、三批：内置 Web 插件收口
+
+- [x] `HardwareMonitor` 的磁盘和进程区域统一初始加载、空数据、失败详情和重试；系统信息失败提供明确不可用值与状态播报。
+- [x] 磁盘名、进程名和动态指标改用 DOM `textContent` 构建，不再把未来真实系统数据插入 `innerHTML`。
+- [x] `ClipboardTool` 统一存储加载、读取失败、历史/固定/搜索空结果，并保留失败后的显式重试。
+- [x] `RegexTester` 统一初始提示、无匹配和表达式错误，错误详情不再只落在页面底部状态行。
+- [x] `FileRenamerPlugin`、`QuickNotePlugin`、`MarkdownPreview` 完成剩余内容空态迁移；宿主 API 返回 `success: false` 与抛异常进入同一错误路径，便签持久化失败会回滚内存变更并保留输入。
+- [x] 新增全仓架构门禁，内置 Web 页面禁止重新引入 `long-empty`、`.empty-state` 或私有 `.loading` 内容状态。
+- [x] 6 个改动页面的内联脚本语法检查通过，设计系统定向测试 34 / 34 通过。
+
+插件内容状态统一已完成。下一项内部体验工作转向仍保留硬编码旧主题样式的 `HardwareMonitor`、`PortManager` 和 `ClipboardHistory`，逐个迁移到 Long UI Kit 令牌和布局；按钮操作结果继续使用轻量 `long-status`，不与内容区三态混用。
