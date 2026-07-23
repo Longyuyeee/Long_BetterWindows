@@ -28,6 +28,65 @@
     requestAnimationFrame(function () { region.textContent = message || ''; });
   };
 
+  LongUI.clearState = function (container) {
+    if (!container) return;
+    container.removeAttribute('aria-busy');
+    container.replaceChildren();
+  };
+
+  LongUI.renderState = function (container, options) {
+    if (!container) return null;
+
+    const settings = options && typeof options === 'object' ? options : {};
+    const supportedKinds = new Set(['empty', 'loading', 'error']);
+    const kind = supportedKinds.has(settings.kind) ? settings.kind : 'empty';
+    const defaultTitles = {
+      empty: '暂无内容',
+      loading: '正在加载',
+      error: '加载失败'
+    };
+
+    const state = document.createElement('div');
+    state.className = 'long-state long-state--' + kind;
+    state.dataset.longState = kind;
+    state.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    state.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
+
+    const indicator = document.createElement('span');
+    indicator.className = 'long-state__indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    state.appendChild(indicator);
+
+    const title = document.createElement('div');
+    title.className = 'long-state__title';
+    title.textContent = typeof settings.title === 'string' && settings.title.trim()
+      ? settings.title
+      : defaultTitles[kind];
+    state.appendChild(title);
+
+    if (typeof settings.detail === 'string' && settings.detail.trim()) {
+      const detail = document.createElement('div');
+      detail.className = 'long-state__detail';
+      detail.textContent = settings.detail;
+      state.appendChild(detail);
+    }
+
+    if (typeof settings.actionLabel === 'string' &&
+        settings.actionLabel.trim() &&
+        typeof settings.onAction === 'function') {
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'long-button long-button--small long-state__action';
+      action.textContent = settings.actionLabel;
+      action.addEventListener('click', settings.onAction);
+      state.appendChild(action);
+    }
+
+    container.toggleAttribute('aria-busy', kind === 'loading');
+    container.replaceChildren(state);
+    return state;
+  };
+
   const commandHandlers = LongUI._commandHandlers || new Set();
   LongUI._commandHandlers = commandHandlers;
   const commandQueue = LongUI._commandQueue || [];

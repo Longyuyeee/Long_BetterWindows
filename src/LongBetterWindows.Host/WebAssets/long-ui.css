@@ -132,6 +132,62 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
 .long-toolbar--spaced { margin-top: 14px; }
 .long-toolbar__spacer { flex: 1; }
 .long-status { min-height: 20px; color: var(--long-text-muted); font-size: 12px; }
+.long-state {
+  display: grid;
+  min-height: 144px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--long-text-secondary);
+  text-align: center;
+}
+.long-state__indicator {
+  position: relative;
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 2px;
+  color: var(--long-text-muted);
+}
+.long-state--empty .long-state__indicator {
+  width: 30px;
+  height: 23px;
+  border: 2px solid currentColor;
+  border-radius: 5px;
+}
+.long-state--empty .long-state__indicator::after {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  left: 5px;
+  height: 2px;
+  background: currentColor;
+  content: "";
+}
+.long-state--loading .long-state__indicator {
+  border: 3px solid var(--long-stroke);
+  border-top-color: var(--long-accent);
+  border-radius: 50%;
+  animation: long-state-spin 800ms linear infinite;
+}
+.long-state--error .long-state__indicator {
+  border: 2px solid var(--long-danger);
+  border-radius: 50%;
+  color: var(--long-danger);
+}
+.long-state--error .long-state__indicator::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  content: "!";
+  font-size: 17px;
+  font-weight: 700;
+}
+.long-state__title { color: var(--long-text-primary); font-size: 14px; font-weight: 600; }
+.long-state__detail { max-width: 520px; color: var(--long-text-muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.long-state__action { margin-top: 4px; }
 .long-result { padding: 16px; border: 1px solid var(--long-stroke); border-radius: var(--long-radius-control); background: var(--long-bg-raised); color: var(--long-text-primary); font: 600 17px/1.55 "Cascadia Code", Consolas, monospace; overflow-wrap: anywhere; }
 .long-option-list { display: grid; gap: 4px; }
 .long-option { display: flex; align-items: center; gap: 10px; min-height: 38px; color: var(--long-text-secondary); font-size: 13px; cursor: pointer; }
@@ -174,6 +230,8 @@ button.long-list-item__content { min-height: 0; padding: 0 !important; border: 0
 @media (max-width: 760px) { .long-file-row { grid-template-columns: 1fr; } .long-file-row__arrow { display: none; } }
 
 @keyframes long-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes long-state-spin { to { transform: rotate(360deg); } }
+:root[data-long-reduced-motion="true"] .long-state--loading .long-state__indicator { animation: none; border-color: var(--long-accent); }
 @media (max-width: 700px) { .long-grid { grid-template-columns: 1fr; } .long-page { padding: 16px; } }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }

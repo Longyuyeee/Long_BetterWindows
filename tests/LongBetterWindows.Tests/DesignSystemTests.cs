@@ -89,6 +89,50 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void WebUiKit_ExposesAccessibleContentStates()
+    {
+        var root = FindRepositoryRoot();
+        var css = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "WebAssets", "long-ui.css"));
+        var script = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "WebAssets", "long-ui.js"));
+
+        Assert.Contains(".long-state--empty", css);
+        Assert.Contains(".long-state--loading", css);
+        Assert.Contains(".long-state--error", css);
+        Assert.Contains("data-long-reduced-motion", css);
+        Assert.Contains("LongUI.renderState", script);
+        Assert.Contains("LongUI.clearState", script);
+        Assert.Contains("kind === 'error' ? 'alert' : 'status'", script);
+        Assert.Contains("container.toggleAttribute('aria-busy', kind === 'loading')", script);
+        Assert.Contains("container.replaceChildren(state)", script);
+        Assert.DoesNotContain("innerHTML", script);
+    }
+
+    [Fact]
+    public void RepresentativeWebPlugins_UseUnifiedContentStates()
+    {
+        var root = FindRepositoryRoot();
+        var portManager = File.ReadAllText(Path.Combine(
+            root, "src", "PortManager", "index.html"));
+        var clipboardHistory = File.ReadAllText(Path.Combine(
+            root, "src", "ClipboardHistory", "index.html"));
+
+        Assert.Contains("LongUI?.renderState", portManager);
+        Assert.Contains("kind: 'loading'", portManager);
+        Assert.Contains("kind: 'empty'", portManager);
+        Assert.Contains("kind: 'error'", portManager);
+        Assert.DoesNotContain(".empty-state", portManager);
+        Assert.DoesNotContain(".loading", portManager);
+
+        Assert.Contains("LongUI?.renderState", clipboardHistory);
+        Assert.Contains("kind: 'loading'", clipboardHistory);
+        Assert.Contains("kind: 'empty'", clipboardHistory);
+        Assert.DoesNotContain(".empty-state", clipboardHistory);
+        Assert.DoesNotContain(".empty-icon", clipboardHistory);
+    }
+
+    [Fact]
     public void CoreStageThreeViews_UseSemanticColorsOnly()
     {
         var root = FindRepositoryRoot();

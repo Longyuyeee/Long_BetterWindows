@@ -250,18 +250,6 @@
       font-weight: 600;
     }
 
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #888;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: #888;
-    }
-
     ::-webkit-scrollbar {
       width: 10px;
     }
@@ -338,9 +326,7 @@
     <button class="tab" data-tab="udp">UDP 端点</button>
   </div>
 
-  <div class="content" id="content">
-    <div class="loading">正在加载端口信息...</div>
-  </div>
+  <div class="content" id="content"></div>
 
   <div class="stats">
     <div class="stat-item">
@@ -390,6 +376,12 @@
 
     // 刷新端口信息
     async function refreshPorts() {
+      const content = document.getElementById('content');
+      window.LongUI?.renderState(content, {
+        kind: 'loading',
+        title: '正在加载端口信息'
+      });
+
       try {
         // 模拟数据（实际应调用 long.networkPort API）
         // const tcpResult = await long.networkPort.getTcpListeners();
@@ -416,7 +408,13 @@
         renderPorts();
       } catch (e) {
         console.error('刷新端口失败:', e);
-        document.getElementById('content').innerHTML = '<div class="empty-state">加载失败: ' + e.message + '</div>';
+        window.LongUI?.renderState(content, {
+          kind: 'error',
+          title: '端口信息加载失败',
+          detail: e && e.message ? e.message : String(e),
+          actionLabel: '重试',
+          onAction: refreshPorts
+        });
       }
     }
 
@@ -442,7 +440,11 @@
       const content = document.getElementById('content');
 
       if (ports.length === 0) {
-        content.innerHTML = '<div class="empty-state">没有找到端口信息</div>';
+        window.LongUI?.renderState(content, {
+          kind: 'empty',
+          title: searchQuery ? '没有匹配的端口' : '暂无端口信息',
+          detail: searchQuery ? '请尝试其他端口号或进程名称' : ''
+        });
         return;
       }
 

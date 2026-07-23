@@ -52,6 +52,25 @@ LongUI.setBusy(button, true)
 LongUI.announce('处理完成')
 ```
 
+内容区域的加载、空数据和失败状态统一使用 `LongUI.renderState`，业务页面不得再为同类状态声明私有 `.loading` 或 `.empty-state` 样式：
+
+```javascript
+LongUI.renderState(container, {
+  kind: 'loading',
+  title: '正在加载端口信息'
+})
+
+LongUI.renderState(container, {
+  kind: 'error',
+  title: '端口信息加载失败',
+  detail: error.message,
+  actionLabel: '重试',
+  onAction: reload
+})
+```
+
+`kind` 只接受 `empty`、`loading`、`error`。组件使用 `textContent` 写入标题和详情；加载态为容器设置 `aria-busy`，错误态使用 `role="alert"`，空态和加载态使用礼貌播报。调用 `LongUI.clearState(container)` 可清空状态并移除忙碌语义。
+
 主题通过 `data-long-theme="dark|light"` 同步，减少动画遵循系统的 `prefers-reduced-motion` 设置。
 
 ## 约束

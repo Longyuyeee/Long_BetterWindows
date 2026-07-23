@@ -547,3 +547,14 @@ WIP UI visual draft before audited implementation
 - [x] UUID 生成命令提供 10 个、100 个和紧凑大写三档参数预设。
 
 下一步进入插件内部空态、加载态和错误态统一；参数类型声明与用户自定义预设继续延后，避免在缺少参数 Schema 时扩展持久化面。
+
+## 插件内容状态统一第一批：共享 Web 状态组件
+
+- [x] Long Web UI Kit 新增 `LongUI.renderState/clearState`，统一 `empty`、`loading`、`error` 三态。
+- [x] 状态标题、详情和动作标签全部通过 `textContent` 写入；加载态设置容器 `aria-busy`，错误态使用断言播报，空态与加载态使用礼貌播报。
+- [x] 统一稳定内容高度、加载指示、错误/空态图形和减少动画行为，不在业务页面复制颜色或状态动画。
+- [x] `PortManager` 迁移加载、空数据、搜索无结果、失败详情和显式重试，并移除异常消息的 `innerHTML` 拼接。
+- [x] `ClipboardHistory` 迁移初始加载、无历史和筛选无结果状态，移除 Emoji 空态和私有状态样式。
+- [x] 新增设计系统架构门禁；共享脚本语法检查通过，定向测试 32 / 32 通过。
+
+下一批迁移 `HardwareMonitor` 的系统/磁盘加载失败、异步翻译与文件工具的结果失败状态，并盘点剩余 `.empty-state/.loading` 私有实现；本阶段保持进行中，直到内置 Web 插件状态面完成迁移。

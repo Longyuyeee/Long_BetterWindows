@@ -179,17 +179,6 @@
       background: #a92222;
     }
 
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #888;
-    }
-
-    .empty-icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-    }
-
     .stats {
       display: flex;
       gap: 20px;
@@ -243,13 +232,7 @@
     </div>
   </div>
 
-  <div class="content" id="content">
-    <div class="empty-state">
-      <div class="empty-icon">📋</div>
-      <p>暂无历史记录</p>
-      <p style="font-size: 11px; margin-top: 8px;">复制内容后会自动记录在这里</p>
-    </div>
-  </div>
+  <div class="content" id="content"></div>
 
   <div class="stats">
     <div class="stat-item">
@@ -273,6 +256,10 @@
 
     // 初始化
     async function init() {
+      window.LongUI?.renderState(document.getElementById('content'), {
+        kind: 'loading',
+        title: '正在加载剪贴板历史'
+      });
       await loadHistory();
       await startMonitoring();
       setupEventListeners();
@@ -366,12 +353,12 @@
         history.filter(item => item.type === 'text').length;
 
       if (filtered.length === 0) {
-        content.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">📋</div>
-            <p>${currentSearch || currentFilter !== 'all' ? '没有找到匹配的记录' : '暂无历史记录'}</p>
-          </div>
-        `;
+        const hasFilter = currentSearch || currentFilter !== 'all';
+        window.LongUI?.renderState(content, {
+          kind: 'empty',
+          title: hasFilter ? '没有匹配的记录' : '暂无历史记录',
+          detail: hasFilter ? '请调整搜索词或筛选条件' : '复制内容后会自动记录在这里'
+        });
         return;
       }
 
