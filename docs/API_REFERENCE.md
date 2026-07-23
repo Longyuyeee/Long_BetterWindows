@@ -1,12 +1,12 @@
 # Long_BetterWindows API 完整参考
 
-本文档提供所有 19 种能力 API 的完整参考。
+本文档提供当前宿主能力 API 的参考。
 
 ---
 
 ## 📋 clipboard - 剪贴板
 
-### setText(text: string): Promise<void>
+### setText(text: string): Promise&lt;HostResponse&gt;
 设置剪贴板文本内容
 
 **参数**:
@@ -17,18 +17,38 @@
 await long.clipboard.setText('Hello, World!');
 ```
 
-### getText(): Promise<string>
+### getText(): Promise&lt;HostResponse&lt;string&gt;&gt;
 获取剪贴板文本内容
 
-**返回**: 剪贴板中的文本
+**返回**: `{success, data, error}`，文本位于 `data`
 
 **示例**:
 ```javascript
-const text = await long.clipboard.getText();
-console.log('剪贴板内容:', text);
+const result = await long.clipboard.getText();
+if (result.success) console.log('剪贴板内容:', result.data);
 ```
 
 **权限**: `system.clipboard`
+
+### startMonitoring(callback): Promise&lt;HostResponse&gt;
+
+订阅剪贴板变化。回调收到
+`{type: 'clipboard.changed', content_type, text, timestamp}`；文本事件的
+`content_type` 为 `text`。
+
+```javascript
+const result = await long.clipboard.startMonitoring(event => {
+    if (event.content_type === 'text') console.log(event.text);
+});
+```
+
+同一 Web 插件运行时重复启动是幂等的。监听由宿主按消费者计数，只有最后一份租约释放后才移除 Windows 监听。
+
+### stopMonitoring(): Promise&lt;HostResponse&gt;
+
+释放当前运行时的监听租约。插件卸载时宿主也会自动释放。
+
+**权限**: `system.clipboard.monitor`
 
 ---
 

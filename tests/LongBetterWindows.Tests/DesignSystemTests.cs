@@ -161,6 +161,11 @@ public class DesignSystemTests
         Assert.Contains("kind: 'empty'", clipboardTool);
         Assert.Contains("kind: 'error'", clipboardTool);
         Assert.Contains("if (!historyResult.success) throw", clipboardTool);
+        Assert.Contains("mutationQueue", clipboardTool);
+        Assert.Contains("persistCollection", clipboardTool);
+        Assert.Contains("history = previous", clipboardTool);
+        Assert.Contains("responseData(response", clipboardTool);
+        Assert.DoesNotContain("async function persist()", clipboardTool);
         Assert.DoesNotContain("id=\"emptyState\"", clipboardTool);
         Assert.DoesNotContain("class=\"long-empty\"", clipboardTool);
 
@@ -203,8 +208,10 @@ public class DesignSystemTests
         var quickNote = File.ReadAllText(Path.Combine(
             root, "src", "QuickNotePlugin", "index.html"));
         Assert.Contains("if (!response.success) throw", fileRenamer);
-        Assert.Contains("if (!result.success) throw", quickNote);
-        Assert.Contains("notes = previousNotes", quickNote);
+        Assert.Contains("mutationQueue", quickNote);
+        Assert.Contains("persistSnapshot", quickNote);
+        Assert.Contains("notes = previous", quickNote);
+        Assert.Contains("if (!result || !result.success)", quickNote);
     }
 
     [Fact]

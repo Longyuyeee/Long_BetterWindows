@@ -55,6 +55,30 @@
     let currentTab = 'history';
     let lastClipboard = '';
     let monitor = 0;
+    let captureRequest = null;
+    let mutationQueue = Promise.resolve();
+
+    function normalizeItems(value, limit) {
+      if (!Array.isArray(value)) return [];
+      return value
+        .filter(function (item) {
+          return item && typeof item.text === 'string' && item.text.trim();
+        })
+        .map(function (item) {
+          return {
+            text: item.text,
+            time: Number.isFinite(Number(item.time)) ? Number(item.time) : Date.now()
+          };
+        })
+        .slice(0, limit);
+    }
+
+    function responseData(response, fallbackMessage) {
+      if (!response || !response.success) {
+        throw new Error(response && response.error ? response.error : fallbackMessage);
+      }
+      return response.data;
+    }
 
     async function initialize() {
       window.LongUI?.renderState(listElement, {
@@ -66,8 +90,8 @@
         const pinnedResult = await long.storage.get(pinnedKey);
         if (!historyResult.success) throw new Error(historyResult.error || '历史记录读取失败');
         if (!pinnedResult.success) throw new Error(pinnedResult.error || '固定记录读取失败');
-        if (historyResult.success && historyResult.data) history = JSON.parse(historyResult.data);
-        if (pinnedResult.success && pinnedResult.data) pinned = JSON.parse(pinnedResult.data);
+        if (historyResult.data) history = normalizeItems(JSON.parse(historyResult.data), 50);
+        if (pinnedResult.data) pinned = normalizeItems(JSON.parse(pinnedResult.data), 50);
       } catch (error) {
         window.LongUI?.renderState(listElement, {
           kind: 'error',
@@ -77,7 +101,6 @@
           onAction: initialize
         });
         setStatus('历史记录读取失败', 'danger');
-        startMonitor();
         return;
       }
       render();
@@ -92,26 +115,56 @@
     function stopMonitor() { window.clearInterval(monitor); monitor = 0; }
 
     async function captureClipboard() {
-      try {
-        const response = await long.clipboard.getText();
-        const text = response.success ? (response.data || '').trim() : '';
-        if (text && text !== lastClipboard) { lastClipboard = text; addHistory(text); }
-      } catch (_) { }
+      if (captureRequest) return captureRequest;
+      captureRequest = (async function () {
+        try {
+          const response = await long.clipboard.getText();
+          const text = (responseData(response, '读取剪贴板失败') || '').trim();
+          if (text && text !== lastClipboard && await addHistory(text)) {
+            lastClipboard = text;
+          }
+        } catch (_) { }
+        finally { captureRequest = null; }
+      })();
+      return captureRequest;
     }
 
-    async function persist() {
-      await Promise.all([
-        long.storage.set(historyKey, JSON.stringify(history)),
-        long.storage.set(pinnedKey, JSON.stringify(pinned))
-      ]);
+    async function persistCollection(name, value) {
+      const key = name === 'history' ? historyKey : pinnedKey;
+      const response = await long.storage.set(key, JSON.stringify(value));
+      responseData(response, name === 'history' ? '历史记录保存失败' : '固定记录保存失败');
+    }
+
+    function mutateCollection(name, transform, successMessage) {
+      const operation = mutationQueue.then(async function () {
+        const previous = name === 'history' ? history : pinned;
+        const next = transform(previous.slice());
+        if (!next) return true;
+        if (name === 'history') history = next; else pinned = next;
+        render();
+        try {
+          await persistCollection(name, next);
+          if (successMessage) setStatus(successMessage, 'success');
+          return true;
+        } catch (error) {
+          if (name === 'history') history = previous; else pinned = previous;
+          render();
+          setStatus(error.message || '本地记录保存失败', 'danger');
+          return false;
+        }
+      });
+      mutationQueue = operation.catch(function () { });
+      return operation;
     }
 
     function addHistory(text) {
-      history = history.filter(function (item) { return item.text !== text; });
-      history.unshift({ text: text, time: Date.now() });
-      history = history.slice(0, 50);
-      persist();
-      if (currentTab === 'history') render();
+      if (typeof text !== 'string' || !text.trim()) return Promise.resolve(true);
+      return mutateCollection('history', function (items) {
+        if (items[0] && items[0].text === text) return null;
+        const next = items.filter(function (item) { return item.text !== text; });
+        next.unshift({ text: text, time: Date.now() });
+        return next.slice(0, 50);
+      });
     }
 
     function setStatus(message, kind) {
@@ -133,7 +186,9 @@
     }
 
     function render() {
-      const query = searchInput.value.trim().toLocaleLowerCase();
+      const query = currentTab === 'history'
+        ? searchInput.value.trim().toLocaleLowerCase()
+        : '';
       const source = currentTab === 'pinned' ? pinned : history;
       const visible = source.filter(function (item) { return !query || item.text.toLocaleLowerCase().includes(query); });
       listElement.replaceChildren();
@@ -176,42 +231,62 @@
     }
 
     async function copyItem(item) {
-      await long.clipboard.setText(item.text);
-      lastClipboard = item.text;
-      addHistory(item.text);
-      setStatus('已复制 · ' + item.text.length + ' 字符', 'success');
+      try {
+        const response = await long.clipboard.setText(item.text);
+        responseData(response, '写入剪贴板失败');
+        if (await addHistory(item.text)) {
+          lastClipboard = item.text;
+          setStatus('已复制 · ' + item.text.length + ' 字符', 'success');
+        }
+      } catch (error) {
+        setStatus(error.message || '写入剪贴板失败', 'danger');
+      }
     }
 
     async function togglePin(item) {
-      const index = pinned.findIndex(function (entry) { return entry.text === item.text; });
-      if (index >= 0) pinned.splice(index, 1); else pinned.unshift({ text: item.text, time: Date.now() });
-      await persist(); render();
+      const isPinned = pinned.some(function (entry) { return entry.text === item.text; });
+      await mutateCollection('pinned', function (items) {
+        const next = items.filter(function (entry) { return entry.text !== item.text; });
+        if (!isPinned) next.unshift({ text: item.text, time: Date.now() });
+        return next.slice(0, 50);
+      }, isPinned ? '已取消固定' : '记录已固定');
     }
 
     async function removeItem(item) {
-      const target = currentTab === 'pinned' ? pinned : history;
-      const index = target.indexOf(item);
-      if (index >= 0) target.splice(index, 1);
-      await persist(); render();
+      const name = currentTab === 'pinned' ? 'pinned' : 'history';
+      await mutateCollection(name, function (items) {
+        return items.filter(function (entry) { return entry !== item && entry.text !== item.text; });
+      }, '记录已删除');
     }
 
     async function readClipboard() {
-      const response = await long.clipboard.getText();
-      content.value = response.success ? response.data || '' : '';
-      setStatus(response.success ? '剪贴板内容已读取' : response.error || '读取失败', response.success ? 'success' : 'danger');
+      try {
+        const response = await long.clipboard.getText();
+        content.value = responseData(response, '读取失败') || '';
+        setStatus('剪贴板内容已读取', 'success');
+      } catch (error) {
+        setStatus(error.message || '读取失败', 'danger');
+      }
     }
 
     async function writeClipboard() {
-      const response = await long.clipboard.setText(content.value);
-      if (response.success) { lastClipboard = content.value; addHistory(content.value); }
-      setStatus(response.success ? '内容已写入剪贴板' : response.error || '写入失败', response.success ? 'success' : 'danger');
+      try {
+        const response = await long.clipboard.setText(content.value);
+        responseData(response, '写入失败');
+        if (await addHistory(content.value)) {
+          lastClipboard = content.value;
+          setStatus('内容已写入剪贴板', 'success');
+        }
+      } catch (error) {
+        setStatus(error.message || '写入失败', 'danger');
+      }
     }
 
-    function transform(kind) {
+    async function transform(kind) {
       if (kind === 'upper') content.value = content.value.toLocaleUpperCase();
       if (kind === 'lower') content.value = content.value.toLocaleLowerCase();
       if (kind === 'trim') content.value = content.value.split('\n').map(function (line) { return line.trim(); }).join('\n').trim();
-      writeClipboard();
+      await writeClipboard();
     }
 
     function relativeTime(value) {
@@ -232,11 +307,15 @@
       else if (event.ctrlKey && event.key === 'Enter' && currentTab === 'tools') { event.preventDefault(); writeClipboard(); }
     });
     document.addEventListener('visibilitychange', function () { document.hidden ? stopMonitor() : startMonitor(); });
-    window.LongUI?.onCommand(function (command) {
+    window.LongUI?.onCommand(async function (command) {
       const text = window.LongUI.commandText(command);
       selectTab('tools');
-      if (text) { content.value = text; addHistory(text); }
+      if (text) {
+        content.value = text;
+        await addHistory(text);
+      }
       content.focus();
+      return { success: true, message: '剪贴板工具已打开' };
     });
     initialize();
   </script>

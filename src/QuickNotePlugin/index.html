@@ -47,7 +47,24 @@
     const preview = document.getElementById('preview');
     const status = document.getElementById('status');
     const list = document.getElementById('noteList');
+    const saveButton = document.getElementById('saveButton');
     let notes = [];
+    let mutationQueue = Promise.resolve();
+
+    function normalizeNotes(value) {
+      if (!Array.isArray(value)) return [];
+      return value
+        .filter(function (note) {
+          return note && typeof note.text === 'string' && note.text.trim();
+        })
+        .map(function (note) {
+          return {
+            text: note.text,
+            time: Number.isFinite(Number(note.time)) ? Number(note.time) : Date.now()
+          };
+        })
+        .slice(0, 30);
+    }
 
     async function initialize() {
       window.LongUI?.renderState(list, {
@@ -57,7 +74,7 @@
       try {
         const result = await long.storage.get('quick_notes');
         if (!result.success) throw new Error(result.error || '历史便签读取失败');
-        if (result.success && result.data) notes = JSON.parse(result.data);
+        if (result.data) notes = normalizeNotes(JSON.parse(result.data));
       } catch (error) {
         window.LongUI?.renderState(list, {
           kind: 'error',
@@ -72,15 +89,33 @@
       renderNotes();
     }
 
-    async function persist() {
-      try {
-        const result = await long.storage.set('quick_notes', JSON.stringify(notes));
-        if (!result.success) throw new Error(result.error || '便签保存失败');
-        return true;
-      } catch (_) {
-        setStatus('便签保存失败', 'danger');
-        return false;
+    async function persistSnapshot(snapshot) {
+      const result = await long.storage.set('quick_notes', JSON.stringify(snapshot));
+      if (!result || !result.success) {
+        throw new Error(result && result.error ? result.error : '便签保存失败');
       }
+    }
+
+    function mutateNotes(transform, successMessage) {
+      const operation = mutationQueue.then(async function () {
+        const previous = notes;
+        const next = transform(notes.slice());
+        if (!next) return true;
+        notes = next.slice(0, 30);
+        renderNotes();
+        try {
+          await persistSnapshot(notes);
+          if (successMessage) setStatus(successMessage, 'success');
+          return true;
+        } catch (error) {
+          notes = previous;
+          renderNotes();
+          setStatus(error.message || '便签保存失败', 'danger');
+          return false;
+        }
+      });
+      mutationQueue = operation.catch(function () { });
+      return operation;
     }
 
     function setStatus(message, kind) {
@@ -90,23 +125,20 @@
     }
 
     async function saveNote() {
+      if (saveButton.disabled) return;
       const text = input.value.trim();
       if (!text) { setStatus('请输入便签内容', 'warning'); input.focus(); return; }
-      const previousNotes = notes.slice();
-      notes.unshift({ text: text, time: Date.now() });
-      notes = notes.slice(0, 30);
-      input.value = '';
-      preview.hidden = true;
-      const saved = await persist();
-      if (!saved) {
-        notes = previousNotes;
-        input.value = text;
-        renderNotes();
-        input.focus();
-        return;
+      window.LongUI?.setBusy(saveButton, true);
+      const saved = await mutateNotes(function (items) {
+        items.unshift({ text: text, time: Date.now() });
+        return items;
+      }, '便签已保存 · ' + text.length + ' 字符');
+      window.LongUI?.setBusy(saveButton, false);
+      if (saved) {
+        if (input.value.trim() === text) input.value = '';
+        preview.hidden = true;
       }
-      renderNotes();
-      setStatus('便签已保存 · ' + text.length + ' 字符', 'success');
+      input.focus();
     }
 
     function renderPreview() {
@@ -133,7 +165,7 @@
         });
         return;
       }
-      notes.forEach(function (note, index) {
+      notes.forEach(function (note) {
         const item = document.createElement('article');
         item.className = 'long-list-item';
         const content = document.createElement('button');
@@ -155,11 +187,14 @@
         remove.textContent = '删除';
         remove.setAttribute('aria-label', '删除此便签');
         remove.addEventListener('click', async function () {
-          const removed = notes.splice(index, 1)[0];
-          const saved = await persist();
-          if (!saved) notes.splice(index, 0, removed);
-          renderNotes();
-          if (saved) setStatus('便签已删除', 'success');
+          window.LongUI?.setBusy(remove, true);
+          await mutateNotes(function (items) {
+            return items.filter(function (entry) {
+              return entry !== note
+                && (entry.time !== note.time || entry.text !== note.text);
+            });
+          }, '便签已删除');
+          window.LongUI?.setBusy(remove, false);
         });
         meta.append(time, remove);
         item.append(content, meta);
@@ -179,7 +214,7 @@
       return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    document.getElementById('saveButton').addEventListener('click', saveNote);
+    saveButton.addEventListener('click', saveNote);
     document.getElementById('previewButton').addEventListener('click', renderPreview);
     document.getElementById('clearButton').addEventListener('click', function () { input.value = ''; preview.hidden = true; input.focus(); });
     document.addEventListener('keydown', function (event) {

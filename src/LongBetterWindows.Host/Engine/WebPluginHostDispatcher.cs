@@ -11,7 +11,11 @@ namespace LongBetterWindows.Host.Engine
         private readonly string _pluginId;
         private readonly IHostApi _host;
         private readonly Action<string> _postMessage;
+        private readonly SemaphoreSlim _clipboardGate = new(1, 1);
+        private readonly object _clipboardStateLock = new();
+        private Task<HostApiResponse>? _clipboardAcquireTask;
         private bool _clipboardSubscribed;
+        private bool _disposed;
 
         internal WebPluginHostDispatcher(
             string pluginId,
@@ -233,23 +237,74 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task<object?> ClipboardStartMonitoringAsync()
         {
-            if (!_clipboardSubscribed)
+            await _clipboardGate.WaitAsync();
+            try
             {
-                _host.Clipboard.ClipboardChanged += OnClipboardChanged;
-                _clipboardSubscribed = true;
-            }
+                Task<HostApiResponse> acquireTask;
+                lock (_clipboardStateLock)
+                {
+                    if (_disposed)
+                        return new { success = false, error = "Web 插件运行时已释放" };
+                    if (_clipboardSubscribed)
+                        return OkObj();
 
-            var result = await _host.Clipboard.StartMonitoringAsync();
-            if (!result.IsSuccess)
-                UnsubscribeClipboard();
-            return new { success = result.IsSuccess, error = result.ErrorMessage };
+                    _host.Clipboard.ClipboardChanged += OnClipboardChanged;
+                    _clipboardSubscribed = true;
+                    _clipboardAcquireTask = _host.Clipboard.StartMonitoringAsync();
+                    acquireTask = _clipboardAcquireTask;
+                }
+
+                var result = await acquireTask;
+                if (!result.IsSuccess)
+                {
+                    lock (_clipboardStateLock)
+                        UnsubscribeClipboardCore();
+                }
+                return new { success = result.IsSuccess, error = result.ErrorMessage };
+            }
+            finally
+            {
+                _clipboardGate.Release();
+            }
         }
 
         private async Task<object?> ClipboardStopMonitoringAsync()
         {
-            UnsubscribeClipboard();
-            var result = await _host.Clipboard.StopMonitoringAsync();
-            return new { success = result.IsSuccess, error = result.ErrorMessage };
+            await _clipboardGate.WaitAsync();
+            try
+            {
+                lock (_clipboardStateLock)
+                {
+                    if (_disposed || !_clipboardSubscribed)
+                        return OkObj();
+                    UnsubscribeClipboardCore();
+                }
+
+                var result = await _host.Clipboard.StopMonitoringAsync();
+                if (!result.IsSuccess)
+                {
+                    var retryRelease = false;
+                    lock (_clipboardStateLock)
+                    {
+                        if (!_disposed)
+                        {
+                            _host.Clipboard.ClipboardChanged += OnClipboardChanged;
+                            _clipboardSubscribed = true;
+                        }
+                        else
+                        {
+                            retryRelease = true;
+                        }
+                    }
+                    if (retryRelease)
+                        _ = ReleaseClipboardAfterAcquireAsync(null);
+                }
+                return new { success = result.IsSuccess, error = result.ErrorMessage };
+            }
+            finally
+            {
+                _clipboardGate.Release();
+            }
         }
 
         private void OnClipboardChanged(object? sender, ClipboardChangedEventArgs args)
@@ -264,7 +319,7 @@ namespace LongBetterWindows.Host.Engine
             }
         }
 
-        private void UnsubscribeClipboard()
+        private void UnsubscribeClipboardCore()
         {
             if (!_clipboardSubscribed) return;
             _host.Clipboard.ClipboardChanged -= OnClipboardChanged;
@@ -273,9 +328,38 @@ namespace LongBetterWindows.Host.Engine
 
         public void Dispose()
         {
-            if (!_clipboardSubscribed) return;
-            UnsubscribeClipboard();
-            _ = _host.Clipboard.StopMonitoringAsync();
+            Task<HostApiResponse>? acquireTask;
+            lock (_clipboardStateLock)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                if (!_clipboardSubscribed) return;
+                UnsubscribeClipboardCore();
+                acquireTask = _clipboardAcquireTask;
+            }
+            _ = ReleaseClipboardAfterAcquireAsync(acquireTask);
+        }
+
+        private async Task ReleaseClipboardAfterAcquireAsync(
+            Task<HostApiResponse>? acquireTask)
+        {
+            try
+            {
+                if (acquireTask != null && !(await acquireTask).IsSuccess)
+                    return;
+                var result = await _host.Clipboard.StopMonitoringAsync();
+                if (!result.IsSuccess)
+                {
+                    Log.Warning(
+                        "[Web:{PluginId}] 释放剪贴板监听租约失败: {Error}",
+                        _pluginId,
+                        result.ErrorMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[Web:{PluginId}] 释放剪贴板监听租约失败", _pluginId);
+            }
         }
 
         private object PluginLog(object?[] args)

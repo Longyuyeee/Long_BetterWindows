@@ -12,11 +12,19 @@ namespace LongBetterWindows.Host.Services
     {
         private HwndSource? _hwndSource;
         private IntPtr _nextClipboardViewer;
+        private readonly ClipboardMonitoringLeaseManager _monitorLeases;
         private bool _isMonitoring;
         private string? _lastClipboardText;
 
         public event EventHandler<ClipboardChangedEventArgs>? ClipboardChanged;
-        public bool IsMonitoring => _isMonitoring;
+        public bool IsMonitoring => _monitorLeases.IsActive && _isMonitoring;
+
+        public ClipboardService()
+        {
+            _monitorLeases = new ClipboardMonitoringLeaseManager(
+                StartMonitoringCoreAsync,
+                StopMonitoringCoreAsync);
+        }
 
         public Task<HostApiResponse<string?>> GetTextAsync()
         {
@@ -108,72 +116,82 @@ namespace LongBetterWindows.Host.Services
             });
         }
 
-        public Task<HostApiResponse> StartMonitoringAsync()
+        public Task<HostApiResponse> StartMonitoringAsync() =>
+            _monitorLeases.AcquireAsync();
+
+        public Task<HostApiResponse> StopMonitoringAsync() =>
+            _monitorLeases.ReleaseAsync();
+
+        private Task<HostApiResponse> StartMonitoringCoreAsync()
         {
-            return Task.Run(() =>
-            {
-                try
-                {
-                    if (_isMonitoring)
-                        return HostApiResponse.Success();
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        var mainWindow = Application.Current.MainWindow;
-                        if (mainWindow == null)
-                            throw new InvalidOperationException("主窗口未初始化");
-
-                        var windowHelper = new WindowInteropHelper(mainWindow);
-                        _hwndSource = HwndSource.FromHwnd(windowHelper.Handle);
-
-                        if (_hwndSource != null)
-                        {
-                            _hwndSource.AddHook(WndProc);
-                            _nextClipboardViewer = SetClipboardViewer(_hwndSource.Handle);
-                            _isMonitoring = true;
-
-                            // 记录当前剪贴板内容
-                            if (Clipboard.ContainsText())
-                                _lastClipboardText = Clipboard.GetText();
-                        }
-                    });
-
-                    return HostApiResponse.Success();
-                }
-                catch (Exception ex)
-                {
-                    return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message);
-                }
-            });
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return Task.FromResult(HostApiResponse.Failure(
+                    ApiErrorCode.Unknown, "主窗口尚未初始化"));
+            if (dispatcher.CheckAccess())
+                return Task.FromResult(StartMonitoringCore());
+            return dispatcher.InvokeAsync(StartMonitoringCore).Task;
         }
 
-        public Task<HostApiResponse> StopMonitoringAsync()
+        private HostApiResponse StartMonitoringCore()
         {
-            return Task.Run(() =>
+            try
             {
-                try
-                {
-                    if (!_isMonitoring)
-                        return HostApiResponse.Success();
+                var mainWindow = Application.Current.MainWindow;
+                if (mainWindow == null)
+                    throw new InvalidOperationException("主窗口未初始化");
 
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        if (_hwndSource != null)
-                        {
-                            ChangeClipboardChain(_hwndSource.Handle, _nextClipboardViewer);
-                            _hwndSource.RemoveHook(WndProc);
-                            _hwndSource = null;
-                        }
-                        _isMonitoring = false;
-                    });
+                var windowHelper = new WindowInteropHelper(mainWindow);
+                _hwndSource = HwndSource.FromHwnd(windowHelper.Handle);
+                if (_hwndSource == null)
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.Unknown, "主窗口句柄不可用");
 
-                    return HostApiResponse.Success();
-                }
-                catch (Exception ex)
+                _hwndSource.AddHook(WndProc);
+                _nextClipboardViewer = SetClipboardViewer(_hwndSource.Handle);
+                _isMonitoring = true;
+
+                if (Clipboard.ContainsText())
+                    _lastClipboardText = Clipboard.GetText();
+                return HostApiResponse.Success();
+            }
+            catch (Exception ex)
+            {
+                return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message);
+            }
+        }
+
+        private Task<HostApiResponse> StopMonitoringCoreAsync()
+        {
+            var dispatcher = Application.Current?.Dispatcher;
+            if (dispatcher == null)
+            {
+                _isMonitoring = false;
+                return Task.FromResult(HostApiResponse.Success());
+            }
+            if (dispatcher.CheckAccess())
+                return Task.FromResult(StopMonitoringCore());
+            return dispatcher.InvokeAsync(StopMonitoringCore).Task;
+        }
+
+        private HostApiResponse StopMonitoringCore()
+        {
+            try
+            {
+                if (_hwndSource != null)
                 {
-                    return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message);
+                    ChangeClipboardChain(_hwndSource.Handle, _nextClipboardViewer);
+                    _hwndSource.RemoveHook(WndProc);
+                    _hwndSource = null;
                 }
-            });
+                _nextClipboardViewer = IntPtr.Zero;
+                _isMonitoring = false;
+                return HostApiResponse.Success();
+            }
+            catch (Exception ex)
+            {
+                return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message);
+            }
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -247,7 +265,8 @@ namespace LongBetterWindows.Host.Services
 
         public void Dispose()
         {
-            StopMonitoringAsync().Wait();
+            _monitorLeases.StopAllAsync().GetAwaiter().GetResult();
+            _monitorLeases.Dispose();
         }
 
         #region Win32 API

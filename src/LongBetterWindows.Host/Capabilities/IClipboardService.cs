@@ -14,10 +14,13 @@ namespace LongBetterWindows.Host.Capabilities
         /// <summary>监听剪贴板变化事件</summary>
         event EventHandler<ClipboardChangedEventArgs>? ClipboardChanged;
 
-        /// <summary>开始监听剪贴板变化（需要 system.clipboard.monitor 能力）</summary>
+        /// <summary>
+        /// 获取剪贴板监听租约（需要 system.clipboard.monitor 能力）。
+        /// 每次成功调用都必须由同一消费者配对调用 StopMonitoringAsync。
+        /// </summary>
         Task<HostApiResponse> StartMonitoringAsync();
 
-        /// <summary>停止监听剪贴板变化</summary>
+        /// <summary>释放一个监听租约；最后一个租约释放后才停止系统监听。</summary>
         Task<HostApiResponse> StopMonitoringAsync();
 
         /// <summary>检查是否正在监听</summary>
