@@ -1103,6 +1103,8 @@ public class QualityGateTests
         Assert.Contains("Long.Workflow.TerminalOutput.Value", workflow);
         Assert.Contains("Long.Workflow.TerminalOutput.Clear", workflow);
         Assert.Contains("Long.Workflow.Duplicate", workflow);
+        Assert.Contains("Long.Workflow.Id", workflow);
+        Assert.Contains("Long.Workflow.Name", workflow);
         Assert.Contains("Long.Icon.Copy", workflow);
         Assert.Contains("Long.Workflow.WideNavigation", workflow);
         Assert.Contains("Long.Workflow.CompactNavigation", workflow);
@@ -1132,6 +1134,10 @@ public class QualityGateTests
         Assert.Contains("palette_enter_opened_review", script);
         Assert.Contains("super_panel_enter_opened_review", script);
         Assert.Contains("Long.Workflow.ReviewCancel", script);
+        Assert.Contains("duplicate_action_completed", script);
+        Assert.Contains("duplicate_remained_unsaved", script);
+        Assert.Contains("source_file_preserved", script);
+        Assert.Contains("source_file_sha256", script);
         Assert.Contains("wide_layout_announced", script);
         Assert.Contains("compact_layout_announced", script);
         Assert.Contains("terminal_output_length", script);

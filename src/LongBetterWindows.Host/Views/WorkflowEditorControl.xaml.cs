@@ -351,9 +351,12 @@ namespace LongBetterWindows.Host.Views
         }
 
         private void DuplicateWorkflow_Click(object sender, RoutedEventArgs e)
+            => DuplicateCurrentWorkflow();
+
+        internal bool DuplicateCurrentWorkflow()
         {
             var source = _session.State.Draft;
-            if (source is null) return;
+            if (source is null) return false;
             var suffix = $".copy-{Guid.NewGuid():N}";
             var prefixLength = Math.Min(source.Id.Length, 64 - suffix.Length);
             var copyId = source.Id[..prefixLength] + suffix;
@@ -363,7 +366,7 @@ namespace LongBetterWindows.Host.Views
             if (!_session.DuplicateCurrent(copyId, copyName))
             {
                 RenderStatus();
-                return;
+                return false;
             }
 
             _rendering = true;
@@ -375,6 +378,7 @@ namespace LongBetterWindows.Host.Views
             RenderEditor();
             WorkflowNameBox.Focus();
             WorkflowNameBox.SelectAll();
+            return true;
         }
 
         private async void DeleteWorkflow_Click(object sender, RoutedEventArgs e)

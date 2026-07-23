@@ -164,6 +164,10 @@ namespace LongBetterWindows.Host.Views
             => WorkflowEditorHost.Content is WorkflowEditorControl editor
                 && editor.CancelExecutionReview();
 
+        internal bool DuplicateCurrentWorkflow()
+            => WorkflowEditorHost.Content is WorkflowEditorControl editor
+                && editor.DuplicateCurrentWorkflow();
+
         internal bool IsWorkflowLayoutCompact
             => WorkflowEditorHost.Content is WorkflowEditorControl editor
                 && editor.IsCompactLayout;

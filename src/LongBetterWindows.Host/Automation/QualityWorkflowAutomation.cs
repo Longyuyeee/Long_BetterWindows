@@ -10,12 +10,14 @@ internal enum QualityWorkflowAction
     ClearTerminalOutput = 4,
     UpgradePluginPackage = 5,
     RunTerminalOutputExportMatrix = 6,
+    DuplicateDraft = 7,
     QueryReviewReady = 10,
     QueryTerminalOutputLength = 11,
     QueryTerminalOutputCleared = 12,
     QueryPluginUpgradeStatus = 13,
     QueryExecutionRejected = 14,
     QueryTerminalOutputExportStatus = 15,
+    QueryDuplicateStatus = 16,
 }
 
 internal static class QualityWorkflowAutomation

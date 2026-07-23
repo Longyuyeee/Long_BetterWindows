@@ -1,0 +1,65 @@
+﻿{
+    "schema_version":  1,
+    "generated_at":  "2026-07-23T05:15:50.9182691+00:00",
+    "classification":  "desktop_ui_automation_smoke",
+    "release_executable":  "E:\\Project\\AIProject\\GeminiProject\\Long_BetterWindows\\src\\LongBetterWindows.Host\\bin\\Release\\net8.0-windows\\LongBetterWindows.Host.exe",
+    "palette":  {
+
+                },
+    "super_panel":  {
+
+                    },
+    "workflow_review":  {
+                            "isolated_workflow_root":  "E:\\Project\\AIProject\\GeminiProject\\Long_BetterWindows\\artifacts\\quality\\workflow-duplicate-v13-20260723\\workflows",
+                            "palette_result_discovered":  true,
+                            "palette_enter_opened_review":  true,
+                            "palette_hidden_on_navigation":  true,
+                            "palette_review_closed_for_duplicate":  true,
+                            "duplicate_action_completed":  true,
+                            "duplicate_remained_unsaved":  true,
+                            "source_file_preserved":  true,
+                            "source_file_sha256":  "ee3ee7926e2dfcbac52c87eb38fb7870086d0ad3de04ac7501b1b2cf1d123951",
+                            "wide_layout_announced":  true,
+                            "compact_layout_announced":  true,
+                            "super_panel_result_discovered":  true,
+                            "super_panel_enter_opened_review":  true,
+                            "super_panel_hidden_on_navigation":  true,
+                            "super_panel_cancel_closed_review":  true,
+                            "execution_was_not_confirmed":  true
+                        },
+    "workflow_output":  {
+                            "isolated_report_root":  "E:\\Project\\AIProject\\GeminiProject\\Long_BetterWindows\\artifacts\\quality\\workflow-duplicate-v13-20260723\\workflows\\.reports",
+                            "read_only_execution_confirmed":  true,
+                            "review_state_cleared_after_confirmation":  true,
+                            "execution_completed":  true,
+                            "terminal_output_approved":  true,
+                            "terminal_output_length":  3699,
+                            "terminal_output_bounded_scroll":  true,
+                            "terminal_output_cleared":  true,
+                            "isolated_report_written":  true
+                        },
+    "workflow_export":  {
+
+                        },
+    "plugin_lifecycle":  {
+
+                         },
+    "marketplace":  {
+
+                    },
+    "automation_semantics":  {
+                                 "workflow_review":  {
+                                                         "cancel":  {
+                                                                        "name":  "取消组合动作执行审查",
+                                                                        "control_type":  "ControlType.Button",
+                                                                        "enabled":  true,
+                                                                        "keyboard_focusable":  true
+                                                                    }
+                                                     }
+                             },
+    "accessibility_modes":  [
+
+                            ],
+    "passed":  true,
+    "error":  null
+}

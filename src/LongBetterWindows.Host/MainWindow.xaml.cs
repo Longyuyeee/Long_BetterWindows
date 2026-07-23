@@ -23,6 +23,7 @@ namespace LongBetterWindows.Host
         private bool _workflowTerminalOutputCleared;
         private int _qualityWorkflowPluginUpgradeStatus;
         private int _qualityTerminalOutputExportStatus;
+        private int _qualityWorkflowDuplicateStatus;
         private bool _workflowExecutionRejected;
 
         public MainWindow()
@@ -357,6 +358,12 @@ namespace LongBetterWindows.Host
                     case QualityWorkflowAction.RunTerminalOutputExportMatrix:
                         await RunQualityTerminalOutputExportMatrixAsync();
                         break;
+                    case QualityWorkflowAction.DuplicateDraft:
+                        if (WorkflowReviewCancelButton.IsVisible)
+                            CancelWorkflowReview();
+                        _qualityWorkflowDuplicateStatus =
+                            ToolCenter.DuplicateCurrentWorkflow() ? 1 : -1;
+                        break;
                 }
             }));
 
@@ -453,6 +460,8 @@ namespace LongBetterWindows.Host
                 return _workflowExecutionRejected ? new IntPtr(1) : IntPtr.Zero;
             if (action == QualityWorkflowAction.QueryTerminalOutputExportStatus)
                 return new IntPtr(_qualityTerminalOutputExportStatus);
+            if (action == QualityWorkflowAction.QueryDuplicateStatus)
+                return new IntPtr(_qualityWorkflowDuplicateStatus);
 
             QueueWorkflowAutomationAction(action);
             return new IntPtr(1);

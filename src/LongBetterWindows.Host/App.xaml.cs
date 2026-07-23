@@ -40,7 +40,8 @@ namespace LongBetterWindows.Host
         internal bool ShowDiagnosticsForQualityRequested => _startupOptions.OpenDiagnosticsForQuality;
         internal bool ShowPluginsForQualityRequested => _startupOptions.OpenPluginsForQuality;
         internal bool QualityWorkflowAutomationEnabled
-            => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId);
+            => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId)
+                || !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowsDirectory);
         internal string? QualityWorkflowUpgradePackagePath
             => _startupOptions.QualityWorkflowUpgradePackagePath;
         internal string? QualityTerminalExportDirectory

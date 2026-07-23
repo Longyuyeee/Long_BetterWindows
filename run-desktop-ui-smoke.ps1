@@ -78,10 +78,14 @@ $qualityWorkflow = @'
   }
 }
 '@
+$sourceWorkflowPath = Join-Path `
+    $workflowRoot 'workflow.quality.review.workflow.json'
 [IO.File]::WriteAllText(
-    (Join-Path $workflowRoot 'workflow.quality.review.workflow.json'),
+    $sourceWorkflowPath,
     $qualityWorkflow,
     [Text.UTF8Encoding]::new($false))
+$sourceWorkflowSha256 = (Get-FileHash `
+    -LiteralPath $sourceWorkflowPath -Algorithm SHA256).Hash.ToLowerInvariant()
 
 $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
 if (-not (Test-Path -LiteralPath $dotnet)) {
@@ -301,6 +305,15 @@ function Find-WindowByAutomationId([int] $processId, [string] $automationId) {
     foreach ($window in $windows) {
         $element = [Windows.Automation.AutomationElement]::FromHandle($window)
         if ($element.Current.AutomationId -eq $automationId) { return $element }
+    }
+    return $null
+}
+
+function Find-WindowHandleByAutomationId([int] $processId, [string] $automationId) {
+    $windows = [LongDesktopInput]::TopLevelWindows($processId)
+    foreach ($window in $windows) {
+        $element = [Windows.Automation.AutomationElement]::FromHandle($window)
+        if ($element.Current.AutomationId -eq $automationId) { return $window }
     }
     return $null
 }
@@ -727,6 +740,10 @@ try {
     $paletteWorkflowMain = Wait-Until {
         Find-WindowByAutomationId $workflowPaletteProcess.Id 'Long.MainWindow'
     } 'The main window did not appear after opening a workflow from Command Palette.'
+    $paletteWorkflowMainHandle = Wait-Until {
+        Find-WindowHandleByAutomationId `
+            $workflowPaletteProcess.Id 'Long.MainWindow'
+    } 'The main workflow window handle was not discoverable.'
     $paletteWorkflowReview = Wait-Until {
         $paletteWorkflowMain.Current.ItemStatus -like `
             'workflow-review:workflow.quality.review;layout:*;width:*'
@@ -750,11 +767,32 @@ try {
         $paletteWorkflowMain.Current.ItemStatus -like `
             'workflow-review:workflow.quality.review;layout:wide;width:*'
     } 'The workflow wide layout was not announced by the main window.'
-    Invoke-AutomationElement $paletteWorkflowCancel `
-        'The top-level workflow review cancel action did not support InvokePattern.'
-    Wait-Until {
-        [string]::IsNullOrWhiteSpace($paletteWorkflowMain.Current.ItemStatus)
-    } 'The cancel action did not close the workflow review opened from Command Palette.' | Out-Null
+    Write-Stage 'Closing review and duplicating through the quality automation channel.'
+    Invoke-WindowWorkflowAction $paletteWorkflowMainHandle 7 `
+        'The workflow duplicate action was not accepted.'
+    $duplicateStatus = Wait-Until {
+        $status = [LongDesktopInput]::WorkflowMessage(
+            $paletteWorkflowMainHandle,
+            16)
+        if ($status -eq 1) { return $true }
+        if ($status -eq -1) { throw 'The workflow duplicate action failed.' }
+        return $null
+    } 'The workflow duplicate action did not complete.'
+    $workflowFilesAfterDuplicate = @(
+        Get-ChildItem -LiteralPath $workflowRoot -Filter '*.workflow.json' -File)
+    $sourceHashAfterDuplicate = if (
+        Test-Path -LiteralPath $sourceWorkflowPath -PathType Leaf) {
+        (Get-FileHash -LiteralPath $sourceWorkflowPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    $sourceFilePreserved = $sourceHashAfterDuplicate -eq $sourceWorkflowSha256
+    $duplicateRemainedUnsaved = $workflowFilesAfterDuplicate.Count -eq 1 `
+        -and $workflowFilesAfterDuplicate[0].FullName -eq $sourceWorkflowPath
+    if (-not $sourceFilePreserved) {
+        throw 'Duplicating the workflow removed or replaced the source definition.'
+    }
+    if (-not $duplicateRemainedUnsaved) {
+        throw 'Duplicating the workflow wrote a definition before an explicit save.'
+    }
     Stop-QualityHost $workflowPaletteProcess
     $workflowPaletteProcess = $null
 
@@ -807,7 +845,11 @@ try {
         palette_result_discovered = $null -ne $paletteWorkflowResult
         palette_enter_opened_review = $null -ne $paletteWorkflowReview
         palette_hidden_on_navigation = $true
-        palette_cancel_closed_review = $true
+        palette_review_closed_for_duplicate = $true
+        duplicate_action_completed = [bool]$duplicateStatus
+        duplicate_remained_unsaved = [bool]$duplicateRemainedUnsaved
+        source_file_preserved = [bool]$sourceFilePreserved
+        source_file_sha256 = $sourceWorkflowSha256
         wide_layout_announced = [bool]$wideLayoutAnnounced
         compact_layout_announced = [bool]$compactLayoutAnnounced
         super_panel_result_discovered = $null -ne $panelWorkflowResult
