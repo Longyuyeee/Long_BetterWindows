@@ -392,6 +392,10 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("function applyLocalization(data)", html);
         Assert.Contains("function setRuntimeText(id, value)", html);
         Assert.Contains("removeAttribute('data-i18n')", html);
+        Assert.Contains("setConsoleState('developer.workbench.logs.loading')", html);
+        Assert.Contains("window.t('developer.workbench.readOnly')", html);
+        Assert.Contains("confirm(t('developer.workbench.closeUnsaved'))", html);
+        Assert.Contains("data.errorKey || 'developer.workbench.error.save'", html);
         Assert.Contains("document.documentElement.lang = data.language", html);
         Assert.Contains("renderTabs();", html);
         Assert.Contains("NavigationStarting += OnNavigationStarting", source);
@@ -399,6 +403,9 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("LanguageChanged += OnLanguageChanged", source);
         Assert.Contains("SendJs(", source);
         Assert.Contains("\"localization\"", source);
+        Assert.Contains("errorKey = \"developer.workbench.error.save\"", source);
+        Assert.Contains("developer.workbench.error.dllUnsupported", source);
+        Assert.DoesNotContain("error = ex.Message", source);
         Assert.DoesNotContain("OnLanguageChanged(string language)\n        {\n            location.reload", source);
         Assert.DoesNotContain("<h3>新建插件</h3>", html);
         Assert.DoesNotContain(">运行日志</strong>", html);

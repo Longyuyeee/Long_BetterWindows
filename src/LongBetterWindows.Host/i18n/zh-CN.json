@@ -601,5 +601,19 @@
   "developer.workbench.newDialog.name": "名称",
   "developer.workbench.newDialog.namePlaceholder": "我的插件",
   "developer.workbench.newDialog.id": "ID（反向域名）",
-  "developer.workbench.newDialog.capabilities": "能力（Capabilities）"
+  "developer.workbench.newDialog.capabilities": "能力（Capabilities）",
+  "developer.workbench.plugins.empty": "无插件",
+  "developer.workbench.logs.selectRequired": "请先在左侧选择插件。",
+  "developer.workbench.logs.loading": "正在读取日志...",
+  "developer.workbench.logs.pluginEmpty": "当前插件暂无日志。",
+  "developer.workbench.logs.cleared": "日志显示已清空（不会删除磁盘日志）。",
+  "developer.workbench.files": "文件",
+  "developer.workbench.readOnly": "只读",
+  "developer.workbench.closeUnsaved": "文件未保存，确定关闭？",
+  "developer.workbench.status.saved": "已保存 · 插件将在 1 秒内热重载 ✓",
+  "developer.workbench.status.created": "插件创建成功 ✓",
+  "developer.workbench.status.previewing": "预览中...",
+  "developer.workbench.error.save": "无法保存文件。",
+  "developer.workbench.error.dllUnsupported": "DLL 插件需要编译环境，请使用项目脚手架；内置编辑器当前支持 Web 和 C# 脚本插件。",
+  "developer.workbench.error.directoryExists": "插件目录已存在。"
 }

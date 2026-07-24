@@ -43,6 +43,20 @@ namespace LongBetterWindows.Host.Views
             "developer.workbench.newDialog.namePlaceholder",
             "developer.workbench.newDialog.id",
             "developer.workbench.newDialog.capabilities",
+            "developer.workbench.plugins.empty",
+            "developer.workbench.logs.selectRequired",
+            "developer.workbench.logs.loading",
+            "developer.workbench.logs.pluginEmpty",
+            "developer.workbench.logs.cleared",
+            "developer.workbench.files",
+            "developer.workbench.readOnly",
+            "developer.workbench.closeUnsaved",
+            "developer.workbench.status.saved",
+            "developer.workbench.status.created",
+            "developer.workbench.status.previewing",
+            "developer.workbench.error.save",
+            "developer.workbench.error.dllUnsupported",
+            "developer.workbench.error.directoryExists",
             "action.create",
             "action.cancel",
         ];
@@ -269,14 +283,26 @@ namespace LongBetterWindows.Host.Views
             try
             {
                 if (!TryResolvePluginPath(path, out var safePath))
-                    throw new UnauthorizedAccessException("只能编辑 Plugins 目录中的文件。");
+                    throw new UnauthorizedAccessException();
 
                 var dir = Path.GetDirectoryName(safePath);
                 if (dir != null && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
                 File.WriteAllText(safePath, content, Encoding.UTF8);
                 SendJs("fileSaved", new { path = safePath, success = true });
             }
-            catch (Exception ex) { SendJs("fileSaved", new { path, success = false, error = ex.Message }); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"PluginDevTools save error: {ex.Message}");
+                SendJs(
+                    "fileSaved",
+                    new
+                    {
+                        path,
+                        success = false,
+                        errorKey = "developer.workbench.error.save",
+                    });
+            }
         }
 
         private void PreviewFile(string path)
@@ -314,14 +340,22 @@ namespace LongBetterWindows.Host.Views
         {
             if (template is "dll" or "dotnet")
             {
-                SendJs("error", new { msg = "DLL 插件需要编译环境，请使用项目脚手架；内置编辑器当前支持 Web 和 C# 脚本插件。" });
+                SendJs(
+                    "error",
+                    new { key = "developer.workbench.error.dllUnsupported" });
                 return;
             }
 
             var safeDir = Regex.Replace(id, "[^a-zA-Z0-9_-]", "-").Trim('-');
             if (string.IsNullOrWhiteSpace(safeDir)) safeDir = "my-plugin";
             var pluginDir = Path.Combine(_pluginsRoot, safeDir);
-            if (Directory.Exists(pluginDir)) { SendJs("error", new { msg = "目录已存在" }); return; }
+            if (Directory.Exists(pluginDir))
+            {
+                SendJs(
+                    "error",
+                    new { key = "developer.workbench.error.directoryExists" });
+                return;
+            }
             Directory.CreateDirectory(pluginDir);
 
             var capsJson = capabilities != null && capabilities.Count > 0

@@ -401,6 +401,10 @@ var tabs = [], currentTab = -1, currentPlugin = '', currentPluginId = '', fileCa
 var searchResults = [], searchIdx = -1;
 var suppressEditorChange = false;
 var localizedStrings = {};
+var consoleStateKey = '';
+var statusState = null;
+var lastPlugins = null;
+var lastFiles = null;
 
 function t(key) {
   return localizedStrings[key] || key;
@@ -426,6 +430,10 @@ function applyLocalization(data) {
   document.querySelectorAll('[data-i18n-title]').forEach(function(element) {
     element.title = t(element.dataset.i18nTitle);
   });
+  if (lastPlugins) renderPlugins(lastPlugins);
+  if (lastFiles) renderFileTree(lastFiles);
+  if (consoleStateKey) setRuntimeText('consoleOutput', t(consoleStateKey));
+  if (statusState) showLocalizedStatus(statusState.key, statusState.success);
   renderTabs();
 }
 var longApiCatalog = [
@@ -567,7 +575,7 @@ function handleMessage(raw) {
     case 'pluginCreated':    onPluginCreated(); break;
     case 'capabilitiesListed': renderCaps(m.data); break;
     case 'pluginLogs':       renderPluginLogs(m.data); break;
-    case 'error':            showStatus(m.data.msg, false); break;
+    case 'error':            showLocalizedStatus(m.data.key, false); break;
   }
 }
 
@@ -575,6 +583,7 @@ function handleMessage(raw) {
 // 插件列表
 // ══════════════════════════════════════════════
 function renderPlugins(plugins) {
+  lastPlugins = plugins || [];
   var h = '';
   (plugins||[]).forEach(function(p) {
     var icon = p.hasManifest ? '\u25C9' : '\u25CB';
@@ -584,7 +593,7 @@ function renderPlugins(plugins) {
          '<span class="icon" style="' + color + '">' + icon + '</span>' + esc(p.name) + '</div>';
   });
   document.getElementById('pluginList').innerHTML = h ||
-    '<span style="color:var(--text3);font-size:11px">无插件</span>';
+    '<span style="color:var(--text3);font-size:11px">' + t('developer.workbench.plugins.empty') + '</span>';
 }
 
 function selectPlugin(dir, pluginId) {
@@ -626,26 +635,37 @@ function toggleConsole(force) {
 
 function refreshPluginLogs() {
   if (!currentPluginId) {
-    setRuntimeText('consoleOutput', '请先在左侧选择插件。');
+    setConsoleState('developer.workbench.logs.selectRequired');
     return;
   }
-  setRuntimeText('consoleOutput', '正在读取日志...');
+  setConsoleState('developer.workbench.logs.loading');
   api('getLogs', { id: currentPluginId });
 }
 
 function renderPluginLogs(data) {
   var lines = data && data.lines ? data.lines : [];
-  setRuntimeText('consoleOutput', lines.length ? lines.join('\n') : '当前插件暂无日志。');
+  if (lines.length) {
+    consoleStateKey = '';
+    setRuntimeText('consoleOutput', lines.join('\n'));
+  } else {
+    setConsoleState('developer.workbench.logs.pluginEmpty');
+  }
 }
 
 function clearConsole() {
-  setRuntimeText('consoleOutput', '日志显示已清空（不会删除磁盘日志）。');
+  setConsoleState('developer.workbench.logs.cleared');
+}
+
+function setConsoleState(key) {
+  consoleStateKey = key;
+  setRuntimeText('consoleOutput', t(key));
 }
 
 // ══════════════════════════════════════════════
 // 文件树 (层级结构)
 // ══════════════════════════════════════════════
 function renderFileTree(data) {
+  lastFiles = data;
   var files = (data.files||[]).sort(function(a,b) { return a.name.localeCompare(b.name); });
 
   // 构建目录树
@@ -660,9 +680,9 @@ function renderFileTree(data) {
     node._files.push({ name: parts[parts.length-1], path: f.path, depth: parts.length - 1 });
   });
 
-  var h = '<h4>文件</h4>';
+  var h = '<h4>' + t('developer.workbench.files') + '</h4>';
   h += renderTree(tree, 0, data.dir);
-  document.getElementById('fileTree').innerHTML += h;
+  document.getElementById('fileTree').innerHTML = h;
 }
 
 function renderTree(node, depth, basePath) {
@@ -718,7 +738,7 @@ function renderTabs() {
   tabs.forEach(function(t, i) {
     var cls = 'tab' + (i === currentTab ? ' active' : '');
     var dot = t.dirty ? ' show' : '';
-    var ro = t.readOnly ? ' [只读]' : '';
+    var ro = t.readOnly ? ' [' + window.t('developer.workbench.readOnly') + ']' : '';
     h += '<div class="' + cls + '" onclick="switchTab(' + i + ')">' +
          '<span class="dot' + dot + '">\u25CF</span>' +
          esc(t.name) + ro +
@@ -732,7 +752,7 @@ function switchTab(i) {
 }
 
 function closeTab(i) {
-  if (tabs[i].dirty && !confirm('文件未保存，确定关闭？')) return;
+  if (tabs[i].dirty && !confirm(t('developer.workbench.closeUnsaved'))) return;
   if (fileCache[tabs[i].path]) delete fileCache[tabs[i].path];
   tabs.splice(i, 1);
   if (currentTab >= tabs.length) currentTab = tabs.length - 1;
@@ -811,9 +831,9 @@ function onFileSaved(data) {
       savedTab.dirty = false;
       renderTabs();
     }
-    showStatus('已保存 · 插件将在 1 秒内热重载 \u2713', true);
+    showLocalizedStatus('developer.workbench.status.saved', true);
   } else {
-    showStatus('保存失败: ' + (data.error||'未知'), false);
+    showLocalizedStatus(data.errorKey || 'developer.workbench.error.save', false);
   }
 }
 
@@ -919,7 +939,7 @@ function createPlugin() {
 }
 
 function onPluginCreated() {
-  showStatus('插件创建成功 \u2713', true);
+  showLocalizedStatus('developer.workbench.status.created', true);
   api('listPlugins');
 }
 
@@ -930,20 +950,27 @@ function previewCurrent() {
   if (currentTab < 0 || !tabs[currentTab]) return;
   saveCurrent();
   api('preview', { path: tabs[currentTab].path });
-  showStatus('预览中...', false);
+  showLocalizedStatus('developer.workbench.status.previewing', false);
 }
 
 // ══════════════════════════════════════════════
 // 状态栏
 // ══════════════════════════════════════════════
 var _statusTimer;
+function showLocalizedStatus(key, isSuccess) {
+  statusState = { key: key, success: isSuccess };
+  showStatus(t(key), isSuccess);
+}
 function showStatus(msg, isSuccess) {
   var s = document.getElementById('status');
   s.textContent = msg;
   s.classList.add('show');
   s.classList.toggle('saved', !!isSuccess);
   clearTimeout(_statusTimer);
-  _statusTimer = setTimeout(function() { s.classList.remove('show', 'saved'); }, 2000);
+  _statusTimer = setTimeout(function() {
+    s.classList.remove('show', 'saved');
+    statusState = null;
+  }, 2000);
 }
 
 // ══════════════════════════════════════════════

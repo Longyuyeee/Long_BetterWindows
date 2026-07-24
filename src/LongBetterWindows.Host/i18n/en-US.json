@@ -601,5 +601,19 @@
   "developer.workbench.newDialog.name": "Name",
   "developer.workbench.newDialog.namePlaceholder": "My plugin",
   "developer.workbench.newDialog.id": "ID (reverse domain)",
-  "developer.workbench.newDialog.capabilities": "Capabilities"
+  "developer.workbench.newDialog.capabilities": "Capabilities",
+  "developer.workbench.plugins.empty": "No plugins",
+  "developer.workbench.logs.selectRequired": "Select a plugin on the left first.",
+  "developer.workbench.logs.loading": "Loading logs...",
+  "developer.workbench.logs.pluginEmpty": "This plugin has no logs.",
+  "developer.workbench.logs.cleared": "Log display cleared. Files on disk were not deleted.",
+  "developer.workbench.files": "Files",
+  "developer.workbench.readOnly": "Read only",
+  "developer.workbench.closeUnsaved": "This file has unsaved changes. Close it?",
+  "developer.workbench.status.saved": "Saved · The plugin will hot reload within 1 second ✓",
+  "developer.workbench.status.created": "Plugin created ✓",
+  "developer.workbench.status.previewing": "Opening preview...",
+  "developer.workbench.error.save": "The file could not be saved.",
+  "developer.workbench.error.dllUnsupported": "DLL plugins require a build environment. Use the project scaffold; the built-in editor currently supports Web and C# script plugins.",
+  "developer.workbench.error.directoryExists": "The plugin directory already exists."
 }
