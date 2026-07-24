@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
@@ -10,7 +11,9 @@ public sealed class BuiltInPluginLocalizationTests
 {
     [Theory]
     [InlineData("Base64Tool")]
+    [InlineData("ClipboardTool")]
     [InlineData("FolderNotePlugin")]
+    [InlineData("QuickNotePlugin")]
     public async Task SamplePlugin_HasValidBilingualResources(string plugin)
     {
         var root = FindRepositoryRoot();
@@ -108,6 +111,59 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.DoesNotContain("location.reload", source);
         Assert.DoesNotContain("input.value = ''", source);
         Assert.DoesNotContain("output.value = ''", source);
+    }
+
+    [Theory]
+    [InlineData("ClipboardTool", "content.value = text", "let currentTab = 'history'")]
+    [InlineData("QuickNotePlugin", "if (input.value.trim() === text) input.value = ''", "let notes = []")]
+    public void StatefulWebPlugin_RefreshesLocalizationWithoutReloading(
+        string plugin,
+        string stateMutationMarker,
+        string stateMarker)
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            plugin,
+            "index.html"));
+
+        Assert.Contains("long.language-changed", source);
+        Assert.Contains("function applyLocalization(message)", source);
+        Assert.Contains("renderStatus();", source);
+        Assert.Contains(stateMarker, source);
+        Assert.Contains(stateMutationMarker, source);
+        Assert.DoesNotContain("location.reload", source);
+        Assert.DoesNotContain("window.location", source);
+    }
+
+    [Theory]
+    [InlineData("Base64Tool")]
+    [InlineData("ClipboardTool")]
+    [InlineData("QuickNotePlugin")]
+    public async Task LocalizedWebPlugin_DeclaresEveryReferencedResourceKey(
+        string plugin)
+    {
+        var root = FindRepositoryRoot();
+        var directory = Path.Combine(root, "src", plugin);
+        var source = File.ReadAllText(Path.Combine(directory, "index.html"));
+        var manifestResult = await ManifestReader.ReadAsync(directory);
+        var localization = Assert.IsType<PluginLocalizationPreference>(
+            manifestResult.Manifest!.Localization);
+        using var resource = ReadResource(
+            directory,
+            localization,
+            localization.DefaultLanguage);
+        var declaredKeys = resource.RootElement.EnumerateObject()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var referencedKeys = Regex.Matches(
+                source,
+                """(?:data-i18n="|\bt\s*\(\s*')([A-Za-z0-9._-]+)""")
+            .Select(match => match.Groups[1].Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.NotEmpty(referencedKeys);
+        Assert.Empty(referencedKeys.Except(declaredKeys, StringComparer.Ordinal));
     }
 
     [Fact]

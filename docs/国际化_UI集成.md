@@ -216,6 +216,14 @@
 4. Release 输出已验证包含两个样板的 `zh-CN.json` / `en-US.json`。Base64 无头 Edge 英文 `760×680`、中文 `620×560` 验证无水平溢出，双向切换后输入、结果和状态保持。
 5. 下一批 G17-C 按使用频率迁移 ClipboardTool、QuickNotePlugin 等 Web 插件；其后再分组处理剩余 DLL 插件，避免一次提交混入全部 25 个插件。
 
+2026-07-24 G17-C 高频 Web 插件已完成：
+
+1. ClipboardTool 使用 48 组中英文插件资源，覆盖元数据、页签、搜索、列表、文本工具、状态、错误和相对时间；语言切换保留历史、固定集合、监控任务、当前页签、搜索词及编辑文本。
+2. QuickNotePlugin 使用 31 组中英文插件资源，覆盖元数据、草稿编辑、Markdown 预览、历史列表、状态、错误和相对时间；语言切换保留草稿、预览可见性、历史集合和持久化队列。
+3. 两个页面均按加载中、加载失败和就绪状态原位重绘，现有状态通过资源键与格式参数刷新，不重新执行初始化、不导航 WebView。
+4. 无头 Edge 中英文往返验证无水平溢出且状态保持；双语资源、页面引用键、Manifest 元数据键和禁止重载门禁纳入自动化，Release 0 警告/0 错误，568 / 568 测试通过。
+5. 下一批 G17-D 处理 TimestampConverter、UuidGenerator、PasswordGenerator、UrlToolkit、JsonFormatterPlugin 和 RegexTester 等较小纯 Web 工具；HardwareMonitor、ClipboardHistory、DevToolkit 与 PortManager 等复杂页面后置单独审计。
+
 ### G4：完成门禁
 
 只有满足以下条件才把 README 国际化标记为完成：

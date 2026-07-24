@@ -10,20 +10,20 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">QUICK CAPTURE</div>
-        <h1 class="long-page-title">快速便签</h1>
-        <p class="long-page-description">随手记录想法，便签仅保存在本机插件存储中。</p>
+        <h1 class="long-page-title" data-i18n="page.title">快速便签</h1>
+        <p class="long-page-description" data-i18n="page.description">随手记录想法，便签仅保存在本机插件存储中。</p>
       </div>
       <span class="long-badge" id="countBadge">0 条便签</span>
     </header>
 
     <section class="long-stack">
       <div class="long-card long-field">
-        <label class="long-field-label" for="noteInput">新便签</label>
+        <label class="long-field-label" for="noteInput" data-i18n="field.newNote">新便签</label>
         <textarea class="long-editor" id="noteInput" placeholder="写点什么，支持简单 Markdown…" autofocus></textarea>
         <div class="long-toolbar">
-          <button class="long-button long-button--primary btn-primary" id="saveButton" type="button">保存便签</button>
-          <button class="long-button long-button--secondary btn-secondary" id="previewButton" type="button">预览</button>
-          <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button">清空</button>
+          <button class="long-button long-button--primary btn-primary" id="saveButton" type="button" data-i18n="action.save">保存便签</button>
+          <button class="long-button long-button--secondary btn-secondary" id="previewButton" type="button" data-i18n="action.preview">预览</button>
+          <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button" data-i18n="action.clear">清空</button>
           <span class="long-toolbar__spacer"></span>
           <span class="long-kbd">Ctrl Enter</span>
         </div>
@@ -33,9 +33,9 @@
 
       <section class="long-card long-stack" aria-labelledby="historyTitle">
         <div class="long-toolbar">
-          <h2 class="long-page-title" id="historyTitle">历史便签</h2>
+          <h2 class="long-page-title" id="historyTitle" data-i18n="history.title">历史便签</h2>
           <span class="long-toolbar__spacer"></span>
-          <span class="long-secondary">最多保留 30 条</span>
+          <span class="long-secondary" data-i18n="history.limit">最多保留 30 条</span>
         </div>
         <div class="long-list" id="noteList"></div>
       </section>
@@ -50,6 +50,65 @@
     const saveButton = document.getElementById('saveButton');
     let notes = [];
     let mutationQueue = Promise.resolve();
+    let strings = {};
+    let listState = 'loading';
+    let loadErrorDetail = '';
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (result, entry) {
+        return result.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function renderStatus() {
+      const message = currentStatus.key
+        ? t(currentStatus.key, currentStatus.fallback, currentStatus.values)
+        : currentStatus.fallback;
+      status.textContent = message;
+      status.className = 'long-status ' +
+        (currentStatus.kind ? 'long-status--' + currentStatus.kind : '');
+      return message;
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
+      const message = renderStatus();
+      window.LongUI?.announce(message);
+    }
+
+    function renderListState() {
+      if (listState === 'loading') {
+        window.LongUI?.renderState(list, {
+          kind: 'loading',
+          title: t('state.loading', '正在加载历史便签')
+        });
+      } else if (listState === 'error') {
+        window.LongUI?.renderState(list, {
+          kind: 'error',
+          title: t('state.loadFailed', '历史便签读取失败'),
+          detail: loadErrorDetail,
+          actionLabel: t('action.retry', '重试'),
+          onAction: initialize
+        });
+      } else {
+        renderNotes();
+      }
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '快速便签');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      input.placeholder = t('field.placeholder', '写点什么，支持简单 Markdown…');
+      renderListState();
+      if (!preview.hidden) renderPreviewContent();
+      renderStatus();
+    }
 
     function normalizeNotes(value) {
       if (!Array.isArray(value)) return [];
@@ -67,32 +126,27 @@
     }
 
     async function initialize() {
-      window.LongUI?.renderState(list, {
-        kind: 'loading',
-        title: '正在加载历史便签'
-      });
+      listState = 'loading';
+      renderListState();
       try {
         const result = await long.storage.get('quick_notes');
-        if (!result.success) throw new Error(result.error || '历史便签读取失败');
+        if (!result.success) throw new Error(result.error || t('error.load', '历史便签读取失败'));
         if (result.data) notes = normalizeNotes(JSON.parse(result.data));
       } catch (error) {
-        window.LongUI?.renderState(list, {
-          kind: 'error',
-          title: '历史便签读取失败',
-          detail: error && error.message ? error.message : String(error),
-          actionLabel: '重试',
-          onAction: initialize
-        });
-        setStatus('历史便签读取失败', 'danger');
+        listState = 'error';
+        loadErrorDetail = error && error.message ? error.message : String(error);
+        renderListState();
+        setStatus('state.loadFailed', 'danger', '历史便签读取失败');
         return;
       }
+      listState = 'ready';
       renderNotes();
     }
 
     async function persistSnapshot(snapshot) {
       const result = await long.storage.set('quick_notes', JSON.stringify(snapshot));
       if (!result || !result.success) {
-        throw new Error(result && result.error ? result.error : '便签保存失败');
+        throw new Error(result && result.error ? result.error : t('error.save', '便签保存失败'));
       }
     }
 
@@ -105,12 +159,18 @@
         renderNotes();
         try {
           await persistSnapshot(notes);
-          if (successMessage) setStatus(successMessage, 'success');
+          if (successMessage) {
+            setStatus(
+              successMessage.key,
+              'success',
+              successMessage.fallback,
+              successMessage.values);
+          }
           return true;
         } catch (error) {
           notes = previous;
           renderNotes();
-          setStatus(error.message || '便签保存失败', 'danger');
+          setStatus('', 'danger', error.message || t('error.save', '便签保存失败'));
           return false;
         }
       });
@@ -118,21 +178,23 @@
       return operation;
     }
 
-    function setStatus(message, kind) {
-      status.textContent = message;
-      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
-    }
-
     async function saveNote() {
       if (saveButton.disabled) return;
       const text = input.value.trim();
-      if (!text) { setStatus('请输入便签内容', 'warning'); input.focus(); return; }
+      if (!text) {
+        setStatus('status.enterContent', 'warning', '请输入便签内容');
+        input.focus();
+        return;
+      }
       window.LongUI?.setBusy(saveButton, true);
       const saved = await mutateNotes(function (items) {
         items.unshift({ text: text, time: Date.now() });
         return items;
-      }, '便签已保存 · ' + text.length + ' 字符');
+      }, {
+        key: 'status.saved',
+        fallback: '便签已保存 · {count} 字符',
+        values: { count: text.length }
+      });
       window.LongUI?.setBusy(saveButton, false);
       if (saved) {
         if (input.value.trim() === text) input.value = '';
@@ -143,6 +205,11 @@
 
     function renderPreview() {
       if (!preview.hidden) { preview.hidden = true; return; }
+      renderPreviewContent();
+      preview.hidden = false;
+    }
+
+    function renderPreviewContent() {
       const safe = escapeHtml(input.value)
         .replace(/^### (.+)$/gm, '<h3>$1</h3>')
         .replace(/^## (.+)$/gm, '<h2>$1</h2>')
@@ -150,18 +217,20 @@
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\n/g, '<br>');
-      preview.innerHTML = safe || '没有可预览的内容';
-      preview.hidden = false;
+      preview.innerHTML = safe || t('preview.empty', '没有可预览的内容');
     }
 
     function renderNotes() {
       list.replaceChildren();
-      document.getElementById('countBadge').textContent = notes.length + ' 条便签';
+      document.getElementById('countBadge').textContent = t(
+        'badge.count',
+        '{count} 条便签',
+        { count: notes.length });
       if (!notes.length) {
         window.LongUI?.renderState(list, {
           kind: 'empty',
-          title: '还没有便签',
-          detail: '新建的便签会显示在这里'
+          title: t('state.empty', '还没有便签'),
+          detail: t('state.emptyDetail', '新建的便签会显示在这里')
         });
         return;
       }
@@ -175,7 +244,7 @@
         content.addEventListener('click', function () {
           input.value = note.text;
           input.focus();
-          setStatus('便签已载入编辑区', 'success');
+          setStatus('status.loaded', 'success', '便签已载入编辑区');
         });
         const meta = document.createElement('div');
         meta.className = 'long-list-item__meta long-stack';
@@ -184,8 +253,8 @@
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'long-button long-button--small';
-        remove.textContent = '删除';
-        remove.setAttribute('aria-label', '删除此便签');
+        remove.textContent = t('action.remove', '删除');
+        remove.setAttribute('aria-label', t('action.removeAria', '删除此便签'));
         remove.addEventListener('click', async function () {
           window.LongUI?.setBusy(remove, true);
           await mutateNotes(function (items) {
@@ -193,7 +262,11 @@
               return entry !== note
                 && (entry.time !== note.time || entry.text !== note.text);
             });
-          }, '便签已删除');
+          }, {
+            key: 'status.removed',
+            fallback: '便签已删除',
+            values: {}
+          });
           window.LongUI?.setBusy(remove, false);
         });
         meta.append(time, remove);
@@ -204,10 +277,10 @@
 
     function relativeTime(value) {
       const seconds = Math.max(0, Math.floor((Date.now() - value) / 1000));
-      if (seconds < 60) return '刚刚';
-      if (seconds < 3600) return Math.floor(seconds / 60) + ' 分钟前';
-      if (seconds < 86400) return Math.floor(seconds / 3600) + ' 小时前';
-      return Math.floor(seconds / 86400) + ' 天前';
+      if (seconds < 60) return t('time.now', '刚刚');
+      if (seconds < 3600) return t('time.minutes', '{count} 分钟前', { count: Math.floor(seconds / 60) });
+      if (seconds < 86400) return t('time.hours', '{count} 小时前', { count: Math.floor(seconds / 3600) });
+      return t('time.days', '{count} 天前', { count: Math.floor(seconds / 86400) });
     }
 
     function escapeHtml(value) {
@@ -224,6 +297,9 @@
       const text = window.LongUI.commandText(command);
       if (text) input.value = text;
       input.focus();
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
     initialize();
   </script>

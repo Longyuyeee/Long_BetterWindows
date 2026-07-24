@@ -10,16 +10,16 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">CLIPBOARD</div>
-        <h1 class="long-page-title">剪贴板工具箱</h1>
-        <p class="long-page-description">搜索、固定和转换最近复制的文本，历史仅保存在本机。</p>
+        <h1 class="long-page-title" data-i18n="page.title">剪贴板工具箱</h1>
+        <p class="long-page-description" data-i18n="page.description">搜索、固定和转换最近复制的文本，历史仅保存在本机。</p>
       </div>
       <span class="long-badge" id="historyBadge">0 条记录</span>
     </header>
 
-    <nav class="long-segment" aria-label="剪贴板工具页签">
-      <button type="button" data-tab="history" aria-selected="true">历史</button>
-      <button type="button" data-tab="pinned" aria-selected="false">固定</button>
-      <button type="button" data-tab="tools" aria-selected="false">文本工具</button>
+    <nav class="long-segment" id="tabNavigation" aria-label="剪贴板工具页签">
+      <button type="button" data-tab="history" data-i18n="tabs.history" aria-selected="true">历史</button>
+      <button type="button" data-tab="pinned" data-i18n="tabs.pinned" aria-selected="false">固定</button>
+      <button type="button" data-tab="tools" data-i18n="tabs.tools" aria-selected="false">文本工具</button>
     </nav>
 
     <section class="long-panel long-stack long-toolbar--spaced" id="listPanel">
@@ -29,14 +29,14 @@
 
     <section class="long-panel long-stack long-toolbar--spaced" id="toolsPanel" hidden>
       <div class="long-card long-field">
-        <label class="long-field-label" for="content">文本内容</label>
+        <label class="long-field-label" for="content" data-i18n="field.content">文本内容</label>
         <textarea class="long-editor" id="content" placeholder="读取剪贴板，或输入需要转换的文本…"></textarea>
         <div class="long-toolbar">
-          <button class="long-button long-button--primary btn-primary" id="readButton" type="button">读取剪贴板</button>
-          <button class="long-button long-button--secondary btn-secondary" id="writeButton" type="button">写入剪贴板</button>
-          <button class="long-button long-button--secondary btn-secondary" data-transform="upper" type="button">大写</button>
-          <button class="long-button long-button--secondary btn-secondary" data-transform="lower" type="button">小写</button>
-          <button class="long-button long-button--secondary btn-secondary" data-transform="trim" type="button">整理空白</button>
+          <button class="long-button long-button--primary btn-primary" id="readButton" type="button" data-i18n="action.read">读取剪贴板</button>
+          <button class="long-button long-button--secondary btn-secondary" id="writeButton" type="button" data-i18n="action.write">写入剪贴板</button>
+          <button class="long-button long-button--secondary btn-secondary" data-transform="upper" data-i18n="action.upper" type="button">大写</button>
+          <button class="long-button long-button--secondary btn-secondary" data-transform="lower" data-i18n="action.lower" type="button">小写</button>
+          <button class="long-button long-button--secondary btn-secondary" data-transform="trim" data-i18n="action.trim" type="button">整理空白</button>
         </div>
         <div class="long-status" id="status" role="status" aria-live="polite"></div>
       </div>
@@ -57,6 +57,71 @@
     let monitor = 0;
     let captureRequest = null;
     let mutationQueue = Promise.resolve();
+    let strings = {};
+    let listState = 'loading';
+    let loadErrorDetail = '';
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (result, entry) {
+        return result.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function renderStatus() {
+      const message = currentStatus.key
+        ? t(currentStatus.key, currentStatus.fallback, currentStatus.values)
+        : currentStatus.fallback;
+      status.textContent = message;
+      status.className = 'long-status ' +
+        (currentStatus.kind ? 'long-status--' + currentStatus.kind : '');
+      return message;
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
+      const message = renderStatus();
+      window.LongUI?.announce(message);
+    }
+
+    function renderListState() {
+      if (listState === 'loading') {
+        window.LongUI?.renderState(listElement, {
+          kind: 'loading',
+          title: t('state.loading', '正在加载剪贴板记录')
+        });
+      } else if (listState === 'error') {
+        window.LongUI?.renderState(listElement, {
+          kind: 'error',
+          title: t('state.loadFailed', '剪贴板记录读取失败'),
+          detail: loadErrorDetail,
+          actionLabel: t('action.retry', '重试'),
+          onAction: initialize
+        });
+      } else {
+        render();
+      }
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '剪贴板工具箱');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('tabNavigation').setAttribute(
+        'aria-label',
+        t('tabs.ariaLabel', '剪贴板工具页签'));
+      searchInput.placeholder = t('search.placeholder', '搜索剪贴板历史…');
+      searchInput.setAttribute('aria-label', t('search.ariaLabel', '搜索剪贴板历史'));
+      content.placeholder = t(
+        'field.contentPlaceholder',
+        '读取剪贴板，或输入需要转换的文本…');
+      renderListState();
+      renderStatus();
+    }
 
     function normalizeItems(value, limit) {
       if (!Array.isArray(value)) return [];
@@ -81,28 +146,23 @@
     }
 
     async function initialize() {
-      window.LongUI?.renderState(listElement, {
-        kind: 'loading',
-        title: '正在加载剪贴板记录'
-      });
+      listState = 'loading';
+      renderListState();
       try {
         const historyResult = await long.storage.get(historyKey);
         const pinnedResult = await long.storage.get(pinnedKey);
-        if (!historyResult.success) throw new Error(historyResult.error || '历史记录读取失败');
-        if (!pinnedResult.success) throw new Error(pinnedResult.error || '固定记录读取失败');
+        if (!historyResult.success) throw new Error(historyResult.error || t('error.historyRead', '历史记录读取失败'));
+        if (!pinnedResult.success) throw new Error(pinnedResult.error || t('error.pinnedRead', '固定记录读取失败'));
         if (historyResult.data) history = normalizeItems(JSON.parse(historyResult.data), 50);
         if (pinnedResult.data) pinned = normalizeItems(JSON.parse(pinnedResult.data), 50);
       } catch (error) {
-        window.LongUI?.renderState(listElement, {
-          kind: 'error',
-          title: '剪贴板记录读取失败',
-          detail: error && error.message ? error.message : String(error),
-          actionLabel: '重试',
-          onAction: initialize
-        });
-        setStatus('历史记录读取失败', 'danger');
+        listState = 'error';
+        loadErrorDetail = error && error.message ? error.message : String(error);
+        renderListState();
+        setStatus('status.historyReadFailed', 'danger', '历史记录读取失败');
         return;
       }
+      listState = 'ready';
       render();
       startMonitor();
     }
@@ -119,7 +179,7 @@
       captureRequest = (async function () {
         try {
           const response = await long.clipboard.getText();
-          const text = (responseData(response, '读取剪贴板失败') || '').trim();
+          const text = (responseData(response, t('error.clipboardRead', '读取剪贴板失败')) || '').trim();
           if (text && text !== lastClipboard && await addHistory(text)) {
             lastClipboard = text;
           }
@@ -132,10 +192,14 @@
     async function persistCollection(name, value) {
       const key = name === 'history' ? historyKey : pinnedKey;
       const response = await long.storage.set(key, JSON.stringify(value));
-      responseData(response, name === 'history' ? '历史记录保存失败' : '固定记录保存失败');
+      responseData(
+        response,
+        name === 'history'
+          ? t('error.historySave', '历史记录保存失败')
+          : t('error.pinnedSave', '固定记录保存失败'));
     }
 
-    function mutateCollection(name, transform, successMessage) {
+    function mutateCollection(name, transform, successStatus) {
       const operation = mutationQueue.then(async function () {
         const previous = name === 'history' ? history : pinned;
         const next = transform(previous.slice());
@@ -144,12 +208,18 @@
         render();
         try {
           await persistCollection(name, next);
-          if (successMessage) setStatus(successMessage, 'success');
+          if (successStatus) {
+            setStatus(
+              successStatus.key,
+              'success',
+              successStatus.fallback,
+              successStatus.values);
+          }
           return true;
         } catch (error) {
           if (name === 'history') history = previous; else pinned = previous;
           render();
-          setStatus(error.message || '本地记录保存失败', 'danger');
+          setStatus('', 'danger', error.message || t('status.localSaveFailed', '本地记录保存失败'));
           return false;
         }
       });
@@ -165,12 +235,6 @@
         next.unshift({ text: text, time: Date.now() });
         return next.slice(0, 50);
       });
-    }
-
-    function setStatus(message, kind) {
-      status.textContent = message;
-      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
     }
 
     function selectTab(tab) {
@@ -192,15 +256,20 @@
       const source = currentTab === 'pinned' ? pinned : history;
       const visible = source.filter(function (item) { return !query || item.text.toLocaleLowerCase().includes(query); });
       listElement.replaceChildren();
-      document.getElementById('historyBadge').textContent = history.length + ' 条记录 · ' + pinned.length + ' 条固定';
+      document.getElementById('historyBadge').textContent = t(
+        'badge.summary',
+        '{history} 条记录 · {pinned} 条固定',
+        { history: history.length, pinned: pinned.length });
       if (!visible.length) {
         const title = query
-          ? '没有匹配的剪贴板记录'
-          : currentTab === 'pinned' ? '暂无固定记录' : '暂无剪贴板记录';
+          ? t('state.noMatches', '没有匹配的剪贴板记录')
+          : currentTab === 'pinned'
+            ? t('state.noPinned', '暂无固定记录')
+            : t('state.noHistory', '暂无剪贴板记录');
         window.LongUI?.renderState(listElement, {
           kind: 'empty',
           title: title,
-          detail: query ? '请尝试其他搜索词' : ''
+          detail: query ? t('state.tryAnotherSearch', '请尝试其他搜索词') : ''
         });
         return;
       }
@@ -219,10 +288,13 @@
         const pin = document.createElement('button');
         pin.type = 'button'; pin.className = 'long-button long-button--small';
         const isPinned = pinned.some(function (entry) { return entry.text === item.text; });
-        pin.textContent = isPinned ? '取消固定' : '固定';
+        pin.textContent = isPinned
+          ? t('action.unpin', '取消固定')
+          : t('action.pin', '固定');
         pin.addEventListener('click', function () { togglePin(item); });
         const remove = document.createElement('button');
-        remove.type = 'button'; remove.className = 'long-button long-button--small'; remove.textContent = '删除';
+        remove.type = 'button'; remove.className = 'long-button long-button--small';
+        remove.textContent = t('action.remove', '删除');
         remove.addEventListener('click', function () { removeItem(item); });
         actions.append(time, pin, remove);
         row.append(value, actions);
@@ -233,13 +305,13 @@
     async function copyItem(item) {
       try {
         const response = await long.clipboard.setText(item.text);
-        responseData(response, '写入剪贴板失败');
+        responseData(response, t('error.clipboardWrite', '写入剪贴板失败'));
         if (await addHistory(item.text)) {
           lastClipboard = item.text;
-          setStatus('已复制 · ' + item.text.length + ' 字符', 'success');
+          setStatus('status.copied', 'success', '已复制 · {count} 字符', { count: item.text.length });
         }
       } catch (error) {
-        setStatus(error.message || '写入剪贴板失败', 'danger');
+        setStatus('', 'danger', error.message || t('error.clipboardWrite', '写入剪贴板失败'));
       }
     }
 
@@ -249,36 +321,38 @@
         const next = items.filter(function (entry) { return entry.text !== item.text; });
         if (!isPinned) next.unshift({ text: item.text, time: Date.now() });
         return next.slice(0, 50);
-      }, isPinned ? '已取消固定' : '记录已固定');
+      }, isPinned
+        ? { key: 'status.unpinned', fallback: '已取消固定', values: {} }
+        : { key: 'status.pinned', fallback: '记录已固定', values: {} });
     }
 
     async function removeItem(item) {
       const name = currentTab === 'pinned' ? 'pinned' : 'history';
       await mutateCollection(name, function (items) {
         return items.filter(function (entry) { return entry !== item && entry.text !== item.text; });
-      }, '记录已删除');
+      }, { key: 'status.removed', fallback: '记录已删除', values: {} });
     }
 
     async function readClipboard() {
       try {
         const response = await long.clipboard.getText();
-        content.value = responseData(response, '读取失败') || '';
-        setStatus('剪贴板内容已读取', 'success');
+        content.value = responseData(response, t('error.clipboardRead', '读取剪贴板失败')) || '';
+        setStatus('status.read', 'success', '剪贴板内容已读取');
       } catch (error) {
-        setStatus(error.message || '读取失败', 'danger');
+        setStatus('', 'danger', error.message || t('error.clipboardRead', '读取剪贴板失败'));
       }
     }
 
     async function writeClipboard() {
       try {
         const response = await long.clipboard.setText(content.value);
-        responseData(response, '写入失败');
+        responseData(response, t('error.clipboardWrite', '写入剪贴板失败'));
         if (await addHistory(content.value)) {
           lastClipboard = content.value;
-          setStatus('内容已写入剪贴板', 'success');
+          setStatus('status.written', 'success', '内容已写入剪贴板');
         }
       } catch (error) {
-        setStatus(error.message || '写入失败', 'danger');
+        setStatus('', 'danger', error.message || t('error.clipboardWrite', '写入剪贴板失败'));
       }
     }
 
@@ -291,10 +365,10 @@
 
     function relativeTime(value) {
       const seconds = Math.max(0, Math.floor((Date.now() - value) / 1000));
-      if (seconds < 60) return '刚刚';
-      if (seconds < 3600) return Math.floor(seconds / 60) + ' 分钟前';
-      if (seconds < 86400) return Math.floor(seconds / 3600) + ' 小时前';
-      return Math.floor(seconds / 86400) + ' 天前';
+      if (seconds < 60) return t('time.now', '刚刚');
+      if (seconds < 3600) return t('time.minutes', '{count} 分钟前', { count: Math.floor(seconds / 60) });
+      if (seconds < 86400) return t('time.hours', '{count} 小时前', { count: Math.floor(seconds / 3600) });
+      return t('time.days', '{count} 天前', { count: Math.floor(seconds / 86400) });
     }
 
     document.querySelectorAll('[data-tab]').forEach(function (button) { button.addEventListener('click', function () { selectTab(button.dataset.tab); }); });
@@ -315,7 +389,13 @@
         await addHistory(text);
       }
       content.focus();
-      return { success: true, message: '剪贴板工具已打开' };
+      return {
+        success: true,
+        message: t('status.opened', '剪贴板工具已打开')
+      };
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
     initialize();
   </script>

@@ -739,7 +739,8 @@ WIP UI visual draft before audited implementation
 - [ ] G16-B2.3-B 真实 WPF/WebView2 候选视觉证据待补录；G16-C 工程范围已关闭，下一工程阶段进入 G17。
 - [x] G17-A 建立可选插件语言声明、受限资源加载、默认回退和 DLL/C# Script/Web 三运行时通知；WebView 导航后重放最新快照，旧插件保持兼容。Release 0 警告/0 错误，556 / 556 测试通过。
 - [x] G17-B 完成 Base64Tool Web 样板和 FolderNotePlugin DLL 样板；宿主插件/命令元数据使用只读语言投影，原 Manifest、目录修订和运行状态不变。Base64 英文宽屏与中文紧凑无头视觉验证通过，Release 0 警告/0 错误，561 / 561 测试通过。
-- [ ] G17-C 优先迁移 ClipboardTool、QuickNotePlugin 等高频 Web 插件，再分组处理剩余 DLL 插件。
+- [x] G17-C 完成 ClipboardTool 与 QuickNotePlugin 高频 Web 插件迁移；中英文双向切换保留页签、搜索、剪贴板文本、便签草稿、预览和历史状态。无头 Edge 无水平溢出，Release 0 警告/0 错误，568 / 568 测试通过。
+- [ ] G17-D 迁移 TimestampConverter、UuidGenerator、PasswordGenerator、UrlToolkit、JsonFormatterPlugin 和 RegexTester 等较小纯 Web 文本工具；复杂监控与开发工具另行分组。
 - [x] G3 插件语言声明与宿主通知协议基础由 G17-A 完成；内置插件内容迁移继续由 G17-B 分批实施，不实现 uTools 插件兼容层。
 
 详细边界与后续顺序见 `docs/国际化_UI集成.md`。
