@@ -117,9 +117,13 @@
             <Border x:Name="ImportReviewPanel" Grid.Row="1" Visibility="Collapsed"
                     CornerRadius="{DynamicResource Long.Radius.Control}" Padding="16"
                     Background="{DynamicResource Long.Brush.Background.Raised}"
-                    BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
+                    BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1"
+                    automation:AutomationProperties.AutomationId="Long.Workflow.ImportReview"
+                    automation:AutomationProperties.Name="{DynamicResource i18n.workflow.import.reviewExternal}">
                 <StackPanel>
-                    <TextBlock x:Name="ImportReviewHeading" Text="{DynamicResource i18n.workflow.import.reviewExternal}" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock x:Name="ImportReviewHeading" Text="{DynamicResource i18n.workflow.import.reviewExternal}"
+                               FontSize="17" FontWeight="SemiBold"
+                               automation:AutomationProperties.AutomationId="Long.Workflow.ImportReview.Title" />
                     <TextBlock x:Name="ImportReviewName" Margin="0,12,0,0" FontSize="14" FontWeight="SemiBold" />
                     <TextBlock x:Name="ImportReviewSource" Margin="0,5,0,0" TextWrapping="Wrap"
                                FontFamily="{DynamicResource Long.Font.Mono}" FontSize="10"

@@ -10,6 +10,7 @@ using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
+using Serilog;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -204,8 +205,8 @@ namespace LongBetterWindows.Host.Views
         {
             var dialog = new OpenFileDialog
             {
-                Title = "选择外部工作流",
-                Filter = "Long 工作流 (*.workflow.json)|*.workflow.json|JSON 文件 (*.json)|*.json",
+                Title = I18n("workflow.import.dialog.title"),
+                Filter = I18n("workflow.import.dialog.filter"),
                 CheckFileExists = true,
                 Multiselect = false,
             };
@@ -213,9 +214,12 @@ namespace LongBetterWindows.Host.Views
             var review = await _session.PreviewImportAsync(dialog.FileName);
             if (!review.IsSuccess)
             {
+                Log.Warning(
+                    "External workflow import preview failed: {Error}",
+                    review.Error);
                 MessageBox.Show(
-                    review.Error ?? "外部工作流无法读取。",
-                    "导入工作流",
+                    I18n("workflow.import.error.read"),
+                    I18n("workflow.import.dialog.errorTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -230,9 +234,12 @@ namespace LongBetterWindows.Host.Views
             var result = await _session.ListTemplatesAsync();
             if (!result.IsSuccess)
             {
+                Log.Warning(
+                    "Workflow template catalog could not be listed: {Error}",
+                    result.Error);
                 MessageBox.Show(
-                    result.Error ?? "工作流模板目录无法读取。",
-                    "工作流模板",
+                    I18n("workflow.template.error.catalog"),
+                    I18n("workflow.template.title"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -240,8 +247,8 @@ namespace LongBetterWindows.Host.Views
             if (result.Templates.Count == 0)
             {
                 MessageBox.Show(
-                    "当前没有可用的工作流模板。",
-                    "工作流模板",
+                    I18n("workflow.template.empty"),
+                    I18n("workflow.template.title"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -255,12 +262,16 @@ namespace LongBetterWindows.Host.Views
             foreach (var template in result.Templates)
             {
                 var trust = template.TrustLevel == WorkflowDocumentTrustLevel.TrustedSource
-                    ? "已校验来源"
-                    : "采用前需审查";
+                    ? I18n("workflow.template.trust.trusted")
+                    : I18n("workflow.template.trust.review");
                 var item = new MenuItem
                 {
                     Header = template.Name,
-                    ToolTip = $"{template.StepCount} 个步骤 · {trust} · {template.Id}",
+                    ToolTip = Format(
+                        "workflow.template.itemDetail",
+                        template.StepCount,
+                        trust,
+                        template.Id),
                     Tag = template,
                 };
                 item.Click += TemplateMenuItem_Click;
@@ -271,7 +282,9 @@ namespace LongBetterWindows.Host.Views
                 menu.Items.Add(new Separator());
                 menu.Items.Add(new MenuItem
                 {
-                    Header = $"{result.Issues.Count} 个模板未通过校验",
+                    Header = Format(
+                        "workflow.template.invalidCount",
+                        result.Issues.Count),
                     IsEnabled = false,
                 });
             }
@@ -292,9 +305,13 @@ namespace LongBetterWindows.Host.Views
                 template.DefinitionSha256);
             if (!review.IsSuccess)
             {
+                Log.Warning(
+                    "Workflow template preview failed for {TemplateKey}: {Error}",
+                    template.Key,
+                    review.Error);
                 MessageBox.Show(
-                    review.Error ?? "工作流模板无法读取，请刷新模板列表。",
-                    "工作流模板",
+                    I18n("workflow.template.error.read"),
+                    I18n("workflow.template.title"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -317,10 +334,10 @@ namespace LongBetterWindows.Host.Views
             if (review is null) return;
             if (_session.State.IsDirty)
             {
-                var sourceLabel = _reviewingTemplate ? "模板" : "外部工作流";
+                var sourceLabel = ImportSourceLabel();
                 var answer = MessageBox.Show(
-                    $"当前草稿有未保存的更改。采用{sourceLabel}会替换当前草稿，是否继续？",
-                    $"采用{sourceLabel}",
+                    Format("workflow.import.confirm.replaceDraft", sourceLabel),
+                    Format("workflow.import.confirm.title", sourceLabel),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning,
                     MessageBoxResult.No);
@@ -328,10 +345,13 @@ namespace LongBetterWindows.Host.Views
             }
             if (!_session.AdoptImport(review))
             {
-                var sourceLabel = _reviewingTemplate ? "模板" : "外部工作流";
+                var sourceLabel = ImportSourceLabel();
+                Log.Warning(
+                    "Workflow import review could not be adopted: {Error}",
+                    _session.State.Error);
                 MessageBox.Show(
-                    _session.State.Error ?? $"{sourceLabel}无法采用。",
-                    $"采用{sourceLabel}",
+                    Format("workflow.import.error.adopt", sourceLabel),
+                    Format("workflow.import.confirm.title", sourceLabel),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -889,25 +909,38 @@ namespace LongBetterWindows.Host.Views
             EditorBody.Visibility = Visibility.Collapsed;
             ImportReviewPanel.Visibility = Visibility.Visible;
             ImportReviewHeading.Text = _reviewingTemplate
-                ? "审查工作流模板"
-                : "审查外部工作流";
+                ? I18n("workflow.import.reviewTemplate")
+                : I18n("workflow.import.reviewExternal");
+            AutomationProperties.SetName(
+                ImportReviewPanel,
+                ImportReviewHeading.Text);
             ImportReviewName.Text = $"{review.Workflow.Name}  ·  {review.Workflow.Id}";
             ImportReviewSource.Text = $"{review.SourcePath}\nSHA-256  {review.DefinitionSha256}";
-            ImportReviewSummary.Text = $"{review.Workflow.Steps.Count} 个步骤 · "
-                + $"{FailureLabel(review.Workflow.FailureMode)} · "
-                + (review.ContainsSensitiveInputs ? "包含潜在敏感输入" : "不包含持久化输入");
+            ImportReviewSummary.Text = Format(
+                "workflow.import.summary",
+                review.Workflow.Steps.Count,
+                I18n(review.Workflow.FailureMode == WorkflowFailureMode.Compensate
+                    ? "workflow.failure.rollbackShort"
+                    : "workflow.failure.stopShort"),
+                I18n(review.ContainsSensitiveInputs
+                    ? "workflow.import.sensitive.present"
+                    : "workflow.import.sensitive.none"));
             ImportReviewTrust.Text = review.TrustLevel switch
             {
-                WorkflowDocumentTrustLevel.TrustedSource => "来源与已信任定义匹配",
-                WorkflowDocumentTrustLevel.LocalManaged => "本机托管来源",
-                _ => "未信任的外部来源",
+                WorkflowDocumentTrustLevel.TrustedSource =>
+                    I18n("workflow.import.trust.trusted"),
+                WorkflowDocumentTrustLevel.LocalManaged =>
+                    I18n("workflow.import.trust.local"),
+                _ => I18n("workflow.import.trust.untrusted"),
             };
             var preflight = review.Preflight;
             ImportReviewPreflight.Text = preflight?.IsValid == true
-                ? $"预检通过；采用后仍需保存，并在每次执行前重新批准 {preflight.Permissions.Count} 个插件。"
-                : "预检未通过；采用后可编辑修正："
-                    + Environment.NewLine
-                    + string.Join(Environment.NewLine, preflight?.Issues ?? Array.Empty<string>());
+                ? Format(
+                    "workflow.import.preflight.passed",
+                    preflight.Permissions.Count)
+                : Format(
+                    "workflow.import.preflight.failed",
+                    preflight?.Issues.Count ?? 0);
         }
 
         private void SetImportReviewMode(bool active)
@@ -1133,9 +1166,6 @@ namespace LongBetterWindows.Host.Views
             ExecutionReviewPanel.Visibility = Visibility.Collapsed;
         }
 
-        private static string FailureLabel(WorkflowFailureMode mode)
-            => WorkflowExecutionPresentation.FailureLabel(mode);
-
         private static string InputTypeLabel(AcceptedInputType inputType)
             => I18n(inputType switch
             {
@@ -1152,6 +1182,14 @@ namespace LongBetterWindows.Host.Views
 
         private static string I18n(string key)
             => ServicesInitializer.I18n.T(key);
+
+        private static string Format(string key, params object[] arguments)
+            => string.Format(I18n(key), arguments);
+
+        private string ImportSourceLabel()
+            => I18n(_reviewingTemplate
+                ? "workflow.import.source.template"
+                : "workflow.import.source.external");
 
         private sealed record EnumOption<T>(T Value, string Label) where T : struct, Enum;
         private sealed record CommandOption(string Key, string Display)

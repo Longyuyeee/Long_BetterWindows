@@ -114,6 +114,9 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("system.sparse.title", chinese);
         Assert.Contains("workflow.editor.name", chinese);
         Assert.Contains("workflow.preflight.permissionCount", chinese);
+        Assert.Contains("workflow.import.reviewTemplate", chinese);
+        Assert.Contains("workflow.import.confirm.replaceDraft", chinese);
+        Assert.Contains("workflow.template.itemDetail", chinese);
         Assert.Contains("workflow.invocation.sensitiveHelp", chinese);
         Assert.Contains("workflow.binding.error.schemaRequired", chinese);
     }
@@ -216,6 +219,33 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("LanguageChanged += OnLanguageChanged", source);
         Assert.Contains("CreateFailureOptions()", source);
         Assert.Contains("workflow.preflight.permissionCount", source);
+    }
+
+    [Fact]
+    public void WorkflowImportAndTemplateReview_UseHostLanguageResources()
+    {
+        var root = FindRepositoryRoot();
+        var views = Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views");
+        var xaml = File.ReadAllText(Path.Combine(
+            views,
+            "WorkflowEditorControl.xaml"));
+        var source = File.ReadAllText(Path.Combine(
+            views,
+            "WorkflowEditorControl.xaml.cs"));
+
+        Assert.Contains("Long.Workflow.ImportReview", xaml);
+        Assert.Contains("workflow.import.dialog.title", source);
+        Assert.Contains("workflow.import.reviewTemplate", source);
+        Assert.Contains("workflow.import.preflight.passed", source);
+        Assert.Contains("workflow.template.itemDetail", source);
+        Assert.Contains("AutomationProperties.SetName", source);
+        Assert.DoesNotContain("选择外部工作流", source);
+        Assert.DoesNotContain("审查工作流模板", source);
+        Assert.DoesNotContain("采用前需审查", source);
     }
 
     [Fact]
