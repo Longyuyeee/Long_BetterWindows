@@ -60,6 +60,7 @@ public class MarketplaceSessionCoordinatorTests
         var prepared = await first;
 
         Assert.True(duplicate.IsBusy);
+        Assert.Equal(MarketplaceErrorCode.OperationBusy, duplicate.ErrorCode);
         Assert.True(prepared.IsSuccess);
         Assert.NotNull(session.PendingAction);
 
@@ -93,7 +94,9 @@ public class MarketplaceSessionCoordinatorTests
             {
                 downloadStarted.SetResult();
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                return PackageDownloadResult.Fail("unreachable");
+                return PackageDownloadResult.Fail(
+                    MarketplaceErrorCode.DownloadFailed,
+                    "unreachable");
             });
         var entry = Assert.Single(Catalog("fixture").Entries);
         var version = Assert.Single(entry.Versions);
@@ -104,8 +107,33 @@ public class MarketplaceSessionCoordinatorTests
         var result = await preparation;
 
         Assert.True(result.IsCanceled);
+        Assert.Equal(MarketplaceErrorCode.OperationCanceled, result.ErrorCode);
         Assert.False(session.IsOperationActive);
         Assert.Null(session.PendingAction);
+    }
+
+    [Fact]
+    public async Task PreparationFailures_PropagateStableMarketplaceCodes()
+    {
+        var entry = Assert.Single(Catalog("fixture").Entries);
+        var version = Assert.Single(entry.Versions);
+        using var unavailable = CreateSession();
+
+        var notConfigured = await unavailable.PrepareRemotePackageAsync(entry, version);
+
+        using var rejected = CreateSession(
+            validatePackage: (_, _, _) => Task.FromResult(
+                PackageValidationResult.Fail("rejected")));
+        var packageRejected = await rejected.PrepareLocalPackageAsync(
+            "fixture.lpak",
+            new MarketplacePackageMetadata());
+
+        Assert.Equal(
+            MarketplaceErrorCode.DownloadNotConfigured,
+            notConfigured.ErrorCode);
+        Assert.Equal(
+            MarketplaceErrorCode.PackageRejected,
+            packageRejected.ErrorCode);
     }
 
     [Fact]
@@ -148,7 +176,10 @@ public class MarketplaceSessionCoordinatorTests
         => new(
             loadCatalog ?? (_ => Task.FromResult(MarketplaceCatalogResult.Ok(Catalog("fixture")))),
             validatePackage ?? ((_, _, _) => Task.FromResult(ValidValidation())),
-            downloadPackage ?? ((_, _, _) => Task.FromResult(PackageDownloadResult.Fail("not configured"))),
+            downloadPackage ?? ((_, _, _) => Task.FromResult(
+                PackageDownloadResult.Fail(
+                    MarketplaceErrorCode.DownloadNotConfigured,
+                    "not configured"))),
             canDownload ?? (() => false),
             _ => null);
 

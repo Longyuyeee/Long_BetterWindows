@@ -34,24 +34,34 @@ namespace LongBetterWindows.Host.Engine
                 var catalog = await JsonSerializer.DeserializeAsync<MarketplaceCatalog>(
                     stream, JsonOptions, cancellationToken);
                 if (catalog == null || catalog.SchemaVersion != 1)
-                    return MarketplaceCatalogResult.Fail("市场目录版本不受支持。");
+                    return MarketplaceCatalogResult.Fail(
+                        MarketplaceErrorCode.CatalogUnsupported,
+                        "市场目录版本不受支持。");
                 if (catalog.Entries.Count > 5000)
-                    return MarketplaceCatalogResult.Fail("市场目录条目超过安全限制。");
+                    return MarketplaceCatalogResult.Fail(
+                        MarketplaceErrorCode.CatalogTooLarge,
+                        "市场目录条目超过安全限制。");
                 var duplicate = catalog.Entries
                     .GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
                     .FirstOrDefault(x => x.Count() > 1);
                 if (duplicate != null)
-                    return MarketplaceCatalogResult.Fail($"市场目录包含重复插件 ID：{duplicate.Key}");
+                    return MarketplaceCatalogResult.Fail(
+                        MarketplaceErrorCode.CatalogDuplicatePlugin,
+                        $"市场目录包含重复插件 ID：{duplicate.Key}");
                 if (catalog.Entries.Any(x => string.IsNullOrWhiteSpace(x.Id)
                     || string.IsNullOrWhiteSpace(x.Name) || x.Versions.Count == 0))
-                    return MarketplaceCatalogResult.Fail("市场目录包含不完整插件条目。");
+                    return MarketplaceCatalogResult.Fail(
+                        MarketplaceErrorCode.CatalogInvalidEntry,
+                        "市场目录包含不完整插件条目。");
                 if (forcedSource.HasValue)
                     catalog = CloneWithSource(catalog, forcedSource.Value);
                 return MarketplaceCatalogResult.Ok(catalog);
             }
             catch (Exception ex) when (ex is IOException or JsonException)
             {
-                return MarketplaceCatalogResult.Fail($"市场目录不可用：{ex.Message}");
+                return MarketplaceCatalogResult.Fail(
+                    MarketplaceErrorCode.CatalogUnreadable,
+                    $"市场目录不可用：{ex.Message}");
             }
         }
 
@@ -110,7 +120,9 @@ namespace LongBetterWindows.Host.Engine
         public async Task<MarketplaceCatalogResult> LoadAsync(CancellationToken cancellationToken = default)
         {
             if (!File.Exists(_catalogPath))
-                return MarketplaceCatalogResult.Fail("市场目录不存在，本地插件不受影响。");
+                return MarketplaceCatalogResult.Fail(
+                    MarketplaceErrorCode.CatalogNotFound,
+                    "市场目录不存在，本地插件不受影响。");
             await using var stream = File.OpenRead(_catalogPath);
             return await MarketplaceCatalogCodec.ReadAsync(
                 stream, cancellationToken, _source);
@@ -173,9 +185,15 @@ namespace LongBetterWindows.Host.Engine
                 response.EnsureSuccessStatusCode();
                 var finalUri = response.RequestMessage?.RequestUri ?? _registryUri;
                 if (!IsSecureHttp(finalUri))
-                    return await LoadCacheOrFailAsync("Registry 重定向到了非 HTTPS 地址。", cancellationToken);
+                    return await LoadCacheOrFailAsync(
+                        MarketplaceErrorCode.CatalogInsecureRedirect,
+                        "Registry 重定向到了非 HTTPS 地址。",
+                        cancellationToken);
                 if (response.Content.Headers.ContentLength > MarketplaceCatalogCodec.MaximumCatalogBytes)
-                    return await LoadCacheOrFailAsync("远程市场目录超过大小限制。", cancellationToken);
+                    return await LoadCacheOrFailAsync(
+                        MarketplaceErrorCode.CatalogTooLarge,
+                        "远程市场目录超过大小限制。",
+                        cancellationToken);
 
                 await using var source = await response.Content.ReadAsStreamAsync(timeout.Token);
                 await using var bounded = new MemoryStream();
@@ -184,13 +202,19 @@ namespace LongBetterWindows.Host.Engine
                 var parsed = await MarketplaceCatalogCodec.ReadAsync(
                     bounded, timeout.Token, MarketplaceSourceKind.RemoteRegistry);
                 if (!parsed.IsSuccess)
-                    return await LoadCacheOrFailAsync(parsed.Error!, cancellationToken);
+                    return await LoadCacheOrFailAsync(
+                        parsed.ErrorCode,
+                        parsed.Error!,
+                        cancellationToken);
                 await WriteCacheAtomicallyAsync(bounded.ToArray(), cancellationToken);
                 return parsed;
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
             {
-                return await LoadCacheOrFailAsync($"远程市场不可用：{ex.Message}", cancellationToken);
+                return await LoadCacheOrFailAsync(
+                    MarketplaceErrorCode.CatalogNetworkUnavailable,
+                    $"远程市场不可用：{ex.Message}",
+                    cancellationToken);
             }
         }
 
@@ -205,9 +229,12 @@ namespace LongBetterWindows.Host.Engine
         }
 
         private async Task<MarketplaceCatalogResult> LoadCacheOrFailAsync(
-            string networkError, CancellationToken cancellationToken)
+            MarketplaceErrorCode errorCode,
+            string networkError,
+            CancellationToken cancellationToken)
         {
-            if (!File.Exists(_cachePath)) return MarketplaceCatalogResult.Fail(networkError);
+            if (!File.Exists(_cachePath))
+                return MarketplaceCatalogResult.Fail(errorCode, networkError);
             try
             {
                 await using var stream = File.OpenRead(_cachePath);
@@ -215,9 +242,12 @@ namespace LongBetterWindows.Host.Engine
                     stream, cancellationToken, MarketplaceSourceKind.RemoteRegistry);
                 return cached.IsSuccess
                     ? MarketplaceCatalogResult.Ok(cached.Catalog!, true, $"{networkError} 已使用上次可信目录。")
-                    : MarketplaceCatalogResult.Fail(networkError);
+                    : MarketplaceCatalogResult.Fail(errorCode, networkError);
             }
-            catch (IOException) { return MarketplaceCatalogResult.Fail(networkError); }
+            catch (IOException)
+            {
+                return MarketplaceCatalogResult.Fail(errorCode, networkError);
+            }
         }
 
         private async Task WriteCacheAtomicallyAsync(byte[] data, CancellationToken cancellationToken)
@@ -275,7 +305,10 @@ namespace LongBetterWindows.Host.Engine
                 foreach (var entry in result.Catalog.Entries) entries[entry.Id] = entry;
                 if (!string.IsNullOrWhiteSpace(result.Status)) statuses.Add(result.Status);
             }
-            if (entries.Count == 0) return MarketplaceCatalogResult.Fail(string.Join(" ", statuses));
+            if (entries.Count == 0)
+                return MarketplaceCatalogResult.Fail(
+                    MarketplaceErrorCode.CatalogAllSourcesUnavailable,
+                    string.Join(" ", statuses));
             return MarketplaceCatalogResult.Ok(new MarketplaceCatalog
             {
                 SchemaVersion = 1,
@@ -301,13 +334,23 @@ namespace LongBetterWindows.Host.Engine
         public bool IsSuccess { get; init; }
         public MarketplaceCatalog? Catalog { get; init; }
         public string? Error { get; init; }
+        public MarketplaceErrorCode ErrorCode { get; init; }
         public bool IsFallback { get; init; }
         public string? Status { get; init; }
 
         public static MarketplaceCatalogResult Ok(
             MarketplaceCatalog catalog, bool fallback = false, string? status = null)
-            => new() { IsSuccess = true, Catalog = catalog, IsFallback = fallback, Status = status };
-        public static MarketplaceCatalogResult Fail(string error)
-            => new() { Error = error };
+            => new()
+            {
+                IsSuccess = true,
+                Catalog = catalog,
+                ErrorCode = MarketplaceErrorCode.None,
+                IsFallback = fallback,
+                Status = status,
+            };
+        public static MarketplaceCatalogResult Fail(
+            MarketplaceErrorCode code,
+            string technicalMessage)
+            => new() { ErrorCode = code, Error = technicalMessage };
     }
 }

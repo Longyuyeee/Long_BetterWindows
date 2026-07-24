@@ -44,9 +44,13 @@ namespace LongBetterWindows.Host.Engine
         {
             var packageUri = version.PackageUri;
             if (packageUri == null || !IsAllowed(packageUri))
-                return PackageDownloadResult.Fail("插件包地址必须是已允许主机上的 HTTPS 地址。");
+                return PackageDownloadResult.Fail(
+                    MarketplaceErrorCode.DownloadUriNotAllowed,
+                    "插件包地址必须是已允许主机上的 HTTPS 地址。");
             if (!IsSha256(version.Sha256))
-                return PackageDownloadResult.Fail("远程插件缺少有效 SHA-256。");
+                return PackageDownloadResult.Fail(
+                    MarketplaceErrorCode.DownloadHashMissing,
+                    "远程插件缺少有效 SHA-256。");
 
             Directory.CreateDirectory(_cacheDirectory);
             CleanupStaleTemporaryFiles();
@@ -75,7 +79,12 @@ namespace LongBetterWindows.Host.Engine
                     return PackageDownloadResult.Ok(
                         finalPath, true, new FileInfo(finalPath).Length, 0);
                 try { File.Delete(finalPath); }
-                catch (Exception ex) { return PackageDownloadResult.Fail(ex.Message); }
+                catch (Exception ex)
+                {
+                    return PackageDownloadResult.Fail(
+                        MarketplaceErrorCode.DownloadCacheFailure,
+                        ex.Message);
+                }
             }
 
             for (var attempt = 1; attempt <= _maximumAttempts; attempt++)
@@ -90,9 +99,15 @@ namespace LongBetterWindows.Host.Engine
                     response.EnsureSuccessStatusCode();
                     var finalUri = response.RequestMessage?.RequestUri ?? packageUri;
                     if (!IsAllowed(finalUri))
-                        return PackageDownloadResult.Fail("插件包重定向到了未允许的地址。", attempt);
+                        return PackageDownloadResult.Fail(
+                            MarketplaceErrorCode.DownloadRedirectNotAllowed,
+                            "插件包重定向到了未允许的地址。",
+                            attempt);
                     if (response.Content.Headers.ContentLength > MaximumPackageBytes)
-                        return PackageDownloadResult.Fail("插件包超过 256 MB 安全限制。", attempt);
+                        return PackageDownloadResult.Fail(
+                            MarketplaceErrorCode.DownloadTooLarge,
+                            "插件包超过 256 MB 安全限制。",
+                            attempt);
 
                     await using var source = await response.Content.ReadAsStreamAsync(timeout.Token);
                     await using var destination = new FileStream(
@@ -106,7 +121,10 @@ namespace LongBetterWindows.Host.Engine
                     {
                         total += read;
                         if (total > MaximumPackageBytes)
-                            return PackageDownloadResult.Fail("插件包超过 256 MB 安全限制。", attempt);
+                            return PackageDownloadResult.Fail(
+                                MarketplaceErrorCode.DownloadTooLarge,
+                                "插件包超过 256 MB 安全限制。",
+                                attempt);
                         hash.AppendData(buffer, 0, read);
                         await destination.WriteAsync(buffer.AsMemory(0, read), timeout.Token);
                     }
@@ -114,14 +132,19 @@ namespace LongBetterWindows.Host.Engine
                     var actualHash = Convert.ToHexString(hash.GetHashAndReset());
                     if (!HashesEqual(actualHash, version.Sha256))
                         return PackageDownloadResult.Fail(
-                            "下载包 SHA-256 与 Registry 不一致。", attempt);
+                            MarketplaceErrorCode.DownloadHashMismatch,
+                            "下载包 SHA-256 与 Registry 不一致。",
+                            attempt);
                     destination.Close();
                     File.Move(tempPath, finalPath, true);
                     return PackageDownloadResult.Ok(finalPath, false, total, attempt);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    return PackageDownloadResult.Fail("下载已取消。", attempt);
+                    return PackageDownloadResult.Fail(
+                        MarketplaceErrorCode.DownloadCanceled,
+                        "下载已取消。",
+                        attempt);
                 }
                 catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
                 {
@@ -130,7 +153,12 @@ namespace LongBetterWindows.Host.Engine
                         var message = ex is OperationCanceledException
                             ? "插件包下载超时。"
                             : $"插件包下载失败：{ex.Message}";
-                        return PackageDownloadResult.Fail(message, attempt);
+                        return PackageDownloadResult.Fail(
+                            ex is OperationCanceledException
+                                ? MarketplaceErrorCode.DownloadTimeout
+                                : MarketplaceErrorCode.DownloadFailed,
+                            message,
+                            attempt);
                     }
                     await Task.Delay(_retryDelay, cancellationToken);
                 }
@@ -140,7 +168,10 @@ namespace LongBetterWindows.Host.Engine
                 }
             }
 
-            return PackageDownloadResult.Fail("插件包下载失败。", _maximumAttempts);
+            return PackageDownloadResult.Fail(
+                MarketplaceErrorCode.DownloadFailed,
+                "插件包下载失败。",
+                _maximumAttempts);
         }
 
         private static bool ShouldRetry(Exception exception)
@@ -202,6 +233,7 @@ namespace LongBetterWindows.Host.Engine
         public bool IsSuccess { get; init; }
         public string? PackagePath { get; init; }
         public string? Error { get; init; }
+        public MarketplaceErrorCode ErrorCode { get; init; }
         public bool FromCache { get; init; }
         public long Bytes { get; init; }
         public int Attempts { get; init; }
@@ -210,12 +242,21 @@ namespace LongBetterWindows.Host.Engine
             {
                 IsSuccess = true,
                 PackagePath = path,
+                ErrorCode = MarketplaceErrorCode.None,
                 FromCache = cache,
                 Bytes = bytes,
                 Attempts = attempts,
             };
-        public static PackageDownloadResult Fail(string error, int attempts = 0)
-            => new() { Error = error, Attempts = attempts };
+        public static PackageDownloadResult Fail(
+            MarketplaceErrorCode code,
+            string technicalMessage,
+            int attempts = 0)
+            => new()
+            {
+                ErrorCode = code,
+                Error = technicalMessage,
+                Attempts = attempts,
+            };
     }
 
     public static class MarketplaceConfigurationLoader

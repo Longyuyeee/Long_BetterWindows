@@ -104,7 +104,10 @@ namespace LongBetterWindows.Host.Interaction
                 if (!validation.IsSuccess)
                 {
                     PendingAction = null;
-                    return MarketplacePreparationResult.Rejected(validation.Error, validation);
+                    return MarketplacePreparationResult.Rejected(
+                        MarketplaceErrorCode.PackageRejected,
+                        validation.Error,
+                        validation);
                 }
 
                 var pending = MarketplacePendingAction.Install(path, metadata, validation);
@@ -131,6 +134,7 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     PendingAction = null;
                     return MarketplacePreparationResult.Rejected(
+                        MarketplaceErrorCode.DownloadNotConfigured,
                         "远程下载器尚未配置。");
                 }
 
@@ -139,7 +143,9 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     PendingAction = null;
                     return MarketplacePreparationResult.Rejected(
-                        download.Error ?? "插件包下载失败。", download: download);
+                        download.ErrorCode,
+                        download.Error ?? "插件包下载失败。",
+                        download: download);
                 }
 
                 var metadata = MarketplacePresentation.CreatePackageMetadata(entry, version);
@@ -152,7 +158,10 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     PendingAction = null;
                     return MarketplacePreparationResult.Rejected(
-                        validation.Error, validation, download);
+                        MarketplaceErrorCode.PackageRejected,
+                        validation.Error,
+                        validation,
+                        download);
                 }
 
                 var pending = MarketplacePendingAction.Install(
@@ -319,6 +328,7 @@ namespace LongBetterWindows.Host.Interaction
         bool IsSuccess,
         bool IsBusy,
         bool IsCanceled,
+        MarketplaceErrorCode ErrorCode,
         string? Error,
         MarketplacePendingAction? PendingAction,
         PackageValidationResult? Validation,
@@ -327,16 +337,41 @@ namespace LongBetterWindows.Host.Interaction
         public static MarketplacePreparationResult Prepared(
             MarketplacePendingAction pending,
             PackageDownloadResult? download = null)
-            => new(true, false, false, null, pending, pending.Validation, download);
+            => new(
+                true,
+                false,
+                false,
+                MarketplaceErrorCode.None,
+                null,
+                pending,
+                pending.Validation,
+                download);
         public static MarketplacePreparationResult Rejected(
+            MarketplaceErrorCode code,
             string? error,
             PackageValidationResult? validation = null,
             PackageDownloadResult? download = null)
-            => new(false, false, false, error, null, validation, download);
+            => new(false, false, false, code, error, null, validation, download);
         public static MarketplacePreparationResult Busy()
-            => new(false, true, false, "已有市场操作正在进行。", null, null, null);
+            => new(
+                false,
+                true,
+                false,
+                MarketplaceErrorCode.OperationBusy,
+                "已有市场操作正在进行。",
+                null,
+                null,
+                null);
         public static MarketplacePreparationResult Canceled()
-            => new(false, false, true, "操作已取消。", null, null, null);
+            => new(
+                false,
+                false,
+                true,
+                MarketplaceErrorCode.OperationCanceled,
+                "操作已取消。",
+                null,
+                null,
+                null);
     }
 
     internal sealed record MarketplaceExecutionResult(

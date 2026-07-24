@@ -187,7 +187,8 @@ namespace LongBetterWindows.Host.Views
             {
                 MarketList.ItemsSource = Array.Empty<MarketCardModel>();
                 ResultCountText.Text = I18n("market.status.offline");
-                CatalogStatusText.Text = result.Error;
+                CatalogStatusText.Text = I18n(
+                    MarketplacePresentation.GetErrorResourceKey(result.ErrorCode));
                 MarketSourceBadge.Text = I18n("market.source.offline");
                 CategoryBox.ItemsSource = new[] { I18n("market.allCategories") };
                 CategoryBox.SelectedIndex = 0;
@@ -203,12 +204,12 @@ namespace LongBetterWindows.Host.Views
                 .Concat(MarketplacePresentation.GetCategories(catalog))
                 .ToArray();
             CategoryBox.SelectedIndex = 0;
-            CatalogStatusText.Text = string.IsNullOrWhiteSpace(result.Status)
-                ? string.Format(
+            CatalogStatusText.Text = result.IsFallback
+                ? I18n("market.status.catalogFallback")
+                : string.Format(
                     I18n("market.status.generated"),
                     catalog.GeneratedAt.ToString("yyyy-MM-dd"),
-                    catalog.SchemaVersion)
-                : result.Status;
+                    catalog.SchemaVersion);
             await ApplyFiltersAsync();
             _ = Dispatcher.BeginInvoke(
                 new Action(() => BringIntoView(new Rect(0, 0, 1, 1))),
@@ -369,7 +370,8 @@ namespace LongBetterWindows.Host.Views
             var preparation = _session.PrepareUninstall(installed);
             if (!preparation.IsSuccess)
             {
-                DetailHint.Text = preparation.Error;
+                DetailHint.Text = I18n(
+                    MarketplacePresentation.GetErrorResourceKey(preparation.ErrorCode));
                 return;
             }
             ConfirmTitle.Text = I18n("market.confirm.uninstallTitle");
@@ -394,28 +396,23 @@ namespace LongBetterWindows.Host.Views
             ConfirmActionButton.Focus();
         }
 
-        private void ShowConfirmationError(string title, string error)
+        private void ShowConfirmationError(
+            string title,
+            MarketplaceErrorCode errorCode)
         {
+            var message = I18n(
+                MarketplacePresentation.GetErrorResourceKey(errorCode));
             ConfirmTitle.Text = title;
             ConfirmSubtitle.Text = I18n("market.confirm.blocked");
             ConfirmTrustText.Text = I18n("market.confirm.validationFailed");
             AutomationProperties.SetItemStatus(
                 ConfirmTrustText,
-                error.Contains("超时", StringComparison.OrdinalIgnoreCase)
-                    ? "NetworkTimeout"
-                    : error.Contains("下载失败", StringComparison.OrdinalIgnoreCase)
-                        || error.Contains("网络", StringComparison.OrdinalIgnoreCase)
-                        ? "NetworkUnavailable"
-                : error.Contains("SHA-256", StringComparison.OrdinalIgnoreCase)
-                    ? "HashRejected"
-                    : error.Contains("签名", StringComparison.OrdinalIgnoreCase)
-                        ? "SignatureRejected"
-                        : "Rejected");
+                MarketplacePresentation.GetErrorAutomationStatus(errorCode));
             ConfirmHashText.Text = string.Empty;
-            ConfirmCompatibilityText.Text = error;
+            ConfirmCompatibilityText.Text = message;
             PermissionDiffItems.ItemsSource = Array.Empty<string>();
             HighTrustWarning.Visibility = Visibility.Collapsed;
-            ConfirmErrorText.Text = error;
+            ConfirmErrorText.Text = message;
             ConfirmActionButton.IsEnabled = false;
             ConfirmOverlay.Visibility = Visibility.Visible;
         }
@@ -539,7 +536,7 @@ namespace LongBetterWindows.Host.Views
             {
                 ShowConfirmationError(
                     rejectionTitle,
-                    preparation.Error ?? I18n("market.error.unknown"));
+                    preparation.ErrorCode);
                 return;
             }
 

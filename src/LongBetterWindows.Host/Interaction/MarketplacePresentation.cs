@@ -91,6 +91,58 @@ namespace LongBetterWindows.Host.Interaction
                 _ => "market.error.unknown",
             };
 
+        public static string GetErrorResourceKey(MarketplaceErrorCode code)
+            => code switch
+            {
+                MarketplaceErrorCode.CatalogNotFound => "market.error.catalog.notFound",
+                MarketplaceErrorCode.CatalogUnsupported => "market.error.catalog.unsupported",
+                MarketplaceErrorCode.CatalogTooLarge => "market.error.catalog.tooLarge",
+                MarketplaceErrorCode.CatalogDuplicatePlugin
+                    or MarketplaceErrorCode.CatalogInvalidEntry => "market.error.catalog.invalid",
+                MarketplaceErrorCode.CatalogUnreadable
+                    or MarketplaceErrorCode.CatalogNetworkUnavailable
+                    or MarketplaceErrorCode.CatalogAllSourcesUnavailable => "market.error.catalog.unavailable",
+                MarketplaceErrorCode.CatalogInsecureRedirect => "market.error.catalog.insecure",
+                MarketplaceErrorCode.DownloadNotConfigured => "market.error.download.notConfigured",
+                MarketplaceErrorCode.DownloadUriNotAllowed
+                    or MarketplaceErrorCode.DownloadRedirectNotAllowed => "market.error.download.sourceRejected",
+                MarketplaceErrorCode.DownloadHashMissing => "market.error.download.metadataInvalid",
+                MarketplaceErrorCode.DownloadCacheFailure => "market.error.download.cacheFailure",
+                MarketplaceErrorCode.DownloadTooLarge => "market.error.download.tooLarge",
+                MarketplaceErrorCode.DownloadHashMismatch => "market.error.download.hashMismatch",
+                MarketplaceErrorCode.DownloadCanceled
+                    or MarketplaceErrorCode.OperationCanceled => "market.status.canceled",
+                MarketplaceErrorCode.DownloadTimeout => "market.error.download.timeout",
+                MarketplaceErrorCode.DownloadFailed => "market.error.downloadFailed",
+                MarketplaceErrorCode.PackageRejected => "market.error.packageRejected",
+                MarketplaceErrorCode.OperationBusy => "market.error.busyWait",
+                _ => "market.error.unknown",
+            };
+
+        public static string GetErrorAutomationStatus(MarketplaceErrorCode code)
+            => code switch
+            {
+                MarketplaceErrorCode.DownloadTimeout => "NetworkTimeout",
+                MarketplaceErrorCode.DownloadFailed
+                    or MarketplaceErrorCode.CatalogNetworkUnavailable
+                    or MarketplaceErrorCode.CatalogAllSourcesUnavailable => "NetworkUnavailable",
+                MarketplaceErrorCode.DownloadHashMissing
+                    or MarketplaceErrorCode.DownloadHashMismatch => "HashRejected",
+                MarketplaceErrorCode.DownloadUriNotAllowed
+                    or MarketplaceErrorCode.DownloadRedirectNotAllowed
+                    or MarketplaceErrorCode.CatalogInsecureRedirect => "SourceRejected",
+                MarketplaceErrorCode.CatalogNotFound
+                    or MarketplaceErrorCode.CatalogUnsupported
+                    or MarketplaceErrorCode.CatalogTooLarge
+                    or MarketplaceErrorCode.CatalogDuplicatePlugin
+                    or MarketplaceErrorCode.CatalogInvalidEntry
+                    or MarketplaceErrorCode.CatalogUnreadable => "CatalogRejected",
+                MarketplaceErrorCode.OperationBusy => "Busy",
+                MarketplaceErrorCode.DownloadCanceled
+                    or MarketplaceErrorCode.OperationCanceled => "Canceled",
+                _ => "Rejected",
+            };
+
         public static Version ParseVersion(string? value)
         {
             var normalized = (value ?? "0.0.0").TrimStart('v', 'V').Split('-', '+')[0];

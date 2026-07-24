@@ -109,7 +109,9 @@ namespace LongBetterWindows.Host.Services
         {
             await InitializeAsync(cancellationToken);
             return _downloader == null
-                ? PackageDownloadResult.Fail("Remote marketplace download is not configured.")
+                ? PackageDownloadResult.Fail(
+                    MarketplaceErrorCode.DownloadNotConfigured,
+                    "Remote marketplace download is not configured.")
                 : await _downloader.DownloadAsync(pluginId, version, cancellationToken);
         }
 
