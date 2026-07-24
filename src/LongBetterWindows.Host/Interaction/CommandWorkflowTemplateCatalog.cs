@@ -15,12 +15,14 @@ namespace LongBetterWindows.Host.Interaction
 
     public sealed record CommandWorkflowTemplateIssue(
         string FileName,
+        WorkflowErrorCode ErrorCode,
         string Error);
 
     public sealed record CommandWorkflowTemplateListResult(
         bool IsSuccess,
         IReadOnlyList<CommandWorkflowTemplateSummary> Templates,
         IReadOnlyList<CommandWorkflowTemplateIssue> Issues,
+        WorkflowErrorCode ErrorCode,
         string? Error);
 
     /// <summary>Reads bounded workflow templates without creating or modifying the catalog directory.</summary>
@@ -53,6 +55,7 @@ namespace LongBetterWindows.Host.Interaction
                         true,
                         Array.Empty<CommandWorkflowTemplateSummary>(),
                         Array.Empty<CommandWorkflowTemplateIssue>(),
+                        WorkflowErrorCode.None,
                         null);
                 }
 
@@ -66,6 +69,7 @@ namespace LongBetterWindows.Host.Interaction
                 if (paths.Count > MaximumTemplateCount)
                 {
                     return Failure(
+                        WorkflowErrorCode.TemplateLimitExceeded,
                         $"Workflow template catalog cannot contain more than {MaximumTemplateCount} templates.");
                 }
 
@@ -82,6 +86,7 @@ namespace LongBetterWindows.Host.Interaction
                     {
                         issues.Add(new CommandWorkflowTemplateIssue(
                             fileName,
+                            result.ErrorCode,
                             result.Error ?? "Workflow template could not be read."));
                         continue;
                     }
@@ -91,6 +96,7 @@ namespace LongBetterWindows.Host.Interaction
                     {
                         issues.Add(new CommandWorkflowTemplateIssue(
                             fileName,
+                            WorkflowErrorCode.TemplateDuplicateId,
                             $"Workflow template id is duplicated: {workflow.Id}"));
                         continue;
                     }
@@ -113,12 +119,15 @@ namespace LongBetterWindows.Host.Interaction
                         .ThenBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
                         .ToList(),
                     issues,
+                    WorkflowErrorCode.None,
                     null);
             }
             catch (Exception ex) when (
                 ex is ArgumentException or IOException or UnauthorizedAccessException)
             {
-                return Failure($"Workflow template catalog is unavailable: {ex.Message}");
+                return Failure(
+                    WorkflowErrorCode.TemplateCatalogUnavailable,
+                    $"Workflow template catalog is unavailable: {ex.Message}");
             }
         }
 
@@ -128,17 +137,26 @@ namespace LongBetterWindows.Host.Interaction
             CancellationToken cancellationToken = default)
         {
             if (!IsTemplateKey(templateKey))
-                return ReadFailure("Workflow template key is invalid.");
+                return ReadFailure(
+                    WorkflowErrorCode.TemplateKeyInvalid,
+                    "Workflow template key is invalid.");
             if (!IsSha256(expectedDefinitionSha256))
-                return ReadFailure("Expected workflow template hash must be 64 hexadecimal characters.");
+                return ReadFailure(
+                    WorkflowErrorCode.ExpectedHashInvalid,
+                    "Expected workflow template hash must be 64 hexadecimal characters.");
 
             try
             {
                 var root = GetExistingRoot();
-                if (root is null) return ReadFailure("Workflow template catalog was not found.");
+                if (root is null)
+                    return ReadFailure(
+                        WorkflowErrorCode.TemplateCatalogNotFound,
+                        "Workflow template catalog was not found.");
                 var path = Path.GetFullPath(Path.Combine(root.FullName, templateKey));
                 if (!IsWithinRoot(path))
-                    return ReadFailure("Workflow template path escapes the catalog root.");
+                    return ReadFailure(
+                        WorkflowErrorCode.TemplatePathRejected,
+                        "Workflow template path escapes the catalog root.");
                 EnsureRootIsStable(root.FullName);
                 var result = await _repository.ImportAsync(path, cancellationToken);
                 if (!result.IsSuccess) return result;
@@ -147,14 +165,18 @@ namespace LongBetterWindows.Host.Interaction
                     expectedDefinitionSha256.Trim(),
                     StringComparison.OrdinalIgnoreCase))
                 {
-                    return ReadFailure("Workflow template changed after it was listed; refresh the catalog.");
+                    return ReadFailure(
+                        WorkflowErrorCode.TemplateChanged,
+                        "Workflow template changed after it was listed; refresh the catalog.");
                 }
                 return result;
             }
             catch (Exception ex) when (
                 ex is ArgumentException or IOException or UnauthorizedAccessException)
             {
-                return ReadFailure($"Workflow template could not be opened: {ex.Message}");
+                return ReadFailure(
+                    WorkflowErrorCode.TemplateOpenFailed,
+                    $"Workflow template could not be opened: {ex.Message}");
             }
         }
 
@@ -196,14 +218,19 @@ namespace LongBetterWindows.Host.Interaction
             return normalized.Length == 64 && normalized.All(Uri.IsHexDigit);
         }
 
-        private static CommandWorkflowTemplateListResult Failure(string error)
+        private static CommandWorkflowTemplateListResult Failure(
+            WorkflowErrorCode errorCode,
+            string technicalMessage)
             => new(
                 false,
                 Array.Empty<CommandWorkflowTemplateSummary>(),
                 Array.Empty<CommandWorkflowTemplateIssue>(),
-                error);
+                errorCode,
+                technicalMessage);
 
-        private static WorkflowDocumentReadResult ReadFailure(string error)
+        private static WorkflowDocumentReadResult ReadFailure(
+            WorkflowErrorCode errorCode,
+            string technicalMessage)
             => new(
                 false,
                 null,
@@ -211,7 +238,7 @@ namespace LongBetterWindows.Host.Interaction
                 WorkflowDocumentTrustLevel.Untrusted,
                 string.Empty,
                 null,
-                WorkflowErrorCode.ValidationFailed,
-                error);
+                errorCode,
+                technicalMessage);
     }
 }

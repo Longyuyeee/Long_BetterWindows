@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
 
 namespace LongBetterWindows.Tests;
@@ -41,6 +42,28 @@ public sealed class WorkflowErrorContractTests : IDisposable
         Assert.Equal(5118, (int)WorkflowErrorCode.ExportPathInvalid);
         Assert.Equal(5119, (int)WorkflowErrorCode.ExportLocationRejected);
         Assert.Equal(5120, (int)WorkflowErrorCode.ExportFailed);
+        Assert.Equal(5200, (int)WorkflowErrorCode.TemplateCatalogUnavailable);
+        Assert.Equal(5201, (int)WorkflowErrorCode.TemplateLimitExceeded);
+        Assert.Equal(5202, (int)WorkflowErrorCode.TemplateDuplicateId);
+        Assert.Equal(5203, (int)WorkflowErrorCode.TemplateKeyInvalid);
+        Assert.Equal(5204, (int)WorkflowErrorCode.TemplateCatalogNotFound);
+        Assert.Equal(5205, (int)WorkflowErrorCode.TemplatePathRejected);
+        Assert.Equal(5206, (int)WorkflowErrorCode.TemplateChanged);
+        Assert.Equal(5207, (int)WorkflowErrorCode.TemplateOpenFailed);
+        Assert.Equal(5210, (int)WorkflowErrorCode.ImportReviewInvalid);
+        Assert.Equal(5220, (int)WorkflowErrorCode.EditorIdentityConflict);
+        Assert.Equal(5221, (int)WorkflowErrorCode.EditorLimitExceeded);
+        Assert.Equal(5222, (int)WorkflowErrorCode.EditorCommandUnavailable);
+        Assert.Equal(5223, (int)WorkflowErrorCode.EditorInputRejected);
+        Assert.Equal(5224, (int)WorkflowErrorCode.EditorTargetUnavailable);
+        Assert.Equal(5230, (int)WorkflowErrorCode.PreflightDefinitionInvalid);
+        Assert.Equal(5231, (int)WorkflowErrorCode.PreflightCommandInvalid);
+        Assert.Equal(5232, (int)WorkflowErrorCode.PreflightPluginUnavailable);
+        Assert.Equal(5233, (int)WorkflowErrorCode.PreflightInputInvalid);
+        Assert.Equal(5234, (int)WorkflowErrorCode.PreflightArgumentInvalid);
+        Assert.Equal(5235, (int)WorkflowErrorCode.PreflightBindingInvalid);
+        Assert.Equal(5236, (int)WorkflowErrorCode.PreflightCompensationRequired);
+        Assert.Equal(5237, (int)WorkflowErrorCode.PreflightCatalogChanged);
     }
 
     [Fact]
@@ -85,6 +108,33 @@ public sealed class WorkflowErrorContractTests : IDisposable
     }
 
     [Fact]
+    public async Task ReviewEditorAndPreflightFailures_PropagateStableCodes()
+    {
+        var registry = new PluginRegistry();
+        var repository = new CommandWorkflowRepository(_root, "local-user");
+        var session = new CommandWorkflowEditorSession(registry, repository);
+        session.StartNew("workflow.current", "Current");
+
+        var duplicate = session.DuplicateCurrent("WORKFLOW.CURRENT", "Copy");
+        var import = await session.PreviewImportAsync("");
+        var template = await session.PreviewTemplateAsync(
+            "missing.workflow.json",
+            new string('0', 64));
+        var preflight = new CommandWorkflowPlanner(registry).Preflight(
+            Workflow("workflow.preflight"));
+
+        Assert.False(duplicate);
+        Assert.Equal(WorkflowErrorCode.EditorIdentityConflict, session.State.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.PathInvalid, import.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.TemplateCatalogUnavailable, template.ErrorCode);
+        Assert.False(preflight.IsValid);
+        Assert.Equal(WorkflowErrorCode.PreflightCommandInvalid, preflight.ErrorCode);
+        Assert.All(
+            preflight.IssueDetails,
+            issue => Assert.NotEqual(WorkflowErrorCode.None, issue.ErrorCode));
+    }
+
+    [Fact]
     public void WorkflowFailures_HaveBilingualPresentationKeys()
     {
         var repository = FindRepositoryRoot();
@@ -121,6 +171,26 @@ public sealed class WorkflowErrorContractTests : IDisposable
             StringComparison.Ordinal);
         Assert.Contains(
             "WorkflowErrorPresentation.GetResourceKey(result.ErrorCode)",
+            view,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "PreflightDetail.Text = state.Error",
+            view,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "I18n(\"workflow.import.error.read\")",
+            view,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "I18n(\"workflow.template.error.catalog\")",
+            view,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "I18n(\"workflow.template.error.read\")",
+            view,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Format(\"workflow.import.error.adopt\"",
             view,
             StringComparison.Ordinal);
     }

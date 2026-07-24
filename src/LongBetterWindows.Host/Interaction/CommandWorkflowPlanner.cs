@@ -23,14 +23,23 @@ namespace LongBetterWindows.Host.Interaction
             ArgumentNullException.ThrowIfNull(workflow);
 
             var catalogRevision = _plugins.CatalogRevision;
-            var issues = new List<string>();
+            var issues = new List<CommandWorkflowPreflightIssue>();
             var pluginIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (!IsValidIdentifier(workflow.Id))
-                issues.Add("Workflow id must contain 1-64 letters, digits, dots, underscores, or hyphens.");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightDefinitionInvalid,
+                    "Workflow id must contain 1-64 letters, digits, dots, underscores, or hyphens.");
             if (string.IsNullOrWhiteSpace(workflow.Name))
-                issues.Add("Workflow name must not be empty.");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightDefinitionInvalid,
+                    "Workflow name must not be empty.");
             if (workflow.Steps.Count is < 1 or > MaximumStepCount)
-                issues.Add($"Workflow must contain between 1 and {MaximumStepCount} steps.");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightDefinitionInvalid,
+                    $"Workflow must contain between 1 and {MaximumStepCount} steps.");
 
             var stepIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var availableOutputs = new Dictionary<
@@ -40,9 +49,15 @@ namespace LongBetterWindows.Host.Interaction
             foreach (var step in workflow.Steps)
             {
                 if (!IsValidIdentifier(step.Id))
-                    issues.Add("Workflow step id must contain 1-64 letters, digits, dots, underscores, or hyphens.");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightDefinitionInvalid,
+                        "Workflow step id must contain 1-64 letters, digits, dots, underscores, or hyphens.");
                 else if (!stepIds.Add(step.Id))
-                    issues.Add($"Workflow step id is duplicated: {step.Id}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightDefinitionInvalid,
+                        $"Workflow step id is duplicated: {step.Id}");
 
                 ValidateCommand(
                     step.Id,
@@ -69,7 +84,10 @@ namespace LongBetterWindows.Host.Interaction
                     && step.Effect == WorkflowStepEffect.Mutating
                     && step.Compensation is null)
                 {
-                    issues.Add($"Mutating workflow step requires compensation: {step.Id}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightCompensationRequired,
+                        $"Mutating workflow step requires compensation: {step.Id}");
                 }
                 availableOutputs[step.Id] = GetDeclaredOutputs(step.Command);
             }
@@ -80,7 +98,10 @@ namespace LongBetterWindows.Host.Interaction
                 var entry = _plugins.Get(id);
                 if (entry is null)
                 {
-                    issues.Add($"Workflow plugin changed during preflight: {id}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightCatalogChanged,
+                        $"Workflow plugin changed during preflight: {id}");
                     continue;
                 }
                 permissions.Add(new WorkflowPermissionRequirement(
@@ -92,13 +113,19 @@ namespace LongBetterWindows.Host.Interaction
                         .ToList()));
             }
             if (_plugins.CatalogRevision != catalogRevision)
-                issues.Add("Plugin catalog changed during workflow preflight.");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightCatalogChanged,
+                    "Plugin catalog changed during workflow preflight.");
 
             return new CommandWorkflowPreflightResult(
                 issues.Count == 0,
                 ComputeFingerprint(workflow, permissions),
-                issues,
-                permissions);
+                issues.Select(issue => issue.Message).ToArray(),
+                permissions)
+            {
+                IssueDetails = issues.ToArray(),
+            };
         }
 
         private void ValidateCommand(
@@ -108,24 +135,33 @@ namespace LongBetterWindows.Host.Interaction
             IReadOnlyDictionary<
                 string,
                 IReadOnlyDictionary<string, PluginCommandOutputType>> availableOutputs,
-            ICollection<string> issues,
+            ICollection<CommandWorkflowPreflightIssue> issues,
             ISet<string> pluginIds)
         {
             if (command is null || string.IsNullOrWhiteSpace(command.CommandKey))
             {
-                issues.Add($"Workflow step {role} is missing: {stepId}");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightCommandInvalid,
+                    $"Workflow step {role} is missing: {stepId}");
                 return;
             }
 
             var descriptor = _plugins.Commands.Get(command.CommandKey);
             if (descriptor is null)
             {
-                issues.Add($"Workflow step {role} command was not found: {stepId}");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightCommandInvalid,
+                    $"Workflow step {role} command was not found: {stepId}");
                 return;
             }
             if (_plugins.Get(descriptor.PluginId) is null)
             {
-                issues.Add($"Workflow step {role} plugin is not loaded: {stepId}");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightPluginUnavailable,
+                    $"Workflow step {role} plugin is not loaded: {stepId}");
                 return;
             }
 
@@ -137,12 +173,18 @@ namespace LongBetterWindows.Host.Interaction
                     descriptor.Command.Id,
                     StringComparison.OrdinalIgnoreCase))
             {
-                issues.Add($"Workflow step {role} command id does not match its target: {stepId}");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightCommandInvalid,
+                    $"Workflow step {role} command id does not match its target: {stepId}");
                 return;
             }
             if (!descriptor.Command.AcceptedInputs.Contains(invocation.InputType))
             {
-                issues.Add($"Workflow step {role} input type is not accepted: {stepId}");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightInputInvalid,
+                    $"Workflow step {role} input type is not accepted: {stepId}");
             }
             var deferredArgumentKeys = (command.Bindings ?? Array.Empty<WorkflowValueBinding>())
                 .Where(binding => binding.Target == WorkflowBindingTarget.Argument
@@ -154,7 +196,9 @@ namespace LongBetterWindows.Host.Interaction
                 deferredArgumentKeys);
             foreach (var issue in parameterResult.Issues)
             {
-                issues.Add(
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightArgumentInvalid,
                     $"Workflow step {role} parameters are invalid: {stepId}. {issue}");
             }
             ValidateBindings(
@@ -189,12 +233,15 @@ namespace LongBetterWindows.Host.Interaction
             IReadOnlyDictionary<
                 string,
                 IReadOnlyDictionary<string, PluginCommandOutputType>> availableOutputs,
-            ICollection<string> issues)
+            ICollection<CommandWorkflowPreflightIssue> issues)
         {
             bindings ??= Array.Empty<WorkflowValueBinding>();
             if (bindings.Count > 64)
             {
-                issues.Add($"Workflow step {role} has more than 64 bindings: {stepId}");
+                AddIssue(
+                    issues,
+                    WorkflowErrorCode.PreflightBindingInvalid,
+                    $"Workflow step {role} has more than 64 bindings: {stepId}");
                 return;
             }
             var textTargets = 0;
@@ -208,35 +255,56 @@ namespace LongBetterWindows.Host.Interaction
                 PluginCommandOutputType? outputType = null;
                 if (!availableOutputs.TryGetValue(binding.SourceStepId, out var sourceOutputs))
                 {
-                    issues.Add($"Workflow step {role} binding source must already be available: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} binding source must already be available: {stepId}");
                 }
                 else if (!sourceOutputs.TryGetValue(binding.OutputKey, out var declaredType))
                 {
-                    issues.Add($"Workflow step {role} binding output is not declared: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} binding output is not declared: {stepId}");
                 }
                 else
                 {
                     outputType = declaredType;
                 }
                 if (!IsValidIdentifier(binding.OutputKey))
-                    issues.Add($"Workflow step {role} binding output key is invalid: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} binding output key is invalid: {stepId}");
                 if (!Enum.IsDefined(binding.Target))
                 {
-                    issues.Add($"Workflow step {role} binding target is invalid: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} binding target is invalid: {stepId}");
                     continue;
                 }
                 if (binding.Target == WorkflowBindingTarget.Text && ++textTargets > 1)
-                    issues.Add($"Workflow step {role} has duplicate text bindings: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} has duplicate text bindings: {stepId}");
                 if (binding.Target == WorkflowBindingTarget.Text
                     && inputType is AcceptedInputType.None or AcceptedInputType.Image)
                 {
-                    issues.Add($"Workflow step {role} text binding is incompatible with its input type: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} text binding is incompatible with its input type: {stepId}");
                 }
                 if (binding.Target == WorkflowBindingTarget.Text
                     && outputType.HasValue
                     && outputType.Value != PluginCommandOutputType.Text)
                 {
-                    issues.Add($"Workflow step {role} text binding output type is incompatible: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} text binding output type is incompatible: {stepId}");
                 }
                 if (binding.Target == WorkflowBindingTarget.Path
                     && inputType is not (AcceptedInputType.File
@@ -244,43 +312,69 @@ namespace LongBetterWindows.Host.Interaction
                         or AcceptedInputType.Folder
                         or AcceptedInputType.ExplorerSelection))
                 {
-                    issues.Add($"Workflow step {role} path binding is incompatible with its input type: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} path binding is incompatible with its input type: {stepId}");
                 }
                 if (binding.Target == WorkflowBindingTarget.Path
                     && outputType.HasValue
                     && outputType.Value != PluginCommandOutputType.Path)
                 {
-                    issues.Add($"Workflow step {role} path binding output type is incompatible: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} path binding output type is incompatible: {stepId}");
                 }
                 if (binding.Target == WorkflowBindingTarget.Argument)
                 {
                     if (string.IsNullOrWhiteSpace(binding.ArgumentKey)
                         || binding.ArgumentKey.Length > 128)
                     {
-                        issues.Add($"Workflow step {role} binding argument key is invalid: {stepId}");
+                        AddIssue(
+                            issues,
+                            WorkflowErrorCode.PreflightBindingInvalid,
+                            $"Workflow step {role} binding argument key is invalid: {stepId}");
                     }
                     else if (!argumentTargets.Add(binding.ArgumentKey))
                     {
-                        issues.Add($"Workflow step {role} has duplicate argument bindings: {stepId}");
+                        AddIssue(
+                            issues,
+                            WorkflowErrorCode.PreflightBindingInvalid,
+                            $"Workflow step {role} has duplicate argument bindings: {stepId}");
                     }
                     else if (declaredArgumentKeys.Count > 0
                         && !declaredArgumentKeys.Contains(binding.ArgumentKey))
                     {
-                        issues.Add(
+                        AddIssue(
+                            issues,
+                            WorkflowErrorCode.PreflightBindingInvalid,
                             $"Workflow step {role} binding argument target is not declared: {stepId}");
                     }
                     if (outputType.HasValue
                         && outputType.Value != PluginCommandOutputType.Text)
                     {
-                        issues.Add($"Workflow step {role} argument binding output type is incompatible: {stepId}");
+                        AddIssue(
+                            issues,
+                            WorkflowErrorCode.PreflightBindingInvalid,
+                            $"Workflow step {role} argument binding output type is incompatible: {stepId}");
                     }
                 }
                 else if (binding.ArgumentKey is not null)
                 {
-                    issues.Add($"Workflow step {role} non-argument binding has an argument key: {stepId}");
+                    AddIssue(
+                        issues,
+                        WorkflowErrorCode.PreflightBindingInvalid,
+                        $"Workflow step {role} non-argument binding has an argument key: {stepId}");
                 }
             }
         }
+
+        private static void AddIssue(
+            ICollection<CommandWorkflowPreflightIssue> issues,
+            WorkflowErrorCode errorCode,
+            string technicalMessage)
+            => issues.Add(new CommandWorkflowPreflightIssue(errorCode, technicalMessage));
 
         private static bool IsValidIdentifier(string value)
         {

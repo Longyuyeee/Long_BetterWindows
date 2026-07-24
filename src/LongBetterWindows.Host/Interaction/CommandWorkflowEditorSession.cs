@@ -19,6 +19,7 @@ namespace LongBetterWindows.Host.Interaction
         int? MigratedFromSchemaVersion,
         CommandWorkflowPreflightResult? Preflight,
         bool ContainsSensitiveInputs,
+        WorkflowErrorCode ErrorCode,
         string? Error);
 
     public sealed record CommandWorkflowEditorState(
@@ -26,6 +27,7 @@ namespace LongBetterWindows.Host.Interaction
         string? ExistingDefinitionSha256,
         bool IsDirty,
         CommandWorkflowPreflightResult? Preflight,
+        WorkflowErrorCode ErrorCode,
         string? Error)
     {
         public bool CanSave => Draft is not null && Preflight?.IsValid == true;
@@ -48,7 +50,13 @@ namespace LongBetterWindows.Host.Interaction
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _templates = templates;
             _planner = new CommandWorkflowPlanner(plugins);
-            State = new CommandWorkflowEditorState(null, null, false, null, null);
+            State = new CommandWorkflowEditorState(
+                null,
+                null,
+                false,
+                null,
+                WorkflowErrorCode.None,
+                null);
         }
 
         public CommandWorkflowEditorState State { get; private set; }
@@ -72,7 +80,11 @@ namespace LongBetterWindows.Host.Interaction
             var normalizedId = id?.Trim() ?? string.Empty;
             if (string.Equals(source.Id, normalizedId, StringComparison.OrdinalIgnoreCase))
             {
-                State = State with { Error = "A workflow copy must use a different id." };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorIdentityConflict,
+                    Error = "A workflow copy must use a different id.",
+                };
                 return false;
             }
 
@@ -92,7 +104,7 @@ namespace LongBetterWindows.Host.Interaction
             var result = await _repository.LoadManagedAsync(workflowId, cancellationToken);
             if (!result.IsSuccess)
             {
-                State = State with { Error = result.Error };
+                State = State with { ErrorCode = result.ErrorCode, Error = result.Error };
                 return false;
             }
             SetDraft(result.Workflow!, result.DefinitionSha256, isDirty: false);
@@ -106,7 +118,11 @@ namespace LongBetterWindows.Host.Interaction
             if (State.ExistingDefinitionSha256 is not null
                 && !string.Equals(draft.Id, normalizedId, StringComparison.OrdinalIgnoreCase))
             {
-                State = State with { Error = "A saved workflow id cannot be changed." };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorIdentityConflict,
+                    Error = "A saved workflow id cannot be changed.",
+                };
                 return;
             }
             var normalizedName = name?.Trim() ?? string.Empty;
@@ -141,6 +157,7 @@ namespace LongBetterWindows.Host.Interaction
             {
                 State = State with
                 {
+                    ErrorCode = WorkflowErrorCode.EditorLimitExceeded,
                     Error = $"A workflow cannot contain more than {CommandWorkflowPlanner.MaximumStepCount} steps.",
                 };
                 return false;
@@ -148,7 +165,11 @@ namespace LongBetterWindows.Host.Interaction
             var command = CreateCommand(commandKey);
             if (command is null)
             {
-                State = State with { Error = $"Command was not found: {commandKey}" };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorCommandUnavailable,
+                    Error = $"Command was not found: {commandKey}",
+                };
                 return false;
             }
             var steps = draft.Steps.ToList();
@@ -188,7 +209,11 @@ namespace LongBetterWindows.Host.Interaction
                     : CreateCommand(compensationCommandKey);
             if (command is null || (!string.IsNullOrWhiteSpace(compensationCommandKey) && compensation is null))
             {
-                State = State with { Error = "A selected workflow command is no longer available." };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorCommandUnavailable,
+                    Error = "A selected workflow command is no longer available.",
+                };
                 return false;
             }
             if (existing.Effect == effect
@@ -228,18 +253,30 @@ namespace LongBetterWindows.Host.Interaction
                 : step.Compensation;
             if (command?.Invocation is null)
             {
-                State = State with { Error = $"Workflow step {role.ToString().ToLowerInvariant()} is not configured: {stepId}" };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorTargetUnavailable,
+                    Error = $"Workflow step {role.ToString().ToLowerInvariant()} is not configured: {stepId}",
+                };
                 return false;
             }
             var descriptor = _plugins.Commands.Get(command.CommandKey);
             if (descriptor is null)
             {
-                State = State with { Error = $"Command was not found: {command.CommandKey}" };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorCommandUnavailable,
+                    Error = $"Command was not found: {command.CommandKey}",
+                };
                 return false;
             }
             if (!descriptor.Command.AcceptedInputs.Contains(inputType))
             {
-                State = State with { Error = $"Command does not accept {inputType} input: {command.CommandKey}" };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorInputRejected,
+                    Error = $"Command does not accept {inputType} input: {command.CommandKey}",
+                };
                 return false;
             }
 
@@ -274,7 +311,11 @@ namespace LongBetterWindows.Host.Interaction
             ArgumentNullException.ThrowIfNull(bindings);
             if (bindings.Count > 64)
             {
-                State = State with { Error = "A workflow command cannot contain more than 64 bindings." };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorLimitExceeded,
+                    Error = "A workflow command cannot contain more than 64 bindings.",
+                };
                 return false;
             }
 
@@ -287,7 +328,11 @@ namespace LongBetterWindows.Host.Interaction
                 : step.Compensation;
             if (command is null)
             {
-                State = State with { Error = $"Workflow step {role.ToString().ToLowerInvariant()} is not configured: {stepId}" };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.EditorTargetUnavailable,
+                    Error = $"Workflow step {role.ToString().ToLowerInvariant()} is not configured: {stepId}",
+                };
                 return false;
             }
 
@@ -325,6 +370,7 @@ namespace LongBetterWindows.Host.Interaction
                     true,
                     Array.Empty<CommandWorkflowTemplateSummary>(),
                     Array.Empty<CommandWorkflowTemplateIssue>(),
+                    WorkflowErrorCode.None,
                     null));
 
         public async Task<CommandWorkflowImportReview> PreviewTemplateAsync(
@@ -343,7 +389,7 @@ namespace LongBetterWindows.Host.Interaction
                         WorkflowDocumentTrustLevel.Untrusted,
                         string.Empty,
                         null,
-                        WorkflowErrorCode.ValidationFailed,
+                        WorkflowErrorCode.TemplateCatalogUnavailable,
                         "Workflow template catalog is not configured."));
             }
             var result = await _templates.OpenAsync(
@@ -369,6 +415,7 @@ namespace LongBetterWindows.Host.Interaction
                     result.MigratedFromSchemaVersion,
                     null,
                     false,
+                    result.ErrorCode,
                     result.Error);
             }
             var workflow = result.Workflow!;
@@ -382,6 +429,7 @@ namespace LongBetterWindows.Host.Interaction
                 result.MigratedFromSchemaVersion,
                 _planner.Preflight(workflow),
                 CommandWorkflowDocumentCodec.ContainsSensitiveInputs(workflow),
+                WorkflowErrorCode.None,
                 null);
         }
 
@@ -390,7 +438,13 @@ namespace LongBetterWindows.Host.Interaction
             ArgumentNullException.ThrowIfNull(review);
             if (!review.IsSuccess || review.Workflow is null)
             {
-                State = State with { Error = review.Error ?? "Workflow import review is invalid." };
+                State = State with
+                {
+                    ErrorCode = review.ErrorCode == WorkflowErrorCode.None
+                        ? WorkflowErrorCode.ImportReviewInvalid
+                        : review.ErrorCode,
+                    Error = review.Error ?? "Workflow import review is invalid.",
+                };
                 return false;
             }
             SetDraft(review.Workflow, existingHash: null, isDirty: true);
@@ -432,12 +486,17 @@ namespace LongBetterWindows.Host.Interaction
             if (!preflight.IsValid)
             {
                 var error = string.Join(" ", preflight.Issues);
-                State = State with { Preflight = preflight, Error = error };
+                State = State with
+                {
+                    Preflight = preflight,
+                    ErrorCode = preflight.ErrorCode,
+                    Error = error,
+                };
                 return new CommandWorkflowSaveResult(
                     false,
                     null,
                     string.Empty,
-                    WorkflowErrorCode.ValidationFailed,
+                    preflight.ErrorCode,
                     error);
             }
             var result = await _repository.SaveAsync(
@@ -452,7 +511,7 @@ namespace LongBetterWindows.Host.Interaction
             }
             else
             {
-                State = State with { Error = result.Error };
+                State = State with { ErrorCode = result.ErrorCode, Error = result.Error };
             }
             return result;
         }
@@ -464,7 +523,11 @@ namespace LongBetterWindows.Host.Interaction
             if (State.ExistingDefinitionSha256 is null)
             {
                 const string error = "The workflow has not been saved.";
-                State = State with { Error = error };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.ExpectedVersionMissing,
+                    Error = error,
+                };
                 return new CommandWorkflowDeleteResult(
                     false,
                     WorkflowErrorCode.ExpectedVersionMissing,
@@ -475,9 +538,15 @@ namespace LongBetterWindows.Host.Interaction
                 State.ExistingDefinitionSha256,
                 cancellationToken);
             if (result.IsSuccess)
-                State = new CommandWorkflowEditorState(null, null, false, null, null);
+                State = new CommandWorkflowEditorState(
+                    null,
+                    null,
+                    false,
+                    null,
+                    WorkflowErrorCode.None,
+                    null);
             else
-                State = State with { Error = result.Error };
+                State = State with { ErrorCode = result.ErrorCode, Error = result.Error };
             return result;
         }
 
@@ -489,7 +558,11 @@ namespace LongBetterWindows.Host.Interaction
             if (State.ExistingDefinitionSha256 is null || State.IsDirty)
             {
                 const string error = "Workflow must be saved without pending changes before export.";
-                State = State with { Error = error };
+                State = State with
+                {
+                    ErrorCode = WorkflowErrorCode.ExpectedVersionMissing,
+                    Error = error,
+                };
                 return new CommandWorkflowExportResult(
                     false,
                     null,
@@ -502,7 +575,8 @@ namespace LongBetterWindows.Host.Interaction
                 State.ExistingDefinitionSha256,
                 destinationPath,
                 cancellationToken);
-            if (!result.IsSuccess) State = State with { Error = result.Error };
+            if (!result.IsSuccess)
+                State = State with { ErrorCode = result.ErrorCode, Error = result.Error };
             return result;
         }
 
@@ -562,6 +636,7 @@ namespace LongBetterWindows.Host.Interaction
                 existingHash,
                 isDirty,
                 _planner.Preflight(draft),
+                WorkflowErrorCode.None,
                 null);
         }
 

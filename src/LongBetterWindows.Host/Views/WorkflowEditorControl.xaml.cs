@@ -233,10 +233,11 @@ namespace LongBetterWindows.Host.Views
             if (!review.IsSuccess)
             {
                 Log.Warning(
-                    "External workflow import preview failed: {Error}",
+                    "External workflow import preview failed ({ErrorCode}): {Error}",
+                    review.ErrorCode,
                     review.Error);
                 MessageBox.Show(
-                    I18n("workflow.import.error.read"),
+                    I18n(WorkflowErrorPresentation.GetResourceKey(review.ErrorCode)),
                     I18n("workflow.import.dialog.errorTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -253,10 +254,11 @@ namespace LongBetterWindows.Host.Views
             if (!result.IsSuccess)
             {
                 Log.Warning(
-                    "Workflow template catalog could not be listed: {Error}",
+                    "Workflow template catalog could not be listed ({ErrorCode}): {Error}",
+                    result.ErrorCode,
                     result.Error);
                 MessageBox.Show(
-                    I18n("workflow.template.error.catalog"),
+                    I18n(WorkflowErrorPresentation.GetResourceKey(result.ErrorCode)),
                     I18n("workflow.template.title"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -324,11 +326,12 @@ namespace LongBetterWindows.Host.Views
             if (!review.IsSuccess)
             {
                 Log.Warning(
-                    "Workflow template preview failed for {TemplateKey}: {Error}",
+                    "Workflow template preview failed for {TemplateKey} ({ErrorCode}): {Error}",
                     template.Key,
+                    review.ErrorCode,
                     review.Error);
                 MessageBox.Show(
-                    I18n("workflow.template.error.read"),
+                    I18n(WorkflowErrorPresentation.GetResourceKey(review.ErrorCode)),
                     I18n("workflow.template.title"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -365,10 +368,11 @@ namespace LongBetterWindows.Host.Views
             {
                 var sourceLabel = ImportSourceLabel();
                 Log.Warning(
-                    "Workflow import review could not be adopted: {Error}",
+                    "Workflow import review could not be adopted ({ErrorCode}): {Error}",
+                    _session.State.ErrorCode,
                     _session.State.Error);
                 MessageBox.Show(
-                    Format("workflow.import.error.adopt", sourceLabel),
+                    I18n(WorkflowErrorPresentation.GetResourceKey(_session.State.ErrorCode)),
                     Format("workflow.import.confirm.title", sourceLabel),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -1141,8 +1145,11 @@ namespace LongBetterWindows.Host.Views
             {
                 PreflightTitle.Text = I18n("workflow.preflight.needsFix");
                 PreflightTitle.Foreground = (System.Windows.Media.Brush)FindResource("Long.Brush.State.Danger");
-                PreflightDetail.Text = state.Error
-                    ?? string.Join(Environment.NewLine, state.Preflight?.Issues ?? Array.Empty<string>());
+                var errorCode = state.ErrorCode != WorkflowErrorCode.None
+                    ? state.ErrorCode
+                    : state.Preflight?.ErrorCode ?? WorkflowErrorCode.PreflightDefinitionInvalid;
+                PreflightDetail.Text = I18n(
+                    WorkflowErrorPresentation.GetResourceKey(errorCode));
             }
         }
 

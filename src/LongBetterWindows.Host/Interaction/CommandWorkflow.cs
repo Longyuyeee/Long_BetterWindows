@@ -50,11 +50,24 @@ namespace LongBetterWindows.Host.Interaction
         long RegistrationRevision,
         IReadOnlyList<string> Capabilities);
 
+    public sealed record CommandWorkflowPreflightIssue(
+        WorkflowErrorCode ErrorCode,
+        string Message);
+
     public sealed record CommandWorkflowPreflightResult(
         bool IsValid,
         string Fingerprint,
         IReadOnlyList<string> Issues,
-        IReadOnlyList<WorkflowPermissionRequirement> Permissions);
+        IReadOnlyList<WorkflowPermissionRequirement> Permissions)
+    {
+        public IReadOnlyList<CommandWorkflowPreflightIssue> IssueDetails { get; init; }
+            = Array.Empty<CommandWorkflowPreflightIssue>();
+
+        public WorkflowErrorCode ErrorCode
+            => IssueDetails.Count == 0
+                ? WorkflowErrorCode.None
+                : IssueDetails[0].ErrorCode;
+    }
 
     public sealed record CommandWorkflowAuthorization(
         string Fingerprint,

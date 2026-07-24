@@ -29,6 +29,28 @@ namespace LongBetterWindows.Host.Interaction
                 WorkflowErrorCode.ExportPathInvalid
                     or WorkflowErrorCode.ExportLocationRejected => "workflow.error.exportPathInvalid",
                 WorkflowErrorCode.ExportFailed => "workflow.error.exportFailed",
+                WorkflowErrorCode.TemplateCatalogUnavailable
+                    or WorkflowErrorCode.TemplateOpenFailed => "workflow.error.templateCatalogUnavailable",
+                WorkflowErrorCode.TemplateLimitExceeded => "workflow.error.templateLimitExceeded",
+                WorkflowErrorCode.TemplateDuplicateId
+                    or WorkflowErrorCode.TemplateKeyInvalid
+                    or WorkflowErrorCode.TemplatePathRejected => "workflow.error.templateInvalid",
+                WorkflowErrorCode.TemplateCatalogNotFound => "workflow.error.templateCatalogNotFound",
+                WorkflowErrorCode.TemplateChanged => "workflow.error.templateChanged",
+                WorkflowErrorCode.ImportReviewInvalid => "workflow.error.importReviewInvalid",
+                WorkflowErrorCode.EditorIdentityConflict => "workflow.error.editorIdentityConflict",
+                WorkflowErrorCode.EditorLimitExceeded => "workflow.error.editorLimitExceeded",
+                WorkflowErrorCode.EditorCommandUnavailable
+                    or WorkflowErrorCode.PreflightCommandInvalid => "workflow.error.commandUnavailable",
+                WorkflowErrorCode.EditorInputRejected
+                    or WorkflowErrorCode.PreflightInputInvalid => "workflow.error.inputRejected",
+                WorkflowErrorCode.EditorTargetUnavailable => "workflow.error.editorTargetUnavailable",
+                WorkflowErrorCode.PreflightDefinitionInvalid => "workflow.error.preflightDefinitionInvalid",
+                WorkflowErrorCode.PreflightPluginUnavailable => "workflow.error.preflightPluginUnavailable",
+                WorkflowErrorCode.PreflightArgumentInvalid => "workflow.error.preflightArgumentInvalid",
+                WorkflowErrorCode.PreflightBindingInvalid => "workflow.error.preflightBindingInvalid",
+                WorkflowErrorCode.PreflightCompensationRequired => "workflow.error.preflightCompensationRequired",
+                WorkflowErrorCode.PreflightCatalogChanged => "workflow.error.preflightCatalogChanged",
                 _ => "workflow.list.readError",
             };
     }

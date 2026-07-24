@@ -21,6 +21,7 @@ public sealed class CommandWorkflowTemplateCatalogTests : IDisposable
         var result = await catalog.ListAsync();
 
         Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(WorkflowErrorCode.None, result.ErrorCode);
         Assert.Empty(result.Templates);
         Assert.Empty(result.Issues);
         Assert.False(Directory.Exists(_root));
@@ -49,6 +50,9 @@ public sealed class CommandWorkflowTemplateCatalogTests : IDisposable
         Assert.Equal("official.templates", template.Source.SourceId);
         Assert.Equal(WorkflowDocumentTrustLevel.Untrusted, template.TrustLevel);
         Assert.Single(result.Issues);
+        Assert.Equal(
+            WorkflowErrorCode.JsonInvalid,
+            Assert.Single(result.Issues).ErrorCode);
         Assert.False(Directory.Exists(managedRoot));
     }
 
@@ -63,6 +67,7 @@ public sealed class CommandWorkflowTemplateCatalogTests : IDisposable
 
         Assert.Single(result.Templates);
         var issue = Assert.Single(result.Issues);
+        Assert.Equal(WorkflowErrorCode.TemplateDuplicateId, issue.ErrorCode);
         Assert.Contains("duplicated", issue.Error);
     }
 
@@ -82,6 +87,7 @@ public sealed class CommandWorkflowTemplateCatalogTests : IDisposable
         var result = await Catalog().ListAsync();
 
         Assert.False(result.IsSuccess);
+        Assert.Equal(WorkflowErrorCode.TemplateLimitExceeded, result.ErrorCode);
         Assert.Contains(
             CommandWorkflowTemplateCatalog.MaximumTemplateCount.ToString(),
             result.Error);
@@ -105,8 +111,10 @@ public sealed class CommandWorkflowTemplateCatalogTests : IDisposable
         var changed = await catalog.OpenAsync(listed.Key, listed.DefinitionSha256);
 
         Assert.False(traversal.IsSuccess);
+        Assert.Equal(WorkflowErrorCode.TemplateKeyInvalid, traversal.ErrorCode);
         Assert.Contains("key is invalid", traversal.Error);
         Assert.False(changed.IsSuccess);
+        Assert.Equal(WorkflowErrorCode.TemplateChanged, changed.ErrorCode);
         Assert.Contains("changed after it was listed", changed.Error);
     }
 
