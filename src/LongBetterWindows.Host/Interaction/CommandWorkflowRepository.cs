@@ -11,6 +11,7 @@ namespace LongBetterWindows.Host.Interaction
         bool IsSuccess,
         string? Path,
         string DefinitionSha256,
+        WorkflowErrorCode ErrorCode,
         string? Error);
 
     public sealed record ManagedCommandWorkflowSummary(
@@ -24,22 +25,26 @@ namespace LongBetterWindows.Host.Interaction
 
     public sealed record CommandWorkflowListIssue(
         string FileName,
+        WorkflowErrorCode ErrorCode,
         string Error);
 
     public sealed record CommandWorkflowListResult(
         bool IsSuccess,
         IReadOnlyList<ManagedCommandWorkflowSummary> Workflows,
         IReadOnlyList<CommandWorkflowListIssue> Issues,
+        WorkflowErrorCode ErrorCode,
         string? Error);
 
     public sealed record CommandWorkflowDeleteResult(
         bool IsSuccess,
+        WorkflowErrorCode ErrorCode,
         string? Error);
 
     public sealed record CommandWorkflowExportResult(
         bool IsSuccess,
         string? Path,
         string DefinitionSha256,
+        WorkflowErrorCode ErrorCode,
         string? Error);
 
     /// <summary>Atomically stores local workflows and reads external imports without adopting them.</summary>
@@ -79,6 +84,7 @@ namespace LongBetterWindows.Host.Interaction
                 && !options.AllowSensitiveInputs)
             {
                 return SaveFailure(
+                    WorkflowErrorCode.SensitiveInputApprovalRequired,
                     "Workflow contains text, paths, image data, or arguments; explicit sensitive-input persistence approval is required.");
             }
 
@@ -93,10 +99,12 @@ namespace LongBetterWindows.Host.Interaction
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
-                return SaveFailure(ex.Message);
+                return SaveFailure(WorkflowErrorCode.ValidationFailed, ex.Message);
             }
             if (!validation.IsSuccess)
-                return SaveFailure(validation.Error ?? "Workflow document validation failed.");
+                return SaveFailure(
+                    validation.ErrorCode,
+                    validation.Error ?? "Workflow document validation failed.");
 
             await _writeGate.WaitAsync(cancellationToken);
             try
@@ -109,29 +117,43 @@ namespace LongBetterWindows.Host.Interaction
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    return SaveFailure($"Workflow storage is unavailable: {ex.Message}");
+                    return SaveFailure(
+                        WorkflowErrorCode.StorageUnavailable,
+                        $"Workflow storage is unavailable: {ex.Message}");
                 }
 
                 if (File.Exists(targetPath))
                 {
                     if (string.IsNullOrWhiteSpace(options.ExpectedExistingDefinitionSha256))
-                        return SaveFailure("Updating a workflow requires its existing definition SHA-256.");
+                        return SaveFailure(
+                            WorkflowErrorCode.ExistingHashRequired,
+                            "Updating a workflow requires its existing definition SHA-256.");
                     if (!TryNormalizeHash(options.ExpectedExistingDefinitionSha256, out var expectedHash))
-                        return SaveFailure("Expected workflow hash must be 64 hexadecimal characters.");
+                        return SaveFailure(
+                            WorkflowErrorCode.ExpectedHashInvalid,
+                            "Expected workflow hash must be 64 hexadecimal characters.");
                     var existing = await ReadAsync(targetPath, isManagedFile: true, cancellationToken);
                     if (!existing.IsSuccess)
-                        return SaveFailure(existing.Error ?? "Existing workflow could not be read.");
+                        return SaveFailure(
+                            existing.ErrorCode,
+                            existing.Error ?? "Existing workflow could not be read.");
                     if (!string.Equals(existing.DefinitionSha256, expectedHash, StringComparison.Ordinal))
-                        return SaveFailure("Workflow changed since it was loaded; refusing a stale update.");
+                        return SaveFailure(
+                            WorkflowErrorCode.StaleWriteConflict,
+                            "Workflow changed since it was loaded; refusing a stale update.");
                 }
                 else if (!string.IsNullOrWhiteSpace(options.ExpectedExistingDefinitionSha256))
                 {
-                    return SaveFailure("Expected workflow version does not exist.");
+                    return SaveFailure(
+                        WorkflowErrorCode.ExpectedVersionMissing,
+                        "Expected workflow version does not exist.");
                 }
 
                 var bytes = StrictUtf8.GetBytes(json);
                 if (bytes.LongLength > MaximumDocumentBytes)
-                    return SaveFailure("Workflow document exceeds the maximum size.");
+                    return SaveFailure(
+                        WorkflowErrorCode.DocumentTooLarge,
+                        "Workflow document exceeds the maximum size.");
                 var temporaryPath = Path.Combine(
                     _root,
                     $".{validation.Workflow.Id}.{Guid.NewGuid():N}.tmp");
@@ -154,11 +176,14 @@ namespace LongBetterWindows.Host.Interaction
                         true,
                         targetPath,
                         validation.DefinitionSha256,
+                        WorkflowErrorCode.None,
                         null);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    return SaveFailure($"Workflow document could not be saved: {ex.Message}");
+                    return SaveFailure(
+                        WorkflowErrorCode.SaveFailed,
+                        $"Workflow document could not be saved: {ex.Message}");
                 }
                 finally
                 {
@@ -176,7 +201,9 @@ namespace LongBetterWindows.Host.Interaction
             CancellationToken cancellationToken = default)
         {
             if (!IsIdentifier(workflowId))
-                return Task.FromResult(ReadFailure("Workflow id is invalid."));
+                return Task.FromResult(ReadFailure(
+                    WorkflowErrorCode.PathInvalid,
+                    "Workflow id is invalid."));
             try
             {
                 EnsureManagedRoot();
@@ -184,7 +211,9 @@ namespace LongBetterWindows.Host.Interaction
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return Task.FromResult(ReadFailure($"Workflow storage is unavailable: {ex.Message}"));
+                return Task.FromResult(ReadFailure(
+                    WorkflowErrorCode.StorageUnavailable,
+                    $"Workflow storage is unavailable: {ex.Message}"));
             }
         }
 
@@ -207,6 +236,7 @@ namespace LongBetterWindows.Host.Interaction
                     {
                         issues.Add(new CommandWorkflowListIssue(
                             Path.GetFileName(path),
+                            result.ErrorCode,
                             result.Error ?? "Workflow document could not be read."));
                         continue;
                     }
@@ -227,6 +257,7 @@ namespace LongBetterWindows.Host.Interaction
                         .ThenBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
                         .ToList(),
                     issues,
+                    WorkflowErrorCode.None,
                     null);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -235,6 +266,7 @@ namespace LongBetterWindows.Host.Interaction
                     false,
                     Array.Empty<ManagedCommandWorkflowSummary>(),
                     Array.Empty<CommandWorkflowListIssue>(),
+                    WorkflowErrorCode.StorageUnavailable,
                     $"Workflow storage is unavailable: {ex.Message}");
             }
         }
@@ -245,9 +277,15 @@ namespace LongBetterWindows.Host.Interaction
             CancellationToken cancellationToken = default)
         {
             if (!IsIdentifier(workflowId))
-                return new CommandWorkflowDeleteResult(false, "Workflow id is invalid.");
+                return new CommandWorkflowDeleteResult(
+                    false,
+                    WorkflowErrorCode.PathInvalid,
+                    "Workflow id is invalid.");
             if (!TryNormalizeHash(expectedDefinitionSha256, out var expectedHash))
-                return new CommandWorkflowDeleteResult(false, "Expected workflow hash must be 64 hexadecimal characters.");
+                return new CommandWorkflowDeleteResult(
+                    false,
+                    WorkflowErrorCode.ExpectedHashInvalid,
+                    "Expected workflow hash must be 64 hexadecimal characters.");
 
             await _writeGate.WaitAsync(cancellationToken);
             try
@@ -260,25 +298,38 @@ namespace LongBetterWindows.Host.Interaction
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    return new CommandWorkflowDeleteResult(false, $"Workflow storage is unavailable: {ex.Message}");
+                    return new CommandWorkflowDeleteResult(
+                        false,
+                        WorkflowErrorCode.StorageUnavailable,
+                        $"Workflow storage is unavailable: {ex.Message}");
                 }
                 var existing = await ReadAsync(path, isManagedFile: true, cancellationToken);
                 if (!existing.IsSuccess)
-                    return new CommandWorkflowDeleteResult(false, existing.Error);
+                    return new CommandWorkflowDeleteResult(
+                        false,
+                        existing.ErrorCode,
+                        existing.Error);
                 if (!string.Equals(existing.DefinitionSha256, expectedHash, StringComparison.Ordinal))
                 {
                     return new CommandWorkflowDeleteResult(
                         false,
+                        WorkflowErrorCode.StaleWriteConflict,
                         "Workflow changed since it was loaded; refusing a stale delete.");
                 }
                 try
                 {
                     File.Delete(path);
-                    return new CommandWorkflowDeleteResult(true, null);
+                    return new CommandWorkflowDeleteResult(
+                        true,
+                        WorkflowErrorCode.None,
+                        null);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    return new CommandWorkflowDeleteResult(false, $"Workflow could not be deleted: {ex.Message}");
+                    return new CommandWorkflowDeleteResult(
+                        false,
+                        WorkflowErrorCode.DeleteFailed,
+                        $"Workflow could not be deleted: {ex.Message}");
                 }
             }
             finally
@@ -292,14 +343,18 @@ namespace LongBetterWindows.Host.Interaction
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(sourcePath))
-                return Task.FromResult(ReadFailure("Workflow import path must not be empty."));
+                return Task.FromResult(ReadFailure(
+                    WorkflowErrorCode.PathInvalid,
+                    "Workflow import path must not be empty."));
             try
             {
                 return ReadAsync(Path.GetFullPath(sourcePath), isManagedFile: false, cancellationToken);
             }
             catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
             {
-                return Task.FromResult(ReadFailure($"Workflow import path is invalid: {ex.Message}"));
+                return Task.FromResult(ReadFailure(
+                    WorkflowErrorCode.PathInvalid,
+                    $"Workflow import path is invalid: {ex.Message}"));
             }
         }
 
@@ -309,11 +364,18 @@ namespace LongBetterWindows.Host.Interaction
             string destinationPath,
             CancellationToken cancellationToken = default)
         {
-            if (!IsIdentifier(workflowId)) return ExportFailure("Workflow id is invalid.");
+            if (!IsIdentifier(workflowId))
+                return ExportFailure(
+                    WorkflowErrorCode.PathInvalid,
+                    "Workflow id is invalid.");
             if (!TryNormalizeHash(expectedDefinitionSha256, out var expectedHash))
-                return ExportFailure("Expected workflow hash must be 64 hexadecimal characters.");
+                return ExportFailure(
+                    WorkflowErrorCode.ExpectedHashInvalid,
+                    "Expected workflow hash must be 64 hexadecimal characters.");
             if (string.IsNullOrWhiteSpace(destinationPath))
-                return ExportFailure("Workflow export path must not be empty.");
+                return ExportFailure(
+                    WorkflowErrorCode.ExportPathInvalid,
+                    "Workflow export path must not be empty.");
 
             string targetPath;
             string targetDirectory;
@@ -323,27 +385,42 @@ namespace LongBetterWindows.Host.Interaction
                 targetDirectory = Path.GetDirectoryName(targetPath)
                     ?? throw new IOException("Workflow export directory is invalid.");
                 if (IsWithinManagedRoot(targetPath))
-                    return ExportFailure("Workflow exports must be written outside the managed workflow directory.");
+                    return ExportFailure(
+                        WorkflowErrorCode.ExportLocationRejected,
+                        "Workflow exports must be written outside the managed workflow directory.");
                 var directory = new DirectoryInfo(targetDirectory);
-                if (!directory.Exists) return ExportFailure("Workflow export directory does not exist.");
+                if (!directory.Exists)
+                    return ExportFailure(
+                        WorkflowErrorCode.ExportPathInvalid,
+                        "Workflow export directory does not exist.");
                 if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
-                    return ExportFailure("Workflow export directory must not be a reparse point.");
+                    return ExportFailure(
+                        WorkflowErrorCode.ReparsePointRejected,
+                        "Workflow export directory must not be a reparse point.");
                 if (File.Exists(targetPath)
                     && (File.GetAttributes(targetPath) & FileAttributes.ReparsePoint) != 0)
                 {
-                    return ExportFailure("Workflow export target must not be a reparse point.");
+                    return ExportFailure(
+                        WorkflowErrorCode.ReparsePointRejected,
+                        "Workflow export target must not be a reparse point.");
                 }
             }
             catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
             {
-                return ExportFailure($"Workflow export path is invalid: {ex.Message}");
+                return ExportFailure(
+                    WorkflowErrorCode.ExportPathInvalid,
+                    $"Workflow export path is invalid: {ex.Message}");
             }
 
             var managed = await LoadManagedAsync(workflowId, cancellationToken);
             if (!managed.IsSuccess)
-                return ExportFailure(managed.Error ?? "Managed workflow could not be read.");
+                return ExportFailure(
+                    managed.ErrorCode,
+                    managed.Error ?? "Managed workflow could not be read.");
             if (!string.Equals(managed.DefinitionSha256, expectedHash, StringComparison.Ordinal))
-                return ExportFailure("Workflow changed since it was loaded; refusing a stale export.");
+                return ExportFailure(
+                    WorkflowErrorCode.StaleWriteConflict,
+                    "Workflow changed since it was loaded; refusing a stale export.");
 
             byte[] bytes;
             try
@@ -355,11 +432,13 @@ namespace LongBetterWindows.Host.Interaction
                         $"{_localSourceId}:export"));
                 bytes = StrictUtf8.GetBytes(json);
                 if (bytes.LongLength > MaximumDocumentBytes)
-                    return ExportFailure("Workflow document exceeds the maximum size.");
+                    return ExportFailure(
+                        WorkflowErrorCode.DocumentTooLarge,
+                        "Workflow document exceeds the maximum size.");
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
-                return ExportFailure(ex.Message);
+                return ExportFailure(WorkflowErrorCode.ValidationFailed, ex.Message);
             }
 
             var temporaryPath = Path.Combine(
@@ -384,11 +463,14 @@ namespace LongBetterWindows.Host.Interaction
                     true,
                     targetPath,
                     managed.DefinitionSha256,
+                    WorkflowErrorCode.None,
                     null);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return ExportFailure($"Workflow document could not be exported: {ex.Message}");
+                return ExportFailure(
+                    WorkflowErrorCode.ExportFailed,
+                    $"Workflow document could not be exported: {ex.Message}");
             }
             finally
             {
@@ -404,11 +486,18 @@ namespace LongBetterWindows.Host.Interaction
             try
             {
                 var file = new FileInfo(path);
-                if (!file.Exists) return ReadFailure($"Workflow document was not found: {path}");
+                if (!file.Exists)
+                    return ReadFailure(
+                        WorkflowErrorCode.DocumentNotFound,
+                        $"Workflow document was not found: {path}");
                 if ((file.Attributes & FileAttributes.ReparsePoint) != 0)
-                    return ReadFailure("Workflow document must not be a reparse point.");
+                    return ReadFailure(
+                        WorkflowErrorCode.ReparsePointRejected,
+                        "Workflow document must not be a reparse point.");
                 if (file.Length > MaximumDocumentBytes)
-                    return ReadFailure("Workflow document exceeds the maximum size.");
+                    return ReadFailure(
+                        WorkflowErrorCode.DocumentTooLarge,
+                        "Workflow document exceeds the maximum size.");
 
                 byte[] bytes;
                 await using (var stream = new FileStream(
@@ -420,7 +509,9 @@ namespace LongBetterWindows.Host.Interaction
                     FileOptions.Asynchronous | FileOptions.SequentialScan))
                 {
                     if (stream.Length > MaximumDocumentBytes)
-                        return ReadFailure("Workflow document exceeds the maximum size.");
+                        return ReadFailure(
+                            WorkflowErrorCode.DocumentTooLarge,
+                            "Workflow document exceeds the maximum size.");
                     bytes = new byte[checked((int)stream.Length)];
                     var offset = 0;
                     while (offset < bytes.Length)
@@ -429,14 +520,19 @@ namespace LongBetterWindows.Host.Interaction
                         if (read == 0) break;
                         offset += read;
                     }
-                    if (offset != bytes.Length) return ReadFailure("Workflow document could not be read completely.");
+                    if (offset != bytes.Length)
+                        return ReadFailure(
+                            WorkflowErrorCode.ReadFailed,
+                            "Workflow document could not be read completely.");
                 }
                 var json = StrictUtf8.GetString(bytes);
                 return CommandWorkflowDocumentCodec.Deserialize(json, isManagedFile, _trustPolicy);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
             {
-                return ReadFailure($"Workflow document could not be read: {ex.Message}");
+                return ReadFailure(
+                    WorkflowErrorCode.ReadFailed,
+                    $"Workflow document could not be read: {ex.Message}");
             }
         }
 
@@ -500,13 +596,27 @@ namespace LongBetterWindows.Host.Interaction
                 && value.All(character => char.IsAsciiLetterOrDigit(character)
                     || character is '.' or '_' or '-' or ':');
 
-        private static CommandWorkflowSaveResult SaveFailure(string error)
-            => new(false, null, string.Empty, error);
+        private static CommandWorkflowSaveResult SaveFailure(
+            WorkflowErrorCode code,
+            string technicalMessage)
+            => new(false, null, string.Empty, code, technicalMessage);
 
-        private static CommandWorkflowExportResult ExportFailure(string error)
-            => new(false, null, string.Empty, error);
+        private static CommandWorkflowExportResult ExportFailure(
+            WorkflowErrorCode code,
+            string technicalMessage)
+            => new(false, null, string.Empty, code, technicalMessage);
 
-        private static WorkflowDocumentReadResult ReadFailure(string error)
-            => new(false, null, null, WorkflowDocumentTrustLevel.Untrusted, string.Empty, null, error);
+        private static WorkflowDocumentReadResult ReadFailure(
+            WorkflowErrorCode code,
+            string technicalMessage)
+            => new(
+                false,
+                null,
+                null,
+                WorkflowDocumentTrustLevel.Untrusted,
+                string.Empty,
+                null,
+                code,
+                technicalMessage);
     }
 }

@@ -35,6 +35,7 @@ namespace LongBetterWindows.Host.Interaction
         WorkflowDocumentTrustLevel TrustLevel,
         string DefinitionSha256,
         int? MigratedFromSchemaVersion,
+        WorkflowErrorCode ErrorCode,
         string? Error);
 
     public sealed class WorkflowSourceTrustPolicy
@@ -94,7 +95,10 @@ namespace LongBetterWindows.Host.Interaction
             bool isManagedFile,
             WorkflowSourceTrustPolicy? trustPolicy = null)
         {
-            if (string.IsNullOrWhiteSpace(json)) return Failure("Workflow document is empty.");
+            if (string.IsNullOrWhiteSpace(json))
+                return Failure(
+                    WorkflowErrorCode.DocumentEmpty,
+                    "Workflow document is empty.");
             try
             {
                 using var document = JsonDocument.Parse(json, new JsonDocumentOptions
@@ -106,7 +110,9 @@ namespace LongBetterWindows.Host.Interaction
                 if (!document.RootElement.TryGetProperty("schema_version", out var schemaElement)
                     || !schemaElement.TryGetInt32(out var schemaVersion))
                 {
-                    return Failure("Workflow document schema_version is missing or invalid.");
+                    return Failure(
+                        WorkflowErrorCode.SchemaMissing,
+                        "Workflow document schema_version is missing or invalid.");
                 }
 
                 WorkflowDocumentEnvelope? envelope;
@@ -139,17 +145,26 @@ namespace LongBetterWindows.Host.Interaction
                 }
                 else
                 {
-                    return Failure($"Workflow document schema version is not supported: {schemaVersion}");
+                    return Failure(
+                        WorkflowErrorCode.SchemaUnsupported,
+                        $"Workflow document schema version is not supported: {schemaVersion}");
                 }
 
                 if (envelope?.Workflow is null || envelope.Source is null)
-                    return Failure("Workflow document content is incomplete.");
+                    return Failure(
+                        WorkflowErrorCode.DocumentIncomplete,
+                        "Workflow document content is incomplete.");
                 if (!IsSourceId(envelope.Source.SourceId))
-                    return Failure("Workflow document source_id is invalid.");
+                    return Failure(
+                        WorkflowErrorCode.SourceInvalid,
+                        "Workflow document source_id is invalid.");
 
                 var normalized = Normalize(envelope.Workflow);
                 var validationError = ValidateStructure(normalized);
-                if (validationError is not null) return Failure(validationError);
+                if (validationError is not null)
+                    return Failure(
+                        WorkflowErrorCode.StructureInvalid,
+                        validationError);
                 var definitionHash = ComputeDefinitionSha256(normalized);
                 var policy = trustPolicy ?? WorkflowSourceTrustPolicy.Empty;
                 var trustLevel = isManagedFile
@@ -166,15 +181,18 @@ namespace LongBetterWindows.Host.Interaction
                     trustLevel,
                     definitionHash,
                     migratedFrom,
+                    WorkflowErrorCode.None,
                     null);
             }
             catch (JsonException ex)
             {
-                return Failure($"Workflow document JSON is invalid: {ex.Message}");
+                return Failure(
+                    WorkflowErrorCode.JsonInvalid,
+                    $"Workflow document JSON is invalid: {ex.Message}");
             }
             catch (ArgumentException ex)
             {
-                return Failure(ex.Message);
+                return Failure(WorkflowErrorCode.ValidationFailed, ex.Message);
             }
         }
 
@@ -343,8 +361,18 @@ namespace LongBetterWindows.Host.Interaction
                 && value.All(character => char.IsAsciiLetterOrDigit(character)
                     || character is '.' or '_' or '-' or ':');
 
-        private static WorkflowDocumentReadResult Failure(string error)
-            => new(false, null, null, WorkflowDocumentTrustLevel.Untrusted, string.Empty, null, error);
+        private static WorkflowDocumentReadResult Failure(
+            WorkflowErrorCode code,
+            string technicalMessage)
+            => new(
+                false,
+                null,
+                null,
+                WorkflowDocumentTrustLevel.Untrusted,
+                string.Empty,
+                null,
+                code,
+                technicalMessage);
 
         private static JsonSerializerOptions CreateOptions(bool writeIndented)
         {

@@ -211,6 +211,7 @@ namespace LongBetterWindows.Host.Interaction
                 WorkflowDocumentTrustLevel.Untrusted,
                 string.Empty,
                 null,
+                WorkflowErrorCode.ValidationFailed,
                 error);
     }
 }

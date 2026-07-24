@@ -343,6 +343,7 @@ namespace LongBetterWindows.Host.Interaction
                         WorkflowDocumentTrustLevel.Untrusted,
                         string.Empty,
                         null,
+                        WorkflowErrorCode.ValidationFailed,
                         "Workflow template catalog is not configured."));
             }
             var result = await _templates.OpenAsync(
@@ -432,7 +433,12 @@ namespace LongBetterWindows.Host.Interaction
             {
                 var error = string.Join(" ", preflight.Issues);
                 State = State with { Preflight = preflight, Error = error };
-                return new CommandWorkflowSaveResult(false, null, string.Empty, error);
+                return new CommandWorkflowSaveResult(
+                    false,
+                    null,
+                    string.Empty,
+                    WorkflowErrorCode.ValidationFailed,
+                    error);
             }
             var result = await _repository.SaveAsync(
                 draft,
@@ -459,7 +465,10 @@ namespace LongBetterWindows.Host.Interaction
             {
                 const string error = "The workflow has not been saved.";
                 State = State with { Error = error };
-                return new CommandWorkflowDeleteResult(false, error);
+                return new CommandWorkflowDeleteResult(
+                    false,
+                    WorkflowErrorCode.ExpectedVersionMissing,
+                    error);
             }
             var result = await _repository.DeleteManagedAsync(
                 draft.Id,
@@ -481,7 +490,12 @@ namespace LongBetterWindows.Host.Interaction
             {
                 const string error = "Workflow must be saved without pending changes before export.";
                 State = State with { Error = error };
-                return new CommandWorkflowExportResult(false, null, string.Empty, error);
+                return new CommandWorkflowExportResult(
+                    false,
+                    null,
+                    string.Empty,
+                    WorkflowErrorCode.ExpectedVersionMissing,
+                    error);
             }
             var result = await _repository.ExportManagedAsync(
                 draft.Id,

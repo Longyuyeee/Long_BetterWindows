@@ -152,7 +152,9 @@ namespace LongBetterWindows.Host.Views
             var result = await _repository.ListManagedAsync();
             if (!result.IsSuccess)
             {
-                SetListStatus(result.Error ?? I18n("workflow.list.readError"), isError: true);
+                SetListStatus(
+                    I18n(WorkflowErrorPresentation.GetResourceKey(result.ErrorCode)),
+                    isError: true);
                 return;
             }
             var items = result.Workflows.Select(WorkflowListItem.From).ToList();
