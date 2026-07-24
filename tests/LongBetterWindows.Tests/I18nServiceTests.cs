@@ -117,6 +117,10 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("workflow.import.reviewTemplate", chinese);
         Assert.Contains("workflow.import.confirm.replaceDraft", chinese);
         Assert.Contains("workflow.template.itemDetail", chinese);
+        Assert.Contains("workflow.execution.review.summaryMutating", chinese);
+        Assert.Contains("workflow.execution.status.completed", chinese);
+        Assert.Contains("workflow.terminal.export.confirm", chinese);
+        Assert.Contains("workflow.reports.detailMeta", chinese);
         Assert.Contains("workflow.invocation.sensitiveHelp", chinese);
         Assert.Contains("workflow.binding.error.schemaRequired", chinese);
     }
@@ -246,6 +250,42 @@ public sealed class I18nServiceTests : IDisposable
         Assert.DoesNotContain("选择外部工作流", source);
         Assert.DoesNotContain("审查工作流模板", source);
         Assert.DoesNotContain("采用前需审查", source);
+    }
+
+    [Fact]
+    public void WorkflowExecutionAndReports_UseExplicitHostLanguageProjection()
+    {
+        var root = FindRepositoryRoot();
+        var host = Path.Combine(root, "src", "LongBetterWindows.Host");
+        var xaml = File.ReadAllText(Path.Combine(
+            host,
+            "Views",
+            "WorkflowEditorControl.xaml"));
+        var source = File.ReadAllText(Path.Combine(
+            host,
+            "Views",
+            "WorkflowEditorControl.xaml.cs"));
+        var presentation = File.ReadAllText(Path.Combine(
+            host,
+            "Views",
+            "WorkflowExecutionPresentation.cs"));
+        var main = File.ReadAllText(Path.Combine(host, "MainWindow.xaml"));
+
+        Assert.Contains("i18n.workflow.execution.review.title", xaml);
+        Assert.Contains("i18n.workflow.terminal.export", xaml);
+        Assert.Contains("i18n.workflow.reports.title", xaml);
+        Assert.Contains("i18n.workflow.topLevel.confirmRun", main);
+        Assert.Contains("RefreshLocalizedExecutionState", source);
+        Assert.Contains("TerminalExportFailureMessage", source);
+        Assert.Contains(
+            "TerminalOutputs = Array.Empty<WorkflowTerminalOutput>()",
+            source);
+        Assert.Contains("Func<string, string> translate", presentation);
+        Assert.Contains("workflow.execution.event.stepFailed", presentation);
+        Assert.DoesNotMatch("[一-龥]", presentation);
+        Assert.DoesNotContain("确认本次执行权限", xaml);
+        Assert.DoesNotContain("导出终端输出", source);
+        Assert.DoesNotContain("清除敏感输出", main);
     }
 
     [Fact]

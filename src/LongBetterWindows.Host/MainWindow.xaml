@@ -56,32 +56,32 @@
                             Margin="0,0,8,0" Click="CancelWorkflowReview_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             AutomationProperties.AutomationId="Long.Workflow.ReviewCancel"
-                            AutomationProperties.Name="取消组合动作执行审查"
-                            Content="取消执行审查" />
+                            AutomationProperties.Name="{DynamicResource i18n.workflow.topLevel.cancelReviewA11y}"
+                            Content="{DynamicResource i18n.workflow.topLevel.cancelReview}" />
 
                     <Button x:Name="WorkflowTerminalApprovalButton" Grid.Column="2"
                             Visibility="Collapsed" Style="{StaticResource LongButton}" Width="126" Height="30"
                             Margin="0,0,8,0" Click="WorkflowTerminalApprovalButton_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.ApproveTopLevel"
-                            Content="允许终端输出" />
+                            Content="{DynamicResource i18n.workflow.topLevel.allowTerminal}" />
 
                     <Button x:Name="WorkflowReviewConfirmButton" Grid.Column="3"
                             Visibility="Collapsed" Style="{StaticResource LongButton.Primary}" Width="88" Height="30"
                             Margin="0,0,8,0" Click="ConfirmWorkflowReview_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             AutomationProperties.AutomationId="Long.Workflow.ReviewConfirmTopLevel"
-                            AutomationProperties.Name="确认执行已审查的组合动作"
-                            Content="确认执行" />
+                            AutomationProperties.Name="{DynamicResource i18n.workflow.topLevel.confirmRunA11y}"
+                            Content="{DynamicResource i18n.workflow.topLevel.confirmRun}" />
 
                     <Button x:Name="WorkflowTerminalClearButton" Grid.Column="2"
                             Visibility="Collapsed" Style="{StaticResource LongButton}" Width="112" Height="30"
                             Margin="0,0,8,0" Click="ClearWorkflowTerminalOutputs_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.ClearTopLevel"
-                            AutomationProperties.Name="清除组合动作敏感终端输出"
-                            ToolTip="清除敏感输出 (Ctrl+Shift+Delete)"
-                            Content="清除敏感输出" />
+                            AutomationProperties.Name="{DynamicResource i18n.workflow.topLevel.clearTerminalA11y}"
+                            ToolTip="{DynamicResource i18n.workflow.topLevel.clearTerminalTooltip}"
+                            Content="{DynamicResource i18n.workflow.topLevel.clearTerminal}" />
 
                     <Button x:Name="OpenSuperPanelButton" Grid.Column="4" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                             Margin="0,0,6,0" Click="OpenSuperPanel_Click"

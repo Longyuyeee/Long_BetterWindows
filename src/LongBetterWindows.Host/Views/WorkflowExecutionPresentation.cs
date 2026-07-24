@@ -1,3 +1,4 @@
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Interaction;
 
 namespace LongBetterWindows.Host.Views
@@ -10,114 +11,163 @@ namespace LongBetterWindows.Host.Views
     {
         public static WorkflowExecutionReviewPresentation DescribeReview(
             CommandWorkflowExecutionReview review,
-            WorkflowFailureMode failureMode)
+            WorkflowFailureMode failureMode,
+            Func<string, string> translate)
         {
             ArgumentNullException.ThrowIfNull(review);
+            ArgumentNullException.ThrowIfNull(translate);
             var summary = review.ContainsMutatingSteps
-                ? $"{review.StepCount} 个步骤，包含系统或文件修改；失败策略为“{FailureLabel(failureMode)}”。"
-                : $"{review.StepCount} 个只读步骤；失败策略为“{FailureLabel(failureMode)}”。";
+                ? Format(
+                    translate,
+                    "workflow.execution.review.summaryMutating",
+                    review.StepCount,
+                    FailureLabel(failureMode, translate))
+                : Format(
+                    translate,
+                    "workflow.execution.review.summaryReadOnly",
+                    review.StepCount,
+                    FailureLabel(failureMode, translate));
             var permissions = review.Permissions
                 .Select(permission => new WorkflowPermissionReviewItem(
                     $"{permission.PluginId}  v{permission.PluginVersion}",
                     permission.Capabilities.Count == 0
-                        ? "无额外能力"
-                        : string.Join("、", permission.Capabilities)))
+                        ? translate("workflow.execution.review.noCapabilities")
+                        : string.Join(
+                            translate("workflow.execution.review.capabilitySeparator"),
+                            permission.Capabilities)))
                 .ToList();
             return new WorkflowExecutionReviewPresentation(summary, permissions);
         }
 
         public static WorkflowExecutionResultPresentation DescribePrepareFailure(
-            CommandWorkflowExecutionReview review)
+            CommandWorkflowExecutionReview review,
+            Func<string, string> translate)
         {
             ArgumentNullException.ThrowIfNull(review);
+            ArgumentNullException.ThrowIfNull(translate);
             return new WorkflowExecutionResultPresentation(
-                "无法准备执行",
-                string.Join(Environment.NewLine, review.Issues),
+                translate("workflow.execution.prepareFailed.title"),
+                Format(
+                    translate,
+                    "workflow.execution.prepareFailed.detail",
+                    review.Issues.Count),
                 Array.Empty<WorkflowOutputSummaryItem>(),
                 Array.Empty<WorkflowTerminalOutputItem>());
         }
 
         public static WorkflowExecutionResultPresentation DescribeRunResult(
-            CommandWorkflowRunResult result)
+            CommandWorkflowRunResult result,
+            Func<string, string> translate)
         {
             ArgumentNullException.ThrowIfNull(result);
+            ArgumentNullException.ThrowIfNull(translate);
             if (!result.IsAccepted || result.Execution is null)
             {
                 return new WorkflowExecutionResultPresentation(
-                    "执行未开始",
-                    result.Error ?? "执行批准已经失效。",
+                    translate("workflow.execution.notStarted.title"),
+                    translate("workflow.execution.notStarted.detail"),
                     Array.Empty<WorkflowOutputSummaryItem>(),
                     Array.Empty<WorkflowTerminalOutputItem>());
             }
 
             var outputs = result.Execution.OutputSummaries
-                .Select(WorkflowOutputSummaryItem.From)
+                .Select(summary => WorkflowOutputSummaryItem.From(summary, translate))
                 .ToList();
             var terminalOutputs = result.Execution.TerminalOutputs
                 .Select(WorkflowTerminalOutputItem.From)
                 .ToList();
             var detail = result.ReportSave?.IsSuccess == true
-                ? $"已记录 {result.Execution.Events.Count} 个脱敏事件。"
-                : $"执行已结束，但报告保存失败：{result.ReportSave?.Error}";
+                ? Format(
+                    translate,
+                    "workflow.execution.report.recorded",
+                    result.Execution.Events.Count)
+                : translate("workflow.execution.report.saveFailed");
             return new WorkflowExecutionResultPresentation(
-                StatusLabel(result.Execution.Status),
+                StatusLabel(result.Execution.Status, translate),
                 detail,
                 outputs,
                 terminalOutputs);
         }
 
         public static IReadOnlyList<WorkflowReportListItem> ToReportListItems(
-            IEnumerable<WorkflowExecutionReportSummary> reports)
+            IEnumerable<WorkflowExecutionReportSummary> reports,
+            Func<string, string> translate)
         {
             ArgumentNullException.ThrowIfNull(reports);
-            return reports.Select(WorkflowReportListItem.From).ToList();
+            ArgumentNullException.ThrowIfNull(translate);
+            return reports
+                .Select(summary => WorkflowReportListItem.From(summary, translate))
+                .ToList();
         }
 
         public static WorkflowReportDetailPresentation DescribeReport(
-            WorkflowExecutionReportDocument report)
+            WorkflowExecutionReportDocument report,
+            Func<string, string> translate)
         {
             ArgumentNullException.ThrowIfNull(report);
-            var messageState = report.MessagesIncluded ? "消息未在界面展示" : "消息已脱敏";
+            ArgumentNullException.ThrowIfNull(translate);
+            var messageState = translate(report.MessagesIncluded
+                ? "workflow.reports.messageHidden"
+                : "workflow.reports.messageRedacted");
             var timeline = report.Events.Select(item => new WorkflowTimelineItem(
                 item.Timestamp.ToLocalTime().ToString("HH:mm:ss"),
-                EventLabel(item.Kind),
-                item.StepId ?? "工作流"))
+                EventLabel(item.Kind, translate),
+                item.StepId ?? translate("workflow.reports.workflowStep")))
                 .ToList();
             return new WorkflowReportDetailPresentation(
-                StatusLabel(report.Status),
-                $"{report.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss} · {report.Events.Count} 个事件 · {messageState}",
+                StatusLabel(report.Status, translate),
+                Format(
+                    translate,
+                    "workflow.reports.detailMeta",
+                    report.StartedAt.ToLocalTime(),
+                    report.Events.Count,
+                    messageState),
                 timeline);
         }
 
-        public static string FailureLabel(WorkflowFailureMode mode)
-            => mode == WorkflowFailureMode.Compensate ? "失败时回滚" : "失败时停止";
+        public static string FailureLabel(
+            WorkflowFailureMode mode,
+            Func<string, string> translate)
+            => translate(mode == WorkflowFailureMode.Compensate
+                ? "workflow.failure.compensate"
+                : "workflow.failure.stop");
 
-        public static string StatusLabel(WorkflowExecutionStatus status)
-            => status switch
+        public static string StatusLabel(
+            WorkflowExecutionStatus status,
+            Func<string, string> translate)
+            => translate(status switch
             {
-                WorkflowExecutionStatus.Completed => "执行完成",
-                WorkflowExecutionStatus.Compensated => "失败后已回滚",
-                WorkflowExecutionStatus.CompensationFailed => "回滚未完全成功",
-                WorkflowExecutionStatus.Cancelled => "执行已取消",
-                WorkflowExecutionStatus.Rejected => "执行已拒绝",
-                _ => "执行失败",
-            };
+                WorkflowExecutionStatus.Completed => "workflow.execution.status.completed",
+                WorkflowExecutionStatus.Compensated => "workflow.execution.status.compensated",
+                WorkflowExecutionStatus.CompensationFailed => "workflow.execution.status.compensationFailed",
+                WorkflowExecutionStatus.Cancelled => "workflow.execution.status.cancelled",
+                WorkflowExecutionStatus.Rejected => "workflow.execution.status.rejected",
+                _ => "workflow.execution.status.failed",
+            });
 
-        public static string EventLabel(WorkflowExecutionEventKind kind)
-            => kind switch
+        public static string EventLabel(
+            WorkflowExecutionEventKind kind,
+            Func<string, string> translate)
+            => translate(kind switch
             {
-                WorkflowExecutionEventKind.PreflightPassed => "预检通过",
-                WorkflowExecutionEventKind.AuthorizationApproved => "批准已确认",
-                WorkflowExecutionEventKind.StepStarted => "步骤开始",
-                WorkflowExecutionEventKind.StepSucceeded => "步骤成功",
-                WorkflowExecutionEventKind.StepFailed => "步骤失败",
-                WorkflowExecutionEventKind.StepCancelled => "步骤取消",
-                WorkflowExecutionEventKind.CompensationStarted => "开始回滚",
-                WorkflowExecutionEventKind.CompensationSucceeded => "回滚成功",
-                WorkflowExecutionEventKind.CompensationFailed => "回滚失败",
-                WorkflowExecutionEventKind.WorkflowCompleted => "流程完成",
-                _ => "流程拒绝",
-            };
+                WorkflowExecutionEventKind.PreflightPassed => "workflow.execution.event.preflightPassed",
+                WorkflowExecutionEventKind.AuthorizationApproved => "workflow.execution.event.authorizationApproved",
+                WorkflowExecutionEventKind.StepStarted => "workflow.execution.event.stepStarted",
+                WorkflowExecutionEventKind.StepSucceeded => "workflow.execution.event.stepSucceeded",
+                WorkflowExecutionEventKind.StepFailed => "workflow.execution.event.stepFailed",
+                WorkflowExecutionEventKind.StepCancelled => "workflow.execution.event.stepCancelled",
+                WorkflowExecutionEventKind.CompensationStarted => "workflow.execution.event.compensationStarted",
+                WorkflowExecutionEventKind.CompensationSucceeded => "workflow.execution.event.compensationSucceeded",
+                WorkflowExecutionEventKind.CompensationFailed => "workflow.execution.event.compensationFailed",
+                WorkflowExecutionEventKind.WorkflowCompleted => "workflow.execution.event.workflowCompleted",
+                _ => "workflow.execution.event.workflowRejected",
+            });
+
+        private static string Format(
+            Func<string, string> translate,
+            string key,
+            params object[] arguments)
+            => string.Format(translate(key), arguments);
     }
 
     internal sealed record WorkflowExecutionReviewPresentation(
@@ -145,12 +195,21 @@ namespace LongBetterWindows.Host.Views
 
     internal sealed record WorkflowOutputSummaryItem(string Step, string Output, string Detail)
     {
-        public static WorkflowOutputSummaryItem From(WorkflowOutputSummary summary)
+        public static WorkflowOutputSummaryItem From(
+            WorkflowOutputSummary summary,
+            Func<string, string> translate)
             => new(
                 summary.StepId,
                 summary.OutputKey,
-                $"{(summary.Role == WorkflowOutputRole.Compensation ? "补偿" : "命令")} · "
-                    + $"{summary.Type} · {summary.ValueLength:N0} 字符");
+                string.Format(
+                    translate("workflow.execution.output.detail"),
+                    translate(summary.Role == WorkflowOutputRole.Compensation
+                        ? "workflow.execution.output.role.compensation"
+                        : "workflow.execution.output.role.primary"),
+                    translate(summary.Type == PluginCommandOutputType.Path
+                        ? "workflow.execution.output.type.path"
+                        : "workflow.execution.output.type.text"),
+                    summary.ValueLength));
     }
 
     internal sealed record WorkflowTerminalOutputItem(WorkflowTerminalOutput Source)
@@ -164,10 +223,15 @@ namespace LongBetterWindows.Host.Views
 
     internal sealed record WorkflowReportListItem(string ReportId, string Status, string Detail)
     {
-        public static WorkflowReportListItem From(WorkflowExecutionReportSummary summary)
+        public static WorkflowReportListItem From(
+            WorkflowExecutionReportSummary summary,
+            Func<string, string> translate)
             => new(
                 summary.ReportId,
-                WorkflowExecutionPresentation.StatusLabel(summary.Status),
-                $"{summary.StartedAt.ToLocalTime():MM-dd HH:mm} · {summary.EventCount} 事件");
+                WorkflowExecutionPresentation.StatusLabel(summary.Status, translate),
+                string.Format(
+                    translate("workflow.reports.listDetail"),
+                    summary.StartedAt.ToLocalTime(),
+                    summary.EventCount));
     }
 }

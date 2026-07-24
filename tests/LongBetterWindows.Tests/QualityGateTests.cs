@@ -579,7 +579,9 @@ public class QualityGateTests
         Assert.Contains(
             "AutomationProperties.Name=\"{DynamicResource i18n.workflow.action.export}\"",
             xaml);
-        Assert.Contains("AutomationProperties.Name=\"确认并执行组合动作\"", xaml);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.workflow.execution.review.confirmA11y}\"",
+            xaml);
         Assert.Contains("ReportTimeline", xaml);
         Assert.DoesNotContain("File.WriteAllText", view);
         Assert.DoesNotContain("OpenFolderDialog", view);

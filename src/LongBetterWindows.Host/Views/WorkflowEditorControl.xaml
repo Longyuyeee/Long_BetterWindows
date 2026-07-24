@@ -328,18 +328,18 @@
 
                 <Border x:Name="ExecutionReviewPanel" Visibility="Collapsed" Margin="0,10,0,0"
                         automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview"
-                        automation:AutomationProperties.Name="组合动作执行权限审查"
+                        automation:AutomationProperties.Name="{DynamicResource i18n.workflow.execution.review.name}"
                         CornerRadius="{DynamicResource Long.Radius.Control}" Padding="12"
                         Background="{DynamicResource Long.Brush.Accent.Soft}"
                         BorderBrush="{DynamicResource Long.Brush.Focus}" BorderThickness="1">
                     <StackPanel>
-                        <TextBlock Text="确认本次执行权限" FontWeight="SemiBold" />
+                        <TextBlock Text="{DynamicResource i18n.workflow.execution.review.title}" FontWeight="SemiBold" />
                         <TextBlock x:Name="ExecutionReviewSummary" Margin="0,5,0,8" TextWrapping="Wrap"
                                    automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.Summary"
                                    FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
-                        <ItemsControl x:Name="ExecutionPermissionList">
+                        <ItemsControl x:Name="ExecutionPermissionList"
+                                      automation:AutomationProperties.Name="{DynamicResource i18n.workflow.execution.review.permissions}">
                             <automation:AutomationProperties.AutomationId>Long.Workflow.ExecutionReview.Permissions</automation:AutomationProperties.AutomationId>
-                            <automation:AutomationProperties.Name>本次执行插件权限</automation:AutomationProperties.Name>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,3">
@@ -353,19 +353,19 @@
                         </ItemsControl>
                         <CheckBox x:Name="TerminalOutputApprovalCheckBox"
                                   automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.TerminalOutput"
-                                  Content="允许本次执行在内存中显示未消费的终端输出值（Ctrl+Shift+T）"
+                                  Content="{DynamicResource i18n.workflow.execution.review.terminalApproval}"
                                   Margin="0,9,0,0"
-                                  automation:AutomationProperties.Name="允许显示本次工作流终端输出值" />
-                        <TextBlock Text="默认关闭；值不会写入执行报告。"
+                                  automation:AutomationProperties.Name="{DynamicResource i18n.workflow.execution.review.terminalApprovalA11y}" />
+                        <TextBlock Text="{DynamicResource i18n.workflow.execution.review.terminalHelp}"
                                    Margin="24,3,0,0" FontSize="10" TextWrapping="Wrap"
                                    Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-                            <Button x:Name="CancelRunReviewButton" Content="取消" Style="{StaticResource LongButton}" Margin="0,0,8,0"
+                            <Button x:Name="CancelRunReviewButton" Content="{DynamicResource i18n.workflow.execution.review.cancel}" Style="{StaticResource LongButton}" Margin="0,0,8,0"
                                     automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.Cancel"
-                                    Click="CancelRunReview_Click" automation:AutomationProperties.Name="取消执行确认" />
-                            <Button Content="确认并执行（Ctrl+Shift+Enter）" Style="{StaticResource LongButton.Primary}"
+                                    Click="CancelRunReview_Click" automation:AutomationProperties.Name="{DynamicResource i18n.workflow.execution.review.cancelA11y}" />
+                            <Button Content="{DynamicResource i18n.workflow.execution.review.confirm}" Style="{StaticResource LongButton.Primary}"
                                     automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.Confirm"
-                                    Click="ConfirmRun_Click" automation:AutomationProperties.Name="确认并执行组合动作" />
+                                    Click="ConfirmRun_Click" automation:AutomationProperties.Name="{DynamicResource i18n.workflow.execution.review.confirmA11y}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -378,18 +378,18 @@
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Text="正在执行" FontWeight="SemiBold" />
-                            <TextBlock Text="命令按顺序运行；取消后仍会按失败策略尝试补偿。" Margin="0,4,12,0"
+                            <TextBlock Text="{DynamicResource i18n.workflow.execution.running.title}" FontWeight="SemiBold" />
+                            <TextBlock Text="{DynamicResource i18n.workflow.execution.running.detail}" Margin="0,4,12,0"
                                        TextWrapping="Wrap" FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                         </StackPanel>
-                        <Button Grid.Column="1" Content="取消执行" Style="{StaticResource LongButton}"
-                                Click="CancelExecution_Click" automation:AutomationProperties.Name="取消正在运行的组合动作" />
+                        <Button Grid.Column="1" Content="{DynamicResource i18n.workflow.execution.running.cancel}" Style="{StaticResource LongButton}"
+                                Click="CancelExecution_Click" automation:AutomationProperties.Name="{DynamicResource i18n.workflow.execution.running.cancelA11y}" />
                     </Grid>
                 </Border>
 
                 <Border x:Name="ExecutionResultPanel" Visibility="Collapsed" Margin="0,10,0,0"
                         automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionResult"
-                        automation:AutomationProperties.Name="组合动作执行结果"
+                        automation:AutomationProperties.Name="{DynamicResource i18n.workflow.execution.result.name}"
                         CornerRadius="{DynamicResource Long.Radius.Control}" Padding="12"
                         Background="{DynamicResource Long.Brush.Background.Raised}"
                         BorderBrush="{DynamicResource Long.Brush.Stroke.Default}" BorderThickness="1">
@@ -400,7 +400,7 @@
                                    automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionResult.Detail"
                                    TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                         <ItemsControl x:Name="ExecutionOutputList" Margin="0,8,0,0" Visibility="Collapsed"
-                                      automation:AutomationProperties.Name="工作流输出摘要">
+                                      automation:AutomationProperties.Name="{DynamicResource i18n.workflow.execution.result.outputs}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,2">
@@ -418,14 +418,14 @@
                                     automation:AutomationProperties.AutomationId="Long.Workflow.TerminalOutput">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <TextBlock Text="本次终端输出（仅内存）" FontWeight="SemiBold" />
-                                <Button Grid.Column="1" Content="清除" Style="{StaticResource LongButton}"
+                                <TextBlock Text="{DynamicResource i18n.workflow.terminal.title}" FontWeight="SemiBold" />
+                                <Button Grid.Column="1" Content="{DynamicResource i18n.workflow.terminal.clear}" Style="{StaticResource LongButton}"
                                         Padding="8,3" Click="ClearTerminalOutputs_Click"
                                         automation:AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.Clear"
-                                        automation:AutomationProperties.Name="清除本次终端输出" />
+                                        automation:AutomationProperties.Name="{DynamicResource i18n.workflow.terminal.clearA11y}" />
                             </Grid>
                             <ItemsControl x:Name="TerminalOutputList" Margin="0,6,0,0"
-                                          automation:AutomationProperties.Name="本次工作流终端输出">
+                                          automation:AutomationProperties.Name="{DynamicResource i18n.workflow.terminal.list}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Margin="0,0,0,8">
@@ -434,18 +434,18 @@
                                             <TextBlock Text="{Binding Detail}" FontSize="10" TextTrimming="CharacterEllipsis"
                                                        Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,3">
-                                                <Button Content="复制" Tag="{Binding}" Padding="8,3"
+                                                <Button Content="{DynamicResource i18n.workflow.terminal.copy}" Tag="{Binding}" Padding="8,3"
                                                         Style="{StaticResource LongButton}"
                                                         Click="CopyTerminalOutput_Click"
-                                                        automation:AutomationProperties.Name="复制终端输出值" />
-                                                <Button Content="导出" Tag="{Binding}" Margin="6,0,0,0" Padding="8,3"
+                                                        automation:AutomationProperties.Name="{DynamicResource i18n.workflow.terminal.copyA11y}" />
+                                                <Button Content="{DynamicResource i18n.workflow.terminal.export}" Tag="{Binding}" Margin="6,0,0,0" Padding="8,3"
                                                         Style="{StaticResource LongButton}"
                                                         Click="ExportTerminalOutput_Click"
-                                                        automation:AutomationProperties.Name="导出终端输出值" />
+                                                        automation:AutomationProperties.Name="{DynamicResource i18n.workflow.terminal.exportA11y}" />
                                             </StackPanel>
                                             <TextBox Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Value, Mode=OneWay}" IsReadOnly="True"
                                                      automation:AutomationProperties.AutomationId="Long.Workflow.TerminalOutput.Value"
-                                                     automation:AutomationProperties.Name="终端输出值"
+                                                     automation:AutomationProperties.Name="{DynamicResource i18n.workflow.terminal.valueA11y}"
                                                      MaxHeight="120" TextWrapping="Wrap" AcceptsReturn="True"
                                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" />
                                         </Grid>
@@ -456,12 +456,12 @@
                     </StackPanel>
                 </Border>
 
-                <Expander x:Name="ReportsExpander" Header="执行记录" Margin="0,14,0,0" IsExpanded="False">
+                <Expander x:Name="ReportsExpander" Header="{DynamicResource i18n.workflow.reports.title}" Margin="0,14,0,0" IsExpanded="False">
                     <Grid Margin="0,10,0,0">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="1"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <ListBox x:Name="ReportList" MaxHeight="220" Background="Transparent" BorderThickness="0"
                                  SelectionChanged="ReportList_SelectionChanged"
-                                 automation:AutomationProperties.Name="执行报告列表">
+                                 automation:AutomationProperties.Name="{DynamicResource i18n.workflow.reports.list}">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
                                     <Setter Property="Margin" Value="0,0,0,5" />
@@ -479,7 +479,7 @@
                         </ListBox>
                         <Border Grid.Column="1" Background="{DynamicResource Long.Brush.Stroke.Default}" />
                         <StackPanel Grid.Column="3">
-                            <TextBlock x:Name="ReportDetailTitle" Text="选择一条执行记录" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ReportDetailTitle" Text="{DynamicResource i18n.workflow.reports.select}" FontWeight="SemiBold" />
                             <TextBlock x:Name="ReportDetailMeta" Margin="0,4,0,8" FontSize="10"
                                        Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                             <ItemsControl x:Name="ReportTimeline">
