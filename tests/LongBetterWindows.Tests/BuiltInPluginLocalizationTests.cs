@@ -18,6 +18,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("JsonFormatterPlugin")]
     [InlineData("MarkdownPreview")]
     [InlineData("PasswordGenerator")]
+    [InlineData("PortManager")]
     [InlineData("QuickNotePlugin")]
     [InlineData("RegexTester")]
     [InlineData("TimestampConverter")]
@@ -231,6 +232,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("JsonFormatterPlugin")]
     [InlineData("MarkdownPreview")]
     [InlineData("PasswordGenerator")]
+    [InlineData("PortManager")]
     [InlineData("QuickNotePlugin")]
     [InlineData("RegexTester")]
     [InlineData("TimestampConverter")]
@@ -276,6 +278,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("UuidGenerator", "function uuid", "output.setAttribute", "generate();")]
     [InlineData("FileRenamerPlugin", "async function loadSelection", "renderListState(false);", "loadSelection();")]
     [InlineData("HardwareMonitor", "async function initialize", "renderMetricsProjection();", "updateMetrics(")]
+    [InlineData("PortManager", "async function initialize", "renderPorts();", "refreshPorts(")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
         string plugin,
         string nextFunction,

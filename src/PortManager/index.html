@@ -10,8 +10,8 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">NETWORK PORTS</div>
-        <h1 class="long-page-title">端口管理器</h1>
-        <p class="long-page-description">查看本机端口占用与关联进程，终止进程前需要再次确认。</p>
+        <h1 class="long-page-title" data-i18n="page.title">端口管理器</h1>
+        <p class="long-page-description" data-i18n="page.description">查看本机端口占用与关联进程，终止进程前需要再次确认。</p>
       </div>
       <div class="long-toolbar">
         <span class="long-badge" id="refreshBadge">等待首次刷新</span>
@@ -20,20 +20,20 @@
     </header>
 
     <div class="long-stack">
-      <section class="long-stack" aria-label="端口筛选">
+      <section class="long-stack" id="filterSection" aria-label="端口筛选">
         <div class="long-toolbar">
           <input class="long-toolbar__field" id="searchInput" type="search" placeholder="搜索端口、地址、进程或 PID" aria-label="搜索端口">
           <label class="long-option">
             <input id="autoRefreshToggle" type="checkbox" checked>
-            <span>自动刷新</span>
+            <span data-i18n="filter.autoRefresh">自动刷新</span>
           </label>
         </div>
 
         <div class="long-toolbar">
-          <nav class="long-segment" aria-label="端口类型">
-            <button type="button" data-tab="tcp" aria-selected="true">TCP 监听</button>
-            <button type="button" data-tab="connections" aria-selected="false">TCP 连接</button>
-            <button type="button" data-tab="udp" aria-selected="false">UDP 端点</button>
+          <nav class="long-segment" id="portTabs" aria-label="端口类型">
+            <button type="button" data-tab="tcp" data-i18n="tabs.tcp" aria-selected="true">TCP 监听</button>
+            <button type="button" data-tab="connections" data-i18n="tabs.connections" aria-selected="false">TCP 连接</button>
+            <button type="button" data-tab="udp" data-i18n="tabs.udp" aria-selected="false">UDP 端点</button>
           </nav>
           <span class="long-toolbar__spacer"></span>
           <span class="long-badge long-badge--neutral" id="tcpListeners">TCP 监听 0</span>
@@ -47,13 +47,13 @@
         <div class="long-data-grid" role="table" aria-label="端口与关联进程" style="--long-data-columns: .7fr 1.15fr 1.15fr .65fr .85fr 1.35fr 1fr">
           <div role="rowgroup">
             <div class="long-data-grid__header" role="row">
-              <div role="columnheader">端口</div>
-              <div role="columnheader">本地地址</div>
-              <div role="columnheader">远程地址</div>
-              <div role="columnheader">协议</div>
-              <div role="columnheader">状态</div>
-              <div role="columnheader">进程</div>
-              <div role="columnheader">操作</div>
+              <div role="columnheader" data-i18n="column.port">端口</div>
+              <div role="columnheader" data-i18n="column.localAddress">本地地址</div>
+              <div role="columnheader" data-i18n="column.remoteAddress">远程地址</div>
+              <div role="columnheader" data-i18n="column.protocol">协议</div>
+              <div role="columnheader" data-i18n="column.state">状态</div>
+              <div role="columnheader" data-i18n="column.process">进程</div>
+              <div role="columnheader" data-i18n="column.actions">操作</div>
             </div>
           </div>
           <div id="portRows" role="rowgroup"></div>
@@ -61,7 +61,7 @@
       </section>
 
       <section class="long-card long-stack" aria-labelledby="findTitle">
-        <h2 class="long-section-title" id="findTitle">查找端口占用</h2>
+        <h2 class="long-section-title" id="findTitle" data-i18n="find.title">查找端口占用</h2>
         <div class="long-toolbar">
           <input id="portNumber" type="number" min="1" max="65535" placeholder="端口号 1-65535" aria-label="端口号">
           <select id="portProtocol" aria-label="端口协议">
@@ -79,14 +79,14 @@
 
   <dialog class="long-dialog" id="killDialog" aria-labelledby="killDialogTitle">
     <div class="long-dialog__header">
-      <h2 class="long-dialog__title" id="killDialogTitle">确认终止进程</h2>
+      <h2 class="long-dialog__title" id="killDialogTitle" data-i18n="dialog.kill.title">确认终止进程</h2>
     </div>
     <div class="long-dialog__body">
       <p id="killDialogMessage"></p>
-      <p class="long-status long-status--warning">终止进程可能导致未保存的数据丢失或相关服务中断。</p>
+      <p class="long-status long-status--warning" data-i18n="dialog.kill.warning">终止进程可能导致未保存的数据丢失或相关服务中断。</p>
     </div>
     <div class="long-dialog__actions">
-      <button class="long-button long-button--secondary btn-secondary" id="cancelKillButton" type="button">取消</button>
+      <button class="long-button long-button--secondary btn-secondary" id="cancelKillButton" type="button" data-i18n="dialog.kill.cancel">取消</button>
       <button class="long-button" id="confirmKillButton" type="button">终止进程</button>
     </div>
   </dialog>
@@ -107,12 +107,151 @@
     let refreshPromise = null;
     let hasLoaded = false;
     let pendingProcess = null;
+    let strings = {};
+    let isRefreshing = false;
+    let isFinding = false;
+    let isKilling = false;
+    let listState = 'loading';
+    let listErrorDetail = '';
+    let updatedAt = 0;
+    let findState = { kind: 'hidden', key: '', fallback: '', values: {}, owner: null };
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
+      const message = key
+        ? t(key, fallback, currentStatus.values)
+        : currentStatus.fallback;
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      if (message) window.LongUI?.announce(message);
+      return message;
+    }
+
+    function renderRefreshState() {
+      refreshButton.textContent = isRefreshing
+        ? t('action.refreshing', '刷新中…')
+        : t('action.refresh', '立即刷新');
+      document.getElementById('refreshBadge').textContent = updatedAt
+        ? t(
+          'refresh.updatedAt',
+          '更新于 {time}',
+          {
+            time: new Date(updatedAt).toLocaleTimeString(
+              document.documentElement.lang,
+              { hour12: false })
+          })
+        : t('refresh.waiting', '等待首次刷新');
+    }
+
+    function renderFindResult() {
+      const findButton = document.getElementById('findButton');
+      findButton.textContent = isFinding
+        ? t('find.searching', '查询中…')
+        : t('find.action', '查找');
+      if (findState.kind === 'hidden') {
+        findResult.hidden = true;
+        findResult.replaceChildren();
+        return;
+      }
+      findResult.hidden = false;
+      findResult.replaceChildren();
+      if (findState.kind === 'owner') {
+        const owner = findState.owner || {};
+        appendText(
+          findResult,
+          'div',
+          'long-section-title',
+          t('find.occupied', '端口已被占用'));
+        appendText(
+          findResult,
+          'div',
+          'long-secondary',
+          endpoint(owner.LocalAddress, owner.LocalPort) + ' · ' + (owner.Protocol || 'TCP'));
+        appendText(
+          findResult,
+          'div',
+          'long-secondary',
+          (owner.ProcessName || t('process.unknown', '未知进程')) +
+            (Number(owner.ProcessId) > 0
+              ? ' · PID ' + owner.ProcessId
+              : ' · ' + t('process.pidUnavailable', 'PID 不可用')));
+        return;
+      }
+      appendText(
+        findResult,
+        'div',
+        'long-status long-status--' + findState.kind,
+        t(findState.key, findState.fallback, findState.values));
+    }
+
+    function renderKillDialog() {
+      confirmKillButton.textContent = isKilling
+        ? t('dialog.kill.killing', '正在终止…')
+        : t('dialog.kill.confirm', '终止进程');
+      document.getElementById('killDialogMessage').textContent = pendingProcess
+        ? t(
+          'dialog.kill.message',
+          '将终止进程 {name}（PID {pid}）。',
+          { name: pendingProcess.name, pid: pendingProcess.id })
+        : '';
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '端口管理器');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('filterSection').setAttribute(
+        'aria-label',
+        t('filter.ariaLabel', '端口筛选'));
+      searchInput.placeholder = t(
+        'filter.searchPlaceholder',
+        '搜索端口、地址、进程或 PID');
+      searchInput.setAttribute(
+        'aria-label',
+        t('filter.searchAriaLabel', '搜索端口'));
+      document.getElementById('portTabs').setAttribute(
+        'aria-label',
+        t('tabs.ariaLabel', '端口类型'));
+      document.querySelector('.long-data-grid').setAttribute(
+        'aria-label',
+        t('table.ariaLabel', '端口与关联进程'));
+      const portNumber = document.getElementById('portNumber');
+      portNumber.placeholder = t('find.portPlaceholder', '端口号 1-65535');
+      portNumber.setAttribute(
+        'aria-label',
+        t('find.portAriaLabel', '端口号'));
+      document.getElementById('portProtocol').setAttribute(
+        'aria-label',
+        t('find.protocolAriaLabel', '端口协议'));
+      renderRefreshState();
+      updateStats();
+      renderPorts();
+      renderFindResult();
+      renderKillDialog();
+      if (currentStatus.key || currentStatus.fallback) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback,
+          currentStatus.values);
+      }
+    }
 
     async function initialize() {
-      window.LongUI?.renderState(portRows, {
-        kind: 'loading',
-        title: '正在加载端口信息'
-      });
+      renderRefreshState();
+      renderPorts();
+      renderFindResult();
       await refreshPorts(false);
       startPolling();
     }
@@ -126,7 +265,9 @@
     }
 
     async function performRefresh(manual) {
+      isRefreshing = true;
       window.LongUI?.setBusy(refreshButton, true);
+      renderRefreshState();
       try {
         const results = await Promise.all([
           long.networkPort.getTcpListeners(),
@@ -134,32 +275,36 @@
           long.networkPort.getUdpEndpoints()
         ]);
         allPorts = {
-          tcp: normalizePorts(unwrap(results[0], 'TCP 监听加载失败')),
-          connections: normalizePorts(unwrap(results[1], 'TCP 连接加载失败')),
-          udp: normalizePorts(unwrap(results[2], 'UDP 端点加载失败'))
+          tcp: normalizePorts(unwrap(results[0], t('error.tcp', 'TCP 监听加载失败'))),
+          connections: normalizePorts(unwrap(results[1], t('error.connections', 'TCP 连接加载失败'))),
+          udp: normalizePorts(unwrap(results[2], t('error.udp', 'UDP 端点加载失败')))
         };
         hasLoaded = true;
+        listState = 'ready';
+        listErrorDetail = '';
+        updatedAt = Date.now();
         updateStats();
         renderPorts();
-        document.getElementById('refreshBadge').textContent =
-          '更新于 ' + new Date().toLocaleTimeString([], { hour12: false });
-        if (manual) setStatus('端口信息已刷新', 'success');
+        renderRefreshState();
+        if (manual) setStatus('status.refreshed', 'success', '端口信息已刷新');
         return true;
       } catch (error) {
-        const detail = errorMessage(error, '端口信息加载失败');
+        const detail = errorMessage(error, t('error.ports', '端口信息加载失败'));
         if (!hasLoaded) {
-          window.LongUI?.renderState(portRows, {
-            kind: 'error',
-            title: '端口信息加载失败',
-            detail: detail,
-            actionLabel: '重试',
-            onAction: function () { void refreshPorts(true); }
-          });
+          listState = 'error';
+          listErrorDetail = detail;
+          renderPorts();
         }
-        setStatus(detail, 'danger');
+        setStatus(
+          'status.refreshFailed',
+          'danger',
+          '端口信息刷新失败：{detail}',
+          { detail: detail });
         return false;
       } finally {
+        isRefreshing = false;
         window.LongUI?.setBusy(refreshButton, false);
+        renderRefreshState();
       }
     }
 
@@ -170,12 +315,43 @@
     }
 
     function updateStats() {
-      document.getElementById('tcpListeners').textContent = 'TCP 监听 ' + allPorts.tcp.length;
-      document.getElementById('tcpConnections').textContent = 'TCP 连接 ' + allPorts.connections.length;
-      document.getElementById('udpEndpoints').textContent = 'UDP 端点 ' + allPorts.udp.length;
+      document.getElementById('tcpListeners').textContent = t(
+        'stats.tcp',
+        'TCP 监听 {count}',
+        { count: allPorts.tcp.length });
+      document.getElementById('tcpConnections').textContent = t(
+        'stats.connections',
+        'TCP 连接 {count}',
+        { count: allPorts.connections.length });
+      document.getElementById('udpEndpoints').textContent = t(
+        'stats.udp',
+        'UDP 端点 {count}',
+        { count: allPorts.udp.length });
     }
 
     function renderPorts() {
+      document.querySelectorAll('[data-tab]').forEach(function (button) {
+        button.setAttribute('aria-selected', String(button.dataset.tab === currentTab));
+      });
+      document.getElementById('listTitle').textContent = tabTitle(currentTab);
+      portRows.replaceChildren();
+      if (listState === 'loading') {
+        window.LongUI?.renderState(portRows, {
+          kind: 'loading',
+          title: t('state.portLoading', '正在加载端口信息')
+        });
+        return;
+      }
+      if (listState === 'error') {
+        window.LongUI?.renderState(portRows, {
+          kind: 'error',
+          title: t('state.loadFailed', '端口信息加载失败'),
+          detail: listErrorDetail,
+          actionLabel: t('action.retry', '重试'),
+          onAction: function () { void refreshPorts(true); }
+        });
+        return;
+      }
       const query = searchInput.value.trim().toLocaleLowerCase();
       const source = allPorts[currentTab] || [];
       const visible = source.filter(function (port) {
@@ -194,13 +370,15 @@
         });
       });
 
-      portRows.replaceChildren();
-      document.getElementById('listTitle').textContent = tabTitle(currentTab);
       if (!visible.length) {
         window.LongUI?.renderState(portRows, {
           kind: 'empty',
-          title: query ? '没有匹配的端口' : '暂无端口信息',
-          detail: query ? '请尝试其他端口、地址、进程名称或 PID' : ''
+          title: query
+            ? t('state.noMatch', '没有匹配的端口')
+            : t('state.empty', '暂无端口信息'),
+          detail: query
+            ? t('state.noMatchDetail', '请尝试其他端口、地址、进程名称或 PID')
+            : ''
         });
         return;
       }
@@ -209,43 +387,60 @@
         const row = document.createElement('div');
         row.className = 'long-data-grid__row';
         row.setAttribute('role', 'row');
-        appendDataCell(row, '端口', port.LocalPort, 'long-code');
-        appendDataCell(row, '本地地址', endpoint(port.LocalAddress, port.LocalPort), 'long-code');
+        appendDataCell(row, t('column.port', '端口'), port.LocalPort, 'long-code');
         appendDataCell(
           row,
-          '远程地址',
+          t('column.localAddress', '本地地址'),
+          endpoint(port.LocalAddress, port.LocalPort),
+          'long-code');
+        appendDataCell(
+          row,
+          t('column.remoteAddress', '远程地址'),
           port.RemotePort ? endpoint(port.RemoteAddress, port.RemotePort) : '--',
           'long-code');
 
-        const protocolCell = createDataCell('协议');
+        const protocolCell = createDataCell(t('column.protocol', '协议'));
         protocolCell.appendChild(createBadge(
           port.Protocol || (currentTab === 'udp' ? 'UDP' : 'TCP'),
           currentTab === 'udp' ? 'success' : 'neutral'));
         row.appendChild(protocolCell);
 
-        const stateCell = createDataCell('状态');
+        const stateCell = createDataCell(t('column.state', '状态'));
         stateCell.appendChild(createBadge(port.State || '--', stateKind(port.State)));
         row.appendChild(stateCell);
 
-        const processCell = createDataCell('进程');
-        appendText(processCell, 'div', 'long-code', port.ProcessName || '未知进程');
+        const processCell = createDataCell(t('column.process', '进程'));
+        appendText(
+          processCell,
+          'div',
+          'long-code',
+          port.ProcessName || t('process.unknown', '未知进程'));
         appendText(
           processCell,
           'div',
           'long-muted',
-          Number(port.ProcessId) > 0 ? 'PID ' + port.ProcessId : 'PID 不可用');
+          Number(port.ProcessId) > 0
+            ? 'PID ' + port.ProcessId
+            : t('process.pidUnavailable', 'PID 不可用'));
         row.appendChild(processCell);
 
-        const actionsCell = createDataCell('操作');
+        const actionsCell = createDataCell(t('column.actions', '操作'));
         const actions = document.createElement('div');
         actions.className = 'long-toolbar';
-        const copyButton = createActionButton('复制', function () { void copyPort(port); });
+        const copyButton = createActionButton(
+          t('action.copy', '复制'),
+          function () { void copyPort(port); });
         actions.appendChild(copyButton);
         if (Number(port.ProcessId) > 0) {
-          const killButton = createActionButton('终止', function () { openKillDialog(port); });
+          const killButton = createActionButton(
+            t('action.kill', '终止'),
+            function () { openKillDialog(port); });
           killButton.setAttribute(
             'aria-label',
-            '终止进程 ' + (port.ProcessName || port.ProcessId));
+            t(
+              'action.killAriaLabel',
+              '终止进程 {name}',
+              { name: port.ProcessName || port.ProcessId }));
           actions.appendChild(killButton);
         }
         actionsCell.appendChild(actions);
@@ -289,24 +484,32 @@
       const text = endpoint(port.LocalAddress, port.LocalPort) +
         (port.ProcessName ? ' · ' + port.ProcessName + ' (PID ' + port.ProcessId + ')' : '');
       try {
-        unwrap(await long.clipboard.setText(text), '端口信息复制失败');
-        setStatus('端口信息已复制', 'success');
+        unwrap(
+          await long.clipboard.setText(text),
+          t('error.copy', '端口信息复制失败'));
+        setStatus('status.copied', 'success', '端口信息已复制');
       } catch (error) {
-        setStatus(errorMessage(error, '端口信息复制失败'), 'danger');
+        setStatus(
+          'status.copyFailed',
+          'danger',
+          '端口信息复制失败：{detail}',
+          { detail: errorMessage(error, t('error.copy', '端口信息复制失败')) });
       }
     }
 
     function openKillDialog(port) {
       if (!Number(port.ProcessId)) {
-        setStatus('此端口没有可用的进程标识，无法终止', 'warning');
+        setStatus(
+          'status.processUnavailable',
+          'warning',
+          '此端口没有可用的进程标识，无法终止');
         return;
       }
       pendingProcess = {
         id: Number(port.ProcessId),
-        name: port.ProcessName || '未知进程'
+        name: port.ProcessName || t('process.unknown', '未知进程')
       };
-      document.getElementById('killDialogMessage').textContent =
-        '将终止进程 ' + pendingProcess.name + '（PID ' + pendingProcess.id + '）。';
+      renderKillDialog();
       killDialog.showModal();
       confirmKillButton.focus();
     }
@@ -314,17 +517,31 @@
     async function confirmKill() {
       if (!pendingProcess) return;
       const target = pendingProcess;
+      isKilling = true;
       window.LongUI?.setBusy(confirmKillButton, true);
+      renderKillDialog();
       try {
-        unwrap(await long.process.kill(target.id), '终止进程失败');
+        unwrap(
+          await long.process.kill(target.id),
+          t('error.kill', '终止进程失败'));
         killDialog.close();
         pendingProcess = null;
-        setStatus('进程 ' + target.name + ' 已终止', 'success');
+        setStatus(
+          'status.processKilled',
+          'success',
+          '进程 {name} 已终止',
+          { name: target.name });
         await refreshPorts(false);
       } catch (error) {
-        setStatus(errorMessage(error, '终止进程失败'), 'danger');
+        setStatus(
+          'status.killFailed',
+          'danger',
+          '终止进程失败：{detail}',
+          { detail: errorMessage(error, t('error.kill', '终止进程失败')) });
       } finally {
+        isKilling = false;
         window.LongUI?.setBusy(confirmKillButton, false);
+        renderKillDialog();
       }
     }
 
@@ -332,59 +549,71 @@
       const port = Number(document.getElementById('portNumber').value);
       const protocol = document.getElementById('portProtocol').value;
       if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        showFindMessage('请输入 1 到 65535 之间的有效端口号', 'danger');
+        showFindMessage(
+          'find.invalidPort',
+          '请输入 1 到 65535 之间的有效端口号',
+          'danger');
         return false;
       }
 
+      isFinding = true;
       window.LongUI?.setBusy(document.getElementById('findButton'), true);
+      renderFindResult();
       try {
         const owner = unwrap(
           await long.networkPort.findOwner(port, protocol),
-          '端口占用查询失败');
+          t('error.find', '端口占用查询失败'));
         if (!owner) {
-          showFindMessage(protocol.toUpperCase() + ' 端口 ' + port + ' 当前未被占用', 'success');
+          showFindMessage(
+            'find.available',
+            '{protocol} 端口 {port} 当前未被占用',
+            'success',
+            { protocol: protocol.toUpperCase(), port: port });
           return true;
         }
         showFindOwner(owner);
         return true;
       } catch (error) {
-        showFindMessage(errorMessage(error, '端口占用查询失败'), 'danger');
+        const detail = errorMessage(error, t('error.find', '端口占用查询失败'));
+        showFindMessage(
+          'status.findFailed',
+          '端口占用查询失败：{detail}',
+          'danger',
+          { detail: detail });
         return false;
       } finally {
+        isFinding = false;
         window.LongUI?.setBusy(document.getElementById('findButton'), false);
+        renderFindResult();
       }
     }
 
     function showFindOwner(owner) {
-      findResult.hidden = false;
-      findResult.replaceChildren();
-      appendText(findResult, 'div', 'long-section-title', '端口已被占用');
-      appendText(
-        findResult,
-        'div',
-        'long-secondary',
-        endpoint(owner.LocalAddress, owner.LocalPort) + ' · ' + (owner.Protocol || 'TCP'));
-      appendText(
-        findResult,
-        'div',
-        'long-secondary',
-        (owner.ProcessName || '未知进程') +
-          (Number(owner.ProcessId) > 0 ? ' · PID ' + owner.ProcessId : ' · PID 不可用'));
-      setStatus('已找到端口占用信息', 'success');
+      findState = {
+        kind: 'owner',
+        key: '',
+        fallback: '',
+        values: {},
+        owner: owner
+      };
+      renderFindResult();
+      setStatus('find.found', 'success', '已找到端口占用信息');
     }
 
-    function showFindMessage(message, kind) {
-      findResult.hidden = false;
-      findResult.replaceChildren();
-      appendText(findResult, 'div', 'long-status long-status--' + kind, message);
-      setStatus(message, kind);
+    function showFindMessage(key, fallback, kind, values) {
+      findState = {
+        kind: kind,
+        key: key,
+        fallback: fallback,
+        values: values || {},
+        owner: null
+      };
+      renderFindResult();
+      setStatus(key, kind, fallback, values);
     }
 
     function selectTab(tab) {
       currentTab = tab;
-      document.querySelectorAll('[data-tab]').forEach(function (button) {
-        button.setAttribute('aria-selected', String(button.dataset.tab === tab));
-      });
       renderPorts();
     }
 
@@ -401,9 +630,9 @@
     }
 
     function tabTitle(tab) {
-      if (tab === 'connections') return 'TCP 连接';
-      if (tab === 'udp') return 'UDP 端点';
-      return 'TCP 监听';
+      if (tab === 'connections') return t('tabs.connections', 'TCP 连接');
+      if (tab === 'udp') return t('tabs.udp', 'UDP 端点');
+      return t('tabs.tcp', 'TCP 监听');
     }
 
     function stateKind(value) {
@@ -436,12 +665,6 @@
 
     function errorMessage(error, fallback) {
       return error && error.message ? error.message : fallback;
-    }
-
-    function setStatus(message, kind) {
-      status.textContent = message;
-      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
     }
 
     refreshButton.addEventListener('click', function () { void refreshPorts(true); });
@@ -488,7 +711,9 @@
         const success = await findPort();
         return {
           success: success,
-          message: success ? '端口查询完成' : '端口查询失败'
+          message: success
+            ? t('command.findCompleted', '端口查询完成')
+            : t('command.findFailed', '端口查询失败')
         };
       }
       if (text) {
@@ -496,7 +721,13 @@
         renderPorts();
         searchInput.focus();
       }
-      return { success: true, message: '端口管理器已打开' };
+      return {
+        success: true,
+        message: t('command.opened', '端口管理器已打开')
+      };
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
     initialize();
   </script>
