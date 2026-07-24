@@ -6,6 +6,25 @@ using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host.Views
 {
+    public sealed record HotkeySettingsLocalization(
+        string CurrentHotkeyLabel,
+        string ApplyAction,
+        string UnchangedStatus,
+        string ConflictStatusFormat,
+        string UpdatedStatus,
+        string ChangeFailedStatusFormat,
+        string FormatHint)
+    {
+        public static HotkeySettingsLocalization Chinese { get; } = new(
+            "当前快捷键",
+            "应用",
+            "未修改",
+            "冲突: 已被「{0}」占用",
+            "已更新",
+            "修改失败: {0}",
+            "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6");
+    }
+
     /// <summary>
     /// 共享热键设置控件——所有插件的设置面板中复用。
     /// 提供热键显示、修改、冲突检测的完整 UI。
@@ -20,40 +39,50 @@ namespace LongBetterWindows.Host.Views
 
         private readonly IHotKeyService _hotKey;
         private readonly string _pluginId;
-        private readonly string _pluginName;
         private readonly Action<string> _onHotkeyChanged;
+        private readonly Action _hotkeyCallback;
+        private readonly TextBlock _title;
+        private readonly TextBlock _label;
+        private readonly Button _applyButton;
+        private readonly TextBlock _statusText;
+        private readonly TextBlock _hint;
         private string _currentHotkey;
+        private HotkeySettingsLocalization _localization;
+        private HotkeySettingsStatus _status;
+        private string? _statusDetail;
 
         public HotkeySettingsControl(
             string pluginName,
             string pluginId,
             string currentHotkey,
-            Action<string> onHotkeyChanged)
+            Action<string> onHotkeyChanged,
+            HotkeySettingsLocalization? localization = null,
+            Action? hotkeyCallback = null)
         {
-            _pluginName = pluginName;
             _pluginId = pluginId;
             _currentHotkey = currentHotkey;
             _onHotkeyChanged = onHotkeyChanged;
+            _hotkeyCallback = hotkeyCallback ?? (() => { });
             _hotKey = ServicesInitializer.HotKey;
+            _localization = localization ?? HotkeySettingsLocalization.Chinese;
 
             var panel = new StackPanel();
 
-            var title = new TextBlock
+            _title = new TextBlock
             {
-                Text = $"{pluginName}",
+                Text = pluginName,
                 FontSize = 16,
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 0, 16),
             };
-            panel.Children.Add(title);
+            panel.Children.Add(_title);
 
-            var label = new TextBlock
+            _label = new TextBlock
             {
-                Text = "当前快捷键",
                 FontSize = 12,
                 Foreground = TryFindBrush("TextSecondaryBrush") ?? GrayBrush,
             };
-            panel.Children.Add(label);
+            panel.Children.Add(_label);
 
             var hotkeyRow = new StackPanel
             {
@@ -71,9 +100,8 @@ namespace LongBetterWindows.Host.Views
                 VerticalContentAlignment = VerticalAlignment.Center,
             };
 
-            var applyBtn = new Button
+            _applyButton = new Button
             {
-                Content = "应用",
                 Width = 56,
                 Height = 30,
                 Margin = new Thickness(8, 0, 0, 0),
@@ -83,19 +111,18 @@ namespace LongBetterWindows.Host.Views
                 BorderThickness = new Thickness(0),
             };
 
-            var statusText = new TextBlock
+            _statusText = new TextBlock
             {
                 FontSize = 11,
                 Margin = new Thickness(0, 4, 0, 0),
             };
 
-            applyBtn.Click += async (_, _) =>
+            _applyButton.Click += async (_, _) =>
             {
                 var newHotkey = hotkeyBox.Text.Trim();
                 if (string.IsNullOrEmpty(newHotkey) || newHotkey == _currentHotkey)
                 {
-                    statusText.Text = "未修改";
-                    statusText.Foreground = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80));
+                    SetStatus(HotkeySettingsStatus.Unchanged);
                     return;
                 }
 
@@ -106,46 +133,97 @@ namespace LongBetterWindows.Host.Views
                     var owner = _hotKey.GetOwner(newHotkey);
                     if (owner != null && owner != _pluginId)
                     {
-                        statusText.Text = $"冲突: 已被「{owner}」占用";
-                        statusText.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
+                        SetStatus(HotkeySettingsStatus.Conflict, owner);
                         return;
                     }
                 }
 
                 // 更换热键
                 var changeResult = await _hotKey.ChangeHotkeyAsync(
-                    _currentHotkey, newHotkey, _pluginId, () => { });
+                    _currentHotkey, newHotkey, _pluginId, _hotkeyCallback);
 
                 if (changeResult.IsSuccess)
                 {
                     _currentHotkey = newHotkey;
                     _onHotkeyChanged(newHotkey);
-                    statusText.Text = "已更新";
-                    statusText.Foreground = new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59));
+                    SetStatus(HotkeySettingsStatus.Updated);
                 }
                 else
                 {
-                    statusText.Text = changeResult.ErrorMessage ?? "修改失败";
-                    statusText.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30));
+                    SetStatus(
+                        HotkeySettingsStatus.Failed,
+                        changeResult.ErrorMessage ?? string.Empty);
                 }
             };
 
             hotkeyRow.Children.Add(hotkeyBox);
-            hotkeyRow.Children.Add(applyBtn);
+            hotkeyRow.Children.Add(_applyButton);
             panel.Children.Add(hotkeyRow);
-            panel.Children.Add(statusText);
+            panel.Children.Add(_statusText);
 
-            var hint = new TextBlock
+            _hint = new TextBlock
             {
-                Text = "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6",
                 FontSize = 11,
                 Foreground = TryFindBrush("TextDimBrush") ?? GrayBrush,
                 Margin = new Thickness(0, 8, 0, 0),
                 TextWrapping = TextWrapping.Wrap,
             };
-            panel.Children.Add(hint);
+            panel.Children.Add(_hint);
 
             Content = panel;
+            ApplyLocalization(pluginName, _localization);
+        }
+
+        public void ApplyLocalization(
+            string pluginName,
+            HotkeySettingsLocalization localization)
+        {
+            _localization = localization;
+            _title.Text = pluginName;
+            _label.Text = localization.CurrentHotkeyLabel;
+            _applyButton.Content = localization.ApplyAction;
+            _hint.Text = localization.FormatHint;
+            RenderStatus();
+        }
+
+        private void SetStatus(HotkeySettingsStatus status, string? detail = null)
+        {
+            _status = status;
+            _statusDetail = detail;
+            RenderStatus();
+        }
+
+        private void RenderStatus()
+        {
+            _statusText.Text = _status switch
+            {
+                HotkeySettingsStatus.Unchanged => _localization.UnchangedStatus,
+                HotkeySettingsStatus.Conflict => string.Format(
+                    _localization.ConflictStatusFormat,
+                    _statusDetail),
+                HotkeySettingsStatus.Updated => _localization.UpdatedStatus,
+                HotkeySettingsStatus.Failed => string.Format(
+                    _localization.ChangeFailedStatusFormat,
+                    _statusDetail),
+                _ => string.Empty,
+            };
+            _statusText.Foreground = _status switch
+            {
+                HotkeySettingsStatus.Conflict or HotkeySettingsStatus.Failed
+                    => new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30)),
+                HotkeySettingsStatus.Updated
+                    => new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59)),
+                _ => new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),
+            };
+        }
+
+        private enum HotkeySettingsStatus
+        {
+            None,
+            Unchanged,
+            Conflict,
+            Updated,
+            Failed,
         }
     }
 }

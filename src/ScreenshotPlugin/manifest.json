@@ -31,6 +31,13 @@
   "window": {
     "mode": "overlay"
   },
+  "localization": {
+    "default_language": "zh-CN",
+    "resources": {
+      "zh-CN": "i18n/zh-CN.json",
+      "en-US": "i18n/en-US.json"
+    }
+  },
   "default_settings": {
     "full_hotkey": "Ctrl+Shift+S",
     "region_hotkey": "Ctrl+Shift+A",

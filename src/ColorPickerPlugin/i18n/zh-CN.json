@@ -1,0 +1,20 @@
+{
+  "plugin.name": "颜色拾取器",
+  "commands.color.pick.title": "屏幕取色",
+  "commands.color.pick.description": "拾取屏幕像素颜色并复制色值",
+  "window.title": "屏幕取色",
+  "window.automationName": "屏幕颜色拾取器",
+  "window.instruction": "单击屏幕复制色值 · Esc 取消",
+  "command.opened": "取色器已打开",
+  "error.unknownCommand": "未知取色命令: {0}",
+  "toast.copied": "已复制颜色 {0}",
+  "toast.copyFailed": "拾取成功，但写入剪贴板失败",
+  "settings.commandCenter": "命令中心",
+  "settings.currentHotkey": "当前快捷键",
+  "settings.apply": "应用",
+  "settings.unchanged": "未修改",
+  "settings.conflict": "冲突: 已被「{0}」占用",
+  "settings.updated": "已更新",
+  "settings.changeFailed": "修改失败: {0}",
+  "settings.formatHint": "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6"
+}

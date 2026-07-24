@@ -1,9 +1,15 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 
 namespace ScreenshotPlugin;
+
+public sealed record RegionSelectorLocalization(
+    string AutomationName,
+    string Instruction,
+    string Cancel);
 
 public partial class RegionSelectorWindow : Window
 {
@@ -11,14 +17,23 @@ public partial class RegionSelectorWindow : Window
     private bool _drawing;
 
     public event Action<BitmapSource>? RegionSelected;
+    public event Action<Exception>? CaptureFailed;
 
-    public RegionSelectorWindow()
+    public RegionSelectorWindow(RegionSelectorLocalization localization)
     {
         InitializeComponent();
         Left = SystemParameters.VirtualScreenLeft;
         Top = SystemParameters.VirtualScreenTop;
         Width = SystemParameters.VirtualScreenWidth;
         Height = SystemParameters.VirtualScreenHeight;
+        ApplyLocalization(localization);
+    }
+
+    public void ApplyLocalization(RegionSelectorLocalization localization)
+    {
+        AutomationProperties.SetName(SelectionCanvas, localization.AutomationName);
+        InstructionText.Text = localization.Instruction;
+        CancelText.Text = "  " + localization.Cancel;
     }
 
     private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -53,12 +68,23 @@ public partial class RegionSelectorWindow : Window
 
         var screenX = (int)(SystemParameters.VirtualScreenLeft + Canvas.GetLeft(SelectionRectangle));
         var screenY = (int)(SystemParameters.VirtualScreenTop + Canvas.GetTop(SelectionRectangle));
-        var bitmap = ScreenCapture.Capture(
-            screenX, screenY,
-            Math.Max(1, (int)SelectionRectangle.Width),
-            Math.Max(1, (int)SelectionRectangle.Height));
-        RegionSelected?.Invoke(bitmap);
-        Close();
+        try
+        {
+            var bitmap = ScreenCapture.Capture(
+                screenX,
+                screenY,
+                Math.Max(1, (int)SelectionRectangle.Width),
+                Math.Max(1, (int)SelectionRectangle.Height));
+            RegionSelected?.Invoke(bitmap);
+        }
+        catch (Exception ex)
+        {
+            CaptureFailed?.Invoke(ex);
+        }
+        finally
+        {
+            Close();
+        }
     }
 
     private void UpdateSelection(Point end)

@@ -9,15 +9,27 @@ using Serilog;
 
 namespace ScreenshotPlugin;
 
-public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginCommandHandler
+public class ScreenshotPluginImpl :
+    ILongPlugin,
+    IHasSettingsUI,
+    IHasMainUI,
+    IPluginCommandHandler,
+    IPluginLanguageLifecycle
 {
     private IHostApi _host = null!;
     private readonly List<string> _registeredHotkeys = new();
-    private string _fullHotkey = "Ctrl+Shift+S";
-    private string _regionHotkey = "Ctrl+Shift+A";
+    private readonly List<WeakReference<HotkeySettingsControl>> _fullSettings = [];
+    private readonly List<WeakReference<HotkeySettingsControl>> _regionSettings = [];
+    private string _configuredFullHotkey = "Ctrl+Shift+S";
+    private string _configuredRegionHotkey = "Ctrl+Shift+A";
+    private string? _registeredFullHotkey;
+    private string? _registeredRegionHotkey;
+    private RegionSelectorWindow? _selector;
+    private IReadOnlyDictionary<string, string> _strings =
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.screenshot";
-    public string Name => "截图工具";
+    public string Name => Text("plugin.name", "截图工具");
     public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
@@ -29,17 +41,24 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
 
     public async Task<bool> StartAsync()
     {
-        _fullHotkey = await RegisterWithFallbackAsync(
-            "Ctrl+Shift+S", "Ctrl+Alt+Shift+S", CaptureFullScreen);
-        _regionHotkey = await RegisterWithFallbackAsync(
-            "Ctrl+Shift+A", "Ctrl+Alt+Shift+A", CaptureRegion);
+        _registeredFullHotkey = await RegisterWithFallbackAsync(
+            _configuredFullHotkey,
+            "Ctrl+Alt+Shift+S",
+            CaptureFullScreen);
+        _registeredRegionHotkey = await RegisterWithFallbackAsync(
+            _configuredRegionHotkey,
+            "Ctrl+Alt+Shift+A",
+            CaptureRegion);
 
         State = PluginState.Running;
-        Log.Information("[Screenshot] 已启动: 全屏 {Full}，区域 {Region}", _fullHotkey, _regionHotkey);
+        Log.Information(
+            "[Screenshot] 已启动: 全屏 {Full}，区域 {Region}",
+            _registeredFullHotkey ?? "command-center",
+            _registeredRegionHotkey ?? "command-center");
         return true;
     }
 
-    private async Task<string> RegisterWithFallbackAsync(
+    private async Task<string?> RegisterWithFallbackAsync(
         string preferred, string fallback, Action callback)
     {
         var result = await _host.HotKey.RegisterAsync(preferred, Id, callback);
@@ -58,7 +77,7 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
         }
 
         Log.Warning("[Screenshot] 热键不可用，命令中心入口仍可执行: {Preferred}", preferred);
-        return "命令中心";
+        return null;
     }
 
     public async Task<bool> StopAsync()
@@ -66,6 +85,9 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
         foreach (var hotkey in _registeredHotkeys)
             await _host.HotKey.UnregisterAsync(hotkey);
         _registeredHotkeys.Clear();
+        _registeredFullHotkey = null;
+        _registeredRegionHotkey = null;
+        Application.Current.Dispatcher.Invoke(() => _selector?.Close());
         State = PluginState.Stopped;
         return true;
     }
@@ -81,12 +103,16 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
         {
             case "screenshot.full":
                 CaptureFullScreen();
-                return Task.FromResult(PluginCommandResult.Success("全屏截图已开始"));
+                return Task.FromResult(PluginCommandResult.Success(
+                    Text("command.fullStarted", "全屏截图已开始")));
             case "screenshot.region":
                 CaptureRegion();
-                return Task.FromResult(PluginCommandResult.Success("拖拽选择截图区域"));
+                return Task.FromResult(PluginCommandResult.Success(
+                    Text("command.regionStarted", "拖拽选择截图区域")));
             default:
-                return Task.FromResult(PluginCommandResult.Failure($"未知截图命令: {invocation.CommandId}"));
+                return Task.FromResult(PluginCommandResult.Failure(string.Format(
+                    Text("error.unknownCommand", "未知截图命令: {0}"),
+                    invocation.CommandId)));
         }
     }
 
@@ -105,12 +131,17 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
                 if (!result.IsSuccess)
                     throw new InvalidOperationException(result.ErrorMessage ?? "剪贴板写入失败");
 
-                FloatingHudWindow.ShowToast($"全屏截图已复制 · {bitmap.PixelWidth} × {bitmap.PixelHeight}");
+                FloatingHudWindow.ShowToast(string.Format(
+                    Text("toast.fullCopied", "全屏截图已复制 · {0} × {1}"),
+                    bitmap.PixelWidth,
+                    bitmap.PixelHeight));
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "[Screenshot] 全屏截图失败");
-                FloatingHudWindow.ShowToast("截图失败，请稍后重试");
+                FloatingHudWindow.ShowToast(Text(
+                    "toast.captureFailed",
+                    "截图失败，请稍后重试"));
             }
         });
     }
@@ -119,13 +150,47 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            var selector = new RegionSelectorWindow();
+            if (_selector?.IsVisible == true)
+            {
+                _selector.Activate();
+                return;
+            }
+
+            var selector = new RegionSelectorWindow(CreateSelectorLocalization());
+            _selector = selector;
+            selector.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_selector, selector))
+                    _selector = null;
+            };
             selector.RegionSelected += async bitmap =>
             {
-                var result = await _host.Clipboard.SetImageAsync(bitmap);
-                FloatingHudWindow.ShowToast(result.IsSuccess
-                    ? $"区域截图已复制 · {bitmap.PixelWidth} × {bitmap.PixelHeight}"
-                    : "截图完成，但写入剪贴板失败");
+                try
+                {
+                    var result = await _host.Clipboard.SetImageAsync(bitmap);
+                    FloatingHudWindow.ShowToast(result.IsSuccess
+                        ? string.Format(
+                            Text("toast.regionCopied", "区域截图已复制 · {0} × {1}"),
+                            bitmap.PixelWidth,
+                            bitmap.PixelHeight)
+                        : Text(
+                            "toast.clipboardFailed",
+                            "截图完成，但写入剪贴板失败"));
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "[Screenshot] 区域截图写入剪贴板失败");
+                    FloatingHudWindow.ShowToast(Text(
+                        "toast.clipboardFailed",
+                        "截图完成，但写入剪贴板失败"));
+                }
+            };
+            selector.CaptureFailed += ex =>
+            {
+                Log.Error(ex, "[Screenshot] 区域截图失败");
+                FloatingHudWindow.ShowToast(Text(
+                    "toast.captureFailed",
+                    "截图失败，请稍后重试"));
             };
             selector.Show();
             selector.Activate();
@@ -135,10 +200,108 @@ public class ScreenshotPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
     public FrameworkElement CreateSettingsUI()
     {
         var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new HotkeySettingsControl("全屏截图", Id, _fullHotkey, value => _fullHotkey = value));
-        panel.Children.Add(new HotkeySettingsControl("区域截图", Id, _regionHotkey, value => _regionHotkey = value));
+        var full = new HotkeySettingsControl(
+            Text("settings.fullTitle", "全屏截图"),
+            Id,
+            _registeredFullHotkey
+                ?? Text("settings.commandCenter", "命令中心"),
+            value =>
+            {
+                ReplaceRegisteredHotkey(_registeredFullHotkey, value);
+                _configuredFullHotkey = value;
+                _registeredFullHotkey = value;
+            },
+            CreateSettingsLocalization(),
+            CaptureFullScreen);
+        var region = new HotkeySettingsControl(
+            Text("settings.regionTitle", "区域截图"),
+            Id,
+            _registeredRegionHotkey
+                ?? Text("settings.commandCenter", "命令中心"),
+            value =>
+            {
+                ReplaceRegisteredHotkey(_registeredRegionHotkey, value);
+                _configuredRegionHotkey = value;
+                _registeredRegionHotkey = value;
+            },
+            CreateSettingsLocalization(),
+            CaptureRegion);
+        _fullSettings.Add(new WeakReference<HotkeySettingsControl>(full));
+        _regionSettings.Add(new WeakReference<HotkeySettingsControl>(region));
+        panel.Children.Add(full);
+        panel.Children.Add(region);
         return panel;
     }
+
+    public Task OnLanguageChangedAsync(
+        PluginLanguageContext context,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _strings = context.Resources;
+        var application = Application.Current;
+        if (application is null)
+            return Task.CompletedTask;
+
+        application.Dispatcher.Invoke(() =>
+        {
+            _selector?.ApplyLocalization(CreateSelectorLocalization());
+            ApplySettingsLocalization(
+                _fullSettings,
+                Text("settings.fullTitle", "全屏截图"));
+            ApplySettingsLocalization(
+                _regionSettings,
+                Text("settings.regionTitle", "区域截图"));
+        });
+        return Task.CompletedTask;
+    }
+
+    private void ApplySettingsLocalization(
+        List<WeakReference<HotkeySettingsControl>> references,
+        string title)
+    {
+        references.RemoveAll(reference => !reference.TryGetTarget(out _));
+        foreach (var reference in references)
+        {
+            if (reference.TryGetTarget(out var control))
+                control.ApplyLocalization(title, CreateSettingsLocalization());
+        }
+    }
+
+    private void ReplaceRegisteredHotkey(string? previous, string current)
+    {
+        if (previous is not null)
+        {
+            _registeredHotkeys.RemoveAll(existing =>
+                existing.Equals(previous, StringComparison.OrdinalIgnoreCase));
+        }
+        if (!_registeredHotkeys.Contains(current, StringComparer.OrdinalIgnoreCase))
+            _registeredHotkeys.Add(current);
+    }
+
+    private RegionSelectorLocalization CreateSelectorLocalization()
+        => new(
+            Text("overlay.automationName", "截图区域选择器"),
+            Text("overlay.instruction", "拖拽选择截图区域"),
+            Text("overlay.cancel", "· ESC 取消"));
+
+    private HotkeySettingsLocalization CreateSettingsLocalization()
+        => new(
+            Text("settings.currentHotkey", "当前快捷键"),
+            Text("settings.apply", "应用"),
+            Text("settings.unchanged", "未修改"),
+            Text("settings.conflict", "冲突: 已被「{0}」占用"),
+            Text("settings.updated", "已更新"),
+            Text("settings.changeFailed", "修改失败: {0}"),
+            Text(
+                "settings.formatHint",
+                "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6"));
+
+    private string Text(string key, string fallback)
+        => _strings.TryGetValue(key, out var value)
+            && !string.IsNullOrWhiteSpace(value)
+                ? value
+                : fallback;
 }
 
 internal static class ScreenCapture

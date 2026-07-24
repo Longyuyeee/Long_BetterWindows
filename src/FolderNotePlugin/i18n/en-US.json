@@ -8,6 +8,13 @@
   "hud.emptyHint": "Enter a note...",
   "hud.modifiedHint": "Modified · Ctrl+Enter to save",
   "settings.commandCenter": "Command center",
+  "settings.currentHotkey": "Current shortcut",
+  "settings.apply": "Apply",
+  "settings.unchanged": "No changes",
+  "settings.conflict": "Conflict: used by \"{0}\"",
+  "settings.updated": "Updated",
+  "settings.changeFailed": "Update failed: {0}",
+  "settings.formatHint": "Format: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6",
   "error.selectFolder": "Open File Explorer and select a folder first.",
   "error.folderMissing": "The target folder no longer exists.",
   "error.unknownCommand": "Unknown folder note command: {0}"

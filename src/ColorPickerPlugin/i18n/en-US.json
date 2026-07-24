@@ -1,0 +1,20 @@
+{
+  "plugin.name": "Color Picker",
+  "commands.color.pick.title": "Pick screen color",
+  "commands.color.pick.description": "Pick a screen pixel color and copy its value",
+  "window.title": "Pick screen color",
+  "window.automationName": "Screen color picker",
+  "window.instruction": "Click the screen to copy · Esc to cancel",
+  "command.opened": "Color Picker opened",
+  "error.unknownCommand": "Unknown color picker command: {0}",
+  "toast.copied": "Copied color {0}",
+  "toast.copyFailed": "Color picked, but it could not be copied",
+  "settings.commandCenter": "Command center",
+  "settings.currentHotkey": "Current shortcut",
+  "settings.apply": "Apply",
+  "settings.unchanged": "No changes",
+  "settings.conflict": "Conflict: used by \"{0}\"",
+  "settings.updated": "Updated",
+  "settings.changeFailed": "Update failed: {0}",
+  "settings.formatHint": "Format: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6"
+}

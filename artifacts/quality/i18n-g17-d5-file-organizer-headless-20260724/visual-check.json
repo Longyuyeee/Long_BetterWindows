@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "mode": "headless-local-html-system-edge",
+  "viewport": {
+    "width": 780,
+    "height": 560
+  },
+  "before": {
+    "calls": {
+      "folder": 1,
+      "plan": 1,
+      "execute": 0
+    },
+    "path": "C:\\Work\\Inbox",
+    "mode": "ByExtension",
+    "rows": 2,
+    "scrollWidth": 780,
+    "clientWidth": 780
+  },
+  "dialog": {
+    "open": true,
+    "calls": {
+      "folder": 1,
+      "plan": 1,
+      "execute": 0
+    },
+    "rows": 2
+  },
+  "after": {
+    "calls": {
+      "folder": 1,
+      "plan": 1,
+      "execute": 1
+    },
+    "path": "C:\\Work\\Inbox",
+    "mode": "ByExtension",
+    "rows": 1,
+    "status": "已移动 1 个，失败 1 个：Destination already exists",
+    "scrollWidth": 780,
+    "clientWidth": 780
+  },
+  "assertions": {
+    "noOverflowBefore": true,
+    "noOverflowAfter": true,
+    "languageNoSideEffects": true,
+    "statePreserved": true,
+    "partialFailureRetained": true
+  }
+}

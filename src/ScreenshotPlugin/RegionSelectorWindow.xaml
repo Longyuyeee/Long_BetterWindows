@@ -12,9 +12,9 @@
         <Border x:Name="InstructionCard" Canvas.Left="24" Canvas.Top="24"
                 Style="{StaticResource LongToast}" Padding="14,10">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="拖拽选择截图区域" FontWeight="SemiBold"
+                <TextBlock x:Name="InstructionText" Text="拖拽选择截图区域" FontWeight="SemiBold"
                            Foreground="{DynamicResource Long.Brush.Text.Primary}" />
-                <TextBlock Text="  ·  ESC 取消" Margin="8,0,0,0"
+                <TextBlock x:Name="CancelText" Text="  ·  ESC 取消" Margin="8,0,0,0"
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
             </StackPanel>
         </Border>

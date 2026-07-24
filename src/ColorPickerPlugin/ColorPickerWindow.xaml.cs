@@ -1,9 +1,15 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media;
 
 namespace ColorPickerPlugin;
+
+public sealed record ColorPickerWindowLocalization(
+    string Title,
+    string AutomationName,
+    string Instruction);
 
 public partial class ColorPickerWindow : Window
 {
@@ -20,11 +26,22 @@ public partial class ColorPickerWindow : Window
     [StructLayout(LayoutKind.Sequential)]
     private struct PointNative { public int X; public int Y; }
 
-    public ColorPickerWindow(Func<string, Task> onPicked)
+    public ColorPickerWindow(
+        Func<string, Task> onPicked,
+        ColorPickerWindowLocalization localization)
     {
         _onPicked = onPicked;
         InitializeComponent();
         Cursor = Cursors.Cross;
+        ApplyLocalization(localization);
+    }
+
+    public void ApplyLocalization(ColorPickerWindowLocalization localization)
+    {
+        Title = localization.Title;
+        TitleText.Text = localization.Title;
+        InstructionText.Text = localization.Instruction;
+        AutomationProperties.SetName(this, localization.AutomationName);
     }
 
     private void Window_Loaded(object sender, RoutedEventArgs e)

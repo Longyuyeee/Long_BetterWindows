@@ -22,6 +22,7 @@ public class FolderNotePluginImpl :
     private IHotKeyService _hotKey = null!;
     private string? _registeredHotkey;
     private FloatingHudWindow? _activeHud;
+    private readonly List<WeakReference<HotkeySettingsControl>> _settings = [];
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -204,14 +205,19 @@ public class FolderNotePluginImpl :
 
     public FrameworkElement CreateSettingsUI()
     {
-        return new LongBetterWindows.Host.Views.HotkeySettingsControl(
+        var control = new HotkeySettingsControl(
             Name,
             Id,
             _registeredHotkey ?? Text("settings.commandCenter", "命令中心"),
             newHotkey =>
             {
-                // 热键变更时的回调——由 HotkeySettingsControl 内部处理
-            });
+                _registeredHotkey = newHotkey;
+            },
+            CreateSettingsLocalization(),
+            OnHotkeyTriggered);
+        _settings.RemoveAll(reference => !reference.TryGetTarget(out _));
+        _settings.Add(new WeakReference<HotkeySettingsControl>(control));
+        return control;
     }
 
     public Task OnLanguageChangedAsync(
@@ -220,14 +226,20 @@ public class FolderNotePluginImpl :
     {
         cancellationToken.ThrowIfCancellationRequested();
         _strings = context.Resources;
-        var window = _activeHud;
-        if (window is null) return Task.CompletedTask;
+        var application = Application.Current;
+        if (application is null)
+            return Task.CompletedTask;
 
-        if (window.Dispatcher.CheckAccess())
-            window.ApplyLocalization(CreateHudLocalization());
-        else
-            window.Dispatcher.Invoke(
-                () => window.ApplyLocalization(CreateHudLocalization()));
+        application.Dispatcher.Invoke(() =>
+        {
+            _activeHud?.ApplyLocalization(CreateHudLocalization());
+            _settings.RemoveAll(reference => !reference.TryGetTarget(out _));
+            foreach (var reference in _settings)
+            {
+                if (reference.TryGetTarget(out var control))
+                    control.ApplyLocalization(Name, CreateSettingsLocalization());
+            }
+        });
         return Task.CompletedTask;
     }
 
@@ -237,6 +249,18 @@ public class FolderNotePluginImpl :
             Text("hud.inputAutomationName", "文件夹备注内容"),
             Text("hud.emptyHint", "输入备注内容..."),
             Text("hud.modifiedHint", "已修改 · Ctrl+Enter 保存"));
+
+    private HotkeySettingsLocalization CreateSettingsLocalization()
+        => new(
+            Text("settings.currentHotkey", "当前快捷键"),
+            Text("settings.apply", "应用"),
+            Text("settings.unchanged", "未修改"),
+            Text("settings.conflict", "冲突: 已被「{0}」占用"),
+            Text("settings.updated", "已更新"),
+            Text("settings.changeFailed", "修改失败: {0}"),
+            Text(
+                "settings.formatHint",
+                "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6"));
 
     private string Text(string key, string fallback)
         => _strings.TryGetValue(key, out var value)

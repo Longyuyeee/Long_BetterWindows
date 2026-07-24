@@ -13,6 +13,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("Base64Tool")]
     [InlineData("ClipboardHistory")]
     [InlineData("ClipboardTool")]
+    [InlineData("ColorPickerPlugin")]
     [InlineData("DevToolkit")]
     [InlineData("FileOrganizer")]
     [InlineData("FileRenamerPlugin")]
@@ -24,6 +25,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("PortManager")]
     [InlineData("QuickNotePlugin")]
     [InlineData("RegexTester")]
+    [InlineData("ScreenshotPlugin")]
     [InlineData("TimestampConverter")]
     [InlineData("TextDiffPlugin")]
     [InlineData("TranslatePlugin")]
@@ -362,9 +364,74 @@ public sealed class BuiltInPluginLocalizationTests
             "LongBetterWindows.Host.csproj"));
 
         Assert.Contains("IPluginLanguageLifecycle", source);
-        Assert.Contains("window.ApplyLocalization", source);
+        Assert.Contains("ApplyLocalization(CreateHudLocalization())", source);
         Assert.Contains("PluginLocalization Include=\"i18n\\*.json\"", project);
         Assert.Contains("FolderNotePlugin\\i18n", hostProject);
+    }
+
+    [Theory]
+    [InlineData(
+        "ColorPickerPlugin",
+        "ColorPickerPluginImpl.cs",
+        "private ColorPickerWindowLocalization CreateWindowLocalization",
+        "OnPickColor();")]
+    [InlineData(
+        "ScreenshotPlugin",
+        "ScreenshotPluginImpl.cs",
+        "private RegionSelectorLocalization CreateSelectorLocalization",
+        "CaptureFullScreen();")]
+    public void NativeCapturePlugin_LocalizesProjectionWithoutRepeatingSideEffects(
+        string plugin,
+        string implementationFile,
+        string nextMarker,
+        string prohibitedCall)
+    {
+        var root = FindRepositoryRoot();
+        var folder = Path.Combine(root, "src", plugin);
+        var source = File.ReadAllText(Path.Combine(folder, implementationFile));
+        var project = File.ReadAllText(Path.Combine(folder, plugin + ".csproj"));
+        var hostProject = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "LongBetterWindows.Host.csproj"));
+        var start = source.IndexOf(
+            "public Task OnLanguageChangedAsync(",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            nextMarker,
+            start,
+            StringComparison.Ordinal);
+
+        Assert.True(start >= 0);
+        Assert.True(end > start);
+        var languageBody = source[start..end];
+        Assert.Contains("IPluginLanguageLifecycle", source);
+        Assert.Contains("ApplyLocalization", languageBody);
+        Assert.DoesNotContain(prohibitedCall, languageBody);
+        Assert.DoesNotContain("RegisterAsync", languageBody);
+        Assert.DoesNotContain("Show();", languageBody);
+        Assert.Contains("PluginLocalization Include=\"i18n\\*.json\"", project);
+        Assert.Contains(plugin + "\\i18n", hostProject);
+    }
+
+    [Fact]
+    public void SharedHotkeySettings_PreservesLocalizedStatusAndRealCallback()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "HotkeySettingsControl.xaml.cs"));
+
+        Assert.Contains("HotkeySettingsLocalization", source);
+        Assert.Contains("ApplyLocalization(", source);
+        Assert.Contains("_hotkeyCallback", source);
+        Assert.Contains(
+            "_currentHotkey, newHotkey, _pluginId, _hotkeyCallback",
+            source);
+        Assert.Contains("RenderStatus();", source);
     }
 
     private static JsonDocument ReadResource(

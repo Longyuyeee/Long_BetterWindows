@@ -17,5 +17,12 @@
     }
   ],
   "window": {"mode": "overlay"},
+  "localization": {
+    "default_language": "zh-CN",
+    "resources": {
+      "zh-CN": "i18n/zh-CN.json",
+      "en-US": "i18n/en-US.json"
+    }
+  },
   "default_settings": {"hotkey": "Ctrl+Shift+P", "auto_start": true}
 }

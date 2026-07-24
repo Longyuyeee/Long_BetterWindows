@@ -8,6 +8,13 @@
   "hud.emptyHint": "输入备注内容...",
   "hud.modifiedHint": "已修改 · Ctrl+Enter 保存",
   "settings.commandCenter": "命令中心",
+  "settings.currentHotkey": "当前快捷键",
+  "settings.apply": "应用",
+  "settings.unchanged": "未修改",
+  "settings.conflict": "冲突: 已被「{0}」占用",
+  "settings.updated": "已更新",
+  "settings.changeFailed": "修改失败: {0}",
+  "settings.formatHint": "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6",
   "error.selectFolder": "请先打开资源管理器并选中文件夹。",
   "error.folderMissing": "目标文件夹不存在。",
   "error.unknownCommand": "未知文件夹备注命令: {0}"
