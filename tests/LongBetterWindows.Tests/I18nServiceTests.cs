@@ -111,6 +111,11 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("market.confirm.highTrustWarning", chinese);
         Assert.Contains("market.status.downloadRetried", chinese);
         Assert.Contains("settings.language.title", chinese);
+        Assert.Contains("diagnostics.cpu.average", chinese);
+        Assert.Contains("diagnostics.plugins.active", chinese);
+        Assert.Contains("developer.about.stats", chinese);
+        Assert.Contains("developer.docs.empty", chinese);
+        Assert.Contains("toast.name", chinese);
         Assert.Contains("system.sparse.title", chinese);
         Assert.Contains("workflow.editor.name", chinese);
         Assert.Contains("workflow.preflight.permissionCount", chinese);
@@ -286,6 +291,50 @@ public sealed class I18nServiceTests : IDisposable
         Assert.DoesNotContain("确认本次执行权限", xaml);
         Assert.DoesNotContain("导出终端输出", source);
         Assert.DoesNotContain("清除敏感输出", main);
+    }
+
+    [Fact]
+    public void DiagnosticsDeveloperLandingAndToast_UseDynamicLanguageResources()
+    {
+        var root = FindRepositoryRoot();
+        var views = Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views");
+        var diagnosticsXaml = File.ReadAllText(Path.Combine(
+            views,
+            "PerformancePanel.xaml"));
+        var diagnosticsSource = File.ReadAllText(Path.Combine(
+            views,
+            "PerformancePanel.xaml.cs"));
+        var toolCenterXaml = File.ReadAllText(Path.Combine(
+            views,
+            "ToolCenterControl.xaml"));
+        var toolCenterSource = File.ReadAllText(Path.Combine(
+            views,
+            "ToolCenterControl.xaml.cs"));
+        var devToolsSource = File.ReadAllText(Path.Combine(
+            views,
+            "PluginDevTools.xaml.cs"));
+        var toast = File.ReadAllText(Path.Combine(
+            views,
+            "ToastWindow.xaml"));
+
+        Assert.Contains("i18n.diagnostics.cpu.title", diagnosticsXaml);
+        Assert.Contains("i18n.diagnostics.ranking.title", diagnosticsXaml);
+        Assert.Contains("LanguageChanged += OnLanguageChanged", diagnosticsSource);
+        Assert.Contains("RenderSnapshot(_lastSnapshot)", diagnosticsSource);
+        Assert.Contains("MetricsGrid.Columns = compact ? 1 : 3", diagnosticsSource);
+        Assert.Contains("i18n.developer.workbench.title", toolCenterXaml);
+        Assert.Contains("i18n.developer.about.title", toolCenterXaml);
+        Assert.Contains("DeveloperGrid.Columns = isNarrow ? 1 : 2", toolCenterSource);
+        Assert.Contains("developer.docs.empty", toolCenterSource);
+        Assert.Contains("developer.workbench.windowTitle", devToolsSource);
+        Assert.Contains("i18n.toast.name", toast);
+        Assert.DoesNotContain("CPU 使用率", diagnosticsXaml);
+        Assert.DoesNotContain("插件开发工作台", toolCenterXaml);
+        Assert.DoesNotContain("AutomationProperties.Name=\"Long 通知\"", toast);
     }
 
     [Fact]

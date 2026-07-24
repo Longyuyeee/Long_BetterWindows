@@ -806,7 +806,8 @@ public class QualityGateTests
 
         Assert.Contains("AssemblyInformationalVersionAttribute", app);
         Assert.Contains("App.ProductVersion", webDispatcher);
-        Assert.Contains("v{App.ProductVersion}", toolCenter);
+        Assert.Contains("App.ProductVersion", toolCenter);
+        Assert.Contains("developer.about.version", toolCenter);
     }
 
     [Fact]

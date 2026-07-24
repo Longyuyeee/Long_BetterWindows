@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight"
-        AutomationProperties.Name="Long 通知">
+        AutomationProperties.Name="{DynamicResource i18n.toast.name}">
     <Border x:Name="ToastBorder" Style="{StaticResource LongToast}" MaxWidth="380">
         <Grid>
             <Grid.ColumnDefinitions>

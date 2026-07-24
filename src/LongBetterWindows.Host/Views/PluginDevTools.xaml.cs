@@ -21,7 +21,7 @@ namespace LongBetterWindows.Host.Views
 
             Width = 900; Height = 650;
             MinWidth = 600; MinHeight = 400;
-            Title = "插件开发工具";
+            Title = ServicesInitializer.I18n.T("developer.workbench.windowTitle");
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             WindowStyle = WindowStyle.ToolWindow;
             _webView = new WebView2();
@@ -191,7 +191,9 @@ namespace LongBetterWindows.Host.Views
             {
                 var w = new Window
                 {
-                    Title = "预览: " + Path.GetFileName(safePath),
+                    Title = string.Format(
+                        ServicesInitializer.I18n.T("developer.workbench.previewTitle"),
+                        Path.GetFileName(safePath)),
                     Width = 500, Height = 500,
                     WindowStartupLocation = WindowStartupLocation.CenterScreen,
                 };

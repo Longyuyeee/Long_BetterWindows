@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
+using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -11,23 +12,35 @@ namespace LongBetterWindows.Host.Views
     {
         private readonly PerformanceRefreshCoordinator _coordinator = new();
         private IReadOnlyList<double> _cpuHistory = Array.Empty<double>();
+        private PerformanceSnapshot? _lastSnapshot;
+        private bool _languageSubscribed;
 
         public PerformancePanel()
         {
             InitializeComponent();
             _coordinator.SnapshotAvailable += Coordinator_SnapshotAvailable;
-            Loaded += (_, _) => _coordinator.Start();
-            Unloaded += (_, _) => _coordinator.Stop();
+            Loaded += PerformancePanel_Loaded;
+            Unloaded += PerformancePanel_Unloaded;
         }
 
         private void Coordinator_SnapshotAvailable(object? sender, PerformanceSnapshot snapshot)
         {
+            _lastSnapshot = snapshot;
+            RenderSnapshot(snapshot);
+        }
+
+        private void RenderSnapshot(PerformanceSnapshot snapshot)
+        {
             var summary = snapshot.Summary;
             CpuPercentText.Text = $"{summary.CurrentCpuPercent:F1}%";
-            CpuAvgText.Text = $"平均 {summary.AverageCpuPercent:F1}%";
+            CpuAvgText.Text = string.Format(
+                I18n("diagnostics.cpu.average"),
+                summary.AverageCpuPercent);
             MemoryText.Text = $"{summary.CurrentMemoryMB:F0} MB";
             ApiCallsText.Text = summary.TotalApiCalls.ToString();
-            PluginCountText.Text = $"{summary.PluginCount} 个活跃插件";
+            PluginCountText.Text = string.Format(
+                I18n("diagnostics.plugins.active"),
+                summary.PluginCount);
             CpuPercentText.SetResourceReference(
                 TextBlock.ForegroundProperty,
                 summary.CurrentCpuPercent > 80
@@ -48,6 +61,36 @@ namespace LongBetterWindows.Host.Views
 
             PluginPerformanceItems.ItemsSource = rows;
             NoDataText.Visibility = rows.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void PerformancePanel_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (!_languageSubscribed)
+            {
+                ServicesInitializer.I18n.LanguageChanged += OnLanguageChanged;
+                _languageSubscribed = true;
+            }
+            ApplyResponsiveLayout(ActualWidth);
+            _coordinator.Start();
+        }
+
+        private void PerformancePanel_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _coordinator.Stop();
+            if (!_languageSubscribed) return;
+            ServicesInitializer.I18n.LanguageChanged -= OnLanguageChanged;
+            _languageSubscribed = false;
+        }
+
+        private void OnLanguageChanged(string language)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => OnLanguageChanged(language));
+                return;
+            }
+            if (_lastSnapshot is not null)
+                RenderSnapshot(_lastSnapshot);
         }
 
         private void DrawCpuChart()
@@ -102,7 +145,27 @@ namespace LongBetterWindows.Host.Views
 
         private void RefreshButton_Click(object sender, RoutedEventArgs e) => _coordinator.Refresh();
 
-        private void PerformancePanel_SizeChanged(object sender, SizeChangedEventArgs e) => DrawCpuChart();
+        private void PerformancePanel_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            ApplyResponsiveLayout(e.NewSize.Width);
+            DrawCpuChart();
+        }
+
+        private void ApplyResponsiveLayout(double width)
+        {
+            var compact = width < 720;
+            MetricsGrid.Columns = compact ? 1 : 3;
+            CpuMetricCard.Margin = compact
+                ? new Thickness(0, 0, 0, 10)
+                : new Thickness(0, 0, 12, 0);
+            MemoryMetricCard.Margin = compact
+                ? new Thickness(0, 0, 0, 10)
+                : new Thickness(0, 0, 12, 0);
+            CallsMetricCard.Margin = new Thickness(0);
+        }
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
 
         private sealed record PluginPerformanceRow(
             string PluginId,

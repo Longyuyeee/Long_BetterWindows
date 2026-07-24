@@ -21,7 +21,6 @@ namespace LongBetterWindows.Host.Views
         private bool _sparsePackageInstalled;
         private bool _sparsePackageBusy;
         private bool _startupEnabled;
-        private bool _docsLoaded;
         private bool? _isNarrowLayout;
         private bool _languageSelectorReady;
 
@@ -105,6 +104,7 @@ namespace LongBetterWindows.Host.Views
                 ? new Thickness(18, 0, 18, 18)
                 : new Thickness(32, 0, 32, 32);
             SystemIntegrationGrid.Columns = isNarrow ? 1 : 2;
+            DeveloperGrid.Columns = isNarrow ? 1 : 2;
 
             if (isNarrow)
             {
@@ -154,8 +154,14 @@ namespace LongBetterWindows.Host.Views
         {
             var plugins = HostProvider.Instance.PluginStore.GetAll();
             var capCount = Engine.ManifestReader.KnownCapabilities.Count;
-            AboutVersion.Text = $"v{App.ProductVersion} · .NET 8.0 · WPF";
-            AboutStats.Text = $"{capCount} 项原子能力 · {plugins.Count} 个插件 · 3 种运行时";
+            AboutVersion.Text = string.Format(
+                I18n("developer.about.version"),
+                App.ProductVersion);
+            AboutStats.Text = string.Format(
+                I18n("developer.about.stats"),
+                capCount,
+                plugins.Count,
+                3);
             OverviewPluginCount.Text = plugins.Count.ToString();
             OverviewCommandCount.Text = HostProvider.Instance.PluginStore.Commands.Count.ToString();
             OverviewCapabilityCount.Text = capCount.ToString();
@@ -299,10 +305,10 @@ namespace LongBetterWindows.Host.Views
                     MarketHost.Content = new MarketplaceControl();
                 else if (key == "diagnostics" && DiagnosticsHost.Content == null)
                     DiagnosticsHost.Content = new PerformancePanel();
-                else if (key == "developer" && !_docsLoaded)
+                else if (key == "developer")
                 {
+                    UpdateAboutInfo();
                     RefreshDocLinks();
-                    _docsLoaded = true;
                 }
                 Helpers.AnimationHelper.FadeInElement(panel, durationMs: 160);
                 _ = Dispatcher.BeginInvoke(
@@ -390,7 +396,7 @@ namespace LongBetterWindows.Host.Views
             {
                 DocLinksPanel.Children.Add(new TextBlock
                 {
-                    Text = "文档目录未找到",
+                    Text = I18n("developer.docs.unavailable"),
                     FontSize = 11,
                     Foreground = GrayBrush,
                 });
@@ -400,16 +406,20 @@ namespace LongBetterWindows.Host.Views
             var docFiles = Directory.GetFiles(docsDir, "*.md")
                 .OrderBy(f => f)
                 .ToList();
+            if (docFiles.Count == 0)
+            {
+                DocLinksPanel.Children.Add(new TextBlock
+                {
+                    Text = I18n("developer.docs.empty"),
+                    FontSize = 11,
+                    Foreground = GrayBrush,
+                });
+                return;
+            }
 
             foreach (var file in docFiles)
             {
-                var name = Path.GetFileNameWithoutExtension(file)
-                    .Replace("设计文档_", "")
-                    .Replace("第一部分_", "Part1 ")
-                    .Replace("第二部分_", "Part2 ")
-                    .Replace("第四部分_", "Part4 ")
-                    .Replace("插件开发指南", "插件开发指南 ⭐")
-                    .Replace("基础能力_API_手册", "API 手册");
+                var name = Path.GetFileNameWithoutExtension(file);
 
                 var link = new TextBlock
                 {
