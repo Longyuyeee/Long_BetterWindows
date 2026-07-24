@@ -64,6 +64,40 @@ public sealed class WorkflowErrorContractTests : IDisposable
         Assert.Equal(5235, (int)WorkflowErrorCode.PreflightBindingInvalid);
         Assert.Equal(5236, (int)WorkflowErrorCode.PreflightCompensationRequired);
         Assert.Equal(5237, (int)WorkflowErrorCode.PreflightCatalogChanged);
+        Assert.Equal(5300, (int)WorkflowErrorCode.ExecutionPreflightRejected);
+        Assert.Equal(5301, (int)WorkflowErrorCode.ExecutionAuthorizationRejected);
+        Assert.Equal(5302, (int)WorkflowErrorCode.ExecutionStateChanged);
+        Assert.Equal(5303, (int)WorkflowErrorCode.ExecutionBindingFailed);
+        Assert.Equal(5304, (int)WorkflowErrorCode.ExecutionArgumentInvalid);
+        Assert.Equal(5305, (int)WorkflowErrorCode.ExecutionCommandFailed);
+        Assert.Equal(5306, (int)WorkflowErrorCode.ExecutionCancelled);
+        Assert.Equal(5307, (int)WorkflowErrorCode.ExecutionOutputInvalid);
+        Assert.Equal(5308, (int)WorkflowErrorCode.ExecutionCompensationBlocked);
+        Assert.Equal(5309, (int)WorkflowErrorCode.ExecutionCompensationFailed);
+        Assert.Equal(5310, (int)WorkflowErrorCode.ExecutionBusy);
+        Assert.Equal(5311, (int)WorkflowErrorCode.ExecutionReviewMissing);
+        Assert.Equal(5400, (int)WorkflowErrorCode.ReportEmpty);
+        Assert.Equal(5401, (int)WorkflowErrorCode.ReportSchemaUnsupported);
+        Assert.Equal(5402, (int)WorkflowErrorCode.ReportInvalid);
+        Assert.Equal(5403, (int)WorkflowErrorCode.ReportJsonInvalid);
+        Assert.Equal(5410, (int)WorkflowErrorCode.ReportSensitiveApprovalRequired);
+        Assert.Equal(5411, (int)WorkflowErrorCode.ReportTooLarge);
+        Assert.Equal(5412, (int)WorkflowErrorCode.ReportStorageUnavailable);
+        Assert.Equal(5413, (int)WorkflowErrorCode.ReportAlreadyExists);
+        Assert.Equal(5414, (int)WorkflowErrorCode.ReportSaveFailed);
+        Assert.Equal(5415, (int)WorkflowErrorCode.ReportIdInvalid);
+        Assert.Equal(5416, (int)WorkflowErrorCode.ReportNotFound);
+        Assert.Equal(5417, (int)WorkflowErrorCode.ReportReparsePointRejected);
+        Assert.Equal(5418, (int)WorkflowErrorCode.ReportReadFailed);
+        Assert.Equal(5500, (int)WorkflowErrorCode.TerminalOutputInvalid);
+        Assert.Equal(5501, (int)WorkflowErrorCode.TerminalExportPathInvalid);
+        Assert.Equal(5510, (int)WorkflowErrorCode.TerminalApprovalMissing);
+        Assert.Equal(5511, (int)WorkflowErrorCode.TerminalReviewInvalid);
+        Assert.Equal(5512, (int)WorkflowErrorCode.TerminalReviewChanged);
+        Assert.Equal(5513, (int)WorkflowErrorCode.TerminalDestinationChanged);
+        Assert.Equal(5514, (int)WorkflowErrorCode.TerminalExportCancelled);
+        Assert.Equal(5515, (int)WorkflowErrorCode.TerminalAccessDenied);
+        Assert.Equal(5516, (int)WorkflowErrorCode.TerminalIoFailure);
     }
 
     [Fact]
@@ -135,6 +169,41 @@ public sealed class WorkflowErrorContractTests : IDisposable
     }
 
     [Fact]
+    public async Task ExecutionReportAndTerminalFailures_PropagateStableCodes()
+    {
+        var registry = new PluginRegistry();
+        var workflow = Workflow("workflow.execution");
+        var executor = new CommandWorkflowExecutor(registry);
+        var execution = await executor.ExecuteAsync(workflow, null);
+        var reports = new CommandWorkflowExecutionReportRepository(
+            Path.Combine(_root, "reports"));
+        using var runSession = new CommandWorkflowRunSession(registry, reports);
+        var run = await runSession.ExecuteApprovedAsync(workflow, "missing-review");
+        var emptyReport = CommandWorkflowExecutionReportCodec.Deserialize("");
+        var invalidReport = CommandWorkflowExecutionReportCodec.Deserialize("{");
+        var invalidReportId = await reports.LoadAsync("");
+        var terminal = new WorkflowTerminalOutputExporter();
+        var output = new WorkflowTerminalOutput(
+            "step",
+            "result",
+            PluginCommandOutputType.Text,
+            "value");
+        var terminalReview = terminal.Prepare(output, "");
+        var terminalExport = await terminal.ExportApprovedAsync(output, "", "");
+
+        Assert.Equal(WorkflowErrorCode.PreflightCommandInvalid, execution.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.ExecutionReviewMissing, run.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.ReportEmpty, emptyReport.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.ReportJsonInvalid, invalidReport.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.ReportIdInvalid, invalidReportId.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.TerminalExportPathInvalid, terminalReview.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.TerminalApprovalMissing, terminalExport.ErrorCode);
+        Assert.Equal(
+            WorkflowTerminalOutputExportFailure.ApprovalMissing,
+            terminalExport.Failure);
+    }
+
+    [Fact]
     public void WorkflowFailures_HaveBilingualPresentationKeys()
     {
         var repository = FindRepositoryRoot();
@@ -191,6 +260,14 @@ public sealed class WorkflowErrorContractTests : IDisposable
             StringComparison.Ordinal);
         Assert.DoesNotContain(
             "Format(\"workflow.import.error.adopt\"",
+            view,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "TerminalExportFailureMessage(result.Failure)",
+            view,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "WorkflowErrorPresentation.GetResourceKey(result.ErrorCode)",
             view,
             StringComparison.Ordinal);
     }

@@ -53,7 +53,14 @@ namespace LongBetterWindows.Host.Interaction
             {
                 var message = string.Join(" ", preflight.Issues);
                 AddEvent(WorkflowExecutionEventKind.WorkflowRejected, message: message);
-                return Result(WorkflowExecutionStatus.Rejected, preflight.Fingerprint, message, events);
+                return Result(
+                    WorkflowExecutionStatus.Rejected,
+                    preflight.Fingerprint,
+                    message,
+                    events,
+                    errorCode: preflight.ErrorCode == WorkflowErrorCode.None
+                        ? WorkflowErrorCode.ExecutionPreflightRejected
+                        : preflight.ErrorCode);
             }
             AddEvent(WorkflowExecutionEventKind.PreflightPassed);
 
@@ -61,7 +68,12 @@ namespace LongBetterWindows.Host.Interaction
             {
                 const string message = "Workflow authorization does not match its fingerprint and permission plan.";
                 AddEvent(WorkflowExecutionEventKind.WorkflowRejected, message: message);
-                return Result(WorkflowExecutionStatus.Rejected, preflight.Fingerprint, message, events);
+                return Result(
+                    WorkflowExecutionStatus.Rejected,
+                    preflight.Fingerprint,
+                    message,
+                    events,
+                    errorCode: WorkflowErrorCode.ExecutionAuthorizationRejected);
             }
             AddEvent(WorkflowExecutionEventKind.AuthorizationApproved);
             var approvedAuthorization = authorization!;
@@ -84,6 +96,7 @@ namespace LongBetterWindows.Host.Interaction
                         outputSummaries,
                         WorkflowExecutionStatus.Cancelled,
                         "Workflow was cancelled.",
+                        WorkflowErrorCode.ExecutionCancelled,
                         events,
                         AddEvent,
                         approvedAuthorization);
@@ -107,6 +120,7 @@ namespace LongBetterWindows.Host.Interaction
                         outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         message,
+                        WorkflowErrorCode.ExecutionStateChanged,
                         events,
                         AddEvent,
                         approvedAuthorization);
@@ -125,6 +139,7 @@ namespace LongBetterWindows.Host.Interaction
                         outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         binding.Error,
+                        WorkflowErrorCode.ExecutionBindingFailed,
                         events,
                         AddEvent,
                         approvedAuthorization);
@@ -144,6 +159,7 @@ namespace LongBetterWindows.Host.Interaction
                         outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         parameterError,
+                        WorkflowErrorCode.ExecutionArgumentInvalid,
                         events,
                         AddEvent,
                         approvedAuthorization);
@@ -182,6 +198,9 @@ namespace LongBetterWindows.Host.Interaction
                         outputSummaries,
                         cancelled ? WorkflowExecutionStatus.Cancelled : WorkflowExecutionStatus.Failed,
                         commandResult.Message,
+                        cancelled
+                            ? WorkflowErrorCode.ExecutionCancelled
+                            : WorkflowErrorCode.ExecutionCommandFailed,
                         events,
                         AddEvent,
                         approvedAuthorization);
@@ -200,6 +219,7 @@ namespace LongBetterWindows.Host.Interaction
                         outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         error,
+                        WorkflowErrorCode.ExecutionStateChanged,
                         events,
                         AddEvent,
                         approvedAuthorization);
@@ -219,6 +239,7 @@ namespace LongBetterWindows.Host.Interaction
                         outputSummaries,
                         WorkflowExecutionStatus.Failed,
                         outputError,
+                        WorkflowErrorCode.ExecutionOutputInvalid,
                         events,
                         AddEvent,
                         approvedAuthorization);
@@ -255,12 +276,19 @@ namespace LongBetterWindows.Host.Interaction
             List<WorkflowOutputSummary> outputSummaries,
             WorkflowExecutionStatus originalStatus,
             string? originalMessage,
+            WorkflowErrorCode originalErrorCode,
             List<WorkflowExecutionEvent> events,
             Action<WorkflowExecutionEventKind, string?, string?> addEvent,
             CommandWorkflowAuthorization authorization)
         {
             if (workflow.FailureMode != WorkflowFailureMode.Compensate)
-                return Result(originalStatus, fingerprint, originalMessage, events, outputSummaries);
+                return Result(
+                    originalStatus,
+                    fingerprint,
+                    originalMessage,
+                    events,
+                    outputSummaries,
+                    errorCode: originalErrorCode);
 
             var compensationAttempted = false;
             var compensationFailed = false;
@@ -276,7 +304,8 @@ namespace LongBetterWindows.Host.Interaction
                     fingerprint,
                     originalMessage,
                     events,
-                    outputSummaries);
+                    outputSummaries,
+                    errorCode: WorkflowErrorCode.ExecutionCompensationBlocked);
             }
             foreach (var step in completed.Reverse())
             {
@@ -361,7 +390,13 @@ namespace LongBetterWindows.Host.Interaction
             }
 
             if (!compensationAttempted)
-                return Result(originalStatus, fingerprint, originalMessage, events, outputSummaries);
+                return Result(
+                    originalStatus,
+                    fingerprint,
+                    originalMessage,
+                    events,
+                    outputSummaries,
+                    errorCode: originalErrorCode);
             return Result(
                 compensationFailed
                     ? WorkflowExecutionStatus.CompensationFailed
@@ -369,7 +404,10 @@ namespace LongBetterWindows.Host.Interaction
                 fingerprint,
                 originalMessage,
                 events,
-                outputSummaries);
+                outputSummaries,
+                errorCode: compensationFailed
+                    ? WorkflowErrorCode.ExecutionCompensationFailed
+                    : originalErrorCode);
         }
 
         private bool TryValidateResolvedInvocation(
@@ -466,8 +504,9 @@ namespace LongBetterWindows.Host.Interaction
             string? message,
             IReadOnlyList<WorkflowExecutionEvent> events,
             IReadOnlyList<WorkflowOutputSummary>? outputSummaries = null,
-            IReadOnlyList<WorkflowTerminalOutput>? terminalOutputs = null)
-            => new(
+            IReadOnlyList<WorkflowTerminalOutput>? terminalOutputs = null,
+            WorkflowErrorCode errorCode = WorkflowErrorCode.None)
+            => new CommandWorkflowExecutionResult(
                 status,
                 fingerprint,
                 message,
@@ -477,7 +516,10 @@ namespace LongBetterWindows.Host.Interaction
                     : outputSummaries.ToList(),
                 terminalOutputs is null
                     ? Array.Empty<WorkflowTerminalOutput>()
-                    : terminalOutputs.ToList());
+                    : terminalOutputs.ToList())
+            {
+                ErrorCode = errorCode,
+            };
 
         private static void AddOutputSummaries(
             ICollection<WorkflowOutputSummary> summaries,

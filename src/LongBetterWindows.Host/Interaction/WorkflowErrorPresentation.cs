@@ -51,6 +51,40 @@ namespace LongBetterWindows.Host.Interaction
                 WorkflowErrorCode.PreflightBindingInvalid => "workflow.error.preflightBindingInvalid",
                 WorkflowErrorCode.PreflightCompensationRequired => "workflow.error.preflightCompensationRequired",
                 WorkflowErrorCode.PreflightCatalogChanged => "workflow.error.preflightCatalogChanged",
+                WorkflowErrorCode.ExecutionPreflightRejected => "workflow.error.executionPreflightRejected",
+                WorkflowErrorCode.ExecutionAuthorizationRejected
+                    or WorkflowErrorCode.ExecutionReviewMissing => "workflow.error.executionApprovalInvalid",
+                WorkflowErrorCode.ExecutionStateChanged => "workflow.error.executionStateChanged",
+                WorkflowErrorCode.ExecutionBindingFailed => "workflow.error.executionBindingFailed",
+                WorkflowErrorCode.ExecutionArgumentInvalid => "workflow.error.preflightArgumentInvalid",
+                WorkflowErrorCode.ExecutionCommandFailed => "workflow.error.executionCommandFailed",
+                WorkflowErrorCode.ExecutionCancelled => "workflow.error.executionCancelled",
+                WorkflowErrorCode.ExecutionOutputInvalid => "workflow.error.executionOutputInvalid",
+                WorkflowErrorCode.ExecutionCompensationBlocked
+                    or WorkflowErrorCode.ExecutionCompensationFailed => "workflow.error.executionCompensationFailed",
+                WorkflowErrorCode.ExecutionBusy => "workflow.error.executionBusy",
+                WorkflowErrorCode.ReportEmpty
+                    or WorkflowErrorCode.ReportSchemaUnsupported
+                    or WorkflowErrorCode.ReportInvalid
+                    or WorkflowErrorCode.ReportJsonInvalid => "workflow.error.reportInvalid",
+                WorkflowErrorCode.ReportSensitiveApprovalRequired => "workflow.error.reportSensitiveApproval",
+                WorkflowErrorCode.ReportTooLarge => "workflow.error.reportTooLarge",
+                WorkflowErrorCode.ReportStorageUnavailable => "workflow.error.reportStorageUnavailable",
+                WorkflowErrorCode.ReportAlreadyExists => "workflow.error.reportAlreadyExists",
+                WorkflowErrorCode.ReportSaveFailed => "workflow.error.reportSaveFailed",
+                WorkflowErrorCode.ReportIdInvalid => "workflow.error.reportIdInvalid",
+                WorkflowErrorCode.ReportNotFound => "workflow.error.reportNotFound",
+                WorkflowErrorCode.ReportReparsePointRejected => "workflow.error.reportPathRejected",
+                WorkflowErrorCode.ReportReadFailed => "workflow.error.reportReadFailed",
+                WorkflowErrorCode.TerminalOutputInvalid => "workflow.error.terminalOutputInvalid",
+                WorkflowErrorCode.TerminalExportPathInvalid => "workflow.error.terminalPathInvalid",
+                WorkflowErrorCode.TerminalApprovalMissing => "workflow.error.terminalApprovalMissing",
+                WorkflowErrorCode.TerminalReviewInvalid => "workflow.error.terminalReviewInvalid",
+                WorkflowErrorCode.TerminalReviewChanged => "workflow.error.terminalReviewChanged",
+                WorkflowErrorCode.TerminalDestinationChanged => "workflow.error.terminalDestinationChanged",
+                WorkflowErrorCode.TerminalExportCancelled => "workflow.error.terminalCancelled",
+                WorkflowErrorCode.TerminalAccessDenied => "workflow.error.terminalAccessDenied",
+                WorkflowErrorCode.TerminalIoFailure => "workflow.error.terminalIoFailure",
                 _ => "workflow.list.readError",
             };
     }

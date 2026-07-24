@@ -83,8 +83,13 @@ public sealed class CommandWorkflowExecutionReportTests : IDisposable
         var loaded = await repository.LoadAsync("report.sensitive");
 
         Assert.False(rejected.IsSuccess);
+        Assert.Equal(
+            WorkflowErrorCode.ReportSensitiveApprovalRequired,
+            rejected.ErrorCode);
         Assert.True(saved.IsSuccess, saved.Error);
+        Assert.Equal(WorkflowErrorCode.None, saved.ErrorCode);
         Assert.True(loaded.IsSuccess, loaded.Error);
+        Assert.Equal(WorkflowErrorCode.None, loaded.ErrorCode);
         Assert.Equal("private result", loaded.Report!.Message);
         Assert.Equal("private event", loaded.Report.Events[0].Message);
     }
@@ -103,6 +108,7 @@ public sealed class CommandWorkflowExecutionReportTests : IDisposable
 
         Assert.True(first.IsSuccess, first.Error);
         Assert.False(second.IsSuccess);
+        Assert.Equal(WorkflowErrorCode.ReportAlreadyExists, second.ErrorCode);
         Assert.Contains("cannot be overwritten", second.Error);
     }
 

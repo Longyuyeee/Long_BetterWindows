@@ -767,7 +767,7 @@ namespace LongBetterWindows.Host.Views
             if (!review.IsValid)
             {
                 MessageBox.Show(
-                    I18n("workflow.terminal.export.prepareFailed"),
+                    I18n(WorkflowErrorPresentation.GetResourceKey(review.ErrorCode)),
                     I18n("workflow.terminal.export.prepareFailedTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
@@ -799,7 +799,7 @@ namespace LongBetterWindows.Host.Views
                         "workflow.terminal.export.success",
                         result.Path ?? string.Empty,
                         result.ValueSha256 ?? string.Empty)
-                    : TerminalExportFailureMessage(result.Failure),
+                    : TerminalExportFailureMessage(result.ErrorCode),
                 I18n("workflow.terminal.export.resultTitle"),
                 MessageBoxButton.OK,
                 result.IsSuccess ? MessageBoxImage.Information : MessageBoxImage.Warning);
@@ -839,7 +839,8 @@ namespace LongBetterWindows.Host.Views
             if (!result.IsSuccess)
             {
                 ReportDetailTitle.Text = I18n("workflow.reports.unavailable");
-                ReportDetailMeta.Text = I18n("workflow.reports.readFailed");
+                ReportDetailMeta.Text = I18n(
+                    WorkflowErrorPresentation.GetResourceKey(result.ErrorCode));
                 return;
             }
             _reportSummaries = result.Reports;
@@ -860,7 +861,8 @@ namespace LongBetterWindows.Host.Views
             if (version != _reportLoadVersion) return;
             if (!result.IsSuccess)
             {
-                ReportDetailTitle.Text = I18n("workflow.reports.readFailed");
+                ReportDetailTitle.Text = I18n(
+                    WorkflowErrorPresentation.GetResourceKey(result.ErrorCode));
                 ReportDetailMeta.Text = string.Empty;
                 ReportTimeline.ItemsSource = null;
                 return;
@@ -1243,25 +1245,8 @@ namespace LongBetterWindows.Host.Views
                 : "workflow.execution.output.type.text");
 
         private static string TerminalExportFailureMessage(
-            WorkflowTerminalOutputExportFailure failure)
-            => I18n(failure switch
-            {
-                WorkflowTerminalOutputExportFailure.ApprovalMissing =>
-                    "workflow.terminal.export.error.approvalMissing",
-                WorkflowTerminalOutputExportFailure.ReviewInvalid =>
-                    "workflow.terminal.export.error.reviewInvalid",
-                WorkflowTerminalOutputExportFailure.ReviewChanged =>
-                    "workflow.terminal.export.error.reviewChanged",
-                WorkflowTerminalOutputExportFailure.DestinationChanged =>
-                    "workflow.terminal.export.error.destinationChanged",
-                WorkflowTerminalOutputExportFailure.Cancelled =>
-                    "workflow.terminal.export.error.cancelled",
-                WorkflowTerminalOutputExportFailure.AccessDenied =>
-                    "workflow.terminal.export.error.accessDenied",
-                WorkflowTerminalOutputExportFailure.IoFailure =>
-                    "workflow.terminal.export.error.ioFailure",
-                _ => "workflow.terminal.export.error.unknown",
-            });
+            WorkflowErrorCode errorCode)
+            => I18n(WorkflowErrorPresentation.GetResourceKey(errorCode));
 
         private void RefreshLocalizedExecutionState()
         {

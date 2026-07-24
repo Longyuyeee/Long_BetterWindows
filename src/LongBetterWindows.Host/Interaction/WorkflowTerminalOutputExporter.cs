@@ -11,14 +11,20 @@ namespace LongBetterWindows.Host.Interaction
         string? DestinationPath,
         string ValueSha256,
         int Utf8ByteCount,
-        IReadOnlyList<string> Issues);
+        IReadOnlyList<string> Issues)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     public sealed record WorkflowTerminalOutputExportResult(
         bool IsSuccess,
         string? Path,
         string? ValueSha256,
         string? Error,
-        WorkflowTerminalOutputExportFailure Failure);
+        WorkflowTerminalOutputExportFailure Failure)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     public enum WorkflowTerminalOutputExportFailure
     {
@@ -93,21 +99,32 @@ namespace LongBetterWindows.Host.Interaction
         {
             ArgumentNullException.ThrowIfNull(output);
             var issues = ValidateOutput(output);
+            var errorCode = issues.Count == 0
+                ? WorkflowErrorCode.None
+                : WorkflowErrorCode.TerminalOutputInvalid;
             string? targetPath = null;
             if (!TryValidateDestination(destinationPath, issues, out targetPath))
+            {
                 targetPath = null;
+                if (errorCode == WorkflowErrorCode.None)
+                    errorCode = WorkflowErrorCode.TerminalExportPathInvalid;
+            }
 
             byte[] valueBytes;
             try
             {
                 valueBytes = StrictUtf8.GetBytes(output.Value);
                 if (valueBytes.Length > MaximumValueBytes)
+                {
                     issues.Add("Terminal output exceeds the maximum export size.");
+                    errorCode = WorkflowErrorCode.TerminalOutputInvalid;
+                }
             }
             catch (EncoderFallbackException)
             {
                 valueBytes = Array.Empty<byte>();
                 issues.Add("Terminal output is not valid Unicode text.");
+                errorCode = WorkflowErrorCode.TerminalOutputInvalid;
             }
 
             var valueSha256 = Convert.ToHexString(SHA256.HashData(valueBytes)).ToLowerInvariant();
@@ -120,7 +137,12 @@ namespace LongBetterWindows.Host.Interaction
                 targetPath,
                 valueSha256,
                 valueBytes.Length,
-                issues);
+                issues)
+            {
+                ErrorCode = issues.Count == 0
+                    ? WorkflowErrorCode.None
+                    : errorCode,
+            };
         }
 
         public async Task<WorkflowTerminalOutputExportResult> ExportApprovedAsync(
@@ -285,7 +307,27 @@ namespace LongBetterWindows.Host.Interaction
         private static WorkflowTerminalOutputExportResult Failure(
             WorkflowTerminalOutputExportFailure failure,
             string error)
-            => new(false, null, null, error, failure);
+            => new(false, null, null, error, failure)
+            {
+                ErrorCode = failure switch
+                {
+                    WorkflowTerminalOutputExportFailure.ApprovalMissing =>
+                        WorkflowErrorCode.TerminalApprovalMissing,
+                    WorkflowTerminalOutputExportFailure.ReviewInvalid =>
+                        WorkflowErrorCode.TerminalReviewInvalid,
+                    WorkflowTerminalOutputExportFailure.ReviewChanged =>
+                        WorkflowErrorCode.TerminalReviewChanged,
+                    WorkflowTerminalOutputExportFailure.DestinationChanged =>
+                        WorkflowErrorCode.TerminalDestinationChanged,
+                    WorkflowTerminalOutputExportFailure.Cancelled =>
+                        WorkflowErrorCode.TerminalExportCancelled,
+                    WorkflowTerminalOutputExportFailure.AccessDenied =>
+                        WorkflowErrorCode.TerminalAccessDenied,
+                    WorkflowTerminalOutputExportFailure.IoFailure =>
+                        WorkflowErrorCode.TerminalIoFailure,
+                    _ => WorkflowErrorCode.None,
+                },
+            };
 
         private void TryDelete(string path)
         {

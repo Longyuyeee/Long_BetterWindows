@@ -25,7 +25,9 @@ public sealed class WorkflowTerminalOutputExporterTests : IDisposable
         var result = await exporter.ExportApprovedAsync(output, target, review.Fingerprint);
 
         Assert.True(review.IsValid, string.Join(" ", review.Issues));
+        Assert.Equal(WorkflowErrorCode.None, review.ErrorCode);
         Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(WorkflowErrorCode.None, result.ErrorCode);
         Assert.Equal(WorkflowTerminalOutputExportFailure.None, result.Failure);
         var bytes = await File.ReadAllBytesAsync(target);
         Assert.Equal(new UTF8Encoding(false).GetBytes(output.Value), bytes);
@@ -57,6 +59,8 @@ public sealed class WorkflowTerminalOutputExporterTests : IDisposable
         Assert.False(changedDestination.IsSuccess);
         Assert.Equal(WorkflowTerminalOutputExportFailure.ReviewChanged, changedValue.Failure);
         Assert.Equal(WorkflowTerminalOutputExportFailure.ReviewChanged, changedDestination.Failure);
+        Assert.Equal(WorkflowErrorCode.TerminalReviewChanged, changedValue.ErrorCode);
+        Assert.Equal(WorkflowErrorCode.TerminalReviewChanged, changedDestination.ErrorCode);
         Assert.Empty(Directory.GetFiles(_root));
     }
 
@@ -78,6 +82,7 @@ public sealed class WorkflowTerminalOutputExporterTests : IDisposable
         Assert.Equal(
             WorkflowTerminalOutputExportFailure.ApprovalMissing,
             missingApproval.Failure);
+        Assert.Equal(WorkflowErrorCode.TerminalApprovalMissing, missingApproval.ErrorCode);
         Assert.DoesNotContain(output.Value, missingApproval.ToString(), StringComparison.Ordinal);
         Assert.False(File.Exists(target));
     }
@@ -96,6 +101,7 @@ public sealed class WorkflowTerminalOutputExporterTests : IDisposable
 
         Assert.False(result.IsSuccess);
         Assert.Equal(WorkflowTerminalOutputExportFailure.ReviewInvalid, result.Failure);
+        Assert.Equal(WorkflowErrorCode.TerminalReviewInvalid, result.ErrorCode);
         Assert.Equal("original", await File.ReadAllTextAsync(target));
         Assert.Empty(Directory.GetFiles(_root, "*.tmp", SearchOption.TopDirectoryOnly));
     }

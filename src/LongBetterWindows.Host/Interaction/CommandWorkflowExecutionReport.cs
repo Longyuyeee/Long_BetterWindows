@@ -21,7 +21,10 @@ namespace LongBetterWindows.Host.Interaction
     public sealed record WorkflowExecutionReportReadResult(
         bool IsSuccess,
         WorkflowExecutionReportDocument? Report,
-        string? Error);
+        string? Error)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     public sealed record WorkflowExecutionReportSaveOptions(
         bool AllowSensitiveMessages = false);
@@ -29,7 +32,10 @@ namespace LongBetterWindows.Host.Interaction
     public sealed record WorkflowExecutionReportSaveResult(
         bool IsSuccess,
         string? Path,
-        string? Error);
+        string? Error)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     public sealed record WorkflowExecutionReportSummary(
         string ReportId,
@@ -42,13 +48,19 @@ namespace LongBetterWindows.Host.Interaction
 
     public sealed record WorkflowExecutionReportListIssue(
         string FileName,
-        string Error);
+        string Error)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     public sealed record WorkflowExecutionReportListResult(
         bool IsSuccess,
         IReadOnlyList<WorkflowExecutionReportSummary> Reports,
         IReadOnlyList<WorkflowExecutionReportListIssue> Issues,
-        string? Error);
+        string? Error)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     public static class CommandWorkflowExecutionReportCodec
     {
@@ -85,7 +97,7 @@ namespace LongBetterWindows.Host.Interaction
                 includeMessages ? result.Message : null,
                 events);
             var error = Validate(document);
-            if (error is not null) throw new ArgumentException(error, nameof(result));
+            if (error is not null) throw new ArgumentException(error.Message, nameof(result));
             return document;
         }
 
@@ -93,62 +105,106 @@ namespace LongBetterWindows.Host.Interaction
         {
             ArgumentNullException.ThrowIfNull(report);
             var error = Validate(report);
-            if (error is not null) throw new ArgumentException(error, nameof(report));
+            if (error is not null) throw new ArgumentException(error.Message, nameof(report));
             return JsonSerializer.Serialize(report, JsonOptions);
         }
 
         public static WorkflowExecutionReportReadResult Deserialize(string json)
         {
-            if (string.IsNullOrWhiteSpace(json)) return Failure("Execution report is empty.");
+            if (string.IsNullOrWhiteSpace(json))
+                return Failure(
+                    WorkflowErrorCode.ReportEmpty,
+                    "Execution report is empty.");
             try
             {
                 var report = JsonSerializer.Deserialize<WorkflowExecutionReportDocument>(json, JsonOptions);
-                if (report is null) return Failure("Execution report is empty.");
+                if (report is null)
+                    return Failure(
+                        WorkflowErrorCode.ReportEmpty,
+                        "Execution report is empty.");
                 var error = Validate(report);
                 return error is null
                     ? new WorkflowExecutionReportReadResult(true, report, null)
-                    : Failure(error);
+                    : Failure(error.ErrorCode, error.Message);
             }
             catch (JsonException ex)
             {
-                return Failure($"Execution report JSON is invalid: {ex.Message}");
+                return Failure(
+                    WorkflowErrorCode.ReportJsonInvalid,
+                    $"Execution report JSON is invalid: {ex.Message}");
             }
         }
 
-        private static string? Validate(WorkflowExecutionReportDocument report)
+        private static ReportValidationFailure? Validate(WorkflowExecutionReportDocument report)
         {
             if (report.SchemaVersion != CurrentSchemaVersion)
-                return $"Unsupported execution report schema version: {report.SchemaVersion}.";
-            if (!IsIdentifier(report.ReportId, 128)) return "Execution report id is invalid.";
-            if (!IsIdentifier(report.WorkflowId, 64)) return "Execution report workflow id is invalid.";
-            if (!IsHash(report.WorkflowDefinitionSha256)) return "Workflow definition SHA-256 is invalid.";
-            if (!IsHash(report.ExecutionFingerprint)) return "Execution fingerprint is invalid.";
-            if (!Enum.IsDefined(report.Status)) return "Execution status is invalid.";
-            if (report.FinishedAt < report.StartedAt) return "Execution report finish time precedes its start time.";
+                return Invalid(
+                    WorkflowErrorCode.ReportSchemaUnsupported,
+                    $"Unsupported execution report schema version: {report.SchemaVersion}.");
+            if (!IsIdentifier(report.ReportId, 128))
+                return Invalid(WorkflowErrorCode.ReportInvalid, "Execution report id is invalid.");
+            if (!IsIdentifier(report.WorkflowId, 64))
+                return Invalid(WorkflowErrorCode.ReportInvalid, "Execution report workflow id is invalid.");
+            if (!IsHash(report.WorkflowDefinitionSha256))
+                return Invalid(WorkflowErrorCode.ReportInvalid, "Workflow definition SHA-256 is invalid.");
+            if (!IsHash(report.ExecutionFingerprint))
+                return Invalid(WorkflowErrorCode.ReportInvalid, "Execution fingerprint is invalid.");
+            if (!Enum.IsDefined(report.Status))
+                return Invalid(WorkflowErrorCode.ReportInvalid, "Execution status is invalid.");
+            if (report.FinishedAt < report.StartedAt)
+                return Invalid(
+                    WorkflowErrorCode.ReportInvalid,
+                    "Execution report finish time precedes its start time.");
             if (report.Events is null || report.Events.Count is < 1 or > MaximumEventCount)
-                return $"Execution report must contain between 1 and {MaximumEventCount} events.";
+                return Invalid(
+                    WorkflowErrorCode.ReportInvalid,
+                    $"Execution report must contain between 1 and {MaximumEventCount} events.");
             if (!report.MessagesIncluded
                 && (report.Message is not null || report.Events.Any(item => item.Message is not null)))
             {
-                return "Execution report contains messages without declaring them included.";
+                return Invalid(
+                    WorkflowErrorCode.ReportInvalid,
+                    "Execution report contains messages without declaring them included.");
             }
             if (report.Message?.Length > MaximumMessageLength)
-                return "Execution report message exceeds the maximum length.";
+                return Invalid(
+                    WorkflowErrorCode.ReportInvalid,
+                    "Execution report message exceeds the maximum length.");
             for (var index = 0; index < report.Events.Count; index++)
             {
                 var item = report.Events[index];
-                if (item is null) return "Execution report contains a null event.";
-                if (item.Sequence != index + 1) return "Execution report event sequence is invalid.";
-                if (!Enum.IsDefined(item.Kind)) return "Execution report event kind is invalid.";
+                if (item is null)
+                    return Invalid(
+                        WorkflowErrorCode.ReportInvalid,
+                        "Execution report contains a null event.");
+                if (item.Sequence != index + 1)
+                    return Invalid(
+                        WorkflowErrorCode.ReportInvalid,
+                        "Execution report event sequence is invalid.");
+                if (!Enum.IsDefined(item.Kind))
+                    return Invalid(
+                        WorkflowErrorCode.ReportInvalid,
+                        "Execution report event kind is invalid.");
                 if (item.StepId is not null && !IsIdentifier(item.StepId, 64))
-                    return "Execution report event step id is invalid.";
+                    return Invalid(
+                        WorkflowErrorCode.ReportInvalid,
+                        "Execution report event step id is invalid.");
                 if (item.Timestamp < report.StartedAt || item.Timestamp > report.FinishedAt)
-                    return "Execution report event timestamp is outside the report interval.";
+                    return Invalid(
+                        WorkflowErrorCode.ReportInvalid,
+                        "Execution report event timestamp is outside the report interval.");
                 if (item.Message?.Length > MaximumMessageLength)
-                    return "Execution report event message exceeds the maximum length.";
+                    return Invalid(
+                        WorkflowErrorCode.ReportInvalid,
+                        "Execution report event message exceeds the maximum length.");
             }
             return null;
         }
+
+        private static ReportValidationFailure Invalid(
+            WorkflowErrorCode errorCode,
+            string technicalMessage)
+            => new(errorCode, technicalMessage);
 
         private static bool IsHash(string value)
             => value is not null
@@ -172,8 +228,17 @@ namespace LongBetterWindows.Host.Interaction
             return options;
         }
 
-        private static WorkflowExecutionReportReadResult Failure(string error)
-            => new(false, null, error);
+        private static WorkflowExecutionReportReadResult Failure(
+            WorkflowErrorCode errorCode,
+            string technicalMessage)
+            => new(false, null, technicalMessage)
+            {
+                ErrorCode = errorCode,
+            };
+
+        private sealed record ReportValidationFailure(
+            WorkflowErrorCode ErrorCode,
+            string Message);
     }
 
     /// <summary>Creates immutable, atomically-written workflow execution reports.</summary>
@@ -203,6 +268,7 @@ namespace LongBetterWindows.Host.Interaction
             if (report.MessagesIncluded && !options.AllowSensitiveMessages)
             {
                 return SaveFailure(
+                    WorkflowErrorCode.ReportSensitiveApprovalRequired,
                     "Execution report includes potentially sensitive messages; explicit persistence approval is required.");
             }
 
@@ -213,11 +279,13 @@ namespace LongBetterWindows.Host.Interaction
             }
             catch (ArgumentException ex)
             {
-                return SaveFailure(ex.Message);
+                return SaveFailure(WorkflowErrorCode.ReportInvalid, ex.Message);
             }
             var bytes = StrictUtf8.GetBytes(json);
             if (bytes.LongLength > MaximumDocumentBytes)
-                return SaveFailure("Execution report exceeds the maximum size.");
+                return SaveFailure(
+                    WorkflowErrorCode.ReportTooLarge,
+                    "Execution report exceeds the maximum size.");
 
             await _writeGate.WaitAsync(cancellationToken);
             try
@@ -230,10 +298,14 @@ namespace LongBetterWindows.Host.Interaction
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    return SaveFailure($"Execution report storage is unavailable: {ex.Message}");
+                    return SaveFailure(
+                        WorkflowErrorCode.ReportStorageUnavailable,
+                        $"Execution report storage is unavailable: {ex.Message}");
                 }
                 if (File.Exists(targetPath))
-                    return SaveFailure("Execution report already exists and cannot be overwritten.");
+                    return SaveFailure(
+                        WorkflowErrorCode.ReportAlreadyExists,
+                        "Execution report already exists and cannot be overwritten.");
 
                 var temporaryPath = Path.Combine(_root, $".{report.ReportId}.{Guid.NewGuid():N}.tmp");
                 try
@@ -255,7 +327,9 @@ namespace LongBetterWindows.Host.Interaction
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
-                    return SaveFailure($"Execution report could not be saved: {ex.Message}");
+                    return SaveFailure(
+                        WorkflowErrorCode.ReportSaveFailed,
+                        $"Execution report could not be saved: {ex.Message}");
                 }
                 finally
                 {
@@ -273,7 +347,9 @@ namespace LongBetterWindows.Host.Interaction
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(reportId))
-                return Task.FromResult(ReadFailure("Execution report id is invalid."));
+                return Task.FromResult(ReadFailure(
+                    WorkflowErrorCode.ReportIdInvalid,
+                    "Execution report id is invalid."));
             try
             {
                 EnsureRoot();
@@ -281,7 +357,11 @@ namespace LongBetterWindows.Host.Interaction
             }
             catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
             {
-                return Task.FromResult(ReadFailure($"Execution report storage is unavailable: {ex.Message}"));
+                return Task.FromResult(ReadFailure(
+                    ex is ArgumentException
+                        ? WorkflowErrorCode.ReportIdInvalid
+                        : WorkflowErrorCode.ReportStorageUnavailable,
+                    $"Execution report storage is unavailable: {ex.Message}"));
             }
         }
 
@@ -305,7 +385,10 @@ namespace LongBetterWindows.Host.Interaction
                     {
                         issues.Add(new WorkflowExecutionReportListIssue(
                             Path.GetFileName(path),
-                            result.Error ?? "Execution report could not be read."));
+                            result.Error ?? "Execution report could not be read.")
+                        {
+                            ErrorCode = result.ErrorCode,
+                        });
                         continue;
                     }
                     var report = result.Report!;
@@ -330,7 +413,10 @@ namespace LongBetterWindows.Host.Interaction
                         .ThenByDescending(item => item.ReportId, StringComparer.Ordinal)
                         .ToList(),
                     issues,
-                    null);
+                    null)
+                {
+                    ErrorCode = WorkflowErrorCode.None,
+                };
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -338,7 +424,10 @@ namespace LongBetterWindows.Host.Interaction
                     false,
                     Array.Empty<WorkflowExecutionReportSummary>(),
                     Array.Empty<WorkflowExecutionReportListIssue>(),
-                    $"Execution report storage is unavailable: {ex.Message}");
+                    $"Execution report storage is unavailable: {ex.Message}")
+                {
+                    ErrorCode = WorkflowErrorCode.ReportStorageUnavailable,
+                };
             }
         }
 
@@ -349,11 +438,18 @@ namespace LongBetterWindows.Host.Interaction
             try
             {
                 var file = new FileInfo(path);
-                if (!file.Exists) return ReadFailure($"Execution report was not found: {path}");
+                if (!file.Exists)
+                    return ReadFailure(
+                        WorkflowErrorCode.ReportNotFound,
+                        $"Execution report was not found: {path}");
                 if ((file.Attributes & FileAttributes.ReparsePoint) != 0)
-                    return ReadFailure("Execution report must not be a reparse point.");
+                    return ReadFailure(
+                        WorkflowErrorCode.ReportReparsePointRejected,
+                        "Execution report must not be a reparse point.");
                 if (file.Length > MaximumDocumentBytes)
-                    return ReadFailure("Execution report exceeds the maximum size.");
+                    return ReadFailure(
+                        WorkflowErrorCode.ReportTooLarge,
+                        "Execution report exceeds the maximum size.");
                 byte[] bytes;
                 await using (var stream = new FileStream(
                     path,
@@ -364,7 +460,9 @@ namespace LongBetterWindows.Host.Interaction
                     FileOptions.Asynchronous | FileOptions.SequentialScan))
                 {
                     if (stream.Length > MaximumDocumentBytes)
-                        return ReadFailure("Execution report exceeds the maximum size.");
+                        return ReadFailure(
+                            WorkflowErrorCode.ReportTooLarge,
+                            "Execution report exceeds the maximum size.");
                     bytes = new byte[checked((int)stream.Length)];
                     var offset = 0;
                     while (offset < bytes.Length)
@@ -373,13 +471,18 @@ namespace LongBetterWindows.Host.Interaction
                         if (read == 0) break;
                         offset += read;
                     }
-                    if (offset != bytes.Length) return ReadFailure("Execution report could not be read completely.");
+                    if (offset != bytes.Length)
+                        return ReadFailure(
+                            WorkflowErrorCode.ReportReadFailed,
+                            "Execution report could not be read completely.");
                 }
                 return CommandWorkflowExecutionReportCodec.Deserialize(StrictUtf8.GetString(bytes));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DecoderFallbackException)
             {
-                return ReadFailure($"Execution report could not be read: {ex.Message}");
+                return ReadFailure(
+                    WorkflowErrorCode.ReportReadFailed,
+                    $"Execution report could not be read: {ex.Message}");
             }
         }
 
@@ -418,10 +521,20 @@ namespace LongBetterWindows.Host.Interaction
             }
         }
 
-        private static WorkflowExecutionReportSaveResult SaveFailure(string error)
-            => new(false, null, error);
+        private static WorkflowExecutionReportSaveResult SaveFailure(
+            WorkflowErrorCode errorCode,
+            string technicalMessage)
+            => new(false, null, technicalMessage)
+            {
+                ErrorCode = errorCode,
+            };
 
-        private static WorkflowExecutionReportReadResult ReadFailure(string error)
-            => new(false, null, error);
+        private static WorkflowExecutionReportReadResult ReadFailure(
+            WorkflowErrorCode errorCode,
+            string technicalMessage)
+            => new(false, null, technicalMessage)
+            {
+                ErrorCode = errorCode,
+            };
     }
 }

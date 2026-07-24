@@ -25,8 +25,10 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
         var mismatched = await session.ExecuteApprovedAsync(workflow, new string('b', 64));
 
         Assert.False(missing.IsAccepted);
+        Assert.Equal(WorkflowErrorCode.ExecutionReviewMissing, missing.ErrorCode);
         Assert.True(review.IsValid);
         Assert.False(mismatched.IsAccepted);
+        Assert.Equal(WorkflowErrorCode.ExecutionReviewMissing, mismatched.ErrorCode);
     }
 
     [Fact]
@@ -44,7 +46,9 @@ public sealed class CommandWorkflowRunSessionTests : IDisposable
         var loaded = await Reports().LoadAsync(reports.Reports[0].ReportId);
 
         Assert.True(result.IsAccepted, result.Error);
+        Assert.Equal(WorkflowErrorCode.None, result.ErrorCode);
         Assert.Equal(WorkflowExecutionStatus.Completed, result.Execution!.Status);
+        Assert.Equal(WorkflowErrorCode.None, result.Execution.ErrorCode);
         Assert.True(result.ReportSave!.IsSuccess, result.ReportSave.Error);
         Assert.False(reused.IsAccepted);
         Assert.Single(reports.Reports);

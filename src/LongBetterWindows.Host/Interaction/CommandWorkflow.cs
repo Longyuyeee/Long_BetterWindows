@@ -130,7 +130,10 @@ namespace LongBetterWindows.Host.Interaction
         string? Message,
         IReadOnlyList<WorkflowExecutionEvent> Events,
         IReadOnlyList<WorkflowOutputSummary> OutputSummaries,
-        IReadOnlyList<WorkflowTerminalOutput> TerminalOutputs);
+        IReadOnlyList<WorkflowTerminalOutput> TerminalOutputs)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     public interface IWorkflowCommandRunner
     {

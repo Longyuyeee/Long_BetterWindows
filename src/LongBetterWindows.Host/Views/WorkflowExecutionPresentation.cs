@@ -45,12 +45,12 @@ namespace LongBetterWindows.Host.Views
         {
             ArgumentNullException.ThrowIfNull(review);
             ArgumentNullException.ThrowIfNull(translate);
+            var errorCode = review.ErrorCode == WorkflowErrorCode.None
+                ? WorkflowErrorCode.ExecutionPreflightRejected
+                : review.ErrorCode;
             return new WorkflowExecutionResultPresentation(
                 translate("workflow.execution.prepareFailed.title"),
-                Format(
-                    translate,
-                    "workflow.execution.prepareFailed.detail",
-                    review.Issues.Count),
+                translate(WorkflowErrorPresentation.GetResourceKey(errorCode)),
                 Array.Empty<WorkflowOutputSummaryItem>(),
                 Array.Empty<WorkflowTerminalOutputItem>());
         }
@@ -63,9 +63,12 @@ namespace LongBetterWindows.Host.Views
             ArgumentNullException.ThrowIfNull(translate);
             if (!result.IsAccepted || result.Execution is null)
             {
+                var errorCode = result.ErrorCode == WorkflowErrorCode.None
+                    ? WorkflowErrorCode.ExecutionReviewMissing
+                    : result.ErrorCode;
                 return new WorkflowExecutionResultPresentation(
                     translate("workflow.execution.notStarted.title"),
-                    translate("workflow.execution.notStarted.detail"),
+                    translate(WorkflowErrorPresentation.GetResourceKey(errorCode)),
                     Array.Empty<WorkflowOutputSummaryItem>(),
                     Array.Empty<WorkflowTerminalOutputItem>());
             }
@@ -76,12 +79,20 @@ namespace LongBetterWindows.Host.Views
             var terminalOutputs = result.Execution.TerminalOutputs
                 .Select(WorkflowTerminalOutputItem.From)
                 .ToList();
-            var detail = result.ReportSave?.IsSuccess == true
-                ? Format(
-                    translate,
-                    "workflow.execution.report.recorded",
-                    result.Execution.Events.Count)
-                : translate("workflow.execution.report.saveFailed");
+            var detail = result.ReportSave?.IsSuccess == false
+                ? translate(WorkflowErrorPresentation.GetResourceKey(
+                    result.ReportSave.ErrorCode == WorkflowErrorCode.None
+                        ? WorkflowErrorCode.ReportSaveFailed
+                        : result.ReportSave.ErrorCode))
+                : result.Execution.ErrorCode != WorkflowErrorCode.None
+                    ? translate(WorkflowErrorPresentation.GetResourceKey(
+                        result.Execution.ErrorCode))
+                    : result.ReportSave?.IsSuccess == true
+                        ? Format(
+                            translate,
+                            "workflow.execution.report.recorded",
+                            result.Execution.Events.Count)
+                        : translate("workflow.execution.report.saveFailed");
             return new WorkflowExecutionResultPresentation(
                 StatusLabel(result.Execution.Status, translate),
                 detail,

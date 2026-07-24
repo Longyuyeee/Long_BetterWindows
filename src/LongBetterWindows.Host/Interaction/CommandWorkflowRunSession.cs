@@ -8,13 +8,19 @@ namespace LongBetterWindows.Host.Interaction
         IReadOnlyList<string> Issues,
         IReadOnlyList<WorkflowPermissionRequirement> Permissions,
         int StepCount,
-        bool ContainsMutatingSteps);
+        bool ContainsMutatingSteps)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     public sealed record CommandWorkflowRunResult(
         bool IsAccepted,
         CommandWorkflowExecutionResult? Execution,
         WorkflowExecutionReportSaveResult? ReportSave,
-        string? Error);
+        string? Error)
+    {
+        public WorkflowErrorCode ErrorCode { get; init; } = WorkflowErrorCode.None;
+    }
 
     /// <summary>Turns an explicit permission review into one execution and one immutable report.</summary>
     public sealed class CommandWorkflowRunSession : IDisposable
@@ -59,7 +65,10 @@ namespace LongBetterWindows.Host.Interaction
                         ["Another workflow execution is already running."],
                         Array.Empty<WorkflowPermissionRequirement>(),
                         workflow.Steps.Count,
-                        workflow.Steps.Any(step => step.Effect == WorkflowStepEffect.Mutating));
+                        workflow.Steps.Any(step => step.Effect == WorkflowStepEffect.Mutating))
+                    {
+                        ErrorCode = WorkflowErrorCode.ExecutionBusy,
+                    };
                 }
                 var preflight = _planner.Preflight(workflow);
                 var review = new CommandWorkflowExecutionReview(
@@ -68,7 +77,10 @@ namespace LongBetterWindows.Host.Interaction
                     preflight.Issues.ToList(),
                     preflight.Permissions.ToList(),
                     workflow.Steps.Count,
-                    workflow.Steps.Any(step => step.Effect == WorkflowStepEffect.Mutating));
+                    workflow.Steps.Any(step => step.Effect == WorkflowStepEffect.Mutating))
+                {
+                    ErrorCode = preflight.ErrorCode,
+                };
                 if (expectedStateFingerprint is not null
                     && !string.Equals(
                         review.Fingerprint,
@@ -82,6 +94,7 @@ namespace LongBetterWindows.Host.Interaction
                         [
                             "搜索结果已失效：组合动作定义或插件身份已发生变化，请重新搜索。",
                         ],
+                        ErrorCode = WorkflowErrorCode.ExecutionStateChanged,
                     };
                 }
                 _pendingReview = review.IsValid ? review : null;
@@ -108,7 +121,9 @@ namespace LongBetterWindows.Host.Interaction
             lock (_sync)
             {
                 if (_execution is not null)
-                    return Rejected("Another workflow execution is already running.");
+                    return Rejected(
+                        WorkflowErrorCode.ExecutionBusy,
+                        "Another workflow execution is already running.");
                 if (_pendingReview is null
                     || !_pendingReview.IsValid
                     || !string.Equals(
@@ -116,7 +131,9 @@ namespace LongBetterWindows.Host.Interaction
                         reviewedFingerprint,
                         StringComparison.Ordinal))
                 {
-                    return Rejected("Workflow execution approval is missing or no longer matches the review.");
+                    return Rejected(
+                        WorkflowErrorCode.ExecutionReviewMissing,
+                        "Workflow execution approval is missing or no longer matches the review.");
                 }
                 review = _pendingReview;
                 _pendingReview = null;
@@ -146,7 +163,12 @@ namespace LongBetterWindows.Host.Interaction
                     true,
                     result,
                     reportSave,
-                    reportSave.IsSuccess ? null : reportSave.Error);
+                    reportSave.IsSuccess ? null : reportSave.Error)
+                {
+                    ErrorCode = reportSave.IsSuccess
+                        ? result.ErrorCode
+                        : reportSave.ErrorCode,
+                };
             }
             finally
             {
@@ -181,7 +203,12 @@ namespace LongBetterWindows.Host.Interaction
             execution?.Cancel();
         }
 
-        private static CommandWorkflowRunResult Rejected(string error)
-            => new(false, null, null, error);
+        private static CommandWorkflowRunResult Rejected(
+            WorkflowErrorCode errorCode,
+            string technicalMessage)
+            => new(false, null, null, technicalMessage)
+            {
+                ErrorCode = errorCode,
+            };
     }
 }
