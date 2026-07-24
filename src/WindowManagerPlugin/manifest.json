@@ -20,5 +20,12 @@
     {"id":"window.third-right","title":"窗口移至右侧三分之二","description":"将当前窗口排列到右侧三分之二","aliases":["右三分屏"],"accepted_inputs":["none"],"view_mode":"none","priority":16}
   ],
   "window": {"mode":"compact","preferred_width":560,"preferred_height":590,"min_width":520,"min_height":480},
+  "localization": {
+    "default_language": "zh-CN",
+    "resources": {
+      "zh-CN": "i18n/zh-CN.json",
+      "en-US": "i18n/en-US.json"
+    }
+  },
   "default_settings": {"auto_start":true}
 }

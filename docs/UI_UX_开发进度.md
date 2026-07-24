@@ -751,7 +751,7 @@ WIP UI visual draft before audited implementation
 - [x] G17-D4-D 完成 DevToolkit；语言切换保留当前页签、全部输入和结果快照，不重新转换、生成 UUID 或调用剪贴板。日期、进制和错误投影正确更新，`760 × 560` 无水平溢出，Release 0 警告/0 错误，611 / 611 测试通过。
 - [x] G17-D5-A 完成 FileOrganizer 功能补全与双语迁移。审计确认该包此前只有 Manifest，Git 历史中从未提交 `index.html`，因此不存在可保持的既有前端事务；本批新增宿主托管的顶层文件计划/执行 API、可复核目标路径、冲突提示、二次确认和部分失败保留。源文件/目标规则会在执行时重新计算，拒绝越界、重解析点、重复项和覆盖。语言切换不重新分析或执行。Release 0 警告/0 错误，621 / 621 测试通过。
 - [x] G17-D5-B 完成 ColorPicker 与 Screenshot 两个捕获类 DLL 插件。Manifest、覆盖层、设置页、Toast 和命令结果已双语化；语言切换保留实时色值、区域框选、热键输入与设置反馈，不注册热键、不打开窗口、不执行捕获。Screenshot 区域覆盖层改为单实例并在插件停止时关闭，区域捕获/剪贴板异常有明确反馈。共享热键控件修复改键后注册空回调的问题，FolderNote 同步接入真实回调和双语设置投影。FileOrganizer 在系统 Edge 无头 `780 × 560` 下完成英文预览、中文部分失败及确认框切换验证，无水平溢出且分析/执行调用不重复；证据位于 `artifacts/quality/i18n-g17-d5-file-organizer-headless-20260724/`。Release 0 警告/0 错误，626 / 626 测试通过。
-- [ ] G17-D5-C 迁移 QuickLaunch 与 WindowManager 两个启动/窗口状态 DLL 插件。
+- [x] G17-D5-C 完成 QuickLaunch 与 WindowManager 两个启动/窗口状态 DLL 插件。QuickLaunch 将应用、计算、链接、文件和内容匹配改为稳定内部类别 ID，窗口及统一搜索结果只投影本地化名称/来源/说明；活动查询、结果、选中项和路径保持，语言切换不重新扫描开始菜单、桌面、文档或文件内容，也不启动结果。WindowManager 的 12 条命令、指南、布局 Toast 和置顶设置完成双语化；语言切换不注册热键、不调用 `SetWindowPos`，置顶改键接入真实 `ToggleTopmost` 回调。Release 0 警告/0 错误，632 / 632 测试通过；真实 WPF 双语视觉并入 D5-E 总审计。
 - [ ] G17-D5-D 单独迁移高副作用 MacroPlugin，验证语言切换不重新注册、录制或回放输入。
 - [ ] G17-D5-E 迁移 SamplePlugin 作为 SDK 示例，并执行 25 个内置插件的资源、硬编码、生命周期和双语视觉总审计。
 - [x] G3 插件语言声明与宿主通知协议基础由 G17-A 完成；内置插件内容迁移继续由 G17-B 分批实施，不实现 uTools 插件兼容层。

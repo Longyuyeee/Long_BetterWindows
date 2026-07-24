@@ -7,14 +7,24 @@ using Serilog;
 
 namespace WindowManagerPlugin;
 
-public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginCommandHandler
+public class WindowManagerPluginImpl :
+    ILongPlugin,
+    IHasSettingsUI,
+    IHasMainUI,
+    IPluginCommandHandler,
+    IPluginLanguageLifecycle
 {
     private IHostApi _host = null!;
     private readonly List<string> _registeredHotkeys = new();
+    private readonly List<WeakReference<HotkeySettingsControl>> _settings = [];
     private WindowManagerGuide? _guide;
+    private string _configuredTopmostHotkey = "Ctrl+Alt+T";
+    private string? _registeredTopmostHotkey;
+    private IReadOnlyDictionary<string, string> _strings =
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.window-manager";
-    public string Name => "窗口管理";
+    public string Name => Text("plugin.name", "窗口管理");
     public string Version => "2.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
@@ -28,7 +38,7 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, 
     {
         var bindings = new (string Key, Action Callback)[]
         {
-            ("Ctrl+Alt+T", ToggleTopmost),
+            (_configuredTopmostHotkey, ToggleTopmost),
             ("Ctrl+Alt+Left", () => Snap("left")),
             ("Ctrl+Alt+Right", () => Snap("right")),
             ("Ctrl+Alt+Up", () => Snap("max")),
@@ -45,7 +55,13 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, 
         {
             var result = await _host.HotKey.RegisterAsync(binding.Key, Id, binding.Callback);
             if (result.IsSuccess)
+            {
                 _registeredHotkeys.Add(binding.Key);
+                if (binding.Key.Equals(
+                        _configuredTopmostHotkey,
+                        StringComparison.OrdinalIgnoreCase))
+                    _registeredTopmostHotkey = binding.Key;
+            }
             else
                 Log.Warning("[WindowManager] 热键冲突，命令入口仍可用: {Hotkey}", binding.Key);
         }
@@ -60,6 +76,7 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, 
         foreach (var key in _registeredHotkeys)
             await _host.HotKey.UnregisterAsync(key);
         _registeredHotkeys.Clear();
+        _registeredTopmostHotkey = null;
         Application.Current.Dispatcher.Invoke(() => _guide?.Close());
         State = PluginState.Stopped;
         return true;
@@ -75,14 +92,31 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, 
                 return;
             }
 
-            _guide = new WindowManagerGuide();
+            _guide = new WindowManagerGuide(CreateGuideLocalization());
             _guide.Closed += (_, _) => _guide = null;
             _guide.Show();
         });
     }
 
     public FrameworkElement CreateSettingsUI()
-        => new HotkeySettingsControl("窗口置顶", Id, "Ctrl+Alt+T", _ => { });
+    {
+        var control = new HotkeySettingsControl(
+            Text("settings.topmostTitle", "窗口置顶"),
+            Id,
+            _registeredTopmostHotkey
+                ?? Text("settings.commandCenter", "命令中心"),
+            value =>
+            {
+                ReplaceRegisteredHotkey(_registeredTopmostHotkey, value);
+                _configuredTopmostHotkey = value;
+                _registeredTopmostHotkey = value;
+            },
+            CreateSettingsLocalization(),
+            ToggleTopmost);
+        _settings.RemoveAll(reference => !reference.TryGetTarget(out _));
+        _settings.Add(new WeakReference<HotkeySettingsControl>(control));
+        return control;
+    }
 
     public Task<PluginCommandResult> ExecuteCommandAsync(
         PluginCommandInvocation invocation,
@@ -103,10 +137,14 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, 
             case "window.bottom-right": Snap("bottom-right"); break;
             case "window.third-left": Snap("third-left"); break;
             case "window.third-right": Snap("third-right"); break;
-            default: return Task.FromResult(PluginCommandResult.Failure($"未知窗口命令: {invocation.CommandId}"));
+            default:
+                return Task.FromResult(PluginCommandResult.Failure(string.Format(
+                    Text("error.unknownCommand", "未知窗口命令: {0}"),
+                    invocation.CommandId)));
         }
 
-        return Task.FromResult(PluginCommandResult.Success("窗口布局已应用"));
+        return Task.FromResult(PluginCommandResult.Success(
+            Text("command.completed", "窗口布局已应用")));
     }
 
     private void ToggleTopmost()
@@ -116,7 +154,9 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, 
         var isTopmost = (GetWindowLong(window, GwlExstyle) & WsExTopmost) != 0;
         SetWindowPos(window, isTopmost ? HwndNotopmost : HwndTopmost, 0, 0, 0, 0,
             SwpNosize | SwpNomove | SwpShowwindow);
-        FloatingHudWindow.ShowToast(isTopmost ? "已取消窗口置顶" : "窗口已置顶");
+        FloatingHudWindow.ShowToast(isTopmost
+            ? Text("toast.topmostDisabled", "已取消窗口置顶")
+            : Text("toast.topmostEnabled", "窗口已置顶"));
     }
 
     private void Snap(string layout)
@@ -153,13 +193,86 @@ public class WindowManagerPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, 
         });
     }
 
-    private static string LayoutName(string layout) => layout switch
+    public Task OnLanguageChangedAsync(
+        PluginLanguageContext context,
+        CancellationToken cancellationToken = default)
     {
-        "left" => "左半屏", "right" => "右半屏", "max" => "最大化", "bottom" => "下半屏",
-        "top-left" => "左上四分屏", "top-right" => "右上四分屏",
-        "bottom-left" => "左下四分屏", "bottom-right" => "右下四分屏",
-        "third-left" => "左侧三分之一", "third-right" => "右侧三分之二", _ => layout,
-    };
+        cancellationToken.ThrowIfCancellationRequested();
+        _strings = context.Resources;
+        var application = Application.Current;
+        if (application is not null)
+        {
+            application.Dispatcher.Invoke(() =>
+            {
+                _guide?.ApplyLocalization(CreateGuideLocalization());
+                _settings.RemoveAll(reference => !reference.TryGetTarget(out _));
+                foreach (var reference in _settings)
+                {
+                    if (reference.TryGetTarget(out var control))
+                    {
+                        control.ApplyLocalization(
+                            Text("settings.topmostTitle", "窗口置顶"),
+                            CreateSettingsLocalization());
+                    }
+                }
+            });
+        }
+        return Task.CompletedTask;
+    }
+
+    private void ReplaceRegisteredHotkey(string? previous, string current)
+    {
+        if (previous is not null)
+        {
+            _registeredHotkeys.RemoveAll(existing =>
+                existing.Equals(previous, StringComparison.OrdinalIgnoreCase));
+        }
+        if (!_registeredHotkeys.Contains(current, StringComparer.OrdinalIgnoreCase))
+            _registeredHotkeys.Add(current);
+    }
+
+    private WindowManagerGuideLocalization CreateGuideLocalization()
+        => new(
+            Text("guide.title", "窗口管理"),
+            Text("guide.description", "用统一指令或快捷键整理当前窗口"),
+            Text("guide.closeAutomationName", "关闭窗口管理指南"),
+            Text("guide.common", "常用操作"),
+            Text("guide.topmost", "切换置顶"),
+            Text("guide.maximize", "最大化"),
+            Text("guide.layouts", "半屏与分区"),
+            Text("guide.left", "←  左半屏"),
+            Text("guide.right", "→  右半屏"),
+            Text("guide.bottom", "↓  下半屏"),
+            Text("guide.topLeft", "1  左上四分屏"),
+            Text("guide.topRight", "2  右上四分屏"),
+            Text("guide.bottomLeft", "3  左下四分屏"),
+            Text("guide.bottomRight", "4  右下四分屏"),
+            Text("guide.thirdLeft", "Shift + ←  左侧 ⅓"),
+            Text("guide.thirdRight", "Shift + →  右侧 ⅔"),
+            Text(
+                "guide.hint",
+                "提示：所有操作也可以直接在命令中心搜索“窗口”。"));
+
+    private HotkeySettingsLocalization CreateSettingsLocalization()
+        => new(
+            Text("settings.currentHotkey", "当前快捷键"),
+            Text("settings.apply", "应用"),
+            Text("settings.unchanged", "未修改"),
+            Text("settings.conflict", "冲突: 已被「{0}」占用"),
+            Text("settings.updated", "已更新"),
+            Text("settings.changeFailed", "修改失败: {0}"),
+            Text(
+                "settings.formatHint",
+                "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6"));
+
+    private string LayoutName(string layout)
+        => Text("layout." + layout, layout);
+
+    private string Text(string key, string fallback)
+        => _strings.TryGetValue(key, out var value)
+            && !string.IsNullOrWhiteSpace(value)
+                ? value
+                : fallback;
 
     private static readonly IntPtr HwndTopmost = new(-1);
     private static readonly IntPtr HwndNotopmost = new(-2);

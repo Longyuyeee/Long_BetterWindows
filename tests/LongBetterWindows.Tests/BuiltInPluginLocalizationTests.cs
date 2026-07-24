@@ -23,6 +23,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("MarkdownPreview")]
     [InlineData("PasswordGenerator")]
     [InlineData("PortManager")]
+    [InlineData("QuickLaunchPlugin")]
     [InlineData("QuickNotePlugin")]
     [InlineData("RegexTester")]
     [InlineData("ScreenshotPlugin")]
@@ -31,6 +32,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("TranslatePlugin")]
     [InlineData("UrlToolkit")]
     [InlineData("UuidGenerator")]
+    [InlineData("WindowManagerPlugin")]
     public async Task SamplePlugin_HasValidBilingualResources(string plugin)
     {
         var root = FindRepositoryRoot();
@@ -432,6 +434,98 @@ public sealed class BuiltInPluginLocalizationTests
             "_currentHotkey, newHotkey, _pluginId, _hotkeyCallback",
             source);
         Assert.Contains("RenderStatus();", source);
+    }
+
+    [Theory]
+    [InlineData(
+        "QuickLaunchPlugin",
+        "QuickLaunchPluginImpl.cs",
+        "private LaunchWindowLocalization CreateWindowLocalization",
+        "ShowLauncher(")]
+    [InlineData(
+        "WindowManagerPlugin",
+        "WindowManagerPluginImpl.cs",
+        "private void ReplaceRegisteredHotkey",
+        "SetWindowPos(")]
+    public void NativeStatefulPlugin_LocalizesProjectionWithoutExecutingAction(
+        string plugin,
+        string implementationFile,
+        string nextMarker,
+        string prohibitedCall)
+    {
+        var root = FindRepositoryRoot();
+        var folder = Path.Combine(root, "src", plugin);
+        var source = File.ReadAllText(Path.Combine(folder, implementationFile));
+        var project = File.ReadAllText(Path.Combine(folder, plugin + ".csproj"));
+        var hostProject = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "LongBetterWindows.Host.csproj"));
+        var start = source.IndexOf(
+            "public Task OnLanguageChangedAsync(",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(nextMarker, start, StringComparison.Ordinal);
+
+        Assert.True(start >= 0);
+        Assert.True(end > start);
+        var languageBody = source[start..end];
+        Assert.Contains("IPluginLanguageLifecycle", source);
+        Assert.Contains("ApplyLocalization", languageBody);
+        Assert.DoesNotContain(prohibitedCall, languageBody);
+        Assert.DoesNotContain("RegisterAsync", languageBody);
+        Assert.Contains("PluginLocalization Include=\"i18n\\*.json\"", project);
+        Assert.Contains(plugin + "\\i18n", hostProject);
+    }
+
+    [Fact]
+    public void QuickLaunch_LocalizesStableResultProjectionWithoutRescanning()
+    {
+        var root = FindRepositoryRoot();
+        var implementation = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "QuickLaunchPlugin",
+            "QuickLaunchPluginImpl.cs"));
+        var window = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "QuickLaunchPlugin",
+            "LaunchWindow.xaml.cs"));
+        var start = window.IndexOf(
+            "public void ApplyLocalization(",
+            StringComparison.Ordinal);
+        var end = window.IndexOf(
+            "private void ApplyResultsProjection",
+            start,
+            StringComparison.Ordinal);
+        var languageBody = window[start..end];
+
+        Assert.Contains("Category = \"application\"", window);
+        Assert.Contains("Category = \"calculation\"", window);
+        Assert.Contains("entry.Category == \"calculation\"", implementation);
+        Assert.DoesNotContain("Category = \"应用\"", window);
+        Assert.DoesNotContain("entry.Category == \"计算\"", implementation);
+        Assert.Contains("ApplyResultsProjection();", languageBody);
+        Assert.DoesNotContain("SearchFiles(", languageBody);
+        Assert.DoesNotContain("SearchContent(", languageBody);
+        Assert.DoesNotContain("SearchBox_TextChanged(", languageBody);
+    }
+
+    [Fact]
+    public void WindowManager_SettingsRetainRealTopmostCallback()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "WindowManagerPlugin",
+            "WindowManagerPluginImpl.cs"));
+
+        Assert.Matches(
+            @"CreateSettingsLocalization\(\),\s*ToggleTopmost\)",
+            source);
+        Assert.Contains("ReplaceRegisteredHotkey(", source);
+        Assert.Contains("_guide?.ApplyLocalization", source);
     }
 
     private static JsonDocument ReadResource(

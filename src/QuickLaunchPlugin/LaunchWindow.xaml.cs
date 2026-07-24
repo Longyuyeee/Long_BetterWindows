@@ -9,21 +9,45 @@ using System.Windows.Media.Animation;
 
 namespace QuickLaunchPlugin;
 
+public sealed record LaunchWindowLocalization(
+    string Title,
+    string SearchAutomationName,
+    string EmptyHint,
+    string ResultCountFormat,
+    string NoMatches,
+    string NavigationHint,
+    string OpenLinkFormat,
+    string ApplicationCategory,
+    string CalculationCategory,
+    string LinkCategory,
+    string FileCategory,
+    string ContentCategory,
+    string ApplicationSubtitle,
+    string CalculationSubtitle,
+    string LinkSubtitle);
+
 public partial class LaunchWindow : Window
 {
     private readonly List<SmartEntry> _apps = new();
+    private List<SmartEntry> _currentResults = [];
+    private LaunchWindowLocalization _localization;
     private Action<SmartEntry?>? _onSelect;
 
-    public LaunchWindow()
+    public LaunchWindow(LaunchWindowLocalization localization)
     {
+        _localization = localization;
         InitializeComponent();
         LoadApps();
+        ApplyLocalization(localization);
     }
 
-    public static void Show(Action<SmartEntry?> onSelect, string? initialQuery = null)
+    public static LaunchWindow Show(
+        Action<SmartEntry?> onSelect,
+        LaunchWindowLocalization localization,
+        string? initialQuery = null)
     {
         var area = LongBetterWindows.Host.Services.MonitorHelper.GetCursorWorkArea();
-        var window = new LaunchWindow
+        var window = new LaunchWindow(localization)
         {
             _onSelect = onSelect,
             Left = area.Left + (area.Width - 640) / 2,
@@ -34,6 +58,7 @@ public partial class LaunchWindow : Window
             window.SearchBox.Text = initialQuery;
         window.SearchBox.Focus();
         window.SearchBox.CaretIndex = window.SearchBox.Text.Length;
+        return window;
     }
 
     private static List<SmartEntry>? _cachedApps;
@@ -77,7 +102,7 @@ public partial class LaunchWindow : Window
                             Name = Path.GetFileNameWithoutExtension(lnk),
                             Path = lnk,
                             Icon = "📦",
-                            Category = "应用",
+                            Category = "application",
                         });
                     }
                     catch { }
@@ -97,8 +122,10 @@ public partial class LaunchWindow : Window
 
         if (string.IsNullOrEmpty(query))
         {
+            _currentResults = [];
+            ResultsList.ItemsSource = null;
             ResultsList.Visibility = Visibility.Collapsed;
-            HintText.Text = "输入应用、文件、链接或算式";
+            HintText.Text = _localization.EmptyHint;
             return;
         }
 
@@ -112,8 +139,7 @@ public partial class LaunchWindow : Window
                 Name = $"{query} = {mathResult}",
                 Path = mathResult,
                 Icon = "🔢",
-                Category = "计算",
-                Subtitle = "Enter 复制到剪贴板",
+                Category = "calculation",
             });
         }
 
@@ -123,11 +149,10 @@ public partial class LaunchWindow : Window
             var url = query.StartsWith("http") ? query : "https://" + query;
             results.Add(new SmartEntry
             {
-                Name = $"打开 {query}",
+                Name = query,
                 Path = url,
                 Icon = "🌐",
-                Category = "链接",
-                Subtitle = "Enter 浏览器打开",
+                Category = "link",
             });
         }
 
@@ -155,7 +180,9 @@ public partial class LaunchWindow : Window
             results.AddRange(fileResults);
         }
 
-        ResultsList.ItemsSource = results;
+        _currentResults = results;
+        ApplyResultsProjection();
+        ResultsList.ItemsSource = _currentResults;
         ResultsList.Visibility = results.Count > 0
             ? Visibility.Visible : Visibility.Collapsed;
 
@@ -163,8 +190,8 @@ public partial class LaunchWindow : Window
             ResultsList.SelectedIndex = 0;
 
         HintText.Text = results.Count > 0
-            ? $"{results.Count} 个结果"
-            : "无匹配结果";
+            ? string.Format(_localization.ResultCountFormat, results.Count)
+            : _localization.NoMatches;
     }
 
     private static bool TryEvaluateMath(string expr, out string result)
@@ -229,7 +256,14 @@ public partial class LaunchWindow : Window
                     ".txt" or ".md" => "📄", ".zip" or ".rar" or ".7z" => "📦",
                     _ => "📁"
                 };
-                yield return new SmartEntry { Name = name, Path = f, Icon = icon, Category = "文件", Subtitle = dir };
+                yield return new SmartEntry
+                {
+                    Name = name,
+                    Path = f,
+                    Icon = icon,
+                    Category = "file",
+                    Subtitle = dir,
+                };
             }
         }
     }
@@ -271,7 +305,8 @@ public partial class LaunchWindow : Window
                         results.Add(new SmartEntry
                         {
                             Name = Path.GetFileName(f), Path = f, Icon = "🔍",
-                            Category = "内容匹配", Subtitle = "..." + preview + "...",
+                            Category = "content",
+                            Subtitle = "..." + preview + "...",
                         });
                     }
                 }
@@ -285,6 +320,43 @@ public partial class LaunchWindow : Window
     {
         return Regex.IsMatch(text, @"^https?://") ||
                Regex.IsMatch(text, @"^[\w-]+\.(com|cn|org|net|io|dev|app|co)([/\w\-?=%.&]*)?$");
+    }
+
+    public void ApplyLocalization(LaunchWindowLocalization localization)
+    {
+        _localization = localization;
+        Title = localization.Title;
+        System.Windows.Automation.AutomationProperties.SetName(
+            SearchBox,
+            localization.SearchAutomationName);
+        NavigationHintText.Text = localization.NavigationHint;
+        ApplyResultsProjection();
+        if (string.IsNullOrWhiteSpace(SearchBox.Text))
+        {
+            HintText.Text = localization.EmptyHint;
+        }
+        else
+        {
+            HintText.Text = _currentResults.Count > 0
+                ? string.Format(
+                    localization.ResultCountFormat,
+                    _currentResults.Count)
+                : localization.NoMatches;
+        }
+    }
+
+    private void ApplyResultsProjection()
+    {
+        var selectedIndex = ResultsList.SelectedIndex;
+        foreach (var entry in _currentResults)
+            entry.ApplyLocalization(_localization);
+        if (ResultsList.ItemsSource is not null)
+        {
+            ResultsList.ItemsSource = null;
+            ResultsList.ItemsSource = _currentResults;
+            if (selectedIndex >= 0 && selectedIndex < _currentResults.Count)
+                ResultsList.SelectedIndex = selectedIndex;
+        }
     }
 
     private void SearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -369,4 +441,30 @@ public class SmartEntry
     public string Icon { get; init; } = "📦";
     public string Category { get; init; } = "";
     public string? Subtitle { get; init; }
+    public string DisplayName { get; private set; } = string.Empty;
+    public string CategoryLabel { get; private set; } = string.Empty;
+    public string? DisplaySubtitle { get; private set; }
+
+    public void ApplyLocalization(LaunchWindowLocalization localization)
+    {
+        DisplayName = Category == "link"
+            ? string.Format(localization.OpenLinkFormat, Name)
+            : Name;
+        CategoryLabel = Category switch
+        {
+            "application" => localization.ApplicationCategory,
+            "calculation" => localization.CalculationCategory,
+            "link" => localization.LinkCategory,
+            "file" => localization.FileCategory,
+            "content" => localization.ContentCategory,
+            _ => Category,
+        };
+        DisplaySubtitle = Category switch
+        {
+            "application" => localization.ApplicationSubtitle,
+            "calculation" => localization.CalculationSubtitle,
+            "link" => localization.LinkSubtitle,
+            _ => Subtitle,
+        };
+    }
 }

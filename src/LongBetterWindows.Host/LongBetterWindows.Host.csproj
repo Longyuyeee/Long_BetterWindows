@@ -75,6 +75,7 @@
     <Exec Command="if exist &quot;$(RepoRoot)src\FolderNotePlugin\bin\$(Configuration)\net8.0-windows\FolderNotePlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\FolderNotePlugin\bin\$(Configuration)\net8.0-windows\FolderNotePlugin.dll&quot; &quot;$(OutputPath)Plugins\FolderNotePlugin\&quot; &gt; nul" />
 
     <Copy SourceFiles="$(RepoRoot)src\QuickLaunchPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\QuickLaunchPlugin" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\QuickLaunchPlugin\i18n&quot; &quot;$(OutputPath)Plugins\QuickLaunchPlugin\i18n&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="if exist &quot;$(RepoRoot)src\QuickLaunchPlugin\bin\$(Configuration)\net8.0-windows\QuickLaunchPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\QuickLaunchPlugin\bin\$(Configuration)\net8.0-windows\QuickLaunchPlugin.dll&quot; &quot;$(OutputPath)Plugins\QuickLaunchPlugin\&quot; &gt; nul" />
 
     <Copy SourceFiles="$(RepoRoot)src\MacroPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\MacroPlugin" />
@@ -89,6 +90,7 @@
     <Exec Command="if exist &quot;$(RepoRoot)src\ScreenshotPlugin\bin\$(Configuration)\net8.0-windows\ScreenshotPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\ScreenshotPlugin\bin\$(Configuration)\net8.0-windows\ScreenshotPlugin.dll&quot; &quot;$(OutputPath)Plugins\ScreenshotPlugin\&quot; &gt; nul" />
 
     <Copy SourceFiles="$(RepoRoot)src\WindowManagerPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\WindowManagerPlugin" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\WindowManagerPlugin\i18n&quot; &quot;$(OutputPath)Plugins\WindowManagerPlugin\i18n&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="if exist &quot;$(RepoRoot)src\WindowManagerPlugin\bin\$(Configuration)\net8.0-windows\WindowManagerPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\WindowManagerPlugin\bin\$(Configuration)\net8.0-windows\WindowManagerPlugin.dll&quot; &quot;$(OutputPath)Plugins\WindowManagerPlugin\&quot; &gt; nul" />
 
     <!-- Web 插件：robocopy 整个目录（排除 bin/obj） -->
