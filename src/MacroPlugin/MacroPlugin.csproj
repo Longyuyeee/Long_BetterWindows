@@ -14,15 +14,20 @@
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
+    <PluginLocalization Include="i18n\*.json" />
   </ItemGroup>
 
   <Target Name="CopyToPlugins" AfterTargets="Build">
     <MakeDir Directories="$(ProjectDir)..\..\Plugins\MacroPlugin" />
+    <MakeDir Directories="$(ProjectDir)..\..\Plugins\MacroPlugin\i18n" />
     <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\MacroPlugin" />
+    <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\MacroPlugin\i18n" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\..\Plugins\MacroPlugin" />
     <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\..\Plugins\MacroPlugin" />
+    <Copy SourceFiles="@(PluginLocalization)" DestinationFolder="$(ProjectDir)..\..\Plugins\MacroPlugin\i18n" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\MacroPlugin" />
     <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\MacroPlugin" />
+    <Copy SourceFiles="@(PluginLocalization)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\MacroPlugin\i18n" />
   </Target>
 
 </Project>

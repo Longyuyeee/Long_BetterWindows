@@ -371,6 +371,45 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.Contains("FolderNotePlugin\\i18n", hostProject);
     }
 
+    [Fact]
+    public void MacroPlugin_LocalizesProjectionWithoutRepeatingSideEffects()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "MacroPlugin",
+            "MacroPluginImpl.cs"));
+        var project = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "MacroPlugin",
+            "MacroPlugin.csproj"));
+        var hostProject = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "LongBetterWindows.Host.csproj"));
+        var start = source.IndexOf(
+            "public Task OnLanguageChangedAsync(",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "private MacroOverlayLocalization",
+            start,
+            StringComparison.Ordinal);
+
+        Assert.True(start >= 0);
+        Assert.True(end > start);
+        var languageBody = source[start..end];
+        Assert.Contains("IPluginLanguageLifecycle", source);
+        Assert.Contains("ApplyLocalization", languageBody);
+        Assert.DoesNotContain("RegisterAsync", languageBody);
+        Assert.DoesNotContain("ToggleRecording", languageBody);
+        Assert.DoesNotContain("PlayOnce", languageBody);
+        Assert.Contains("PluginLocalization Include=\"i18n\\*.json\"", project);
+        Assert.Contains("MacroPlugin\\i18n", hostProject);
+    }
+
     [Theory]
     [InlineData(
         "ColorPickerPlugin",
