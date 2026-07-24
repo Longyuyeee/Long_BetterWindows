@@ -42,10 +42,24 @@ public sealed record SparsePackageState
     public string? PackageSha256 { get; init; }
 }
 
+public enum SparsePackageErrorCode
+{
+    None = 0,
+    ScriptMissing = 6000,
+    ProcessFailed = 6001,
+    InvalidState = 6002,
+    TimedOut = 6003,
+    Cancelled = 6004,
+    UnexpectedFailure = 6005,
+}
+
 public sealed record SparsePackageOperationResult(
     bool IsSuccess,
     string Message,
-    SparsePackageState? State);
+    SparsePackageState? State)
+{
+    public SparsePackageErrorCode ErrorCode { get; init; }
+}
 
 internal sealed record SparsePackageProcessResult(
     int ExitCode,
@@ -172,7 +186,10 @@ public sealed class SparsePackageService
             return new SparsePackageOperationResult(
                 false,
                 "Sparse Package 管理脚本未随应用发布",
-                null);
+                null)
+            {
+                ErrorCode = SparsePackageErrorCode.ScriptMissing,
+            };
         }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
@@ -193,24 +210,45 @@ public sealed class SparsePackageService
                     : process.StandardError.Trim();
             }
 
-            return new SparsePackageOperationResult(
-                process.ExitCode == 0 && state?.Succeeded == true,
-                message,
-                state);
+            var isSuccess = process.ExitCode == 0 && state?.Succeeded == true;
+            return new SparsePackageOperationResult(isSuccess, message, state)
+            {
+                ErrorCode = isSuccess
+                    ? SparsePackageErrorCode.None
+                    : state is null
+                        ? SparsePackageErrorCode.InvalidState
+                        : SparsePackageErrorCode.ProcessFailed,
+            };
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return new SparsePackageOperationResult(
                 false,
                 "Sparse Package 操作等待超时",
-                null);
+                null)
+            {
+                ErrorCode = SparsePackageErrorCode.TimedOut,
+            };
+        }
+        catch (OperationCanceledException exception)
+        {
+            return new SparsePackageOperationResult(
+                false,
+                exception.Message,
+                null)
+            {
+                ErrorCode = SparsePackageErrorCode.Cancelled,
+            };
         }
         catch (Exception exception)
         {
             return new SparsePackageOperationResult(
                 false,
                 exception.Message,
-                null);
+                null)
+            {
+                ErrorCode = SparsePackageErrorCode.UnexpectedFailure,
+            };
         }
     }
 

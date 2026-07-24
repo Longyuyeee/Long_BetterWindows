@@ -7,6 +7,7 @@ using System.Windows.Media;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
+using Serilog;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -473,7 +474,7 @@ namespace LongBetterWindows.Host.Views
         private async void ColumnButton_Click(object sender, RoutedEventArgs e)
         {
             ColumnButton.IsEnabled = false;
-            ColumnStatusText.Text = "处理中...";
+            ColumnStatusText.Text = I18n("status.processing");
 
             try
             {
@@ -484,11 +485,19 @@ namespace LongBetterWindows.Host.Views
                     if (result.IsSuccess)
                     {
                         _columnEnabled = false;
-                        ColumnStatusText.Text = "备注列已移除";
+                        ColumnStatusText.Text = I18n("status.disabled");
                         ColumnStatusText.Foreground = GrayBrush;
                     }
                     else
-                        ColumnStatusText.Text = "移除失败: " + (result.ErrorMessage ?? "未知错误");
+                    {
+                        Log.Warning(
+                            "Explorer note column disable failed ({ErrorCode}): {Error}",
+                            result.ErrorCode,
+                            result.ErrorMessage);
+                        ColumnStatusText.Text = I18n(
+                            "system.column.error.disable");
+                        ColumnStatusText.Foreground = RedBrush;
+                    }
                 }
                 else
                 {
@@ -497,27 +506,39 @@ namespace LongBetterWindows.Host.Views
                     if (result.IsSuccess)
                     {
                         _columnEnabled = true;
-                        ColumnStatusText.Text = "备注列已启用 · Explorer 已刷新";
+                        ColumnStatusText.Text = I18n("status.enabled");
                         ColumnStatusText.Foreground = GreenBrush;
                     }
                     else
-                        ColumnStatusText.Text = "注入失败: " + (result.ErrorMessage ?? "未知错误");
+                    {
+                        Log.Warning(
+                            "Explorer note column enable failed ({ErrorCode}): {Error}",
+                            result.ErrorCode,
+                            result.ErrorMessage);
+                        ColumnStatusText.Text = I18n(
+                            "system.column.error.enable");
+                        ColumnStatusText.Foreground = RedBrush;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                ColumnStatusText.Text = "操作异常: " + ex.Message;
+                Log.Error(ex, "Explorer note column operation failed");
+                ColumnStatusText.Text = I18n(
+                    "system.column.error.unexpected");
                 ColumnStatusText.Foreground = RedBrush;
             }
 
-            ColumnButton.Content = _columnEnabled ? "移除" : "一键开启";
+            ColumnButton.Content = _columnEnabled
+                ? I18n("action.remove")
+                : I18n("action.enable");
             ColumnButton.IsEnabled = true;
         }
 
         private async void ContextMenuButton_Click(object sender, RoutedEventArgs e)
         {
             ContextMenuButton.IsEnabled = false;
-            ContextMenuStatusText.Text = "处理中...";
+            ContextMenuStatusText.Text = I18n("status.processing");
 
             try
             {
@@ -527,11 +548,20 @@ namespace LongBetterWindows.Host.Views
                     if (result.IsSuccess)
                     {
                         _contextMenuRegistered = false;
-                        ContextMenuStatusText.Text = "已移除";
+                        ContextMenuStatusText.Text = I18n(
+                            "status.notRegistered");
                         ContextMenuStatusText.Foreground = GrayBrush;
                     }
                     else
-                        ContextMenuStatusText.Text = "移除失败: " + (result.ErrorMessage ?? "未知错误");
+                    {
+                        Log.Warning(
+                            "Legacy context menu unregister failed ({ErrorCode}): {Error}",
+                            result.ErrorCode,
+                            result.ErrorMessage);
+                        ContextMenuStatusText.Text = I18n(
+                            "system.legacy.error.unregister");
+                        ContextMenuStatusText.Foreground = RedBrush;
+                    }
                 }
                 else
                 {
@@ -539,20 +569,33 @@ namespace LongBetterWindows.Host.Views
                     if (result.IsSuccess)
                     {
                         _contextMenuRegistered = true;
-                        ContextMenuStatusText.Text = "已注册 · 右键文件夹即可使用";
+                        ContextMenuStatusText.Text = I18n(
+                            "status.registered");
                         ContextMenuStatusText.Foreground = GreenBrush;
                     }
                     else
-                        ContextMenuStatusText.Text = "注册失败: " + (result.ErrorMessage ?? "未知错误");
+                    {
+                        Log.Warning(
+                            "Legacy context menu register failed ({ErrorCode}): {Error}",
+                            result.ErrorCode,
+                            result.ErrorMessage);
+                        ContextMenuStatusText.Text = I18n(
+                            "system.legacy.error.register");
+                        ContextMenuStatusText.Foreground = RedBrush;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                ContextMenuStatusText.Text = "操作异常: " + ex.Message;
+                Log.Error(ex, "Legacy context menu operation failed");
+                ContextMenuStatusText.Text = I18n(
+                    "system.legacy.error.unexpected");
                 ContextMenuStatusText.Foreground = RedBrush;
             }
 
-            ContextMenuButton.Content = _contextMenuRegistered ? "移除" : "注册";
+            ContextMenuButton.Content = _contextMenuRegistered
+                ? I18n("action.remove")
+                : I18n("action.register");
             ContextMenuButton.IsEnabled = true;
         }
 
@@ -615,9 +658,13 @@ namespace LongBetterWindows.Host.Views
 
             if (!result.IsSuccess)
             {
-                SparsePackageStatusText.Text = string.Format(
-                    I18n("status.operationFailed"),
+                Log.Warning(
+                    "Sparse package operation failed ({ErrorCode}): {Error}",
+                    (int)result.ErrorCode,
                     result.Message);
+                SparsePackageStatusText.Text = I18n(
+                    SparsePackagePresentation.GetErrorResourceKey(
+                        result.ErrorCode));
                 SparsePackageStatusText.Foreground = RedBrush;
             }
             SetSparsePackageBusy(false);
@@ -628,14 +675,18 @@ namespace LongBetterWindows.Host.Views
             if (_sparsePackageBusy) return;
             SetSparsePackageBusy(true, I18n("status.checking"));
             var result = await ServicesInitializer.SparsePackage.GetStatusAsync();
-            if (result.State is { } state)
+            if (result.IsSuccess && result.State is { } state)
                 ApplySparsePackageState(state);
             else
             {
-                _sparsePackageInstalled = false;
-                SparsePackageStatusText.Text = string.Format(
-                    I18n("status.unavailable"),
+                _sparsePackageInstalled = result.State?.Installed ?? false;
+                Log.Warning(
+                    "Sparse package status failed ({ErrorCode}): {Error}",
+                    (int)result.ErrorCode,
                     result.Message);
+                SparsePackageStatusText.Text = I18n(
+                    SparsePackagePresentation.GetErrorResourceKey(
+                        result.ErrorCode));
                 SparsePackageStatusText.Foreground = RedBrush;
             }
             SetSparsePackageBusy(false);

@@ -32,6 +32,7 @@ public sealed class SparsePackageServiceTests : IDisposable
         var result = await service.GetStatusAsync();
 
         Assert.True(result.IsSuccess);
+        Assert.Equal(SparsePackageErrorCode.None, result.ErrorCode);
         Assert.NotNull(result.State);
         Assert.True(result.State.Installed);
         Assert.Equal("1.9.0.0", result.State.Version);
@@ -72,6 +73,7 @@ public sealed class SparsePackageServiceTests : IDisposable
         var result = await service.UnregisterAsync();
 
         Assert.False(result.IsSuccess);
+        Assert.Equal(SparsePackageErrorCode.ProcessFailed, result.ErrorCode);
         Assert.Equal("signature rejected", result.Message);
         Assert.True(result.State?.Installed);
         Assert.Equal("1.8.0.0", result.State?.Version);
@@ -91,8 +93,24 @@ public sealed class SparsePackageServiceTests : IDisposable
         var result = await service.GetStatusAsync();
 
         Assert.False(result.IsSuccess);
-        Assert.Contains("未随应用发布", result.Message);
+        Assert.Equal(SparsePackageErrorCode.ScriptMissing, result.ErrorCode);
         Assert.Empty(runner.Arguments);
+    }
+
+    [Fact]
+    public async Task InvalidScriptOutput_ReturnsStableInvalidStateCode()
+    {
+        var runner = new FakeRunner(new SparsePackageProcessResult(
+            0,
+            "progress without a final state",
+            string.Empty));
+        var service = new SparsePackageService(_scriptPath, runner);
+
+        var result = await service.GetStatusAsync();
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(SparsePackageErrorCode.InvalidState, result.ErrorCode);
+        Assert.Null(result.State);
     }
 
     public void Dispose()
