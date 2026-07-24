@@ -10,8 +10,8 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">SYSTEM PERFORMANCE</div>
-        <h1 class="long-page-title">硬件监控</h1>
-        <p class="long-page-description">查看当前 CPU、内存、磁盘与高占用进程，页面隐藏时自动暂停轮询。</p>
+        <h1 class="long-page-title" data-i18n="page.title">硬件监控</h1>
+        <p class="long-page-description" data-i18n="page.description">查看当前 CPU、内存、磁盘与高占用进程，页面隐藏时自动暂停轮询。</p>
       </div>
       <div class="long-toolbar">
         <span class="long-badge" id="refreshBadge">每 2 秒刷新</span>
@@ -21,19 +21,19 @@
 
     <div class="long-stack">
       <section class="long-stack" aria-labelledby="overviewTitle">
-        <h2 class="long-section-title" id="overviewTitle">实时概览</h2>
+        <h2 class="long-section-title" id="overviewTitle" data-i18n="section.overview">实时概览</h2>
         <div class="long-metric-grid">
           <article class="long-card long-metric">
-            <div class="long-metric__label">CPU 使用率</div>
+            <div class="long-metric__label" data-i18n="metric.cpu.label">CPU 使用率</div>
             <div class="long-metric__value" id="cpuValue">--</div>
-            <div class="long-metric__detail">处理器总负载</div>
+            <div class="long-metric__detail" data-i18n="metric.cpu.detail">处理器总负载</div>
             <div class="long-progress" id="cpuProgress" role="progressbar" aria-label="CPU 使用率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
               <div class="long-progress__fill" id="cpuBar"></div>
             </div>
           </article>
 
           <article class="long-card long-metric">
-            <div class="long-metric__label">内存使用率</div>
+            <div class="long-metric__label" data-i18n="metric.memory.label">内存使用率</div>
             <div class="long-metric__value" id="memValue">--</div>
             <div class="long-metric__detail" id="memLabel">等待数据</div>
             <div class="long-progress" id="memProgress" role="progressbar" aria-label="内存使用率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -42,53 +42,53 @@
           </article>
 
           <article class="long-card long-metric">
-            <div class="long-metric__label">系统运行时间</div>
+            <div class="long-metric__label" data-i18n="metric.uptime.label">系统运行时间</div>
             <div class="long-metric__value" id="uptimeValue">--</div>
-            <div class="long-metric__detail">自上次启动</div>
+            <div class="long-metric__detail" data-i18n="metric.uptime.detail">自上次启动</div>
           </article>
         </div>
       </section>
 
       <section class="long-stack" aria-labelledby="systemTitle">
-        <h2 class="long-section-title" id="systemTitle">系统信息</h2>
+        <h2 class="long-section-title" id="systemTitle" data-i18n="section.system">系统信息</h2>
         <div class="long-card long-key-value">
           <div class="long-key-value__row">
-            <span class="long-key-value__label">操作系统</span>
+            <span class="long-key-value__label" data-i18n="system.os">操作系统</span>
             <span class="long-key-value__value" id="osName">--</span>
           </div>
           <div class="long-key-value__row">
-            <span class="long-key-value__label">计算机名</span>
+            <span class="long-key-value__label" data-i18n="system.machine">计算机名</span>
             <span class="long-key-value__value" id="machineName">--</span>
           </div>
           <div class="long-key-value__row">
-            <span class="long-key-value__label">处理器</span>
+            <span class="long-key-value__label" data-i18n="system.processor">处理器</span>
             <span class="long-key-value__value" id="processorName">--</span>
           </div>
           <div class="long-key-value__row">
-            <span class="long-key-value__label">逻辑处理器</span>
+            <span class="long-key-value__label" data-i18n="system.processorCount">逻辑处理器</span>
             <span class="long-key-value__value" id="processorCount">--</span>
           </div>
           <div class="long-key-value__row">
-            <span class="long-key-value__label">总内存</span>
+            <span class="long-key-value__label" data-i18n="system.totalMemory">总内存</span>
             <span class="long-key-value__value" id="totalRam">--</span>
           </div>
         </div>
       </section>
 
       <section class="long-stack" aria-labelledby="diskTitle">
-        <h2 class="long-section-title" id="diskTitle">磁盘使用情况</h2>
+        <h2 class="long-section-title" id="diskTitle" data-i18n="section.disks">磁盘使用情况</h2>
         <div class="long-grid" id="diskList"></div>
       </section>
 
       <section class="long-stack" aria-labelledby="processTitle">
-        <h2 class="long-section-title" id="processTitle">内存占用 Top 10</h2>
+        <h2 class="long-section-title" id="processTitle" data-i18n="section.processes">内存占用 Top 10</h2>
         <div class="long-data-grid" role="table" aria-label="内存占用最高的进程" style="--long-data-columns: 2fr 1fr 1fr 1fr">
           <div role="rowgroup">
             <div class="long-data-grid__header" role="row">
-              <div role="columnheader">进程名称</div>
-              <div role="columnheader">PID</div>
-              <div role="columnheader">内存</div>
-              <div role="columnheader">线程数</div>
+              <div role="columnheader" data-i18n="process.name">进程名称</div>
+              <div role="columnheader" data-i18n="process.pid">PID</div>
+              <div role="columnheader" data-i18n="process.memory">内存</div>
+              <div role="columnheader" data-i18n="process.threads">线程数</div>
             </div>
           </div>
           <div id="processList" role="rowgroup"></div>
@@ -107,9 +107,134 @@
     const status = document.getElementById('status');
     let refreshTimer = 0;
     let refreshPromise = null;
+    let strings = {};
+    let isRefreshing = false;
+    let systemInfoState = { kind: 'loading', info: null, detail: '' };
+    let metricsState = {
+      kind: 'loading',
+      cpuUsage: 0,
+      memory: null,
+      disks: [],
+      processes: [],
+      updatedAt: 0,
+      detail: ''
+    };
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
+      const message = key
+        ? t(key, fallback, currentStatus.values)
+        : currentStatus.fallback;
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      if (message) window.LongUI?.announce(message);
+      return message;
+    }
+
+    function renderRefreshState() {
+      refreshButton.textContent = isRefreshing
+        ? t('action.refreshing', '刷新中…')
+        : t('action.refresh', '立即刷新');
+      const badge = document.getElementById('refreshBadge');
+      badge.textContent = metricsState.updatedAt
+        ? t(
+          'refresh.updatedAt',
+          '更新于 {time}',
+          {
+            time: new Date(metricsState.updatedAt).toLocaleTimeString(
+              document.documentElement.lang,
+              { hour12: false })
+          })
+        : t(
+          'refresh.interval',
+          '每 {seconds} 秒刷新',
+          { seconds: refreshInterval / 1000 });
+    }
+
+    function renderSystemInfo() {
+      const ids = ['osName', 'machineName', 'processorName', 'processorCount', 'totalRam'];
+      if (systemInfoState.kind === 'loading') {
+        ids.forEach(function (id) { document.getElementById(id).textContent = '--'; });
+        document.getElementById('uptimeValue').textContent = '--';
+        return;
+      }
+      if (systemInfoState.kind === 'error') {
+        ids.forEach(function (id) {
+          document.getElementById(id).textContent = t('value.unavailable', '不可用');
+        });
+        document.getElementById('uptimeValue').textContent = '--';
+        return;
+      }
+      const info = systemInfoState.info || {};
+      const unknown = t('value.unknown', '未知');
+      document.getElementById('osName').textContent =
+        [info.OsName, info.OsVersion].filter(Boolean).join(' · ') || unknown;
+      document.getElementById('machineName').textContent = info.MachineName || unknown;
+      document.getElementById('processorName').textContent = info.ProcessorName || unknown;
+      document.getElementById('processorCount').textContent = t(
+        'value.cores',
+        '{count} 核心',
+        { count: Number(info.ProcessorCount || 0) });
+      document.getElementById('totalRam').textContent = formatBytes(info.TotalRam);
+      document.getElementById('uptimeValue').textContent = formatUptime(info.Uptime);
+    }
+
+    function renderMetricsProjection() {
+      renderRefreshState();
+      if (metricsState.kind === 'loading') {
+        document.getElementById('memLabel').textContent =
+          t('metric.memory.waiting', '等待数据');
+        renderLoadingStates();
+        return;
+      }
+      if (metricsState.kind === 'error') {
+        renderMetricsError(metricsState.detail);
+        return;
+      }
+      updateCpu(metricsState.cpuUsage);
+      updateMemory(metricsState.memory || {});
+      updateDisks(metricsState.disks);
+      updateProcesses(metricsState.processes);
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '硬件监控');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('cpuProgress').setAttribute(
+        'aria-label',
+        t('metric.cpu.ariaLabel', 'CPU 使用率'));
+      document.getElementById('memProgress').setAttribute(
+        'aria-label',
+        t('metric.memory.ariaLabel', '内存使用率'));
+      document.querySelector('.long-data-grid').setAttribute(
+        'aria-label',
+        t('process.tableAriaLabel', '内存占用最高的进程'));
+      renderSystemInfo();
+      renderMetricsProjection();
+      if (currentStatus.key || currentStatus.fallback) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback,
+          currentStatus.values);
+      }
+    }
 
     async function initialize() {
-      renderLoadingStates();
+      renderSystemInfo();
+      renderMetricsProjection();
       await Promise.all([loadSystemInfo(), updateMetrics()]);
       startPolling();
     }
@@ -117,31 +242,31 @@
     function renderLoadingStates() {
       window.LongUI?.renderState(document.getElementById('diskList'), {
         kind: 'loading',
-        title: '正在加载磁盘信息'
+        title: t('state.diskLoading', '正在加载磁盘信息')
       });
       window.LongUI?.renderState(document.getElementById('processList'), {
         kind: 'loading',
-        title: '正在加载进程信息'
+        title: t('state.processLoading', '正在加载进程信息')
       });
     }
 
     async function loadSystemInfo() {
       try {
-        const info = unwrap(await long.performance.getSystemInfo(), '系统信息加载失败');
-        document.getElementById('osName').textContent =
-          [info.OsName, info.OsVersion].filter(Boolean).join(' · ') || '未知';
-        document.getElementById('machineName').textContent = info.MachineName || '未知';
-        document.getElementById('processorName').textContent = info.ProcessorName || '未知';
-        document.getElementById('processorCount').textContent = Number(info.ProcessorCount || 0) + ' 核心';
-        document.getElementById('totalRam').textContent = formatBytes(info.TotalRam);
-        document.getElementById('uptimeValue').textContent = formatUptime(info.Uptime);
+        const info = unwrap(
+          await long.performance.getSystemInfo(),
+          t('error.systemInfo', '系统信息加载失败'));
+        systemInfoState = { kind: 'ready', info: info || {}, detail: '' };
+        renderSystemInfo();
         return true;
       } catch (error) {
-        ['osName', 'machineName', 'processorName', 'processorCount', 'totalRam'].forEach(function (id) {
-          document.getElementById(id).textContent = '不可用';
-        });
-        document.getElementById('uptimeValue').textContent = '--';
-        setStatus(errorMessage(error, '系统信息加载失败'), 'danger');
+        const detail = errorMessage(error, t('error.systemInfo', '系统信息加载失败'));
+        systemInfoState = { kind: 'error', info: null, detail: detail };
+        renderSystemInfo();
+        setStatus(
+          'status.systemInfoFailed',
+          'danger',
+          '系统信息加载失败：{detail}',
+          { detail: detail });
         return false;
       }
     }
@@ -155,7 +280,9 @@
     }
 
     async function performMetricsUpdate(manual) {
+      isRefreshing = true;
       window.LongUI?.setBusy(refreshButton, true);
+      renderRefreshState();
       try {
         const results = await Promise.all([
           long.performance.getCpuUsage(),
@@ -163,40 +290,50 @@
           long.performance.getDiskInfo(),
           long.performance.getTopByMemory(10)
         ]);
-        const cpuUsage = unwrap(results[0], 'CPU 数据加载失败');
-        const memory = unwrap(results[1], '内存数据加载失败');
-        const disks = unwrap(results[2], '磁盘数据加载失败');
-        const processes = unwrap(results[3], '进程数据加载失败');
-
-        updateCpu(cpuUsage);
-        updateMemory(memory);
-        updateDisks(Array.isArray(disks) ? disks : []);
-        updateProcesses(Array.isArray(processes) ? processes : []);
-        document.getElementById('refreshBadge').textContent =
-          '更新于 ' + new Date().toLocaleTimeString([], { hour12: false });
-        if (manual) setStatus('硬件信息已刷新', 'success');
+        const cpuUsage = unwrap(results[0], t('error.cpu', 'CPU 数据加载失败'));
+        const memory = unwrap(results[1], t('error.memory', '内存数据加载失败'));
+        const disks = unwrap(results[2], t('error.disks', '磁盘数据加载失败'));
+        const processes = unwrap(results[3], t('error.processes', '进程数据加载失败'));
+        metricsState = {
+          kind: 'ready',
+          cpuUsage: cpuUsage,
+          memory: memory || {},
+          disks: Array.isArray(disks) ? disks : [],
+          processes: Array.isArray(processes) ? processes : [],
+          updatedAt: Date.now(),
+          detail: ''
+        };
+        renderMetricsProjection();
+        if (manual) setStatus('status.refreshed', 'success', '硬件信息已刷新');
         return true;
       } catch (error) {
-        const detail = errorMessage(error, '性能数据加载失败');
-        renderMetricsError(detail);
-        setStatus(detail, 'danger');
+        const detail = errorMessage(error, t('error.metrics', '性能数据加载失败'));
+        metricsState = { ...metricsState, kind: 'error', detail: detail };
+        renderMetricsProjection();
+        setStatus(
+          'status.refreshFailed',
+          'danger',
+          '硬件信息刷新失败：{detail}',
+          { detail: detail });
         return false;
       } finally {
+        isRefreshing = false;
         window.LongUI?.setBusy(refreshButton, false);
+        renderRefreshState();
       }
     }
 
     function renderMetricsError(detail) {
       window.LongUI?.renderState(document.getElementById('diskList'), {
         kind: 'error',
-        title: '磁盘信息加载失败',
+        title: t('state.diskFailed', '磁盘信息加载失败'),
         detail: detail,
-        actionLabel: '重试',
+        actionLabel: t('action.retry', '重试'),
         onAction: function () { void updateMetrics(true); }
       });
       window.LongUI?.renderState(document.getElementById('processList'), {
         kind: 'error',
-        title: '进程信息加载失败',
+        title: t('state.processFailed', '进程信息加载失败'),
         detail: detail
       });
     }
@@ -227,25 +364,45 @@
       const list = document.getElementById('diskList');
       list.replaceChildren();
       if (!disks.length) {
-        window.LongUI?.renderState(list, { kind: 'empty', title: '暂无磁盘信息' });
+        window.LongUI?.renderState(list, {
+          kind: 'empty',
+          title: t('state.noDisks', '暂无磁盘信息')
+        });
         return;
       }
 
       disks.forEach(function (disk) {
         const usage = percentage(disk.UsagePercentage);
+        const diskName = disk.Name || t('disk.unknown', '未知磁盘');
         const card = document.createElement('article');
         card.className = 'long-card long-metric';
-        appendText(card, 'div', 'long-metric__label', disk.DriveType || '磁盘');
-        appendText(card, 'div', 'long-metric__value', disk.Name || '未知磁盘');
+        appendText(
+          card,
+          'div',
+          'long-metric__label',
+          disk.DriveType || t('disk.defaultType', '磁盘'));
+        appendText(card, 'div', 'long-metric__value', diskName);
         appendText(
           card,
           'div',
           'long-metric__detail',
-          formatBytes(disk.UsedSpace) + ' / ' + formatBytes(disk.TotalSize) + ' · ' + Math.round(usage) + '% 已用');
+          t(
+            'disk.used',
+            '{used} / {total} · 已用 {usage}%',
+            {
+              used: formatBytes(disk.UsedSpace),
+              total: formatBytes(disk.TotalSize),
+              usage: Math.round(usage)
+            }));
         const progress = document.createElement('div');
         progress.className = 'long-progress';
         progress.setAttribute('role', 'progressbar');
-        progress.setAttribute('aria-label', (disk.Name || '磁盘') + ' 使用率');
+        progress.setAttribute(
+          'aria-label',
+          t(
+            'disk.usageAriaLabel',
+            '{name} 使用率',
+            { name: diskName }));
         progress.setAttribute('aria-valuemin', '0');
         progress.setAttribute('aria-valuemax', '100');
         progress.setAttribute('aria-valuenow', String(Math.round(usage)));
@@ -262,7 +419,10 @@
       const list = document.getElementById('processList');
       list.replaceChildren();
       if (!processes.length) {
-        window.LongUI?.renderState(list, { kind: 'empty', title: '暂无进程信息' });
+        window.LongUI?.renderState(list, {
+          kind: 'empty',
+          title: t('state.noProcesses', '暂无进程信息')
+        });
         return;
       }
 
@@ -270,10 +430,19 @@
         const row = document.createElement('div');
         row.className = 'long-data-grid__row';
         row.setAttribute('role', 'row');
-        appendDataCell(row, '进程名称', process.ProcessName || '未知进程');
-        appendDataCell(row, 'PID', process.ProcessId);
-        appendDataCell(row, '内存', formatBytes(process.MemoryUsage));
-        appendDataCell(row, '线程数', process.ThreadCount);
+        appendDataCell(
+          row,
+          t('process.name', '进程名称'),
+          process.ProcessName || t('process.unknown', '未知进程'));
+        appendDataCell(row, t('process.pid', 'PID'), process.ProcessId);
+        appendDataCell(
+          row,
+          t('process.memory', '内存'),
+          formatBytes(process.MemoryUsage));
+        appendDataCell(
+          row,
+          t('process.threads', '线程数'),
+          process.ThreadCount);
         list.appendChild(row);
       });
     }
@@ -318,17 +487,14 @@
         : null;
       if (!match) return '--';
       const hours = Number(match[1] || 0) * 24 + Number(match[2] || 0);
-      return hours + 'h ' + Number(match[3] || 0) + 'm';
+      return t(
+        'value.uptime',
+        '{hours} 小时 {minutes} 分',
+        { hours: hours, minutes: Number(match[3] || 0) });
     }
 
     function errorMessage(error, fallback) {
       return error && error.message ? error.message : fallback;
-    }
-
-    function setStatus(message, kind) {
-      status.textContent = message;
-      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
     }
 
     function startPolling() {
@@ -361,8 +527,13 @@
       const success = await updateMetrics(true);
       return {
         success: success,
-        message: success ? '硬件信息已刷新' : '硬件信息刷新失败'
+        message: success
+          ? t('command.refreshed', '硬件信息已刷新')
+          : t('command.refreshFailed', '硬件信息刷新失败')
       };
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
     initialize();
   </script>

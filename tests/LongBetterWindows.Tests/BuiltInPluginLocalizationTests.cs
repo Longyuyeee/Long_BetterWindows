@@ -14,6 +14,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("ClipboardTool")]
     [InlineData("FileRenamerPlugin")]
     [InlineData("FolderNotePlugin")]
+    [InlineData("HardwareMonitor")]
     [InlineData("JsonFormatterPlugin")]
     [InlineData("MarkdownPreview")]
     [InlineData("PasswordGenerator")]
@@ -226,6 +227,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("Base64Tool")]
     [InlineData("ClipboardTool")]
     [InlineData("FileRenamerPlugin")]
+    [InlineData("HardwareMonitor")]
     [InlineData("JsonFormatterPlugin")]
     [InlineData("MarkdownPreview")]
     [InlineData("PasswordGenerator")]
@@ -273,6 +275,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("UrlToolkit", "function transform", "renderStat();", "transform(")]
     [InlineData("UuidGenerator", "function uuid", "output.setAttribute", "generate();")]
     [InlineData("FileRenamerPlugin", "async function loadSelection", "renderListState(false);", "loadSelection();")]
+    [InlineData("HardwareMonitor", "async function initialize", "renderMetricsProjection();", "updateMetrics(")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
         string plugin,
         string nextFunction,
@@ -297,6 +300,8 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.DoesNotContain("generate();", localizationBody);
         Assert.DoesNotContain("convert();", localizationBody);
         Assert.DoesNotContain("useNow();", localizationBody);
+        Assert.DoesNotContain("startPolling();", localizationBody);
+        Assert.DoesNotContain("setInterval", localizationBody);
         Assert.DoesNotContain("location.reload", source);
     }
 

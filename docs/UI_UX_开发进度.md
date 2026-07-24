@@ -745,7 +745,9 @@ WIP UI visual draft before audited implementation
 - [x] G17-D2-B 完成 UrlToolkit、JsonFormatterPlugin 与 RegexTester；语言切换保留输入输出、解析错误详情和正则匹配快照，最小窗口无溢出。Release 0 警告/0 错误，587 / 587 测试通过。
 - [x] G17-D3-A 完成 MarkdownPreview 与 TextDiffPlugin；切换语言保留 Markdown 预览 DOM 和差异操作快照，不重新解析或比较。最小窗口无溢出，593 / 593 测试通过。
 - [x] G17-D3-B 完成 TranslatePlugin 与 FileRenamerPlugin；翻译请求中切换语言不重复 HTTP 调用，重命名切换语言不重新读取选区或重复文件操作，预览与部分失败项均保持。紧凑视口无水平溢出，Release 0 警告/0 错误，599 / 599 测试通过。
-- [ ] G17-D4 审计并分批迁移 HardwareMonitor、ClipboardHistory、DevToolkit 与 PortManager；语言切换不得重启定时刷新、重复事件订阅或改变当前筛选/选择状态。
+- [x] G17-D4-A 完成 HardwareMonitor；系统信息与指标保存原始快照，语言切换不重复性能 API、不重启轮询，刷新中按钮、更新时间、磁盘和进程投影正确更新。`760 × 540` 无水平溢出，Release 0 警告/0 错误，602 / 602 测试通过。
+- [ ] G17-D4-B 迁移 PortManager；语言切换不得改变端口页签、搜索词、自动刷新、查询结果或终止进程确认，也不得重复端口请求或重启轮询。
+- [ ] G17-D4-C/D 后续迁移 ClipboardHistory 与 DevToolkit，分别处理事件订阅/持久化事务和多页签转换状态。
 - [x] G3 插件语言声明与宿主通知协议基础由 G17-A 完成；内置插件内容迁移继续由 G17-B 分批实施，不实现 uTools 插件兼容层。
 
 详细边界与后续顺序见 `docs/国际化_UI集成.md`。
