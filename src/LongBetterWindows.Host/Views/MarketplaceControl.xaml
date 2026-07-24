@@ -31,8 +31,10 @@
                         <TextBlock x:Name="MarketSourceBadge" Text="{DynamicResource i18n.market.source.local}" Margin="10,4,0,0"
                                    Foreground="{DynamicResource Long.Brush.Text.OnAccentMuted}" />
                     </StackPanel>
-                    <TextBlock Text="{DynamicResource i18n.market.hero.title}"
+                    <TextBlock x:Name="MarketHeroTitle"
+                               Text="{DynamicResource i18n.market.hero.title}"
                                FontSize="22" FontWeight="SemiBold" Margin="0,12,0,0"
+                               TextWrapping="Wrap"
                                Foreground="{DynamicResource Long.Brush.Text.OnAccent}" />
                     <TextBlock Text="{DynamicResource i18n.market.hero.subtitle}"
                                FontSize="12" Margin="0,6,0,0"

@@ -1251,6 +1251,8 @@ public class QualityGateTests
         Assert.Contains("Long.Marketplace.Search", market);
         Assert.Contains("Long.Marketplace.Results", market);
         Assert.Contains("Long.Marketplace.ConfirmCancel", market);
+        Assert.Contains("x:Name=\"MarketHeroTitle\"", market);
+        Assert.Contains("TextWrapping=\"Wrap\"", market);
         Assert.Contains("Long.Marketplace.Uninstall", script);
         Assert.Contains("Long.Marketplace.ConfirmCancel", script);
         Assert.DoesNotContain("Invoke-AutomationElement $confirmAction", script);

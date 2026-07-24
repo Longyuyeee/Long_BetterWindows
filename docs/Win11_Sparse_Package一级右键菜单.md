@@ -42,12 +42,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 脚本不会运行包注册，不会创建证书，也不会写入 Trusted People。
 
-本批最终复验证据位于
-`artifacts/quality/sparse-package-foundation-20260723-final/`：其中
-`sparse-package-build.json` 记录包与 DLL 哈希、x64 检查和未签名/未安装状态；
-`package-inspection-nv/` 是用 MakeAppx `/nv` 反解得到的实际包结构；
-`embedded-host.manifest` 是从 Release 宿主 EXE 提取的身份关联清单。
-最终 Release 构建 0 警告、0 错误，全量自动化 494 / 494 通过。
+未签名构建已在 `df841c8` 整合审计中从干净源码重新执行，宿主 Release、x64 原生 DLL、必要 COM 导出和 MakeAppx `/nv` 均通过。构建报告包含本机绝对路径和可再生成的中间文件，因此不作为最终发布证据提交；正式证据只在未来提供正式证书和干净 Windows 11 环境后，由第三批采集器绑定冻结提交、签名哈希链和 Explorer 截图生成。
 
 ## 第二批：签名、注册事务与管理 UI
 
@@ -136,10 +131,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 当前本机负向验证确认：工作区不干净、签名链不完整的候选会在创建证据目录和注册包之前被拒绝，前后包状态均为 `NotInstalled`。
 本批 Release 构建 0 警告、0 错误，全量自动化 503 / 503 通过。
 
-正式完成定义仍是：
+可选 Sparse Package 通道的正式完成定义仍是：
 
 1. 在干净 Windows 11 x64 环境签名并注册候选。
 2. 文件夹选中和目录背景均在一级菜单看到“备注此文件夹”。
 3. 调用打开正确目标的备注界面，Explorer 不崩溃、不阻塞。
 4. 卸载后菜单消失，兼容旧菜单状态不变。
-5. 由独立审核人批准并通过最终汇总；此前 README 保持未完成。
+5. 由独立审核人批准并通过最终汇总；此前该可选通道保持“外部验收未完成”。
+
+该完成定义只约束 Win11 一级右键菜单通道。Long 的 unsigned 便携主产品、兼容旧右键菜单和其他插件能力不依赖 Sparse Package 证书，也不因该通道缺少外部证据而阻断发布。
