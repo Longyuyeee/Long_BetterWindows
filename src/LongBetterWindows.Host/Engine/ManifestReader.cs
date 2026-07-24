@@ -57,7 +57,9 @@ namespace LongBetterWindows.Host.Engine
 
             if (!File.Exists(manifestPath))
             {
-                return ManifestResult.Fail("manifest.json 未找到。");
+                return ManifestResult.Fail(
+                    ManifestErrorCode.FileNotFound,
+                    "manifest.json 未找到。");
             }
 
             string json;
@@ -67,7 +69,9 @@ namespace LongBetterWindows.Host.Engine
             }
             catch (Exception ex)
             {
-                return ManifestResult.Fail($"无法读取 manifest.json: {ex.Message}");
+                return ManifestResult.Fail(
+                    ManifestErrorCode.ReadFailed,
+                    $"无法读取 manifest.json: {ex.Message}");
             }
 
             PluginManifest manifest;
@@ -78,7 +82,9 @@ namespace LongBetterWindows.Host.Engine
             }
             catch (JsonException ex)
             {
-                return ManifestResult.Fail($"manifest.json JSON 解析失败: {ex.Message}");
+                return ManifestResult.Fail(
+                    ManifestErrorCode.InvalidJson,
+                    $"manifest.json JSON 解析失败: {ex.Message}");
             }
 
             return Validate(manifest);
@@ -87,6 +93,7 @@ namespace LongBetterWindows.Host.Engine
         private static ManifestResult Validate(PluginManifest manifest)
         {
             var errors = new List<string>();
+            var issues = new List<ManifestValidationIssue>();
 
             if (string.IsNullOrWhiteSpace(manifest.Id))
                 errors.Add("缺少必填字段: id");
@@ -106,8 +113,25 @@ namespace LongBetterWindows.Host.Engine
                     errors.Add($"未知能力声明: '{cap}'");
             }
 
-            ValidateCommands(manifest, errors);
-            ValidateWindowPreference(manifest.Window, errors);
+            issues.AddRange(errors.Select(error => new ManifestValidationIssue(
+                ManifestValidationCode.InvalidManifestValue,
+                "$",
+                error)));
+
+            var commandErrors = new List<string>();
+            ValidateCommands(manifest, commandErrors);
+            issues.AddRange(commandErrors.Select(error => new ManifestValidationIssue(
+                ManifestValidationCode.InvalidCommand,
+                "commands",
+                error)));
+
+            var windowErrors = new List<string>();
+            ValidateWindowPreference(manifest.Window, windowErrors);
+            issues.AddRange(windowErrors.Select(error => new ManifestValidationIssue(
+                ManifestValidationCode.InvalidWindow,
+                "window",
+                error)));
+            errors.Clear();
 
             // ApiVersion 兼容性检查
             if (!string.IsNullOrWhiteSpace(manifest.MinApiVersion))
@@ -120,8 +144,13 @@ namespace LongBetterWindows.Host.Engine
                 }
             }
 
-            if (errors.Count > 0)
-                return ManifestResult.Fail(string.Join("; ", errors));
+            issues.AddRange(errors.Select(error => new ManifestValidationIssue(
+                ManifestValidationCode.IncompatibleApiVersion,
+                "min_api_version",
+                error)));
+
+            if (issues.Count > 0)
+                return ManifestResult.ValidationFailure(issues);
 
             return ManifestResult.Ok(manifest);
         }
@@ -386,16 +415,4 @@ namespace LongBetterWindows.Host.Engine
         }
     }
 
-    public class ManifestResult
-    {
-        public bool IsSuccess { get; init; }
-        public PluginManifest? Manifest { get; init; }
-        public string? Error { get; init; }
-
-        public static ManifestResult Ok(PluginManifest manifest)
-            => new() { IsSuccess = true, Manifest = manifest };
-
-        public static ManifestResult Fail(string error)
-            => new() { IsSuccess = false, Error = error };
-    }
 }

@@ -31,6 +31,18 @@ public sealed class PluginPackageValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateAsync_InvalidManifest_PropagatesStableFailureContract()
+    {
+        var package = CreatePackage(manifestJson: "{");
+
+        var result = await new PluginPackageValidator().ValidateAsync(package);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ManifestErrorCode.InvalidJson, result.ManifestFailureCode);
+        Assert.Empty(result.ManifestIssues);
+    }
+
+    [Fact]
     public async Task ValidateAsync_PathTraversalEntry_IsRejected()
     {
         var package = CreatePackage(extraEntryName: "../outside.txt");
@@ -180,7 +192,8 @@ public sealed class PluginPackageValidatorTests : IDisposable
         string? extraEntryName = null,
         string? minHostVersion = null,
         string runtime = "native",
-        string entryPoint = "plugin.dll")
+        string entryPoint = "plugin.dll",
+        string? manifestJson = null)
     {
         var path = Path.Combine(_tempDir, $"{Guid.NewGuid():N}.lpak");
         using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
@@ -195,7 +208,10 @@ public sealed class PluginPackageValidatorTests : IDisposable
             capabilities = new[] { "storage.local" },
             min_host_version = minHostVersion,
         };
-        WriteEntry(archive, "manifest.json", JsonSerializer.Serialize(manifest));
+        WriteEntry(
+            archive,
+            "manifest.json",
+            manifestJson ?? JsonSerializer.Serialize(manifest));
         WriteEntry(archive, entryPoint, "test-entry");
         if (extraEntryName != null) WriteEntry(archive, extraEntryName, "unsafe");
         return path;

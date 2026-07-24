@@ -120,6 +120,9 @@ public class CommandContractTests
         var result = await ManifestReader.ReadAsync(dir);
 
         Assert.False(result.IsSuccess);
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == ManifestValidationCode.InvalidCommand
+            && issue.Path == "commands");
         Assert.Contains("OPEN", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -614,6 +617,9 @@ public class CommandContractTests
         var result = await ManifestReader.ReadAsync(dir);
 
         Assert.False(result.IsSuccess);
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == ManifestValidationCode.InvalidWindow
+            && issue.Path == "window");
         Assert.Contains("preferred_width", result.Error);
     }
 

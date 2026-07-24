@@ -225,8 +225,8 @@ namespace LongBetterWindows.Host.Engine
 
             if (!manifestResult.IsSuccess)
             {
-                Log.Warning("插件清单无效: {Dir} - {Error}",
-                    pluginDir, manifestResult.Error);
+                Log.Warning("插件清单无效: {Dir} - {ErrorCode} - {Error}",
+                    pluginDir, manifestResult.ErrorCode, manifestResult.Error);
                 return;
             }
 

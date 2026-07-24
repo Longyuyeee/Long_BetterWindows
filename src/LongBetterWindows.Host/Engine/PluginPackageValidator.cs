@@ -90,7 +90,11 @@ namespace LongBetterWindows.Host.Engine
                 ExtractSafely(archive, stagingDir);
                 var manifestResult = await ManifestReader.ReadAsync(stagingDir);
                 if (!manifestResult.IsSuccess)
-                    return PackageValidationResult.Fail($"manifest.json 无效：{manifestResult.Error}", sha256);
+                    return PackageValidationResult.Fail(
+                        $"manifest.json 无效：{manifestResult.Error}",
+                        sha256,
+                        manifestFailureCode: manifestResult.ErrorCode,
+                        manifestIssues: manifestResult.Issues);
 
                 var manifest = manifestResult.Manifest!;
                 if (!Matches(metadata.ExpectedPluginId, manifest.Id))
@@ -295,6 +299,9 @@ namespace LongBetterWindows.Host.Engine
         public PackageTrustLevel TrustLevel { get; init; }
         public PermissionDiff PermissionDiff { get; init; } = new();
         public bool RequiresHighTrustWarning { get; init; }
+        public ManifestErrorCode? ManifestFailureCode { get; init; }
+        public IReadOnlyList<ManifestValidationIssue> ManifestIssues { get; init; }
+            = Array.Empty<ManifestValidationIssue>();
 
         public static PackageValidationResult Ok(
             PluginManifest manifest, string sha256, PackageTrustLevel trust,
@@ -310,7 +317,18 @@ namespace LongBetterWindows.Host.Engine
             };
 
         public static PackageValidationResult Fail(
-            string error, string? sha256 = null, PluginManifest? manifest = null)
-            => new() { Error = error, Sha256 = sha256, Manifest = manifest };
+            string error,
+            string? sha256 = null,
+            PluginManifest? manifest = null,
+            ManifestErrorCode? manifestFailureCode = null,
+            IReadOnlyList<ManifestValidationIssue>? manifestIssues = null)
+            => new()
+            {
+                Error = error,
+                Sha256 = sha256,
+                Manifest = manifest,
+                ManifestFailureCode = manifestFailureCode,
+                ManifestIssues = manifestIssues ?? Array.Empty<ManifestValidationIssue>(),
+            };
     }
 }

@@ -11,6 +11,20 @@ namespace LongBetterWindows.Tests;
 public class CoreTests
 {
     [Fact]
+    public void ManifestErrorCodes_HaveStablePublishedValues()
+    {
+        Assert.Equal(0, (int)ManifestErrorCode.None);
+        Assert.Equal(1000, (int)ManifestErrorCode.FileNotFound);
+        Assert.Equal(1001, (int)ManifestErrorCode.ReadFailed);
+        Assert.Equal(1002, (int)ManifestErrorCode.InvalidJson);
+        Assert.Equal(1003, (int)ManifestErrorCode.ValidationFailed);
+        Assert.Equal(2000, (int)ManifestValidationCode.InvalidManifestValue);
+        Assert.Equal(2001, (int)ManifestValidationCode.InvalidCommand);
+        Assert.Equal(2002, (int)ManifestValidationCode.InvalidWindow);
+        Assert.Equal(2003, (int)ManifestValidationCode.IncompatibleApiVersion);
+    }
+
+    [Fact]
     public void ApiVersion_IsCompatible_HostNewerThanPlugin_ReturnsTrue()
     {
         var host = new ApiVersion(1, 5, 0);
@@ -57,7 +71,50 @@ public class CoreTests
         var dir = CreateManifestDir(new { id = "com.test.app", version = "1.0.0", name = "Test", entry_point = "test.dll" });
         var result = await ManifestReader.ReadAsync(dir);
         Assert.True(result.IsSuccess);
+        Assert.Equal(ManifestErrorCode.None, result.ErrorCode);
+        Assert.Empty(result.Issues);
         Assert.Equal("com.test.app", result.Manifest!.Id);
+    }
+
+    [Fact]
+    public async Task ManifestReader_MissingFile_ReturnsStableErrorCode()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "long-test-" + Guid.NewGuid());
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var result = await ManifestReader.ReadAsync(directory);
+
+            Assert.False(result.IsSuccess);
+            Assert.Equal(ManifestErrorCode.FileNotFound, result.ErrorCode);
+            Assert.Empty(result.Issues);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public async Task ManifestReader_InvalidJson_ReturnsStableErrorCode()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "long-test-" + Guid.NewGuid());
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(Path.Combine(directory, "manifest.json"), "{");
+
+        try
+        {
+            var result = await ManifestReader.ReadAsync(directory);
+
+            Assert.False(result.IsSuccess);
+            Assert.Equal(ManifestErrorCode.InvalidJson, result.ErrorCode);
+            Assert.Empty(result.Issues);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
     }
 
     [Fact]
@@ -66,6 +123,10 @@ public class CoreTests
         var dir = CreateManifestDir(new { version = "1.0.0", name = "Test", entry_point = "test.dll" });
         var result = await ManifestReader.ReadAsync(dir);
         Assert.False(result.IsSuccess);
+        Assert.Equal(ManifestErrorCode.ValidationFailed, result.ErrorCode);
+        Assert.Contains(result.Issues, issue =>
+            issue.Code == ManifestValidationCode.InvalidManifestValue
+            && issue.Path == "$");
         Assert.Contains("id", result.Error);
     }
 
