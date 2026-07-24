@@ -2,24 +2,20 @@ namespace LongBetterWindows.Host.Interaction
 {
     internal sealed class SuperPanelGroupCoordinator
     {
-        private static readonly IReadOnlyList<SuperPanelGroupDefinition> BuiltInGroups =
-        [
-            new(SuperPanelGroupIds.Smart, "智能推荐", "按上下文、相关性与使用习惯排序"),
-            new(SuperPanelGroupIds.Pinned, "已固定", "可拖拽调整固定操作顺序"),
-            new(SuperPanelGroupIds.Recent, "最近使用", "按最后成功执行时间排序"),
-        ];
-
         private readonly SearchPreferenceService _preferences;
         private readonly SuperPanelGroupService _groups;
+        private readonly Func<string, string>? _localize;
         private IReadOnlyList<SearchResultItem> _results = Array.Empty<SearchResultItem>();
         private bool _searchCompleted;
 
         public SuperPanelGroupCoordinator(
             SearchPreferenceService preferences,
-            SuperPanelGroupService groups)
+            SuperPanelGroupService groups,
+            Func<string, string>? localize = null)
         {
             _preferences = preferences;
             _groups = groups;
+            _localize = localize;
         }
 
         public string ActiveGroupId { get; private set; } = SuperPanelGroupIds.Smart;
@@ -81,8 +77,8 @@ namespace LongBetterWindows.Host.Interaction
                 ? new SuperPanelGroupMutationResult(
                     true,
                     ActiveGroupId == SuperPanelGroupIds.Pinned
-                        ? "固定顺序已保存"
-                        : "分组顺序已保存")
+                        ? Text("superPanel.status.pinnedOrderSaved", "固定顺序已保存")
+                        : Text("superPanel.status.groupOrderSaved", "分组顺序已保存"))
                 : SuperPanelGroupMutationResult.Failed;
         }
 
@@ -100,7 +96,9 @@ namespace LongBetterWindows.Host.Interaction
                 await _groups.RemoveResultAsync(sourceGroupId!, resultId);
 
             SelectGroup(targetGroupId);
-            return new SuperPanelGroupMutationResult(true, "已移动到分组");
+            return new SuperPanelGroupMutationResult(
+                true,
+                Text("superPanel.status.movedToGroup", "已移动到分组"));
         }
 
         public async Task<SuperPanelGroupMutationResult> SaveGroupAsync(
@@ -108,21 +106,29 @@ namespace LongBetterWindows.Host.Interaction
             string title)
         {
             if (string.IsNullOrWhiteSpace(title))
-                return new SuperPanelGroupMutationResult(false, "请输入分组名称");
+                return new SuperPanelGroupMutationResult(
+                    false,
+                    Text("superPanel.error.groupNameRequired", "请输入分组名称"));
 
             if (groupId is null)
             {
                 var group = await _groups.CreateAsync(title);
                 if (group is null)
-                    return new SuperPanelGroupMutationResult(false, "最多创建 8 个分组");
+                    return new SuperPanelGroupMutationResult(
+                        false,
+                        Text("superPanel.error.groupLimit", "最多创建 8 个分组"));
                 SelectGroup(group.Id);
             }
             else if (!await _groups.RenameAsync(groupId, title))
             {
-                return new SuperPanelGroupMutationResult(false, "分组重命名失败");
+                return new SuperPanelGroupMutationResult(
+                    false,
+                    Text("superPanel.error.renameFailed", "分组重命名失败"));
             }
 
-            return new SuperPanelGroupMutationResult(true, "分组已保存");
+            return new SuperPanelGroupMutationResult(
+                true,
+                Text("superPanel.status.groupSaved", "分组已保存"));
         }
 
         public async Task<SuperPanelGroupMutationResult> DeleteActiveGroupAsync()
@@ -132,7 +138,9 @@ namespace LongBetterWindows.Host.Interaction
                 return SuperPanelGroupMutationResult.Failed;
 
             SelectGroup(SuperPanelGroupIds.Pinned);
-            return new SuperPanelGroupMutationResult(true, "分组已删除");
+            return new SuperPanelGroupMutationResult(
+                true,
+                Text("superPanel.status.groupDeleted", "分组已删除"));
         }
 
         public async Task<SuperPanelGroupMutationResult> RemoveFromActiveGroupAsync(
@@ -142,7 +150,9 @@ namespace LongBetterWindows.Host.Interaction
                 || !await _groups.RemoveResultAsync(ActiveGroupId, resultId))
                 return SuperPanelGroupMutationResult.Failed;
 
-            return new SuperPanelGroupMutationResult(true, "已移出分组");
+            return new SuperPanelGroupMutationResult(
+                true,
+                Text("superPanel.status.removedFromGroup", "已移出分组"));
         }
 
         public SuperPanelViewState BuildView()
@@ -179,19 +189,37 @@ namespace LongBetterWindows.Host.Interaction
                 _searchCompleted && visible.Count == 0,
                 ActiveGroupId switch
                 {
-                    SuperPanelGroupIds.Pinned => "还没有固定操作",
-                    SuperPanelGroupIds.Recent => "还没有最近使用记录",
-                    _ when customGroup is not null => "把固定操作拖到这个分组",
-                    _ => "当前上下文没有可用操作",
+                    SuperPanelGroupIds.Pinned => Text(
+                        "superPanel.empty.pinned",
+                        "还没有固定操作"),
+                    SuperPanelGroupIds.Recent => Text(
+                        "superPanel.empty.recent",
+                        "还没有最近使用记录"),
+                    _ when customGroup is not null => Text(
+                        "superPanel.empty.custom",
+                        "把固定操作拖到这个分组"),
+                    _ => Text(
+                        "superPanel.empty.context",
+                        "当前上下文没有可用操作"),
                 },
                 visible.Count > 0
-                    ? $"{visible.Count} 个操作"
-                    : _searchCompleted ? "当前分组为空" : "正在匹配...",
+                    ? string.Format(
+                        Text("superPanel.status.actionCount", "{0} 个操作"),
+                        visible.Count)
+                    : _searchCompleted
+                        ? Text("superPanel.status.groupEmpty", "当前分组为空")
+                        : Text("superPanel.status.matching", "正在匹配..."),
                 ActiveGroupId switch
                 {
-                    SuperPanelGroupIds.Pinned => "拖拽排序或拖到文件夹 · 单击执行 · 滚轮切组",
-                    _ when customGroup is not null => "拖拽排序 · Delete 移出分组 · 滚轮切组",
-                    _ => "单击执行 · 滚轮切组 · Esc 返回原窗口",
+                    SuperPanelGroupIds.Pinned => Text(
+                        "superPanel.hint.pinned",
+                        "拖拽排序或拖到文件夹 · 单击执行 · 滚轮切组"),
+                    _ when customGroup is not null => Text(
+                        "superPanel.hint.custom",
+                        "拖拽排序 · Delete 移出分组 · 滚轮切组"),
+                    _ => Text(
+                        "superPanel.hint.default",
+                        "单击执行 · 滚轮切组 · Esc 返回原窗口"),
                 },
                 customGroup is not null);
         }
@@ -216,14 +244,45 @@ namespace LongBetterWindows.Host.Interaction
         private List<SuperPanelGroupDefinition> GetGroupDefinitions()
             => GetGroupDefinitions(_groups.GetGroups());
 
-        private static List<SuperPanelGroupDefinition> GetGroupDefinitions(
+        private List<SuperPanelGroupDefinition> GetGroupDefinitions(
             IReadOnlyList<SuperPanelCustomGroup> customGroups)
-            => BuiltInGroups.Concat(customGroups.Select(group =>
+            => new[]
+                {
+                    new SuperPanelGroupDefinition(
+                        SuperPanelGroupIds.Smart,
+                        Text("superPanel.group.smart", "智能推荐"),
+                        Text(
+                            "superPanel.group.smartHint",
+                            "按上下文、相关性与使用习惯排序")),
+                    new SuperPanelGroupDefinition(
+                        SuperPanelGroupIds.Pinned,
+                        Text("superPanel.group.pinned", "已固定"),
+                        Text(
+                            "superPanel.group.pinnedHint",
+                            "可拖拽调整固定操作顺序")),
+                    new SuperPanelGroupDefinition(
+                        SuperPanelGroupIds.Recent,
+                        Text("superPanel.group.recent", "最近使用"),
+                        Text(
+                            "superPanel.group.recentHint",
+                            "按最后成功执行时间排序")),
+                }
+                .Concat(customGroups.Select(group =>
                     new SuperPanelGroupDefinition(
                         group.Id,
                         group.Title,
-                        "自定义操作文件夹")))
+                        Text(
+                            "superPanel.group.customHint",
+                            "自定义操作文件夹"))))
                 .ToList();
+
+        internal string Text(string key, string fallback)
+        {
+            var value = _localize?.Invoke(key);
+            return string.IsNullOrWhiteSpace(value) || value == key
+                ? fallback
+                : value;
+        }
     }
 
     internal sealed record SuperPanelGroupDefinition(

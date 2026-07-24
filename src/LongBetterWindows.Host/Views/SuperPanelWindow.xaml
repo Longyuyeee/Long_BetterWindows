@@ -1,7 +1,7 @@
 <Window x:Class="LongBetterWindows.Host.Views.SuperPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Long 超级面板"
+        Title="{DynamicResource i18n.superPanel.title}"
         Width="640" Height="450"
         MinWidth="560" MinHeight="360"
         WindowStyle="None"
@@ -14,7 +14,7 @@
         WindowStartupLocation="Manual"
         Deactivated="Window_Deactivated"
         AutomationProperties.AutomationId="Long.SuperPanel"
-        AutomationProperties.Name="Long 超级面板"
+        AutomationProperties.Name="{DynamicResource i18n.superPanel.title}"
         PreviewKeyDown="Window_PreviewKeyDown">
 
     <Border x:Name="PanelChrome"
@@ -54,24 +54,24 @@
                           HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
                 <StackPanel Grid.Column="1" Margin="11,0,12,0" VerticalAlignment="Center">
-                    <TextBlock Text="Long 超级面板" FontSize="15" FontWeight="SemiBold"
+                    <TextBlock Text="{DynamicResource i18n.superPanel.title}" FontSize="15" FontWeight="SemiBold"
                                Foreground="{DynamicResource Long.Brush.Text.Primary}" />
-                    <TextBlock x:Name="ContextSummary" Text="正在读取当前上下文…" FontSize="10" Margin="0,2,0,0"
+                    <TextBlock x:Name="ContextSummary" Text="{DynamicResource i18n.superPanel.context.loading}" FontSize="10" Margin="0,2,0,0"
                                AutomationProperties.LiveSetting="Polite"
                                Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                 </StackPanel>
                 <Button Grid.Column="2" Style="{StaticResource LongButton}" Height="30"
                         Padding="10,0" Margin="0,0,6,0" Click="OpenCommandCenter_Click"
                         AutomationProperties.AutomationId="Long.SuperPanel.OpenCommandCenter"
-                        AutomationProperties.Name="打开完整命令中心">
+                        AutomationProperties.Name="{DynamicResource i18n.superPanel.openCommandCenterAutomation}">
                     <StackPanel Orientation="Horizontal">
                         <Path Data="{StaticResource Long.Icon.Search}" Style="{StaticResource LongIcon}"
                               Width="13" Height="13" />
-                        <TextBlock Text="命令中心" FontSize="10" Margin="6,0,0,0" />
+                        <TextBlock Text="{DynamicResource i18n.superPanel.commandCenter}" FontSize="10" Margin="6,0,0,0" />
                     </StackPanel>
                 </Button>
                 <Button Grid.Column="3" Style="{StaticResource LongIconButton}" Width="30" Height="30"
-                        Click="Close_Click" AutomationProperties.Name="关闭超级面板">
+                        Click="Close_Click" AutomationProperties.Name="{DynamicResource i18n.superPanel.closeAutomation}">
                     <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}"
                           Width="12" Height="12" />
                 </Button>
@@ -85,7 +85,7 @@
                 </Grid.ColumnDefinitions>
                 <ItemsControl x:Name="GroupTabs"
                               AutomationProperties.AutomationId="Long.SuperPanel.Groups"
-                              AutomationProperties.Name="操作分组">
+                              AutomationProperties.Name="{DynamicResource i18n.superPanel.groupsAutomation}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -124,14 +124,17 @@
                             Margin="2,0,4,0" Visibility="Collapsed">
                     <Button Style="{StaticResource LongIconButton}" Width="28" Height="28"
                             Content="✎" Click="RenameGroup_Click"
-                            ToolTip="重命名当前分组" AutomationProperties.Name="重命名当前分组" />
+                            ToolTip="{DynamicResource i18n.superPanel.renameGroup}"
+                            AutomationProperties.Name="{DynamicResource i18n.superPanel.renameGroup}" />
                     <Button Style="{StaticResource LongIconButton}" Width="28" Height="28"
                             Content="×" Margin="2,0,0,0" Click="DeleteGroup_Click"
-                            ToolTip="删除当前分组" AutomationProperties.Name="删除当前分组" />
+                            ToolTip="{DynamicResource i18n.superPanel.deleteGroup}"
+                            AutomationProperties.Name="{DynamicResource i18n.superPanel.deleteGroup}" />
                 </StackPanel>
                 <Button x:Name="AddGroupButton" Grid.Column="2" Style="{StaticResource LongIconButton}"
                         Width="30" Height="30" Content="+" Click="AddGroup_Click"
-                        ToolTip="新建操作分组" AutomationProperties.Name="新建操作分组" />
+                        ToolTip="{DynamicResource i18n.superPanel.createGroup}"
+                        AutomationProperties.Name="{DynamicResource i18n.superPanel.createGroup}" />
                 <Popup x:Name="GroupEditorPopup" PlacementTarget="{Binding ElementName=AddGroupButton}"
                        Placement="Bottom" HorizontalOffset="-196" VerticalOffset="6"
                        AllowsTransparency="True" StaysOpen="False">
@@ -140,15 +143,15 @@
                             BorderBrush="{DynamicResource Long.Brush.Stroke.Strong}" BorderThickness="1">
                         <Border.Effect><StaticResource ResourceKey="Long.Shadow.Level2" /></Border.Effect>
                         <StackPanel>
-                            <TextBlock x:Name="GroupEditorTitle" Text="新建分组" FontSize="12" FontWeight="SemiBold"
+                            <TextBlock x:Name="GroupEditorTitle" Text="{DynamicResource i18n.superPanel.editor.createShort}" FontSize="12" FontWeight="SemiBold"
                                        Foreground="{DynamicResource Long.Brush.Text.Primary}" />
                             <TextBox x:Name="GroupNameTextBox" Margin="0,9,0,9" MaxLength="24" Height="32"
                                      VerticalContentAlignment="Center" PreviewKeyDown="GroupNameTextBox_PreviewKeyDown"
-                                     AutomationProperties.Name="分组名称" />
+                                     AutomationProperties.Name="{DynamicResource i18n.superPanel.groupNameAutomation}" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Style="{StaticResource LongButton}" Content="取消" Height="28"
+                                <Button Style="{StaticResource LongButton}" Content="{DynamicResource i18n.action.cancel}" Height="28"
                                         Click="CancelGroupEditor_Click" />
-                                <Button Style="{StaticResource LongButton.Primary}" Content="保存" Height="28"
+                                <Button Style="{StaticResource LongButton.Primary}" Content="{DynamicResource i18n.action.save}" Height="28"
                                         Margin="6,0,0,0" Click="SaveGroupEditor_Click" />
                             </StackPanel>
                         </StackPanel>
@@ -174,7 +177,7 @@
             <Grid Grid.Row="3">
                 <ListBox x:Name="ResultsList" BorderThickness="0" Background="Transparent"
                          AutomationProperties.AutomationId="Long.SuperPanel.Results"
-                         AutomationProperties.Name="超级面板结果"
+                         AutomationProperties.Name="{DynamicResource i18n.superPanel.resultsAutomation}"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          AllowDrop="True"
@@ -247,9 +250,9 @@
                                 </StackPanel>
                                 <Button Grid.Column="1" Click="SecondaryActions_Click"
                                         Width="26" Height="26" Margin="8,0,0,0"
-                                        Content="⋯" ToolTip="更多操作"
+                                        Content="⋯" ToolTip="{DynamicResource i18n.superPanel.moreActions}"
                                         AutomationProperties.AutomationId="Long.Result.MoreActions"
-                                        AutomationProperties.Name="更多结果操作">
+                                        AutomationProperties.Name="{DynamicResource i18n.superPanel.moreResultActions}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource LongIconButton}">
                                             <Setter Property="Visibility" Value="Collapsed" />
@@ -263,7 +266,8 @@
                                 </Button>
                                 <Button Grid.Column="2" Tag="{Binding Id}" Click="PinResult_Click"
                                         Width="26" Height="26" Margin="8,0,0,0"
-                                        ToolTip="固定或取消固定" AutomationProperties.Name="固定或取消固定结果">
+                                        ToolTip="{DynamicResource i18n.superPanel.togglePin}"
+                                        AutomationProperties.Name="{DynamicResource i18n.superPanel.togglePinAutomation}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource LongIconButton}">
                                             <Setter Property="Content" Value="☆" />
@@ -291,13 +295,13 @@
                     <Path Data="{StaticResource Long.Icon.Command}" Style="{StaticResource LongIcon}"
                           Width="28" Height="28" HorizontalAlignment="Center"
                           Stroke="{DynamicResource Long.Brush.Text.Muted}" />
-                    <TextBlock x:Name="EmptyStateText" Text="当前上下文没有可用操作" Style="{StaticResource LongEmptyState}"
+                    <TextBlock x:Name="EmptyStateText" Text="{DynamicResource i18n.superPanel.empty.context}" Style="{StaticResource LongEmptyState}"
                                Margin="0,10,0,0" />
                 </StackPanel>
             </Grid>
 
             <Grid Grid.Row="4" Margin="4,9,4,0">
-                <TextBlock x:Name="InteractionHint" Text="Enter 执行 · Shift+Enter 次级动作 · 滚轮切组 · Esc 返回" FontSize="10"
+                <TextBlock x:Name="InteractionHint" Text="{DynamicResource i18n.superPanel.interactionHint}" FontSize="10"
                            Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                 <TextBlock x:Name="StatusText" HorizontalAlignment="Right" FontSize="10"
                            AutomationProperties.LiveSetting="Polite"

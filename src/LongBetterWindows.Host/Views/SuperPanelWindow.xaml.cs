@@ -35,7 +35,8 @@ namespace LongBetterWindows.Host.Views
                 key => ServicesInitializer.I18n.T(key));
             _groupCoordinator = new SuperPanelGroupCoordinator(
                 ServicesInitializer.SearchPreferences,
-                ServicesInitializer.SuperPanelGroups);
+                ServicesInitializer.SuperPanelGroups,
+                key => ServicesInitializer.I18n.T(key));
             _groupEditor = new SuperPanelGroupEditorSession(_groupCoordinator);
             _searchSession = new SuperPanelSearchSession(
                 ServicesInitializer.ContextCapture,
@@ -68,7 +69,10 @@ namespace LongBetterWindows.Host.Views
                     {
                         Id = "quality.url",
                         Source = ContextSource.Clipboard,
-                        Label = "剪贴板链接 · https://long.example/quality",
+                        Label = string.Format(
+                            ServicesInitializer.I18n.T(
+                                "superPanel.quality.clipboardLink"),
+                            "https://long.example/quality"),
                         Text = "https://long.example/quality",
                         CompatibleInputTypes = new[]
                         {
@@ -114,7 +118,9 @@ namespace LongBetterWindows.Host.Views
             SuperPanelContextUpdate update)
         {
             _groupCoordinator.ResetResults();
-            var view = SuperPanelViewProjection.ProjectContext(update);
+            var view = SuperPanelViewProjection.ProjectContext(
+                update,
+                key => ServicesInitializer.I18n.T(key));
             ContextBadges.ItemsSource = view.Items;
             ContextBadges.Visibility = view.ShowBadges
                 ? Visibility.Visible
@@ -371,8 +377,12 @@ namespace LongBetterWindows.Host.Views
             var group = _groupCoordinator.ActiveCustomGroup;
             if (group is null) return;
             var answer = MessageBox.Show(
-                $"删除分组“{group.Title}”？分组中的操作不会被取消固定。",
-                "删除操作分组", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                string.Format(
+                    I18n("superPanel.confirm.deleteGroup.message"),
+                    group.Title),
+                I18n("superPanel.confirm.deleteGroup.title"),
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
             if (answer != MessageBoxResult.Yes) return;
             var outcome = await _groupCoordinator.DeleteActiveGroupAsync();
             if (outcome.Success)
@@ -500,6 +510,9 @@ namespace LongBetterWindows.Host.Views
             }
             return null;
         }
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
 
     }
 }

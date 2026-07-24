@@ -171,6 +171,18 @@ public class SuperPanelInteractionTests
     }
 
     [Fact]
+    public void ViewProjection_ProjectsCurrentLanguage()
+    {
+        var view = SuperPanelViewProjection.ProjectContext(
+            new SuperPanelContextUpdate(ContextSnapshot.Empty, IsLoading: true),
+            key => key == "superPanel.context.loading"
+                ? "Reading context..."
+                : key);
+
+        Assert.Equal("Reading context...", view.Summary);
+    }
+
+    [Fact]
     public void ViewProjection_ProjectsActionDisposition()
     {
         var continuation = SuperPanelViewProjection.ProjectAction(new(

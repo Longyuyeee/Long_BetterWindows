@@ -647,7 +647,7 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Interaction", "SuperPanelViewProjection.cs");
         var palette = Read("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml.cs");
 
-        Assert.Contains("Long 超级面板", xaml);
+        Assert.Contains("i18n.superPanel.title", xaml);
         Assert.Contains("new SuperPanelSearchSession", source);
         Assert.Contains("_contextCapture.CaptureAsync", session);
         Assert.Contains("_search.SearchIncrementalAsync", session);

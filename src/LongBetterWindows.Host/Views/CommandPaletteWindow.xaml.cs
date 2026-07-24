@@ -135,7 +135,7 @@ namespace LongBetterWindows.Host.Views
                     await Task.Delay(45, token);
 
                 StatusText.Foreground = (Brush)FindResource("Long.Brush.Text.Secondary");
-                StatusText.Text = "正在搜索…";
+                StatusText.Text = I18n("palette.status.searching");
                 var request = new SearchRequest(
                     SearchBox.Text,
                     _contextSnapshot,
@@ -228,11 +228,15 @@ namespace LongBetterWindows.Host.Views
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             EmptyStateText.Text = _plugins.Commands.Count == 0
-                ? "插件仍在加载，请稍候…"
-                : "没有匹配的命令";
+                ? I18n("palette.status.pluginsLoading")
+                : I18n("palette.empty");
             StatusText.Text = results.Count == 0
-                ? completed ? "没有匹配的命令" : "正在搜索…"
-                : $"{results.Count} 个结果";
+                ? completed
+                    ? I18n("palette.empty")
+                    : I18n("palette.status.searching")
+                : string.Format(
+                    I18n("palette.status.resultCount"),
+                    results.Count);
         }
 
         private async Task ExecuteSelectedAsync()
@@ -262,12 +266,12 @@ namespace LongBetterWindows.Host.Views
             var descriptor = _plugins.Commands.Get(selected.PrimaryAction.Target);
             if (descriptor is null)
             {
-                StatusText.Text = "结果已失效，请重新搜索";
+                StatusText.Text = I18n("palette.status.resultExpired");
                 return;
             }
 
             StatusText.Foreground = (Brush)FindResource("Long.Brush.Text.Secondary");
-            StatusText.Text = "正在执行…";
+            StatusText.Text = I18n("palette.status.executing");
             var invocation = selected.PrimaryAction.Invocation;
             if (invocation is null)
                 invocation = CommandInvocationFactory.Create(descriptor, _contextSnapshot);
@@ -287,7 +291,8 @@ namespace LongBetterWindows.Host.Views
 
             Show();
             Activate();
-            StatusText.Text = result.Message ?? "执行失败";
+            StatusText.Text =
+                result.Message ?? I18n("palette.status.executionFailed");
             StatusText.Foreground = (Brush)FindResource(result.IsSuccess
                 ? "Long.Brush.State.Success"
                 : "Long.Brush.State.Danger");
@@ -332,7 +337,9 @@ namespace LongBetterWindows.Host.Views
             if (sender is not Button { Tag: string resultId }) return;
             e.Handled = true;
             var pinned = await ServicesInitializer.SearchPreferences.TogglePinnedAsync(resultId);
-            StatusText.Text = pinned ? "已固定到结果顶部" : "已取消固定";
+            StatusText.Text = pinned
+                ? I18n("palette.status.pinned")
+                : I18n("palette.status.unpinned");
             BeginSearch();
         }
 
@@ -348,7 +355,9 @@ namespace LongBetterWindows.Host.Views
                 var action = selected.SecondaryActions[index];
                 var item = new MenuItem
                 {
-                    Header = string.IsNullOrWhiteSpace(action.Label) ? "执行" : action.Label,
+                    Header = string.IsNullOrWhiteSpace(action.Label)
+                        ? I18n("palette.action.execute")
+                        : action.Label,
                     Tag = action,
                 };
                 AutomationProperties.SetAutomationId(
@@ -368,7 +377,9 @@ namespace LongBetterWindows.Host.Views
             if (result.IsSuccess)
                 await ServicesInitializer.SearchPreferences.RecordUseAsync(selected.Id);
 
-            StatusText.Text = result.Message ?? (result.IsSuccess ? "操作已完成" : "操作失败");
+            StatusText.Text = result.Message ?? (result.IsSuccess
+                ? I18n("search.result.completed")
+                : I18n("search.error.operationFailed"));
             StatusText.Foreground = (Brush)FindResource(result.IsSuccess
                 ? "Long.Brush.State.Success"
                 : "Long.Brush.State.Danger");
@@ -407,7 +418,9 @@ namespace LongBetterWindows.Host.Views
                 && ResultsList.SelectedItem is SearchResultItem { CanPin: true } selected)
             {
                 var pinned = await ServicesInitializer.SearchPreferences.TogglePinnedAsync(selected.Id);
-                StatusText.Text = pinned ? "已固定到结果顶部" : "已取消固定";
+                StatusText.Text = pinned
+                    ? I18n("palette.status.pinned")
+                    : I18n("palette.status.unpinned");
                 BeginSearch();
                 e.Handled = true;
                 return;
@@ -427,5 +440,8 @@ namespace LongBetterWindows.Host.Views
             if (!App.KeepPaletteVisibleForQuality)
                 Hide();
         }
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
     }
 }

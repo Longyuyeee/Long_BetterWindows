@@ -18,7 +18,13 @@ namespace LongBetterWindows.Host.Interaction
             _editingGroupId = groupId;
             State = new SuperPanelGroupEditorState(
                 true,
-                groupId is null ? "新建操作分组" : "重命名操作分组",
+                groupId is null
+                    ? _groups.Text(
+                        "superPanel.editor.createTitle",
+                        "新建操作分组")
+                    : _groups.Text(
+                        "superPanel.editor.renameTitle",
+                        "重命名操作分组"),
                 title);
         }
 
