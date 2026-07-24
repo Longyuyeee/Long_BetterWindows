@@ -13,6 +13,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("Base64Tool")]
     [InlineData("ClipboardHistory")]
     [InlineData("ClipboardTool")]
+    [InlineData("DevToolkit")]
     [InlineData("FileRenamerPlugin")]
     [InlineData("FolderNotePlugin")]
     [InlineData("HardwareMonitor")]
@@ -229,6 +230,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("Base64Tool")]
     [InlineData("ClipboardHistory")]
     [InlineData("ClipboardTool")]
+    [InlineData("DevToolkit")]
     [InlineData("FileRenamerPlugin")]
     [InlineData("HardwareMonitor")]
     [InlineData("JsonFormatterPlugin")]
@@ -260,7 +262,7 @@ public sealed class BuiltInPluginLocalizationTests
             .ToHashSet(StringComparer.Ordinal);
         var referencedKeys = Regex.Matches(
                 source,
-                """(?:data-i18n="|\bt\s*\(\s*')([A-Za-z0-9._-]+)""")
+                """(?:data-i18n(?:-placeholder)?="|\bt\s*\(\s*')([A-Za-z0-9._-]+)""")
             .Select(match => match.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -282,6 +284,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("HardwareMonitor", "async function initialize", "renderMetricsProjection();", "updateMetrics(")]
     [InlineData("PortManager", "async function initialize", "renderPorts();", "refreshPorts(")]
     [InlineData("ClipboardHistory", "function responseData", "renderListState();", "startMonitoring();")]
+    [InlineData("DevToolkit", "function base64Encode", "renderAllResults();", "base64Encode();")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
         string plugin,
         string nextFunction,
@@ -310,6 +313,8 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.DoesNotContain("setInterval", localizationBody);
         Assert.DoesNotContain("captureClipboard(", localizationBody);
         Assert.DoesNotContain("persistSnapshot(", localizationBody);
+        Assert.DoesNotContain("autoCopy(", localizationBody);
+        Assert.DoesNotContain("copyFromClipboard(", localizationBody);
         Assert.DoesNotContain("location.reload", source);
     }
 

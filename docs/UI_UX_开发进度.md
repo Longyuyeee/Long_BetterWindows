@@ -748,7 +748,9 @@ WIP UI visual draft before audited implementation
 - [x] G17-D4-A 完成 HardwareMonitor；系统信息与指标保存原始快照，语言切换不重复性能 API、不重启轮询，刷新中按钮、更新时间、磁盘和进程投影正确更新。`760 × 540` 无水平溢出，Release 0 警告/0 错误，602 / 602 测试通过。
 - [x] G17-D4-B 完成 PortManager；语言切换保留端口快照、页签、搜索词、自动刷新开关、查询结果和终止确认，不重复端口请求、不重启轮询、不执行进程终止。`760 × 520` 无水平溢出，Release 0 警告/0 错误，605 / 605 测试通过。
 - [x] G17-D4-C 完成 ClipboardHistory；语言切换保留历史、搜索词、时间范围、相对时间和清空确认，不重复监听、热键、兜底定时器、剪贴板读取或持久化写入。`620 × 500` 无水平溢出，Release 0 警告/0 错误，608 / 608 测试通过。
-- [ ] G17-D4-D 后续迁移 DevToolkit，处理多页签输入、输出和本地转换状态。
+- [x] G17-D4-D 完成 DevToolkit；语言切换保留当前页签、全部输入和结果快照，不重新转换、生成 UUID 或调用剪贴板。日期、进制和错误投影正确更新，`760 × 560` 无水平溢出，Release 0 警告/0 错误，611 / 611 测试通过。
+- [ ] G17-D5-A 迁移最后一个 Web 插件 FileOrganizer，保持文件列表、分类预览、规则和执行事务。
+- [ ] G17-D5-B/C 分批迁移 ColorPicker、Macro、QuickLaunch、Screenshot、WindowManager 五个 DLL 产品插件，SamplePlugin 最后作为 SDK 示例收口。
 - [x] G3 插件语言声明与宿主通知协议基础由 G17-A 完成；内置插件内容迁移继续由 G17-B 分批实施，不实现 uTools 插件兼容层。
 
 详细边界与后续顺序见 `docs/国际化_UI集成.md`。
