@@ -2,6 +2,7 @@
   "plugin.name": "文件夹备注助手",
   "commands.folder-note.edit.title": "编辑文件夹备注",
   "commands.folder-note.edit.description": "为当前文件夹或 Explorer 选区编辑备注",
+  "commands.folder-note.edit.outputs.selected-folder.description": "本次打开备注面板时使用的文件夹",
   "hud.title": "备注",
   "hud.inputAutomationName": "文件夹备注内容",
   "hud.emptyHint": "输入备注内容...",

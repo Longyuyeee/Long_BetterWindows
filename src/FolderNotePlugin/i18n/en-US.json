@@ -2,6 +2,7 @@
   "plugin.name": "Folder Notes",
   "commands.folder-note.edit.title": "Edit Folder Note",
   "commands.folder-note.edit.description": "Edit the note for the current folder or Explorer selection",
+  "commands.folder-note.edit.outputs.selected-folder.description": "Folder used when opening the note panel",
   "hud.title": "Folder note",
   "hud.inputAutomationName": "Folder note content",
   "hud.emptyHint": "Enter a note...",

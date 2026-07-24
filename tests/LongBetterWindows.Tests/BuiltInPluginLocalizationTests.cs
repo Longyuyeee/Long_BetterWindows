@@ -16,6 +16,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("PasswordGenerator")]
     [InlineData("QuickNotePlugin")]
     [InlineData("TimestampConverter")]
+    [InlineData("UuidGenerator")]
     public async Task SamplePlugin_HasValidBilingualResources(string plugin)
     {
         var root = FindRepositoryRoot();
@@ -44,6 +45,27 @@ public sealed class BuiltInPluginLocalizationTests
         {
             Assert.Contains($"commands.{command.Id}.title", chineseKeys);
             Assert.Contains($"commands.{command.Id}.description", chineseKeys);
+            foreach (var argument in command.ArgumentSchema)
+            {
+                Assert.Contains(
+                    $"commands.{command.Id}.arguments.{argument.Key}.name",
+                    chineseKeys);
+                Assert.Contains(
+                    $"commands.{command.Id}.arguments.{argument.Key}.description",
+                    chineseKeys);
+            }
+            foreach (var preset in command.ArgumentPresets)
+            {
+                Assert.Contains(
+                    $"commands.{command.Id}.presets.{preset.Id}.name",
+                    chineseKeys);
+            }
+            foreach (var output in command.Outputs)
+            {
+                Assert.Contains(
+                    $"commands.{command.Id}.outputs.{output.Key}.description",
+                    chineseKeys);
+            }
         }
     }
 
@@ -64,6 +86,40 @@ public sealed class BuiltInPluginLocalizationTests
                     Title = "原始命令",
                     Description = "原始说明",
                     AcceptedInputs = [AcceptedInputType.None],
+                    ArgumentSchema =
+                    [
+                        new PluginCommandArgumentDeclaration
+                        {
+                            Key = "count",
+                            Name = "原始数量",
+                            Description = "原始参数说明",
+                            Type = PluginCommandArgumentType.Integer,
+                            DefaultValue = "10",
+                            Minimum = 1,
+                            Maximum = 100,
+                        },
+                    ],
+                    ArgumentPresets =
+                    [
+                        new PluginCommandArgumentPreset
+                        {
+                            Id = "batch",
+                            Name = "原始预设",
+                            Arguments = new Dictionary<string, string>
+                            {
+                                ["count"] = "100",
+                            },
+                        },
+                    ],
+                    Outputs =
+                    [
+                        new PluginCommandOutputDeclaration
+                        {
+                            Key = "result",
+                            Type = PluginCommandOutputType.Text,
+                            Description = "原始输出说明",
+                        },
+                    ],
                 },
             ],
         };
@@ -83,6 +139,10 @@ public sealed class BuiltInPluginLocalizationTests
                     ["plugin.name"] = "Localized plugin",
                     ["commands.run.title"] = "Localized command",
                     ["commands.run.description"] = "Localized description",
+                    ["commands.run.arguments.count.name"] = "Localized count",
+                    ["commands.run.arguments.count.description"] = "Localized argument",
+                    ["commands.run.presets.batch.name"] = "Localized batch",
+                    ["commands.run.outputs.result.description"] = "Localized output",
                 })));
 
         var entry = Assert.IsType<PluginEntry>(registry.Get(manifest.Id));
@@ -92,7 +152,24 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.Equal("Localized plugin", descriptor.PluginName);
         Assert.Equal("Localized command", descriptor.Title);
         Assert.Equal("Localized description", descriptor.Description);
+        var argument = Assert.Single(descriptor.ArgumentSchema);
+        Assert.Equal("Localized count", argument.Name);
+        Assert.Equal("Localized argument", argument.Description);
+        Assert.Equal("count", argument.Key);
+        Assert.Equal("10", argument.DefaultValue);
+        var preset = Assert.Single(descriptor.ArgumentPresets);
+        Assert.Equal("Localized batch", preset.Name);
+        Assert.Equal("100", preset.Arguments["count"]);
+        var output = Assert.Single(descriptor.Outputs);
+        Assert.Equal("Localized output", output.Description);
+        Assert.Equal(PluginCommandOutputType.Text, output.Type);
         Assert.Equal("原始命令", descriptor.Command.Title);
+        Assert.Equal("原始数量", Assert.Single(descriptor.Command.ArgumentSchema).Name);
+        Assert.Equal("原始预设", Assert.Single(descriptor.Command.ArgumentPresets).Name);
+        Assert.Equal("原始输出说明", Assert.Single(descriptor.Command.Outputs).Description);
+        Assert.NotSame(descriptor.Command.ArgumentSchema, descriptor.ArgumentSchema);
+        Assert.NotSame(descriptor.Command.ArgumentPresets, descriptor.ArgumentPresets);
+        Assert.NotSame(descriptor.Command.Outputs, descriptor.Outputs);
         Assert.Equal(revision, registry.CatalogRevision);
         Assert.Equal(2, changes);
         Assert.Single(registry.Commands.Search("localized command"));
@@ -144,6 +221,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("PasswordGenerator")]
     [InlineData("QuickNotePlugin")]
     [InlineData("TimestampConverter")]
+    [InlineData("UuidGenerator")]
     public async Task LocalizedWebPlugin_DeclaresEveryReferencedResourceKey(
         string plugin)
     {
@@ -173,6 +251,7 @@ public sealed class BuiltInPluginLocalizationTests
     [Theory]
     [InlineData("PasswordGenerator", "function secureIndex", "renderStrength();")]
     [InlineData("TimestampConverter", "function parse", "renderResult();")]
+    [InlineData("UuidGenerator", "function uuid", "output.setAttribute")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
         string plugin,
         string nextFunction,
@@ -196,6 +275,26 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.DoesNotContain("convert();", localizationBody);
         Assert.DoesNotContain("useNow();", localizationBody);
         Assert.DoesNotContain("location.reload", source);
+    }
+
+    [Fact]
+    public void WorkflowEditor_UsesLocalizedCommandContractProjection()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "WorkflowEditorControl.xaml.cs"));
+
+        Assert.Contains(
+            "SnapshotArgumentSchema(descriptor?.ArgumentSchema)",
+            source);
+        Assert.Contains("descriptor?.ArgumentPresets", source);
+        Assert.Contains("descriptor?.Outputs.Select", source);
+        Assert.DoesNotContain(
+            "SnapshotArgumentSchema(descriptor?.Command.ArgumentSchema)",
+            source);
     }
 
     [Fact]

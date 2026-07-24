@@ -2,6 +2,7 @@
   "plugin.name": "Timestamp Converter",
   "commands.timestamp.convert.title": "Convert Timestamp",
   "commands.timestamp.convert.description": "Convert between Unix timestamps and local date-time values",
+  "commands.timestamp.convert.outputs.result.description": "Conversion summary with timestamps, local time, and UTC",
   "page.title": "Timestamp Converter",
   "page.description": "Recognize seconds, milliseconds, or date text and show both local and UTC time.",
   "page.nowBadge": "Now",

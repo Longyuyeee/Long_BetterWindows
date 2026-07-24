@@ -1034,11 +1034,11 @@ namespace LongBetterWindows.Host.Views
                 BindingEditor = new WorkflowBindingEditorModel(
                     availableOutputs,
                     invocation.InputType,
-                    descriptor?.Command.ArgumentSchema
+                    descriptor?.ArgumentSchema
                         .Select(declaration => declaration.Key)
                         .ToArray()),
-                ArgumentSchema = SnapshotArgumentSchema(descriptor?.Command.ArgumentSchema),
-                ArgumentPresets = descriptor?.Command.ArgumentPresets
+                ArgumentSchema = SnapshotArgumentSchema(descriptor?.ArgumentSchema),
+                ArgumentPresets = descriptor?.ArgumentPresets
                     .Select(preset => new WorkflowArgumentPresetOption(
                         preset.Id,
                         preset.Name,
@@ -1084,7 +1084,7 @@ namespace LongBetterWindows.Host.Views
             WorkflowCommand? command)
         {
             var descriptor = command is null ? null : _plugins.Commands.Get(command.CommandKey);
-            return descriptor?.Command.Outputs.Select(output => new WorkflowBindingOutputOption(
+            return descriptor?.Outputs.Select(output => new WorkflowBindingOutputOption(
                     stepId,
                     output.Key,
                     output.Type,

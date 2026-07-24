@@ -80,5 +80,12 @@
   ],
   "window": {"mode": "compact", "preferred_width": 650, "preferred_height": 640, "min_width": 520, "min_height": 520},
   "lifecycle": {"start_with_host": false, "close_behavior": "stop", "default_presentation": "embedded", "search_in_background": false},
+  "localization": {
+    "default_language": "zh-CN",
+    "resources": {
+      "zh-CN": "i18n/zh-CN.json",
+      "en-US": "i18n/en-US.json"
+    }
+  },
   "default_settings": {"auto_start": false}
 }

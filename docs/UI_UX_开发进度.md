@@ -741,7 +741,8 @@ WIP UI visual draft before audited implementation
 - [x] G17-B 完成 Base64Tool Web 样板和 FolderNotePlugin DLL 样板；宿主插件/命令元数据使用只读语言投影，原 Manifest、目录修订和运行状态不变。Base64 英文宽屏与中文紧凑无头视觉验证通过，Release 0 警告/0 错误，561 / 561 测试通过。
 - [x] G17-C 完成 ClipboardTool 与 QuickNotePlugin 高频 Web 插件迁移；中英文双向切换保留页签、搜索、剪贴板文本、便签草稿、预览和历史状态。无头 Edge 无水平溢出，Release 0 警告/0 错误，568 / 568 测试通过。
 - [x] G17-D1 完成 TimestampConverter 与 PasswordGenerator；切换语言不重新解析时间或重新生成密码，最小窗口无水平溢出。Release 0 警告/0 错误，574 / 574 测试通过。
-- [ ] G17-D2-A 扩展命令参数、说明和预设名称的只读语言投影并迁移 UuidGenerator；D2-B 再处理 UrlToolkit、JsonFormatterPlugin 与 RegexTester。
+- [x] G17-D2-A 完成命令参数/说明、预设名称和输出说明的只读语言投影，并迁移 UuidGenerator；原参数键、约束、值、预设字典和工作流状态不变。最小窗口验证无溢出，578 / 578 测试通过。
+- [ ] G17-D2-B 迁移 UrlToolkit、JsonFormatterPlugin 与 RegexTester，保留输入输出、解析错误详情和匹配列表。
 - [x] G3 插件语言声明与宿主通知协议基础由 G17-A 完成；内置插件内容迁移继续由 G17-B 分批实施，不实现 uTools 插件兼容层。
 
 详细边界与后续顺序见 `docs/国际化_UI集成.md`。

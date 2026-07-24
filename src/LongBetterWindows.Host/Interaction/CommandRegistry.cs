@@ -12,6 +12,12 @@ namespace LongBetterWindows.Host.Interaction
         public string ManifestPluginName { get; init; } = PluginName;
         public string Title { get; init; } = Command.Title;
         public string Description { get; init; } = Command.Description ?? string.Empty;
+        public IReadOnlyList<PluginCommandArgumentDeclaration> ArgumentSchema { get; init; } =
+            Command.ArgumentSchema;
+        public IReadOnlyList<PluginCommandArgumentPreset> ArgumentPresets { get; init; } =
+            Command.ArgumentPresets;
+        public IReadOnlyList<PluginCommandOutputDeclaration> Outputs { get; init; } =
+            Command.Outputs;
     }
 
     /// <summary>统一入口的搜索结果及其可解释得分。</summary>
@@ -81,6 +87,24 @@ namespace LongBetterWindows.Host.Interaction
                             context,
                             $"commands.{descriptor.Command.Id}.description",
                             descriptor.Command.Description),
+                        ArgumentSchema = descriptor.Command.ArgumentSchema
+                            .Select(argument => LocalizeArgument(
+                                descriptor.Command.Id,
+                                argument,
+                                context))
+                            .ToArray(),
+                        ArgumentPresets = descriptor.Command.ArgumentPresets
+                            .Select(preset => LocalizePreset(
+                                descriptor.Command.Id,
+                                preset,
+                                context))
+                            .ToArray(),
+                        Outputs = descriptor.Command.Outputs
+                            .Select(output => LocalizeOutput(
+                                descriptor.Command.Id,
+                                output,
+                                context))
+                            .ToArray(),
                     };
                 }
             }
@@ -203,5 +227,61 @@ namespace LongBetterWindows.Host.Interaction
                 && !string.IsNullOrWhiteSpace(value)
                     ? value
                     : fallback ?? string.Empty;
+
+        private static PluginCommandArgumentDeclaration LocalizeArgument(
+            string commandId,
+            PluginCommandArgumentDeclaration argument,
+            PluginLanguageContext context)
+            => new()
+            {
+                Key = argument.Key,
+                Name = GetResource(
+                    context,
+                    $"commands.{commandId}.arguments.{argument.Key}.name",
+                    argument.Name),
+                Description = GetResource(
+                    context,
+                    $"commands.{commandId}.arguments.{argument.Key}.description",
+                    argument.Description),
+                Type = argument.Type,
+                Required = argument.Required,
+                DefaultValue = argument.DefaultValue,
+                Sensitive = argument.Sensitive,
+                Minimum = argument.Minimum,
+                Maximum = argument.Maximum,
+                MinLength = argument.MinLength,
+                MaxLength = argument.MaxLength,
+                EnumValues = argument.EnumValues.ToList(),
+            };
+
+        private static PluginCommandArgumentPreset LocalizePreset(
+            string commandId,
+            PluginCommandArgumentPreset preset,
+            PluginLanguageContext context)
+            => new()
+            {
+                Id = preset.Id,
+                Name = GetResource(
+                    context,
+                    $"commands.{commandId}.presets.{preset.Id}.name",
+                    preset.Name),
+                Arguments = new Dictionary<string, string>(
+                    preset.Arguments,
+                    StringComparer.Ordinal),
+            };
+
+        private static PluginCommandOutputDeclaration LocalizeOutput(
+            string commandId,
+            PluginCommandOutputDeclaration output,
+            PluginLanguageContext context)
+            => new()
+            {
+                Key = output.Key,
+                Type = output.Type,
+                Description = GetResource(
+                    context,
+                    $"commands.{commandId}.outputs.{output.Key}.description",
+                    output.Description),
+            };
     }
 }

@@ -2,6 +2,7 @@
   "plugin.name": "时间戳转换",
   "commands.timestamp.convert.title": "时间戳转换",
   "commands.timestamp.convert.description": "在 Unix 时间戳与本地日期时间之间转换",
+  "commands.timestamp.convert.outputs.result.description": "时间戳、本地时间与 UTC 的转换摘要",
   "page.title": "时间戳转换",
   "page.description": "自动识别秒、毫秒时间戳或日期文本，同时展示本地与 UTC 时间。",
   "page.nowBadge": "现在",
