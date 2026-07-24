@@ -15,6 +15,7 @@ namespace LongBetterWindows.Host.Interaction
         private readonly PluginRegistry _plugins;
         private readonly SearchResultActionExecutor _executor;
         private readonly SearchPreferenceService _preferences;
+        private readonly Func<string, string>? _localize;
 
         public SuperPanelActionCoordinator(
             PluginRegistry plugins,
@@ -23,11 +24,16 @@ namespace LongBetterWindows.Host.Interaction
                 string,
                 string?,
                 CancellationToken,
-                Task<PluginCommandResult>>? workflowReviewLauncher = null)
+                Task<PluginCommandResult>>? workflowReviewLauncher = null,
+            Func<string, string>? localize = null)
         {
             _plugins = plugins;
-            _executor = new SearchResultActionExecutor(plugins, workflowReviewLauncher);
+            _executor = new SearchResultActionExecutor(
+                plugins,
+                workflowReviewLauncher,
+                localize);
             _preferences = preferences;
+            _localize = localize;
         }
 
         public async Task<SuperPanelActionOutcome> ExecuteAsync(
@@ -55,7 +61,9 @@ namespace LongBetterWindows.Host.Interaction
                         action.Kind,
                         IsSuccess: false,
                         KeepPanelOpen: true,
-                        Message: "操作已失效");
+                        Message: Text(
+                            "search.error.actionExpired",
+                            "操作已失效"));
                 }
 
             }
@@ -74,7 +82,17 @@ namespace LongBetterWindows.Host.Interaction
                 action.Kind,
                 result.IsSuccess,
                 result.KeepPaletteOpen,
-                result.Message ?? (result.IsSuccess ? "操作已完成" : "操作失败"));
+                result.Message ?? (result.IsSuccess
+                    ? Text("search.result.completed", "操作已完成")
+                    : Text("search.error.operationFailed", "操作失败")));
+        }
+
+        private string Text(string key, string fallback)
+        {
+            var value = _localize?.Invoke(key);
+            return string.IsNullOrWhiteSpace(value) || value == key
+                ? fallback
+                : value;
         }
     }
 }

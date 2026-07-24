@@ -16,7 +16,7 @@
     <Border x:Name="HudBorder" Style="{StaticResource LongToast}">
 
         <StackPanel Width="320">
-            <TextBlock x:Name="TitleLabel" Text="备注"
+            <TextBlock x:Name="TitleLabel" Text="{DynamicResource i18n.folderNote.hud.title}"
                        FontSize="11" FontWeight="Medium"
                        Foreground="{DynamicResource Long.Brush.Accent.Primary}" Margin="0,0,0,4"
                        TextTrimming="CharacterEllipsis" />
@@ -26,7 +26,7 @@
                        TextTrimming="CharacterEllipsis" />
 
             <TextBox x:Name="NoteTextBox"
-                     AutomationProperties.Name="文件夹备注内容"
+                     AutomationProperties.Name="{DynamicResource i18n.folderNote.hud.inputAutomationName}"
                      FontSize="14"
                      CaretBrush="{DynamicResource Long.Brush.Accent.Primary}"
                      BorderThickness="0"
@@ -39,7 +39,7 @@
                      VerticalScrollBarVisibility="Auto"
                      TextChanged="NoteTextBox_TextChanged" />
 
-            <TextBlock x:Name="HintText" Text="输入备注内容..."
+            <TextBlock x:Name="HintText" Text="{DynamicResource i18n.folderNote.hud.emptyHint}"
                        FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Muted}"
                        Margin="0,8,0,0" TextAlignment="Right" />
         </StackPanel>

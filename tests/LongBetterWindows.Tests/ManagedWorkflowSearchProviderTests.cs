@@ -82,6 +82,31 @@ public sealed class ManagedWorkflowSearchProviderTests : IDisposable
         Assert.Equal("workflow:workflow.organize", result.Id);
     }
 
+    [Fact]
+    public async Task SearchAsync_ProjectsCurrentLanguageWithoutReloadingWorkflow()
+    {
+        var repository = new CommandWorkflowRepository(_root, "local-managed");
+        Assert.True((await repository.SaveAsync(Workflow())).IsSuccess);
+        var provider = new ManagedWorkflowSearchProvider(
+            Registry(),
+            repository,
+            key => key switch
+            {
+                "search.workflow.source" => "Workflow · {0} steps",
+                "search.workflow.reviewAndRun" => "Review and run",
+                "search.workflow.failure.stop" => "Stop on failure",
+                "search.workflow.subtitle" =>
+                    "{0} · {1} plugins · Approval required",
+                _ => key,
+            });
+
+        var result = Assert.Single(await provider.SearchAsync(Request("整理")));
+
+        Assert.Equal("Workflow · 1 steps", result.Source);
+        Assert.Equal("Review and run", result.PrimaryAction.Label);
+        Assert.Contains("Approval required", result.Subtitle);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);

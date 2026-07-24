@@ -10,14 +10,17 @@ namespace LongBetterWindows.Host.Interaction
     {
         private readonly CommandWorkflowRepository _repository;
         private readonly CommandWorkflowPlanner _planner;
+        private readonly Func<string, string>? _localize;
 
         public ManagedWorkflowSearchProvider(
             PluginRegistry plugins,
-            CommandWorkflowRepository repository)
+            CommandWorkflowRepository repository,
+            Func<string, string>? localize = null)
         {
             ArgumentNullException.ThrowIfNull(plugins);
             _repository = repository ?? throw new ArgumentNullException(nameof(repository));
             _planner = new CommandWorkflowPlanner(plugins);
+            _localize = localize;
         }
 
         public string Id => "managed-workflows";
@@ -64,13 +67,17 @@ namespace LongBetterWindows.Host.Interaction
                     ProviderId = Id,
                     Title = summary.Name,
                     Subtitle = BuildSubtitle(summary, preflight),
-                    Source = $"组合动作 · {summary.StepCount} 步",
+                    Source = string.Format(
+                        Text("search.workflow.source", "组合动作 · {0} 步"),
+                        summary.StepCount),
                     Score = score,
                     Kind = SearchResultKind.Command,
                     PrimaryAction = new SearchResultAction(
                         SearchActionKind.OpenWorkflowReview,
                         summary.Id,
-                        Label: "审查并运行",
+                        Label: Text(
+                            "search.workflow.reviewAndRun",
+                            "审查并运行"),
                         ExpectedStateFingerprint: preflight.Fingerprint),
                     CanPin = true,
                 });
@@ -99,14 +106,27 @@ namespace LongBetterWindows.Host.Interaction
             return 0;
         }
 
-        private static string BuildSubtitle(
+        private string BuildSubtitle(
             ManagedCommandWorkflowSummary workflow,
             CommandWorkflowPreflightResult preflight)
         {
             var failureMode = workflow.FailureMode == WorkflowFailureMode.Compensate
-                ? "失败时回滚"
-                : "失败时停止";
-            return $"{failureMode} · {preflight.Permissions.Count} 个插件 · 运行前需批准";
+                ? Text("search.workflow.failure.compensate", "失败时回滚")
+                : Text("search.workflow.failure.stop", "失败时停止");
+            return string.Format(
+                Text(
+                    "search.workflow.subtitle",
+                    "{0} · {1} 个插件 · 运行前需批准"),
+                failureMode,
+                preflight.Permissions.Count);
+        }
+
+        private string Text(string key, string fallback)
+        {
+            var value = _localize?.Invoke(key);
+            return string.IsNullOrWhiteSpace(value) || value == key
+                ? fallback
+                : value;
         }
 
         private static string Normalize(string value)

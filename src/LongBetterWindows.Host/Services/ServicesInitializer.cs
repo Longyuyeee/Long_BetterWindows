@@ -124,9 +124,13 @@ namespace LongBetterWindows.Host.Services
                 new ISearchProvider[]
                 {
                     new StaticCommandSearchProvider(provider.PluginStore.Commands),
-                    new ManagedWorkflowSearchProvider(provider.PluginStore, Workflows),
+                    new ManagedWorkflowSearchProvider(
+                        provider.PluginStore,
+                        Workflows,
+                        key => I18n.T(key)),
                     new WindowsSettingsSearchProvider(),
-                    new LocalFileSearchProvider(),
+                    new LocalFileSearchProvider(
+                        localize: key => I18n.T(key)),
                 },
                 preferences: SearchPreferences);
             provider.PluginStore.AttachSearchCoordinator(Search);

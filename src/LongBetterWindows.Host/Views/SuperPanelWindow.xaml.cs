@@ -31,7 +31,8 @@ namespace LongBetterWindows.Host.Views
             _actionCoordinator = new SuperPanelActionCoordinator(
                 _plugins,
                 ServicesInitializer.SearchPreferences,
-                WorkflowReviewNavigation.OpenAsync);
+                WorkflowReviewNavigation.OpenAsync,
+                key => ServicesInitializer.I18n.T(key));
             _groupCoordinator = new SuperPanelGroupCoordinator(
                 ServicesInitializer.SearchPreferences,
                 ServicesInitializer.SuperPanelGroups);

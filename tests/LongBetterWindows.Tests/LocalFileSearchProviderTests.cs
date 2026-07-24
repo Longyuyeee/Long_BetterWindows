@@ -46,6 +46,30 @@ public sealed class LocalFileSearchProviderTests : IDisposable
     }
 
     [Fact]
+    public async Task SearchAsync_UsesCurrentLocalizedProjection()
+    {
+        var provider = new LocalFileSearchProvider(
+            new[] { _root },
+            key => key switch
+            {
+                "search.local.file" => "Local file",
+                "search.action.open" => "Open",
+                "search.action.openContainingFolder" => "Open containing folder",
+                "search.action.copyPath" => "Copy path",
+                _ => key,
+            });
+
+        var result = Assert.Single(await provider.SearchAsync(new SearchRequest(
+            "needle", ContextSnapshot.Empty, MaxResults: 10)));
+
+        Assert.Equal("Local file", result.Source);
+        Assert.Equal("Open", result.PrimaryAction.Label);
+        Assert.Equal(
+            new[] { "Open containing folder", "Copy path" },
+            result.SecondaryActions.Select(action => action.Label));
+    }
+
+    [Fact]
     public void WebPluginTemplate_UsesLongUiKitAndEscapesPluginName()
     {
         var html = PluginDevTools.BuildWebPluginTemplate("<Demo>\" Plugin");

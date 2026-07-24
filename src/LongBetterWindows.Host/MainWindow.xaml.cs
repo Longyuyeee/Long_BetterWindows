@@ -48,7 +48,7 @@ namespace LongBetterWindows.Host
                 _workflowTerminalOutputCleared = false;
                 _workflowExecutionRejected = string.Equals(
                     result.Title,
-                    "执行已拒绝",
+                    I18n("workflow.execution.status.rejected"),
                     StringComparison.Ordinal);
                 AutomationProperties.SetItemStatus(
                     this,

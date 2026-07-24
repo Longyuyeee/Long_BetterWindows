@@ -1055,7 +1055,8 @@ public class QualityGateTests
     [Fact]
     public void CoreNativeInputs_HaveAutomationNames()
     {
-        Assert.Contains("AutomationProperties.Name=\"文件夹备注内容\"",
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.folderNote.hud.inputAutomationName}\"",
             Read("src", "LongBetterWindows.Host", "Views", "FloatingHudWindow.xaml"));
         Assert.Contains("AutomationProperties.Name=\"截图区域选择器\"",
             Read("src", "ScreenshotPlugin", "RegionSelectorWindow.xaml"));

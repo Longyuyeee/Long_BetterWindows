@@ -218,7 +218,8 @@ namespace LongBetterWindows.Host
                     return;
                 }
                 await ServicesInitializer.Notification.ShowAsync(
-                    "插件加载出错", "部分插件未能正确加载，请查看日志。");
+                    ServicesInitializer.I18n.T("pluginLoad.error.title"),
+                    ServicesInitializer.I18n.T("pluginLoad.error.message"));
             }
         }
 
@@ -283,7 +284,8 @@ namespace LongBetterWindows.Host
 
             if (!Directory.Exists(folderPath))
             {
-                FloatingHudWindow.ShowToast("目标文件夹不存在。");
+                FloatingHudWindow.ShowToast(
+                    ServicesInitializer.I18n.T("folderNote.error.folderMissing"));
                 return;
             }
 
@@ -300,15 +302,32 @@ namespace LongBetterWindows.Host
                 double x = area.Left + (area.Width - 320) / 2;
                 double y = area.Top + (area.Height - 150) / 2;
 
-                FloatingHudWindow.ShowAt(x, y, existingNote, folderPath, async (text) =>
-                {
-                    if (string.IsNullOrEmpty(text))
-                        await ServicesInitializer.ADS.DeleteAsync(folderPath, "long_note");
-                    else
-                        await ServicesInitializer.ADS.WriteAsync(folderPath, "long_note", text);
+                FloatingHudWindow.ShowAt(
+                    x,
+                    y,
+                    existingNote,
+                    folderPath,
+                    async (text) =>
+                    {
+                        if (string.IsNullOrEmpty(text))
+                            await ServicesInitializer.ADS.DeleteAsync(
+                                folderPath,
+                                "long_note");
+                        else
+                            await ServicesInitializer.ADS.WriteAsync(
+                                folderPath,
+                                "long_note",
+                                text);
 
-                    Log.Information("右键备注已保存: {Path}", folderPath);
-                });
+                        Log.Information("右键备注已保存: {Path}", folderPath);
+                    },
+                    new FloatingHudLocalization(
+                        ServicesInitializer.I18n.T("folderNote.hud.title"),
+                        ServicesInitializer.I18n.T(
+                            "folderNote.hud.inputAutomationName"),
+                        ServicesInitializer.I18n.T("folderNote.hud.emptyHint"),
+                        ServicesInitializer.I18n.T(
+                            "folderNote.hud.modifiedHint")));
             });
         }
 
