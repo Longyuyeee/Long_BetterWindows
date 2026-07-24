@@ -198,6 +198,16 @@
 
 在现有 Manifest 和 Web 消息桥上增加可选语言声明及宿主语言变更通知。未声明的旧插件保持兼容；语言切换不得重启插件、清空本地状态或绕过生命周期管理。
 
+2026-07-24 G3-A / G17-A 协议基础已完成：
+
+1. Manifest 支持可选 `localization.default_language` 与语言到 JSON 相对路径的 `resources` 映射，并校验语言标识、数量、默认回退和目录边界。
+2. 宿主以受限大小和条目数加载资源，生成防御性复制的 `PluginLanguageContext`；缺少当前语言时回退插件默认语言。
+3. DLL 使用可选 `IPluginLanguageLifecycle`，C# 脚本使用 `LanguageChanged` 委托，Web 使用 `long.language-changed` 消息；未声明语言的插件不进入通知链。
+4. `PluginScanner` 在初始化后发送当前语言，`PluginRuntimeCoordinator` 订阅后续变化；通知不调用插件启停方法，失败仅记录日志。
+5. WebView 只保留最新语言快照，导航完成后投递并在后续页面导航时重放，不积压旧消息、不重建页面。
+
+下一批选择一个 Web 内置插件和一个 DLL 内置插件作为双语样板，同时验证 Manifest 显示元数据与插件内部 UI 使用同一资源目录。
+
 ### G4：完成门禁
 
 只有满足以下条件才把 README 国际化标记为完成：

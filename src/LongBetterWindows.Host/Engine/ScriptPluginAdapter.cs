@@ -7,7 +7,7 @@ namespace LongBetterWindows.Host.Engine
     /// 将 .csx 脚本插件适配为 ILongPlugin 接口。
     /// 使脚本插件与 DLL 插件使用相同的注册、启停、权限流程。
     /// </summary>
-    public class ScriptPluginAdapter : ILongPlugin
+    public class ScriptPluginAdapter : ILongPlugin, IPluginLanguageLifecycle
     {
         private readonly ScriptGlobals _globals;
 
@@ -70,6 +70,15 @@ namespace LongBetterWindows.Host.Engine
             State = PluginState.Stopped;
             Log.Information("[Script:{Id}] 已停止", Id);
             return true;
+        }
+
+        public async Task OnLanguageChangedAsync(
+            Contracts.PluginLanguageContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_globals.LanguageChanged is not null)
+                await _globals.LanguageChanged(context);
         }
     }
 }

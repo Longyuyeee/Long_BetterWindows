@@ -131,6 +131,14 @@ namespace LongBetterWindows.Host.Engine
                 ManifestValidationCode.InvalidWindow,
                 "window",
                 error)));
+
+            var localizationErrors = new List<string>();
+            ValidateLocalization(manifest.Localization, localizationErrors);
+            issues.AddRange(localizationErrors.Select(error =>
+                new ManifestValidationIssue(
+                    ManifestValidationCode.InvalidLocalization,
+                    "localization",
+                    error)));
             errors.Clear();
 
             // ApiVersion 兼容性检查
@@ -391,6 +399,83 @@ namespace LongBetterWindows.Host.Engine
             if (window.PreferredHeight.HasValue && window.MinHeight.HasValue
                 && window.PreferredHeight < window.MinHeight)
                 errors.Add("window.preferred_height 不能小于 min_height");
+        }
+
+        private static void ValidateLocalization(
+            PluginLocalizationPreference? localization,
+            List<string> errors)
+        {
+            if (localization is null) return;
+
+            if (!IsValidLanguageTag(localization.DefaultLanguage))
+                errors.Add("localization.default_language 必须是有效语言标识");
+            if (localization.Resources is not { } resources)
+            {
+                errors.Add("localization.resources 必须包含 1 到 16 种语言");
+                return;
+            }
+            if (resources.Count is < 1 or > 16)
+                errors.Add("localization.resources 必须包含 1 到 16 种语言");
+
+            var languages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var resource in resources)
+            {
+                if (!IsValidLanguageTag(resource.Key))
+                    errors.Add($"localization.resources 包含无效语言标识: '{resource.Key}'");
+                else if (!languages.Add(resource.Key))
+                    errors.Add($"localization.resources 包含重复语言标识: '{resource.Key}'");
+
+                if (!IsSafeLocalizationResourcePath(resource.Value))
+                    errors.Add(
+                        $"localization.resources['{resource.Key}'] 必须是插件目录内的 JSON 相对路径");
+            }
+
+            if (IsValidLanguageTag(localization.DefaultLanguage)
+                && !languages.Contains(localization.DefaultLanguage))
+            {
+                errors.Add(
+                    "localization.default_language 必须存在于 localization.resources");
+            }
+        }
+
+        private static bool IsValidLanguageTag(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 35)
+                return false;
+            var parts = value.Split('-');
+            return parts.Length is >= 1 and <= 8
+                && parts[0].Length is >= 2 and <= 8
+                && parts[0].All(char.IsAsciiLetter)
+                && parts.Skip(1).All(part =>
+                    part.Length is >= 1 and <= 8
+                    && part.All(char.IsAsciiLetterOrDigit));
+        }
+
+        private static bool IsSafeLocalizationResourcePath(string value)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(value)
+                    || value.Length > 260
+                    || value.IndexOfAny(Path.GetInvalidPathChars()) >= 0
+                    || Path.IsPathRooted(value)
+                    || !string.Equals(
+                        Path.GetExtension(value),
+                        ".json",
+                        StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                var segments = value
+                    .Replace('\\', '/')
+                    .Split('/', StringSplitOptions.RemoveEmptyEntries);
+                return segments.Length > 0
+                    && segments.All(segment => segment is not "." and not "..");
+            }
+            catch (Exception exception) when (exception is
+                ArgumentException or NotSupportedException)
+            {
+                return false;
+            }
         }
 
         private static void ValidateDimension(string name, int? value, List<string> errors)

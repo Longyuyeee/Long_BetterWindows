@@ -29,4 +29,15 @@ namespace LongBetterWindows.Host.Core
     {
         Task ReleaseResourcesAsync();
     }
+
+    /// <summary>
+    /// 可选的插件语言生命周期扩展。仅声明 localization 的插件会收到通知；
+    /// 回调不得重启插件或清空运行状态。
+    /// </summary>
+    public interface IPluginLanguageLifecycle
+    {
+        Task OnLanguageChangedAsync(
+            Contracts.PluginLanguageContext context,
+            CancellationToken cancellationToken = default);
+    }
 }

@@ -9,15 +9,21 @@ namespace LongBetterWindows.Host.Services
     {
         private readonly PluginScanner _scanner;
         private readonly PluginRegistry _registry;
+        private readonly I18nService _i18n;
         private bool _disposed;
 
         public PluginRuntimeCoordinator(
             string? pluginsDirectory = null,
-            PluginRegistry? registry = null)
+            PluginRegistry? registry = null,
+            I18nService? i18n = null)
         {
-            _scanner = new PluginScanner(pluginsDirectory);
+            _i18n = i18n ?? ServicesInitializer.I18n;
+            _scanner = new PluginScanner(
+                pluginsDirectory,
+                () => _i18n.CurrentLanguage);
             _registry = registry ?? HostProvider.Instance.PluginStore;
             PackageInstaller = new LpakInstaller(_scanner, pluginsDirectory);
+            _i18n.LanguageChanged += OnLanguageChanged;
         }
 
         public LpakInstaller PackageInstaller { get; }
@@ -96,7 +102,30 @@ namespace LongBetterWindows.Host.Services
         {
             if (_disposed) return;
             _disposed = true;
+            _i18n.LanguageChanged -= OnLanguageChanged;
             _scanner.Dispose();
+        }
+
+        private void OnLanguageChanged(string language)
+            => _ = NotifyLanguageChangedAsync(language);
+
+        private async Task NotifyLanguageChangedAsync(string language)
+        {
+            try
+            {
+                if (!_disposed)
+                    await _scanner.NotifyLanguageChangedAsync(language);
+            }
+            catch (ObjectDisposedException) when (_disposed)
+            {
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Plugin language broadcast failed: {Language}",
+                    language);
+            }
         }
     }
 

@@ -51,6 +51,10 @@ namespace LongBetterWindows.Host.Contracts
         /// <summary>启动、关闭、后台和窗口承载策略；旧插件缺省使用安全默认值。</summary>
         [JsonPropertyName("lifecycle")]
         public PluginLifecyclePreference? Lifecycle { get; init; }
+
+        /// <summary>可选的插件语言资源声明；未声明时保留 Manifest 原文和旧运行时行为。</summary>
+        [JsonPropertyName("localization")]
+        public PluginLocalizationPreference? Localization { get; init; }
     }
 
     public class PluginDependency

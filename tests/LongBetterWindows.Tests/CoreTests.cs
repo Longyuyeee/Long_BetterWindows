@@ -22,6 +22,7 @@ public class CoreTests
         Assert.Equal(2001, (int)ManifestValidationCode.InvalidCommand);
         Assert.Equal(2002, (int)ManifestValidationCode.InvalidWindow);
         Assert.Equal(2003, (int)ManifestValidationCode.IncompatibleApiVersion);
+        Assert.Equal(2004, (int)ManifestValidationCode.InvalidLocalization);
     }
 
     [Fact]

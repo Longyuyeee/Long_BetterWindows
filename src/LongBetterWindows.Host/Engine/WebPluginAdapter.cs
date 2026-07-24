@@ -7,7 +7,12 @@ namespace LongBetterWindows.Host.Engine
     /// 将 WebView2 插件适配为 ILongPlugin。
     /// WebView2 生命周期与插件生命周期保持一致。
     /// </summary>
-    public class WebPluginAdapter : ILongPlugin, IHasMainUI, IPluginCommandHandler, IDisposable
+    public class WebPluginAdapter :
+        ILongPlugin,
+        IHasMainUI,
+        IPluginCommandHandler,
+        IPluginLanguageLifecycle,
+        IDisposable
     {
         private readonly WebPluginRuntime _runtime;
         private readonly WebPluginPresentationCoordinator _presentation;
@@ -108,6 +113,14 @@ namespace LongBetterWindows.Host.Engine
                 return Contracts.PluginCommandResult.Failure("插件界面初始化失败，请检查 WebView2 Runtime。");
 
             return await _runtime.SendCommandAsync(invocation, cancellationToken);
+        }
+
+        public async Task OnLanguageChangedAsync(
+            Contracts.PluginLanguageContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await _runtime.NotifyLanguageChangedAsync(context);
         }
     }
 }

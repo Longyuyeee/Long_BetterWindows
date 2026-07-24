@@ -106,6 +106,7 @@ namespace LongBetterWindows.Host.Engine
         // 用法: Start = async () => { await Host.HotKey.RegisterAsync(...); };
         public Func<Task>? Start { get; set; }
         public Func<Task>? Stop { get; set; }
+        public Func<PluginLanguageContext, Task>? LanguageChanged { get; set; }
     }
 
     public class ScriptLoadResult

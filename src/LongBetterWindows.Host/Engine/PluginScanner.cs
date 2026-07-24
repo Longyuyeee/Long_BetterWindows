@@ -20,8 +20,11 @@ namespace LongBetterWindows.Host.Engine
         private readonly Dictionary<string, StandalonePluginHandle> _standalonePlugins =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly SemaphoreSlim _reloadGate = new(1, 1);
+        private readonly Func<string>? _currentLanguage;
 
-        public PluginScanner(string? pluginsDir = null)
+        public PluginScanner(
+            string? pluginsDir = null,
+            Func<string>? currentLanguage = null)
         {
             _sourceDiscovery = new PluginSourceDiscovery(pluginsDir);
             _standaloneLoader = new StandalonePluginLoader(
@@ -29,6 +32,7 @@ namespace LongBetterWindows.Host.Engine
             _changeMonitor = new PluginChangeMonitor(
                 _sourceDiscovery.ScanDirectories,
                 HandlePluginFileChangeAsync);
+            _currentLanguage = currentLanguage;
         }
 
         public List<PluginManifest> DiscoveredManifests { get; } = new();
@@ -90,6 +94,20 @@ namespace LongBetterWindows.Host.Engine
                 await UnloadDirectoryPluginAsync(fullPath);
                 if (File.Exists(Path.Combine(fullPath, "manifest.json")))
                     await TryLoadPluginAsync(fullPath);
+            }
+            finally
+            {
+                _reloadGate.Release();
+            }
+        }
+
+        internal async Task NotifyLanguageChangedAsync(string language)
+        {
+            await _reloadGate.WaitAsync();
+            try
+            {
+                foreach (var entry in LoadedPlugins.ToArray())
+                    await NotifyPluginLanguageAsync(entry, language);
             }
             finally
             {
@@ -272,6 +290,8 @@ namespace LongBetterWindows.Host.Engine
 
             // 检查用户配置：仅 auto_start=true 时自动启动
             var entry = registry.Get(manifest.Id)!;
+            if (_currentLanguage is not null)
+                await NotifyPluginLanguageAsync(entry, _currentLanguage());
             _directoryPlugins[pluginDir] = new LoadedDirectoryPlugin(
                 manifest.Id, runtime);
             var autoStart = entry.GetSetting("auto_start")
@@ -312,6 +332,42 @@ namespace LongBetterWindows.Host.Engine
             }
 
             LoadedPlugins.Add(entry);
+        }
+
+        private static async Task NotifyPluginLanguageAsync(
+            PluginEntry entry,
+            string language)
+        {
+            if (entry.Manifest.Localization is not { } localization
+                || entry.Instance is not IPluginLanguageLifecycle lifecycle)
+                return;
+
+            if (!PluginLocalizationLoader.TryLoad(
+                    entry.Directory,
+                    localization,
+                    language,
+                    out var context,
+                    out var error))
+            {
+                Log.Warning(
+                    "Plugin {PluginId} localization could not be loaded: {Error}",
+                    entry.Id,
+                    error);
+                return;
+            }
+
+            try
+            {
+                using (PluginAccessContext.Enter(entry.Id))
+                    await lifecycle.OnLanguageChangedAsync(context!);
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Plugin {PluginId} language notification failed",
+                    entry.Id);
+            }
         }
 
         public void Dispose()

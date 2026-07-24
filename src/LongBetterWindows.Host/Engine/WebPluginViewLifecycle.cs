@@ -11,6 +11,7 @@ namespace LongBetterWindows.Host.Engine
         private readonly PluginManifest _manifest;
         private readonly WebPluginNavigationPolicy _navigationPolicy;
         private readonly Action<string> _messageReceived;
+        private readonly WebPluginLanguageMessageState _languageMessages = new();
         private WebView2? _webView;
         private bool _themeSubscribed;
 
@@ -51,6 +52,7 @@ namespace LongBetterWindows.Host.Engine
 #endif
                 webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
                 webView.CoreWebView2.NavigationStarting += OnNavigationStarting;
+                webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
                 webView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
                 webView.CoreWebView2.DownloadStarting += OnDownloadStarting;
                 webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
@@ -168,10 +170,23 @@ namespace LongBetterWindows.Host.Engine
             object? sender,
             CoreWebView2NavigationStartingEventArgs args)
         {
-            if (_navigationPolicy.IsTrustedLocalUri(args.Uri)) return;
+            if (_navigationPolicy.IsTrustedLocalUri(args.Uri))
+            {
+                _languageMessages.BeginNavigation();
+                return;
+            }
 
             args.Cancel = true;
             Log.Warning("[Web:{Id}] 已阻止越界页面导航：{Uri}", _manifest.Id, args.Uri);
+        }
+
+        private void OnNavigationCompleted(
+            object? sender,
+            CoreWebView2NavigationCompletedEventArgs args)
+        {
+            var message = _languageMessages.CompleteNavigation(args.IsSuccess);
+            if (message is not null)
+                PostMessageCore(message);
         }
 
         private void OnNewWindowRequested(
@@ -225,6 +240,7 @@ namespace LongBetterWindows.Host.Engine
             if (_webView?.CoreWebView2 != null)
             {
                 _webView.CoreWebView2.NavigationStarting -= OnNavigationStarting;
+                _webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
                 _webView.CoreWebView2.NewWindowRequested -= OnNewWindowRequested;
                 _webView.CoreWebView2.DownloadStarting -= OnDownloadStarting;
                 _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
@@ -232,6 +248,7 @@ namespace LongBetterWindows.Host.Engine
 
             _webView?.Dispose();
             _webView = null;
+            _languageMessages.BeginNavigation();
         }
 
         internal void PostMessage(string json)
@@ -256,6 +273,25 @@ namespace LongBetterWindows.Host.Engine
                 PostMessageCore(json);
             else
                 await dispatcher.InvokeAsync(() => PostMessageCore(json));
+        }
+
+        internal async Task SetLanguageMessageAsync(string json)
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null || dispatcher.HasShutdownStarted)
+                return;
+
+            if (dispatcher.CheckAccess())
+                SetLanguageMessageCore(json);
+            else
+                await dispatcher.InvokeAsync(() => SetLanguageMessageCore(json));
+        }
+
+        private void SetLanguageMessageCore(string json)
+        {
+            var message = _languageMessages.Update(json);
+            if (message is not null)
+                PostMessageCore(message);
         }
 
         private void PostMessageCore(string json)

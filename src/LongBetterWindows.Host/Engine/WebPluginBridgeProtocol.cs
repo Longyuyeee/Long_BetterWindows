@@ -30,6 +30,16 @@ namespace LongBetterWindows.Host.Engine
                 command,
             });
 
+        internal static string SerializeLanguageChanged(
+            PluginLanguageContext context) =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                type = "long.language-changed",
+                requested_language = context.RequestedLanguage,
+                resolved_language = context.ResolvedLanguage,
+                resources = context.Resources,
+            });
+
         internal static WebCommandResultMessage? ParseCommandResult(string json)
         {
             using var document = System.Text.Json.JsonDocument.Parse(json);

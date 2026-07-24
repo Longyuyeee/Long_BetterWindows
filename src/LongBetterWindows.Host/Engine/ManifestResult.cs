@@ -17,6 +17,7 @@ namespace LongBetterWindows.Host.Engine
         InvalidCommand = 2001,
         InvalidWindow = 2002,
         IncompatibleApiVersion = 2003,
+        InvalidLocalization = 2004,
     }
 
     public sealed record ManifestValidationIssue(

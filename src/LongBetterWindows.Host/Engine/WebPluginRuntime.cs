@@ -98,6 +98,11 @@ namespace LongBetterWindows.Host.Engine
             CancellationToken cancellationToken = default)
             => await _commands.SendAsync(invocation, cancellationToken);
 
+        public Task NotifyLanguageChangedAsync(
+            PluginLanguageContext context)
+            => _viewLifecycle.SetLanguageMessageAsync(
+                WebPluginBridgeProtocol.SerializeLanguageChanged(context));
+
         private async Task<object?> DispatchJsCall(string method, object?[] args)
         {
             // ✅ 权限检查：验证插件是否声明了所需的 capability
