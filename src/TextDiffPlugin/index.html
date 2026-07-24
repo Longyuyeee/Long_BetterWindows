@@ -10,38 +10,38 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">TEXT DIFF</div>
-        <h1 class="long-page-title">文本对比</h1>
-        <p class="long-page-description">按行对齐新增、删除与未变内容，结果完全在本地计算。</p>
+        <h1 class="long-page-title" data-i18n="page.title">文本对比</h1>
+        <p class="long-page-description" data-i18n="page.description">按行对齐新增、删除与未变内容，结果完全在本地计算。</p>
       </div>
       <span class="long-badge" id="summary">等待对比</span>
     </header>
 
-    <section class="long-grid" aria-label="待对比文本">
+    <section class="long-grid" id="editorSection" aria-label="待对比文本">
       <div class="long-card long-field">
-        <label class="long-field-label" for="textA">原始文本</label>
+        <label class="long-field-label" for="textA" data-i18n="field.original">原始文本</label>
         <textarea class="long-editor" id="textA" placeholder="粘贴原始版本…" autofocus></textarea>
-        <button class="long-button long-button--secondary btn-secondary" id="pasteAButton" type="button">粘贴到原始文本</button>
+        <button class="long-button long-button--secondary btn-secondary" id="pasteAButton" type="button" data-i18n="action.pasteOriginal">粘贴到原始文本</button>
       </div>
       <div class="long-card long-field">
-        <label class="long-field-label" for="textB">修改后文本</label>
+        <label class="long-field-label" for="textB" data-i18n="field.modified">修改后文本</label>
         <textarea class="long-editor" id="textB" placeholder="粘贴修改后的版本…"></textarea>
-        <button class="long-button long-button--secondary btn-secondary" id="pasteBButton" type="button">粘贴到修改文本</button>
+        <button class="long-button long-button--secondary btn-secondary" id="pasteBButton" type="button" data-i18n="action.pasteModified">粘贴到修改文本</button>
       </div>
     </section>
 
     <div class="long-toolbar long-toolbar--spaced">
-      <button class="long-button long-button--primary btn-primary" id="compareButton" type="button">对比差异</button>
-      <button class="long-button long-button--secondary btn-secondary" id="swapButton" type="button">交换两侧</button>
-      <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button">清空</button>
+      <button class="long-button long-button--primary btn-primary" id="compareButton" type="button" data-i18n="action.compare">对比差异</button>
+      <button class="long-button long-button--secondary btn-secondary" id="swapButton" type="button" data-i18n="action.swap">交换两侧</button>
+      <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button" data-i18n="action.clear">清空</button>
       <span class="long-toolbar__spacer"></span>
       <span class="long-kbd">Ctrl Enter</span>
     </div>
 
     <section class="long-card long-stack long-toolbar--spaced" aria-labelledby="resultTitle">
       <div class="long-toolbar">
-        <h2 class="long-field-label" id="resultTitle">对比结果</h2>
+        <h2 class="long-field-label" id="resultTitle" data-i18n="result.title">对比结果</h2>
         <span class="long-toolbar__spacer"></span>
-        <button class="long-button long-button--small" id="copyButton" type="button" disabled>复制 Diff</button>
+        <button class="long-button long-button--small" id="copyButton" type="button" data-i18n="action.copy" disabled>复制 Diff</button>
       </div>
       <div class="long-diff" id="diffResult" role="region" aria-live="polite"></div>
       <div class="long-status" id="status" role="status" aria-live="polite"></div>
@@ -55,36 +55,89 @@
     const status = document.getElementById('status');
     const copyButton = document.getElementById('copyButton');
     let diffText = '';
+    let operationsSnapshot = [];
+    let addedCount = 0;
+    let removedCount = 0;
+    let hasComparison = false;
+    let strings = {};
+    let currentStatus = { key: '', fallback: '', kind: '' };
 
-    function setStatus(message, kind) {
+    function t(key, fallback) {
+      return strings[key] || fallback || key;
+    }
+
+    function setStatus(key, kind, fallback) {
+      currentStatus = { key, kind, fallback: fallback || '' };
+      const message = key ? t(key, fallback) : currentStatus.fallback;
       status.textContent = message;
       status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
+      if (message) window.LongUI?.announce(message);
+      return message;
+    }
+
+    function renderDiff() {
+      result.replaceChildren();
+      diffText = operationsSnapshot.map(function (operation) {
+        const line = document.createElement('span');
+        line.className = 'long-diff-line long-diff-line--' + operation.kind;
+        const prefix = operation.kind === 'add'
+          ? '+ '
+          : operation.kind === 'delete' ? '- ' : '  ';
+        line.textContent = prefix + operation.text;
+        result.appendChild(line);
+        return prefix + operation.text;
+      }).join('\n');
+      document.getElementById('summary').textContent = hasComparison
+        ? '+' + addedCount + ' / -' + removedCount
+        : t('page.waiting', '等待对比');
+      copyButton.disabled = operationsSnapshot.length === 0;
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '文本对比');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('editorSection').setAttribute(
+        'aria-label',
+        t('editor.ariaLabel', '待对比文本'));
+      textA.placeholder = t('field.originalPlaceholder', '粘贴原始版本…');
+      textB.placeholder = t('field.modifiedPlaceholder', '粘贴修改后的版本…');
+      result.setAttribute(
+        'aria-label',
+        t('result.regionAriaLabel', '文本差异结果'));
+      renderDiff();
+      if (currentStatus.key || currentStatus.fallback) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback);
+      }
     }
 
     function compare() {
       const left = textA.value.split('\n');
       const right = textB.value.split('\n');
       if (left.length * right.length > 160000) {
-        setStatus('文本行数过多，请将两侧控制在约 400 行以内', 'warning');
+        setStatus('status.tooManyLines', 'warning', '文本行数过多，请将两侧控制在约 400 行以内');
         return;
       }
-      const operations = buildLineDiff(left, right);
-      result.replaceChildren();
-      let added = 0, removed = 0;
-      diffText = operations.map(function (operation) {
-        const line = document.createElement('span');
-        line.className = 'long-diff-line long-diff-line--' + operation.kind;
-        const prefix = operation.kind === 'add' ? '+ ' : operation.kind === 'delete' ? '- ' : '  ';
-        line.textContent = prefix + operation.text;
-        result.appendChild(line);
-        if (operation.kind === 'add') added++;
-        if (operation.kind === 'delete') removed++;
-        return prefix + operation.text;
-      }).join('\n');
-      document.getElementById('summary').textContent = '+' + added + ' / −' + removed;
-      copyButton.disabled = operations.length === 0;
-      setStatus(added || removed ? '对比完成' : '两侧文本没有差异', 'success');
+      operationsSnapshot = buildLineDiff(left, right);
+      addedCount = operationsSnapshot.filter(function (operation) {
+        return operation.kind === 'add';
+      }).length;
+      removedCount = operationsSnapshot.filter(function (operation) {
+        return operation.kind === 'delete';
+      }).length;
+      hasComparison = true;
+      renderDiff();
+      if (addedCount || removedCount) {
+        setStatus('status.completed', 'success', '对比完成');
+      } else {
+        setStatus('status.noDifference', 'success', '两侧文本没有差异');
+      }
     }
 
     function buildLineDiff(left, right) {
@@ -109,14 +162,14 @@
       try {
         const response = await long.clipboard.getText();
         if (response.success && response.data) { target.value = response.data; target.focus(); }
-        else setStatus('剪贴板中没有文本', 'warning');
-      } catch (_) { setStatus('无法读取剪贴板', 'danger'); }
+        else setStatus('error.clipboardEmpty', 'warning', '剪贴板中没有文本');
+      } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); }
     }
 
     async function copyDiff() {
       if (!diffText) return;
-      try { await long.clipboard.setText(diffText); setStatus('Diff 已复制', 'success'); }
-      catch (_) { setStatus('复制失败', 'danger'); }
+      try { const response = await long.clipboard.setText(diffText); if (!response || !response.success) throw new Error(response && response.error); setStatus('status.copied', 'success', 'Diff 已复制'); }
+      catch (_) { setStatus('error.copy', 'danger', '复制失败'); }
     }
 
     document.getElementById('compareButton').addEventListener('click', compare);
@@ -124,7 +177,7 @@
     document.getElementById('pasteBButton').addEventListener('click', function () { paste(textB); });
     document.getElementById('copyButton').addEventListener('click', copyDiff);
     document.getElementById('swapButton').addEventListener('click', function () { const value = textA.value; textA.value = textB.value; textB.value = value; compare(); });
-    document.getElementById('clearButton').addEventListener('click', function () { textA.value = ''; textB.value = ''; result.replaceChildren(); diffText = ''; copyButton.disabled = true; document.getElementById('summary').textContent = '等待对比'; textA.focus(); setStatus(''); });
+    document.getElementById('clearButton').addEventListener('click', function () { textA.value = ''; textB.value = ''; operationsSnapshot = []; addedCount = 0; removedCount = 0; hasComparison = false; renderDiff(); textA.focus(); setStatus('', '', ''); });
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); compare(); }
     });
@@ -133,6 +186,10 @@
       if (text) textA.value = text;
       textB.focus();
     });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
+    });
+    renderDiff();
   </script>
 </body>
 </html>

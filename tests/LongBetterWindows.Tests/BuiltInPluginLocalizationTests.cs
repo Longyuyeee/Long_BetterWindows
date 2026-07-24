@@ -14,10 +14,12 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("ClipboardTool")]
     [InlineData("FolderNotePlugin")]
     [InlineData("JsonFormatterPlugin")]
+    [InlineData("MarkdownPreview")]
     [InlineData("PasswordGenerator")]
     [InlineData("QuickNotePlugin")]
     [InlineData("RegexTester")]
     [InlineData("TimestampConverter")]
+    [InlineData("TextDiffPlugin")]
     [InlineData("UrlToolkit")]
     [InlineData("UuidGenerator")]
     public async Task SamplePlugin_HasValidBilingualResources(string plugin)
@@ -222,10 +224,12 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("Base64Tool")]
     [InlineData("ClipboardTool")]
     [InlineData("JsonFormatterPlugin")]
+    [InlineData("MarkdownPreview")]
     [InlineData("PasswordGenerator")]
     [InlineData("QuickNotePlugin")]
     [InlineData("RegexTester")]
     [InlineData("TimestampConverter")]
+    [InlineData("TextDiffPlugin")]
     [InlineData("UrlToolkit")]
     [InlineData("UuidGenerator")]
     public async Task LocalizedWebPlugin_DeclaresEveryReferencedResourceKey(
@@ -256,9 +260,11 @@ public sealed class BuiltInPluginLocalizationTests
 
     [Theory]
     [InlineData("JsonFormatterPlugin", "function transform", "renderStat();", "transform(")]
+    [InlineData("MarkdownPreview", "function render", "renderEmptyState();", "render();")]
     [InlineData("PasswordGenerator", "function secureIndex", "renderStrength();", "generate();")]
     [InlineData("RegexTester", "function test", "renderMatches();", "test();")]
     [InlineData("TimestampConverter", "function parse", "renderResult();", "convert();")]
+    [InlineData("TextDiffPlugin", "function compare", "renderDiff();", "compare();")]
     [InlineData("UrlToolkit", "function transform", "renderStat();", "transform(")]
     [InlineData("UuidGenerator", "function uuid", "output.setAttribute", "generate();")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(

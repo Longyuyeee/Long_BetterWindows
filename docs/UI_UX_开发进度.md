@@ -743,7 +743,8 @@ WIP UI visual draft before audited implementation
 - [x] G17-D1 完成 TimestampConverter 与 PasswordGenerator；切换语言不重新解析时间或重新生成密码，最小窗口无水平溢出。Release 0 警告/0 错误，574 / 574 测试通过。
 - [x] G17-D2-A 完成命令参数/说明、预设名称和输出说明的只读语言投影，并迁移 UuidGenerator；原参数键、约束、值、预设字典和工作流状态不变。最小窗口验证无溢出，578 / 578 测试通过。
 - [x] G17-D2-B 完成 UrlToolkit、JsonFormatterPlugin 与 RegexTester；语言切换保留输入输出、解析错误详情和正则匹配快照，最小窗口无溢出。Release 0 警告/0 错误，587 / 587 测试通过。
-- [ ] G17-D3 审计并迁移 MarkdownPreview、TextDiffPlugin、TranslatePlugin 与 FileRenamerPlugin；复杂监控、历史和开发工具继续后置。
+- [x] G17-D3-A 完成 MarkdownPreview 与 TextDiffPlugin；切换语言保留 Markdown 预览 DOM 和差异操作快照，不重新解析或比较。最小窗口无溢出，593 / 593 测试通过。
+- [ ] G17-D3-B 迁移 TranslatePlugin 与 FileRenamerPlugin，分别验证进行中网络请求和文件预览/部分失败事务状态。
 - [x] G3 插件语言声明与宿主通知协议基础由 G17-A 完成；内置插件内容迁移继续由 G17-B 分批实施，不实现 uTools 插件兼容层。
 
 详细边界与后续顺序见 `docs/国际化_UI集成.md`。

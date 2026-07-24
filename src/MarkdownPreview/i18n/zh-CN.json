@@ -1,0 +1,22 @@
+{
+  "plugin.name": "Markdown 预览",
+  "commands.markdown.preview.title": "预览 Markdown",
+  "commands.markdown.preview.description": "安全预览文本或剪贴板中的 Markdown",
+  "page.title": "Markdown 预览",
+  "page.description": "安全地实时预览 Markdown，链接仅允许常见可信协议。",
+  "page.localBadge": "本地渲染",
+  "page.livePreview": "实时预览",
+  "editor.ariaLabel": "Markdown 编辑和预览",
+  "field.input": "Markdown",
+  "field.inputPlaceholder": "# 标题\n\n使用 **粗体**、`代码`、列表和引用…",
+  "preview.ariaLabel": "Markdown 预览结果",
+  "action.paste": "粘贴 Markdown",
+  "action.copy": "复制 HTML",
+  "action.clear": "清空",
+  "state.empty": "等待 Markdown 内容",
+  "state.emptyDetail": "在左侧输入内容后，这里会显示预览",
+  "status.copied": "HTML 已复制",
+  "status.refreshed": "预览已刷新",
+  "error.clipboardRead": "无法读取剪贴板",
+  "error.copy": "复制失败"
+}

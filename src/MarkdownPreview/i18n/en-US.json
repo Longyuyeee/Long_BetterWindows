@@ -1,0 +1,22 @@
+{
+  "plugin.name": "Markdown Preview",
+  "commands.markdown.preview.title": "Preview Markdown",
+  "commands.markdown.preview.description": "Safely preview Markdown from text or clipboard content",
+  "page.title": "Markdown Preview",
+  "page.description": "Preview Markdown locally with links limited to common trusted protocols.",
+  "page.localBadge": "Local rendering",
+  "page.livePreview": "Live preview",
+  "editor.ariaLabel": "Markdown editor and preview",
+  "field.input": "Markdown",
+  "field.inputPlaceholder": "# Heading\n\nUse **bold**, `code`, lists, and quotes…",
+  "preview.ariaLabel": "Markdown preview result",
+  "action.paste": "Paste Markdown",
+  "action.copy": "Copy HTML",
+  "action.clear": "Clear",
+  "state.empty": "Waiting for Markdown",
+  "state.emptyDetail": "Enter content on the left to preview it here",
+  "status.copied": "HTML copied",
+  "status.refreshed": "Preview refreshed",
+  "error.clipboardRead": "The clipboard could not be read",
+  "error.copy": "Copy failed"
+}

@@ -10,23 +10,23 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">DOCUMENT</div>
-        <h1 class="long-page-title">Markdown 预览</h1>
-        <p class="long-page-description">安全地实时预览 Markdown，链接仅允许常见可信协议。</p>
+        <h1 class="long-page-title" data-i18n="page.title">Markdown 预览</h1>
+        <p class="long-page-description" data-i18n="page.description">安全地实时预览 Markdown，链接仅允许常见可信协议。</p>
       </div>
-      <span class="long-badge">本地渲染</span>
+      <span class="long-badge" data-i18n="page.localBadge">本地渲染</span>
     </header>
 
     <div class="long-toolbar">
-      <button class="long-button long-button--primary btn-primary" id="pasteButton" type="button">粘贴 Markdown</button>
-      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button">复制 HTML</button>
-      <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button">清空</button>
+      <button class="long-button long-button--primary btn-primary" id="pasteButton" type="button" data-i18n="action.paste">粘贴 Markdown</button>
+      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制 HTML</button>
+      <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button" data-i18n="action.clear">清空</button>
       <span class="long-toolbar__spacer"></span>
-      <span class="long-secondary">实时预览</span>
+      <span class="long-secondary" data-i18n="page.livePreview">实时预览</span>
     </div>
 
-    <section class="long-grid long-toolbar--spaced" aria-label="Markdown 编辑和预览">
+    <section class="long-grid long-toolbar--spaced" id="editorSection" aria-label="Markdown 编辑和预览">
       <div class="long-card long-field">
-        <label class="long-field-label" for="input">Markdown</label>
+        <label class="long-field-label" for="input" data-i18n="field.input">Markdown</label>
         <textarea class="long-editor" id="input" placeholder="# 标题
 
 使用 **粗体**、`代码`、列表和引用…" autofocus></textarea>
@@ -40,11 +40,54 @@
     const input = document.getElementById('input');
     const preview = document.getElementById('preview');
     const status = document.getElementById('status');
+    let strings = {};
+    let previewEmpty = true;
+    let currentStatus = { key: '', fallback: '', kind: '' };
 
-    function setStatus(message, kind) {
+    function t(key, fallback) {
+      return strings[key] || fallback || key;
+    }
+
+    function setStatus(key, kind, fallback) {
+      currentStatus = { key, kind, fallback: fallback || '' };
+      const message = key ? t(key, fallback) : currentStatus.fallback;
       status.textContent = message;
       status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
+      if (message) window.LongUI?.announce(message);
+      return message;
+    }
+
+    function renderEmptyState() {
+      window.LongUI?.renderState(preview, {
+        kind: 'empty',
+        title: t('state.empty', '等待 Markdown 内容'),
+        detail: t('state.emptyDetail', '在左侧输入内容后，这里会显示预览')
+      });
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', 'Markdown 预览');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('editorSection').setAttribute(
+        'aria-label',
+        t('editor.ariaLabel', 'Markdown 编辑和预览'));
+      input.placeholder = t(
+        'field.inputPlaceholder',
+        '# 标题\n\n使用 **粗体**、`代码`、列表和引用…');
+      preview.setAttribute(
+        'aria-label',
+        t('preview.ariaLabel', 'Markdown 预览结果'));
+      if (previewEmpty) renderEmptyState();
+      if (currentStatus.key || currentStatus.fallback) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback);
+      }
     }
 
     function render() {
@@ -80,13 +123,8 @@
         const paragraph = document.createElement('p'); appendInline(paragraph, line); preview.appendChild(paragraph); list = null;
       });
       if (codeBlock) preview.appendChild(codeBlock);
-      if (!preview.childNodes.length) {
-        window.LongUI?.renderState(preview, {
-          kind: 'empty',
-          title: '等待 Markdown 内容',
-          detail: '在左侧输入内容后，这里会显示预览'
-        });
-      }
+      previewEmpty = !preview.childNodes.length;
+      if (previewEmpty) renderEmptyState();
     }
 
     function appendInline(parent, text) {
@@ -120,14 +158,23 @@
     }
 
     async function paste() {
-      const response = await long.clipboard.getText();
-      if (response.success) { input.value = response.data || ''; render(); input.focus(); }
-      else setStatus(response.error || '无法读取剪贴板', 'danger');
+      try {
+        const response = await long.clipboard.getText();
+        if (response.success) { input.value = response.data || ''; render(); input.focus(); }
+        else setStatus('', 'danger', response.error || t('error.clipboardRead', '无法读取剪贴板'));
+      } catch (_) {
+        setStatus('error.clipboardRead', 'danger', '无法读取剪贴板');
+      }
     }
 
     async function copyHtml() {
-      const response = await long.clipboard.setText(preview.innerHTML);
-      setStatus(response.success ? 'HTML 已复制' : response.error || '复制失败', response.success ? 'success' : 'danger');
+      try {
+        const response = await long.clipboard.setText(preview.innerHTML);
+        if (response.success) setStatus('status.copied', 'success', 'HTML 已复制');
+        else setStatus('', 'danger', response.error || t('error.copy', '复制失败'));
+      } catch (_) {
+        setStatus('error.copy', 'danger', '复制失败');
+      }
     }
 
     input.addEventListener('input', render);
@@ -135,13 +182,16 @@
     document.getElementById('copyButton').addEventListener('click', copyHtml);
     document.getElementById('clearButton').addEventListener('click', function () { input.value = ''; render(); input.focus(); });
     document.addEventListener('keydown', function (event) {
-      if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); render(); preview.focus(); setStatus('预览已刷新', 'success'); }
+      if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); render(); preview.focus(); setStatus('status.refreshed', 'success', '预览已刷新'); }
       else if (event.ctrlKey && event.shiftKey && event.key.toLocaleLowerCase() === 'c') { event.preventDefault(); copyHtml(); }
     });
     window.LongUI?.onCommand(function (command) {
       const text = window.LongUI.commandText(command);
       if (text) input.value = text;
       render(); input.focus();
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
     render();
   </script>
