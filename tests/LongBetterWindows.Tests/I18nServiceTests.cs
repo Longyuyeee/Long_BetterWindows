@@ -409,11 +409,41 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("apiCatalog,", source);
         Assert.Contains("data.apiCatalog || []", html);
         Assert.Contains("renderApiExplorer();", html);
+        Assert.Contains("capabilitySelectionToRestore", html);
+        Assert.Contains("api('listCapabilities')", html);
+        Assert.Contains("developer.workbench.capabilities.empty", html);
+        Assert.Contains("$\"capability.{c}.name\"", source);
+        Assert.Contains("$\"capability.{c}.description\"", source);
         Assert.DoesNotContain("['long.app.getVersion()', '读取宿主版本'", html);
+        Assert.DoesNotContain("无可用能力</span>", html);
         Assert.DoesNotContain("error = ex.Message", source);
         Assert.DoesNotContain("OnLanguageChanged(string language)\n        {\n            location.reload", source);
         Assert.DoesNotContain("<h3>新建插件</h3>", html);
         Assert.DoesNotContain(">运行日志</strong>", html);
+    }
+
+    [Fact]
+    public void DeveloperWorkbench_AllKnownCapabilitiesHaveBilingualMetadata()
+    {
+        var root = FindRepositoryRoot();
+        var resourceDirectory = Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "i18n");
+        var service = new I18nService(resourceDirectory, _settings);
+
+        foreach (var language in I18nService.SupportedLanguages)
+        {
+            service.Initialize(language);
+            foreach (var capability in LongBetterWindows.Host.Engine.ManifestReader.KnownCapabilities)
+            {
+                var nameKey = $"capability.{capability}.name";
+                var descriptionKey = $"capability.{capability}.description";
+                Assert.NotEqual(nameKey, service.T(nameKey));
+                Assert.NotEqual(descriptionKey, service.T(descriptionKey));
+            }
+        }
     }
 
     [Fact]

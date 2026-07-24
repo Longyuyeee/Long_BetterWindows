@@ -57,6 +57,7 @@ namespace LongBetterWindows.Host.Views
             "developer.workbench.error.save",
             "developer.workbench.error.dllUnsupported",
             "developer.workbench.error.directoryExists",
+            "developer.workbench.capabilities.empty",
             "action.create",
             "action.cancel",
         ];
@@ -455,9 +456,13 @@ namespace LongBetterWindows.Host.Views
                     return new
                     {
                         id = c,
-                        name = info.DisplayName,
+                        name = ServicesInitializer.I18n.T(
+                            $"capability.{c}.name",
+                            info.DisplayName),
                         icon = info.Icon,
-                        description = info.Description,
+                        description = ServicesInitializer.I18n.T(
+                            $"capability.{c}.description",
+                            info.Description),
                         level = info.Level.ToString().ToLowerInvariant()
                     };
                 })
