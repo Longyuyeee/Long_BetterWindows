@@ -10,27 +10,27 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">FILE OPERATION</div>
-        <h1 class="long-page-title">批量重命名</h1>
-        <p class="long-page-description">只处理明确选中的文件，确认预览后再执行重命名。</p>
+        <h1 class="long-page-title" data-i18n="page.title">批量重命名</h1>
+        <p class="long-page-description" data-i18n="page.description">只处理明确选中的文件，确认预览后再执行重命名。</p>
       </div>
       <span class="long-badge" id="fileBadge">0 个文件</span>
     </header>
 
     <section class="long-card long-stack">
       <div class="long-toolbar">
-        <button class="long-button long-button--primary btn-primary" id="loadButton" type="button">读取 Explorer 选区</button>
-        <span class="long-secondary">不会自动扩大到整个文件夹</span>
+        <button class="long-button long-button--primary btn-primary" id="loadButton" type="button" data-i18n="action.load">读取 Explorer 选区</button>
+        <span class="long-secondary" data-i18n="selection.scopeHint">不会自动扩大到整个文件夹</span>
       </div>
 
       <div class="long-toolbar">
-        <label class="long-field-label" for="ruleType">命名规则</label>
+        <label class="long-field-label" for="ruleType" data-i18n="field.rule">命名规则</label>
         <select id="ruleType">
-          <option value="none">仅手动编辑</option>
-          <option value="prefix">添加前缀</option>
-          <option value="suffix">添加后缀</option>
-          <option value="replace">查找替换</option>
-          <option value="number">顺序编号</option>
-          <option value="extension">修改扩展名</option>
+          <option value="none" data-i18n="rule.none">仅手动编辑</option>
+          <option value="prefix" data-i18n="rule.prefix">添加前缀</option>
+          <option value="suffix" data-i18n="rule.suffix">添加后缀</option>
+          <option value="replace" data-i18n="rule.replace">查找替换</option>
+          <option value="number" data-i18n="rule.number">顺序编号</option>
+          <option value="extension" data-i18n="rule.extension">修改扩展名</option>
         </select>
         <input id="parameterA" placeholder="参数" aria-label="重命名规则参数">
         <input id="parameterB" placeholder="替换为" aria-label="替换后的文本" hidden>
@@ -39,8 +39,8 @@
       <div class="long-file-list" id="fileList"></div>
 
       <div class="long-toolbar">
-        <button class="long-button long-button--primary btn-primary" id="renameButton" type="button" disabled>执行重命名</button>
-        <button class="long-button long-button--secondary btn-secondary" id="resetButton" type="button">恢复原名称</button>
+        <button class="long-button long-button--primary btn-primary" id="renameButton" type="button" data-i18n="action.rename" disabled>执行重命名</button>
+        <button class="long-button long-button--secondary btn-secondary" id="resetButton" type="button" data-i18n="action.reset">恢复原名称</button>
         <span class="long-toolbar__spacer"></span>
         <span class="long-secondary" id="changeCount">0 项待修改</span>
       </div>
@@ -54,48 +54,115 @@
     const renameButton = document.getElementById('renameButton');
     let files = [];
     let previewNames = [];
+    let strings = {};
+    let listState = 'empty';
+    let loadErrorDetail = '';
+    let isRenaming = false;
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
 
-    function setStatus(message, kind) {
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
+      const message = key
+        ? t(key, fallback, currentStatus.values)
+        : currentStatus.fallback;
       status.textContent = message;
       status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
+      if (message) window.LongUI?.announce(message);
+      return message;
+    }
+
+    function renderListState(updateStatus) {
+      if (listState === 'loading') {
+        window.LongUI?.renderState(list, {
+          kind: 'loading',
+          title: t('state.loading', '正在读取 Explorer 选区')
+        });
+        return;
+      }
+      if (listState === 'error') {
+        window.LongUI?.renderState(list, {
+          kind: 'error',
+          title: t('state.loadFailed', 'Explorer 选区读取失败'),
+          detail: loadErrorDetail,
+          actionLabel: t('action.retry', '重试'),
+          onAction: loadSelection
+        });
+        return;
+      }
+      renderFiles(updateStatus);
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '批量重命名');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      const parameterA = document.getElementById('parameterA');
+      const parameterB = document.getElementById('parameterB');
+      parameterA.placeholder = t('field.parameter', '参数');
+      parameterA.setAttribute(
+        'aria-label',
+        t('field.parameterAriaLabel', '重命名规则参数'));
+      parameterB.placeholder = t('field.replacement', '替换为');
+      parameterB.setAttribute(
+        'aria-label',
+        t('field.replacementAriaLabel', '替换后的文本'));
+      renderListState(false);
+      if (currentStatus.key || currentStatus.fallback) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback,
+          currentStatus.values);
+      }
     }
 
     async function loadSelection() {
       if (!files.length) {
-        window.LongUI?.renderState(list, {
-          kind: 'loading',
-          title: '正在读取 Explorer 选区'
-        });
+        listState = 'loading';
+        renderListState(false);
       }
       try {
         const response = await long.shell.getSelectedItems();
-        if (!response.success) throw new Error(response.error || 'Explorer 选区读取失败');
+        if (!response.success) throw new Error(response.error || t('error.selectionRead', 'Explorer 选区读取失败'));
         if (!response.data || !response.data.length) {
-          setFiles([]); setStatus('Explorer 当前没有明确选中的文件', 'warning'); return;
+          setFiles([]);
+          setStatus('status.selectionEmpty', 'warning', 'Explorer 当前没有明确选中的文件');
+          return;
         }
         setFiles(response.data);
-        setStatus('已读取 ' + files.length + ' 个选中项', 'success');
+        setStatus(
+          'status.selectionLoaded',
+          'success',
+          '已读取 {count} 个选中项',
+          { count: files.length });
       } catch (error) {
+        loadErrorDetail = error && error.message ? error.message : String(error);
         if (!files.length) {
-          window.LongUI?.renderState(list, {
-            kind: 'error',
-            title: 'Explorer 选区读取失败',
-            detail: error && error.message ? error.message : String(error),
-            actionLabel: '重试',
-            onAction: loadSelection
-          });
+          listState = 'error';
+          renderListState(false);
         }
         setStatus(
-          '读取 Explorer 选区失败：' + (error && error.message ? error.message : String(error)),
-          'danger');
+          'status.selectionFailed',
+          'danger',
+          '读取 Explorer 选区失败：{detail}',
+          { detail: loadErrorDetail });
       }
     }
 
     function setFiles(paths) {
       files = paths.filter(function (path) { return typeof path === 'string' && path.length > 0; });
       previewNames = files.map(fileName);
-      document.getElementById('fileBadge').textContent = files.length + ' 个文件';
+      listState = files.length ? 'ready' : 'empty';
       applyRule();
     }
 
@@ -117,63 +184,87 @@
       renderFiles();
     }
 
-    function renderFiles() {
+    function renderFiles(updateStatus) {
+      if (updateStatus === undefined) updateStatus = true;
       list.replaceChildren();
+      document.getElementById('fileBadge').textContent = t(
+        'page.fileCount',
+        '{count} 个文件',
+        { count: files.length });
       if (!files.length) {
         window.LongUI?.renderState(list, {
           kind: 'empty',
-          title: '等待文件选区',
-          detail: '请先在 Explorer 中选择需要重命名的文件'
+          title: t('state.empty', '等待文件选区'),
+          detail: t('state.emptyDetail', '请先在 Explorer 中选择需要重命名的文件')
         });
-        updateValidation();
+        updateValidation(updateStatus);
         return;
       }
       files.forEach(function (path, index) {
         const row = document.createElement('div'); row.className = 'long-file-row';
         const oldName = document.createElement('span'); oldName.className = 'long-file-row__old'; oldName.textContent = fileName(path); oldName.title = path;
         const arrow = document.createElement('span'); arrow.className = 'long-file-row__arrow'; arrow.textContent = '→';
-        const nextName = document.createElement('input'); nextName.className = 'long-file-row__new'; nextName.value = previewNames[index]; nextName.setAttribute('aria-label', '新文件名');
+        const nextName = document.createElement('input'); nextName.className = 'long-file-row__new'; nextName.value = previewNames[index]; nextName.setAttribute('aria-label', t('file.newNameAriaLabel', '新文件名'));
         nextName.addEventListener('input', function () { previewNames[index] = nextName.value; updateValidation(); });
-        const badge = document.createElement('span'); badge.className = 'long-badge'; badge.textContent = previewNames[index] === fileName(path) ? '未修改' : '待修改';
+        const badge = document.createElement('span'); badge.className = 'long-badge'; badge.textContent = previewNames[index] === fileName(path) ? t('file.unchanged', '未修改') : t('file.pending', '待修改');
         row.append(oldName, arrow, nextName, badge); list.appendChild(row);
       });
-      updateValidation();
+      updateValidation(updateStatus);
     }
 
-    function updateValidation() {
+    function updateValidation(updateStatus) {
+      if (updateStatus === undefined) updateStatus = true;
       const changed = previewNames.filter(function (name, index) { return name !== fileName(files[index]); }).length;
       const invalid = previewNames.some(function (name) { return !isValidFileName(name); });
       const normalized = previewNames.map(function (name) { return name.toLocaleLowerCase(); });
       const duplicates = new Set(normalized).size !== normalized.length;
-      document.getElementById('changeCount').textContent = changed + ' 项待修改';
-      renameButton.disabled = !changed || invalid || duplicates;
-      if (invalid) setStatus('存在无效文件名', 'danger');
-      else if (duplicates) setStatus('预览结果中存在重名', 'danger');
-      else if (files.length) setStatus('请确认预览后执行');
+      document.getElementById('changeCount').textContent = t(
+        'change.count',
+        '{count} 项待修改',
+        { count: changed });
+      renameButton.disabled = isRenaming || !changed || invalid || duplicates;
+      if (!updateStatus) return;
+      if (invalid) setStatus('status.invalidName', 'danger', '存在无效文件名');
+      else if (duplicates) setStatus('status.duplicateName', 'danger', '预览结果中存在重名');
+      else if (files.length) setStatus('status.confirm', '', '请确认预览后执行');
     }
 
     async function executeRename() {
+      if (isRenaming) return;
+      isRenaming = true;
       window.LongUI?.setBusy(renameButton, true);
       const failures = [];
       const failedIndexes = [];
       let completed = 0;
-      for (let index = 0; index < files.length; index++) {
-        const original = fileName(files[index]);
-        if (previewNames[index] === original) continue;
-        try {
-          const response = await long.shell.renameFile(files[index], previewNames[index]);
-          if (response.success) completed++; else { failures.push(original + '：' + (response.error || '失败')); failedIndexes.push(index); }
-        } catch (error) { failures.push(original + '：' + error.message); failedIndexes.push(index); }
+      try {
+        for (let index = 0; index < files.length; index++) {
+          const original = fileName(files[index]);
+          if (previewNames[index] === original) continue;
+          try {
+            const response = await long.shell.renameFile(files[index], previewNames[index]);
+            if (response.success) completed++; else { failures.push(original + ': ' + (response.error || t('error.rename', '失败'))); failedIndexes.push(index); }
+          } catch (error) { failures.push(original + ': ' + error.message); failedIndexes.push(index); }
+        }
+      } finally {
+        isRenaming = false;
+        window.LongUI?.setBusy(renameButton, false);
       }
-      window.LongUI?.setBusy(renameButton, false);
       if (failures.length) {
         const failedFiles = failedIndexes.map(function (index) { return files[index]; });
         const failedNames = failedIndexes.map(function (index) { return previewNames[index]; });
         files = failedFiles; previewNames = failedNames; renderFiles();
-        setStatus('完成 ' + completed + ' 项，失败 ' + failures.length + ' 项 · ' + failures[0], 'danger');
+        setStatus(
+          'status.partialFailure',
+          'danger',
+          '完成 {completed} 项，失败 {failed} 项 · {detail}',
+          { completed: completed, failed: failures.length, detail: failures[0] });
       } else {
         setFiles([]);
-        setStatus('已完成 ' + completed + ' 项重命名', 'success');
+        setStatus(
+          'status.completed',
+          'success',
+          '已完成 {count} 项重命名',
+          { count: completed });
       }
     }
 
@@ -195,10 +286,13 @@
     });
     window.LongUI?.onCommand(function (command) {
       const paths = window.LongUI.commandPaths(command);
-      if (paths.length) { setFiles(paths); setStatus('已从命令上下文读取 ' + paths.length + ' 个文件', 'success'); }
+      if (paths.length) { setFiles(paths); setStatus('status.contextLoaded', 'success', '已从命令上下文读取 {count} 个文件', { count: paths.length }); }
       else loadSelection();
     });
-    renderFiles();
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
+    });
+    renderListState(false);
   </script>
 </body>
 </html>

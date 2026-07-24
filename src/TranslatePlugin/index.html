@@ -10,15 +10,15 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">TRANSLATE</div>
-        <h1 class="long-page-title">翻译工具</h1>
-        <p class="long-page-description">自动检测源语言，通过宿主受控网络能力完成翻译。</p>
+        <h1 class="long-page-title" data-i18n="page.title">翻译工具</h1>
+        <p class="long-page-description" data-i18n="page.description">自动检测源语言，通过宿主受控网络能力完成翻译。</p>
       </div>
       <span class="long-badge" id="detectedLanguage">自动检测</span>
     </header>
 
-    <section class="long-card long-stack" aria-label="文本翻译">
+    <section class="long-card long-stack" id="translatorSection" aria-label="文本翻译">
       <div class="long-toolbar">
-        <label class="long-field-label" for="targetLanguage">翻译为</label>
+        <label class="long-field-label" for="targetLanguage" data-i18n="field.target">翻译为</label>
         <select id="targetLanguage" aria-label="目标语言">
           <option value="zh">中文</option>
           <option value="en">English</option>
@@ -34,21 +34,21 @@
       </div>
 
       <div class="long-field">
-        <label class="long-field-label" for="inputText">原文</label>
+        <label class="long-field-label" for="inputText" data-i18n="field.input">原文</label>
         <textarea class="long-editor" id="inputText" placeholder="输入文本，或从命令中心携带剪贴板内容…" autofocus></textarea>
       </div>
 
       <div class="long-toolbar">
         <button class="long-button long-button--primary btn-primary" id="translateButton" type="button">开始翻译</button>
-        <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button">粘贴并翻译</button>
-        <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button">清空</button>
+        <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button" data-i18n="action.paste">粘贴并翻译</button>
+        <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button" data-i18n="action.clear">清空</button>
       </div>
 
       <div class="long-result long-result--body" id="result" role="region" aria-label="翻译结果" tabindex="0" hidden></div>
       <div class="long-toolbar">
         <div class="long-status" id="status" role="status" aria-live="polite"></div>
         <span class="long-toolbar__spacer"></span>
-        <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" disabled>复制结果</button>
+        <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy" disabled>复制结果</button>
       </div>
     </section>
   </main>
@@ -59,39 +59,101 @@
     const status = document.getElementById('status');
     const translateButton = document.getElementById('translateButton');
     const copyButton = document.getElementById('copyButton');
+    let strings = {};
+    let isTranslating = false;
+    let detectedLanguage = '';
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
 
-    function setStatus(message, kind) {
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
+      const message = key
+        ? t(key, fallback, currentStatus.values)
+        : currentStatus.fallback;
       status.textContent = message;
       status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
+      if (message) window.LongUI?.announce(message);
+      return message;
+    }
+
+    function renderRequestState() {
+      translateButton.textContent = isTranslating
+        ? t('action.translating', '翻译中…')
+        : t('action.translate', '开始翻译');
+      document.getElementById('detectedLanguage').textContent = detectedLanguage
+        ? t('page.detected', '检测：{language}', { language: detectedLanguage })
+        : t('page.autoDetect', '自动检测');
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '翻译工具');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('translatorSection').setAttribute(
+        'aria-label',
+        t('translator.ariaLabel', '文本翻译'));
+      document.getElementById('targetLanguage').setAttribute(
+        'aria-label',
+        t('field.targetAriaLabel', '目标语言'));
+      input.placeholder = t(
+        'field.inputPlaceholder',
+        '输入文本，或从命令中心携带剪贴板内容…');
+      result.setAttribute(
+        'aria-label',
+        t('result.ariaLabel', '翻译结果'));
+      renderRequestState();
+      if (currentStatus.key || currentStatus.fallback) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback,
+          currentStatus.values);
+      }
     }
 
     async function translate() {
+      if (isTranslating) return;
       const text = input.value.trim();
-      if (!text) { setStatus('请输入需要翻译的文本', 'warning'); input.focus(); return; }
+      if (!text) { setStatus('error.enterText', 'warning', '请输入需要翻译的文本'); input.focus(); return; }
+      isTranslating = true;
       window.LongUI?.setBusy(translateButton, true);
-      translateButton.textContent = '翻译中…';
+      renderRequestState();
       result.hidden = true;
       copyButton.disabled = true;
-      setStatus('正在连接翻译服务');
+      setStatus('status.connecting', '', '正在连接翻译服务');
       try {
         const target = document.getElementById('targetLanguage').value;
         const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' + target + '&dt=t&q=' + encodeURIComponent(text);
         const response = await long.http.get(url);
-        if (!response.success) throw new Error(response.error || '网络请求失败');
+        if (!response.success) throw new Error(response.error || t('error.network', '网络请求失败'));
         const data = JSON.parse(response.data);
         const translated = Array.isArray(data[0]) ? data[0].map(function (part) { return part[0] || ''; }).join('') : '';
-        if (!translated) throw new Error('服务没有返回翻译内容');
+        if (!translated) throw new Error(t('error.emptyResponse', '服务没有返回翻译内容'));
         result.textContent = translated;
         result.hidden = false;
         copyButton.disabled = false;
-        document.getElementById('detectedLanguage').textContent = '检测：' + (data[2] || 'auto');
-        setStatus('翻译完成', 'success');
+        detectedLanguage = data[2] || 'auto';
+        renderRequestState();
+        setStatus('status.completed', 'success', '翻译完成');
       } catch (error) {
-        setStatus('翻译失败：' + error.message, 'danger');
+        setStatus(
+          'error.translate',
+          'danger',
+          '翻译失败：{detail}',
+          { detail: error && error.message ? error.message : String(error) });
       } finally {
+        isTranslating = false;
         window.LongUI?.setBusy(translateButton, false);
-        translateButton.textContent = '开始翻译';
+        renderRequestState();
       }
     }
 
@@ -99,21 +161,21 @@
       try {
         const response = await long.clipboard.getText();
         if (response.success && response.data) { input.value = response.data; await translate(); }
-        else setStatus('剪贴板中没有文本', 'warning');
-      } catch (_) { setStatus('无法读取剪贴板', 'danger'); }
+        else setStatus('error.clipboardEmpty', 'warning', '剪贴板中没有文本');
+      } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); }
     }
 
     async function copyResult() {
       if (!result.textContent) return;
-      try { await long.clipboard.setText(result.textContent); setStatus('翻译结果已复制', 'success'); }
-      catch (_) { setStatus('复制失败', 'danger'); }
+      try { const response = await long.clipboard.setText(result.textContent); if (!response || !response.success) throw new Error(response && response.error); setStatus('status.copied', 'success', '翻译结果已复制'); }
+      catch (_) { setStatus('error.copy', 'danger', '复制失败'); }
     }
 
     document.getElementById('translateButton').addEventListener('click', translate);
     document.getElementById('pasteButton').addEventListener('click', pasteAndTranslate);
     document.getElementById('copyButton').addEventListener('click', copyResult);
     document.getElementById('clearButton').addEventListener('click', function () {
-      input.value = ''; result.textContent = ''; result.hidden = true; copyButton.disabled = true; input.focus(); setStatus('');
+      input.value = ''; result.textContent = ''; result.hidden = true; copyButton.disabled = true; detectedLanguage = ''; renderRequestState(); input.focus(); setStatus('', '', '');
     });
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); translate(); }
@@ -121,6 +183,9 @@
     window.LongUI?.onCommand(function (command) {
       const text = window.LongUI.commandText(command);
       if (text) { input.value = text; translate(); } else input.focus();
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
   </script>
 </body>

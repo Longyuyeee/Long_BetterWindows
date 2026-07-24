@@ -12,6 +12,7 @@ public sealed class BuiltInPluginLocalizationTests
     [Theory]
     [InlineData("Base64Tool")]
     [InlineData("ClipboardTool")]
+    [InlineData("FileRenamerPlugin")]
     [InlineData("FolderNotePlugin")]
     [InlineData("JsonFormatterPlugin")]
     [InlineData("MarkdownPreview")]
@@ -20,6 +21,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("RegexTester")]
     [InlineData("TimestampConverter")]
     [InlineData("TextDiffPlugin")]
+    [InlineData("TranslatePlugin")]
     [InlineData("UrlToolkit")]
     [InlineData("UuidGenerator")]
     public async Task SamplePlugin_HasValidBilingualResources(string plugin)
@@ -223,6 +225,7 @@ public sealed class BuiltInPluginLocalizationTests
     [Theory]
     [InlineData("Base64Tool")]
     [InlineData("ClipboardTool")]
+    [InlineData("FileRenamerPlugin")]
     [InlineData("JsonFormatterPlugin")]
     [InlineData("MarkdownPreview")]
     [InlineData("PasswordGenerator")]
@@ -230,6 +233,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("RegexTester")]
     [InlineData("TimestampConverter")]
     [InlineData("TextDiffPlugin")]
+    [InlineData("TranslatePlugin")]
     [InlineData("UrlToolkit")]
     [InlineData("UuidGenerator")]
     public async Task LocalizedWebPlugin_DeclaresEveryReferencedResourceKey(
@@ -265,8 +269,10 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("RegexTester", "function test", "renderMatches();", "test();")]
     [InlineData("TimestampConverter", "function parse", "renderResult();", "convert();")]
     [InlineData("TextDiffPlugin", "function compare", "renderDiff();", "compare();")]
+    [InlineData("TranslatePlugin", "async function translate", "renderRequestState();", "translate();")]
     [InlineData("UrlToolkit", "function transform", "renderStat();", "transform(")]
     [InlineData("UuidGenerator", "function uuid", "output.setAttribute", "generate();")]
+    [InlineData("FileRenamerPlugin", "async function loadSelection", "renderListState(false);", "loadSelection();")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
         string plugin,
         string nextFunction,
