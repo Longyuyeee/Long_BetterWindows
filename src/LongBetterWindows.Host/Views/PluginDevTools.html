@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>插件开发工具</title>
+<title>Long Plugin DevTools</title>
 <link rel="stylesheet" href="../Assets/CodeMirror/lib/codemirror.min.css">
 <link rel="stylesheet" href="../Assets/CodeMirror/theme/material-darker.min.css">
 <link rel="stylesheet" href="../Assets/CodeMirror/addon/hint/show-hint.min.css">
@@ -294,11 +294,11 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
 
 <!-- ══════════ 侧栏 ══════════ -->
 <div id="sidebar">
-  <h4>插件</h4>
+  <h4 data-i18n="developer.workbench.plugins"></h4>
   <div id="pluginList"></div>
   <div id="fileTree"></div>
   <h4>LONG API</h4>
-  <input id="apiFilter" class="sidebar-search" placeholder="搜索 API 或能力..." oninput="renderApiExplorer()">
+  <input id="apiFilter" class="sidebar-search" data-i18n-placeholder="developer.workbench.apiSearch" oninput="renderApiExplorer()">
   <div id="apiList" class="api-list"></div>
 </div>
 
@@ -306,18 +306,18 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
 <div id="main">
   <!-- 工具栏 -->
   <div id="toolbar">
-    <button class="btn-primary" onclick="showNewDialog()">+ 新建</button>
+    <button class="btn-primary" onclick="showNewDialog()" data-i18n="developer.workbench.new"></button>
     <span class="sep"></span>
-    <button class="btn-secondary" onclick="saveCurrent()" title="Ctrl+S">保存</button>
-    <button class="btn-secondary" onclick="previewCurrent()">预览</button>
+    <button class="btn-secondary" onclick="saveCurrent()" title="Ctrl+S" data-i18n="developer.workbench.save"></button>
+    <button class="btn-secondary" onclick="previewCurrent()" data-i18n="developer.workbench.preview"></button>
     <span class="sep"></span>
-    <button class="btn-secondary" onclick="showSearch()" title="Ctrl+F">搜索</button>
-    <button class="btn-secondary" onclick="showLongHints()" title="Ctrl+Space">API 提示</button>
-    <button class="btn-secondary" onclick="toggleConsole()" title="查看当前插件日志">运行日志</button>
+    <button class="btn-secondary" onclick="showSearch()" title="Ctrl+F" data-i18n="developer.workbench.search"></button>
+    <button class="btn-secondary" onclick="showLongHints()" title="Ctrl+Space" data-i18n="developer.workbench.apiHints"></button>
+    <button class="btn-secondary" onclick="toggleConsole()" data-i18n-title="developer.workbench.logs.tooltip" data-i18n="developer.workbench.logs"></button>
     <span class="sep"></span>
     <span id="fileInfo" style="color:var(--text3);font-size:11px;margin-left:4px"></span>
     <span style="flex:1"></span>
-    <button class="btn-secondary" onclick="location.reload()">刷新</button>
+    <button class="btn-secondary" onclick="location.reload()" data-i18n="developer.workbench.refresh"></button>
   </div>
 
   <!-- 标签栏 -->
@@ -326,8 +326,8 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
   <!-- 编辑器 -->
   <div id="editor">
     <div id="empty">
-      <h3>插件开发工具</h3>
-      <p>选择左侧插件打开文件，或点击「+ 新建」创建插件</p>
+      <h3 data-i18n="developer.workbench.empty.title"></h3>
+      <p data-i18n="developer.workbench.empty.desc"></p>
     </div>
     <div id="editorWrap" style="display:none">
       <div id="editorHost">
@@ -337,11 +337,11 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
           onscroll="syncScroll()"></textarea>
         <!-- 搜索栏 -->
         <div id="searchBar">
-          <input id="searchInput" placeholder="查找..." oninput="doSearch()" onkeydown="handleSearchKey(event)">
+          <input id="searchInput" data-i18n-placeholder="developer.workbench.search.placeholder" oninput="doSearch()" onkeydown="handleSearchKey(event)">
           <span id="searchCount">0/0</span>
-          <button onclick="searchPrev()">▲</button>
-          <button onclick="searchNext()">▼</button>
-          <button onclick="closeSearch()">✕</button>
+          <button onclick="searchPrev()" data-i18n-title="developer.workbench.search.previous">▲</button>
+          <button onclick="searchNext()" data-i18n-title="developer.workbench.search.next">▼</button>
+          <button onclick="closeSearch()" data-i18n-title="developer.workbench.search.close">✕</button>
         </div>
       </div>
     </div>
@@ -349,14 +349,14 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
 
   <div id="consolePanel">
     <div class="console-head">
-      <strong>运行日志</strong>
-      <span id="consolePlugin">选择插件后查看日志</span>
+      <strong data-i18n="developer.workbench.logs"></strong>
+      <span id="consolePlugin" data-i18n="developer.workbench.logs.select"></span>
       <span style="flex:1"></span>
-      <button onclick="refreshPluginLogs()">刷新</button>
-      <button onclick="clearConsole()">清空</button>
-      <button onclick="toggleConsole(false)">关闭</button>
+      <button onclick="refreshPluginLogs()" data-i18n="developer.workbench.logs.refresh"></button>
+      <button onclick="clearConsole()" data-i18n="developer.workbench.logs.clear"></button>
+      <button onclick="toggleConsole(false)" data-i18n="developer.workbench.logs.close"></button>
     </div>
-    <div id="consoleOutput">暂无日志</div>
+    <div id="consoleOutput" data-i18n="developer.workbench.logs.empty"></div>
   </div>
 
   <!-- 状态栏 -->
@@ -366,21 +366,21 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
 <!-- ══════════ 新建对话框 ══════════ -->
 <div id="newDialog" class="overlay">
   <div class="dialog">
-    <h3>新建插件</h3>
-    <label>类型</label>
+    <h3 data-i18n="developer.workbench.newDialog.title"></h3>
+    <label data-i18n="developer.workbench.newDialog.type"></label>
     <select id="newType" onchange="onTypeChange()">
-      <option value="web">HTML/JS (WebView2)</option>
-      <option value="script">C# 脚本 (.csx)</option>
+      <option value="web" data-i18n="developer.workbench.newDialog.webType"></option>
+      <option value="script" data-i18n="developer.workbench.newDialog.scriptType"></option>
     </select>
-    <label>名称</label>
-    <input id="newName" placeholder="我的插件">
-    <label>ID (反向域名)</label>
+    <label data-i18n="developer.workbench.newDialog.name"></label>
+    <input id="newName" data-i18n-placeholder="developer.workbench.newDialog.namePlaceholder">
+    <label data-i18n="developer.workbench.newDialog.id"></label>
     <input id="newId" placeholder="com.example.myplugin">
-    <label>能力 (Capabilities)</label>
+    <label data-i18n="developer.workbench.newDialog.capabilities"></label>
     <div class="caps-grid" id="capsGrid"></div>
     <br>
-    <button class="btn-primary" onclick="createPlugin()">创建</button>
-    <button class="btn-secondary" onclick="closeNewDialog()">取消</button>
+    <button class="btn-primary" onclick="createPlugin()" data-i18n="action.create"></button>
+    <button class="btn-secondary" onclick="closeNewDialog()" data-i18n="action.cancel"></button>
   </div>
 </div>
 
@@ -400,6 +400,34 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
 var tabs = [], currentTab = -1, currentPlugin = '', currentPluginId = '', fileCache = {};
 var searchResults = [], searchIdx = -1;
 var suppressEditorChange = false;
+var localizedStrings = {};
+
+function t(key) {
+  return localizedStrings[key] || key;
+}
+
+function setRuntimeText(id, value) {
+  var element = document.getElementById(id);
+  element.removeAttribute('data-i18n');
+  element.textContent = value;
+}
+
+function applyLocalization(data) {
+  if (!data || !data.strings) return;
+  localizedStrings = data.strings;
+  document.documentElement.lang = data.language || 'zh-CN';
+  document.title = t('developer.workbench.pageTitle');
+  document.querySelectorAll('[data-i18n]').forEach(function(element) {
+    element.textContent = t(element.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(function(element) {
+    element.placeholder = t(element.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(function(element) {
+    element.title = t(element.dataset.i18nTitle);
+  });
+  renderTabs();
+}
 var longApiCatalog = [
   ['long.app.getVersion()', '读取宿主版本', ''],
   ['long.app.log()', '写入插件运行日志', ''],
@@ -531,6 +559,7 @@ api('listPlugins');
 function handleMessage(raw) {
   try { var m = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
   switch(m.type) {
+    case 'localization':     applyLocalization(m.data); break;
     case 'pluginsListed':    renderPlugins(m.data); break;
     case 'filesListed':      renderFileTree(m.data); break;
     case 'fileOpened':       openInTab(m.data.path, m.data.content, m.data.readOnly); break;
@@ -561,7 +590,7 @@ function renderPlugins(plugins) {
 function selectPlugin(dir, pluginId) {
   currentPlugin = dir;
   currentPluginId = pluginId || '';
-  document.getElementById('consolePlugin').textContent = currentPluginId || dir.split('/').pop();
+  setRuntimeText('consolePlugin', currentPluginId || dir.split('/').pop());
   document.querySelectorAll('.plugin-item').forEach(function(el) {
     el.classList.toggle('active', el.dataset.path === dir);
   });
@@ -597,20 +626,20 @@ function toggleConsole(force) {
 
 function refreshPluginLogs() {
   if (!currentPluginId) {
-    document.getElementById('consoleOutput').textContent = '请先在左侧选择插件。';
+    setRuntimeText('consoleOutput', '请先在左侧选择插件。');
     return;
   }
-  document.getElementById('consoleOutput').textContent = '正在读取日志...';
+  setRuntimeText('consoleOutput', '正在读取日志...');
   api('getLogs', { id: currentPluginId });
 }
 
 function renderPluginLogs(data) {
   var lines = data && data.lines ? data.lines : [];
-  document.getElementById('consoleOutput').textContent = lines.length ? lines.join('\n') : '当前插件暂无日志。';
+  setRuntimeText('consoleOutput', lines.length ? lines.join('\n') : '当前插件暂无日志。');
 }
 
 function clearConsole() {
-  document.getElementById('consoleOutput').textContent = '日志显示已清空（不会删除磁盘日志）。';
+  setRuntimeText('consoleOutput', '日志显示已清空（不会删除磁盘日志）。');
 }
 
 // ══════════════════════════════════════════════

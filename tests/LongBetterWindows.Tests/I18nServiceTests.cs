@@ -372,6 +372,39 @@ public sealed class I18nServiceTests : IDisposable
     }
 
     [Fact]
+    public void DeveloperWorkbench_StaticShellUsesRuntimeLocalizationBridge()
+    {
+        var root = FindRepositoryRoot();
+        var views = Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views");
+        var html = File.ReadAllText(Path.Combine(
+            views,
+            "PluginDevTools.html"));
+        var source = File.ReadAllText(Path.Combine(
+            views,
+            "PluginDevTools.xaml.cs"));
+
+        Assert.Contains("data-i18n=\"developer.workbench.plugins\"", html);
+        Assert.Contains("data-i18n=\"developer.workbench.newDialog.title\"", html);
+        Assert.Contains("function applyLocalization(data)", html);
+        Assert.Contains("function setRuntimeText(id, value)", html);
+        Assert.Contains("removeAttribute('data-i18n')", html);
+        Assert.Contains("document.documentElement.lang = data.language", html);
+        Assert.Contains("renderTabs();", html);
+        Assert.Contains("NavigationStarting += OnNavigationStarting", source);
+        Assert.Contains("NavigationCompleted += OnNavigationCompleted", source);
+        Assert.Contains("LanguageChanged += OnLanguageChanged", source);
+        Assert.Contains("SendJs(", source);
+        Assert.Contains("\"localization\"", source);
+        Assert.DoesNotContain("OnLanguageChanged(string language)\n        {\n            location.reload", source);
+        Assert.DoesNotContain("<h3>新建插件</h3>", html);
+        Assert.DoesNotContain(">运行日志</strong>", html);
+    }
+
+    [Fact]
     public void WorkflowInvocationAndBindingEditors_UseHostLanguageResources()
     {
         var root = FindRepositoryRoot();

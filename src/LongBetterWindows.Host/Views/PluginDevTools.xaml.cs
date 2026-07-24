@@ -11,8 +11,46 @@ namespace LongBetterWindows.Host.Views
 {
     public partial class PluginDevTools : Window
     {
+        private static readonly string[] WorkbenchLocalizationKeys =
+        [
+            "developer.workbench.pageTitle",
+            "developer.workbench.plugins",
+            "developer.workbench.apiSearch",
+            "developer.workbench.new",
+            "developer.workbench.save",
+            "developer.workbench.preview",
+            "developer.workbench.search",
+            "developer.workbench.apiHints",
+            "developer.workbench.logs",
+            "developer.workbench.logs.tooltip",
+            "developer.workbench.refresh",
+            "developer.workbench.empty.title",
+            "developer.workbench.empty.desc",
+            "developer.workbench.search.placeholder",
+            "developer.workbench.search.previous",
+            "developer.workbench.search.next",
+            "developer.workbench.search.close",
+            "developer.workbench.logs.select",
+            "developer.workbench.logs.refresh",
+            "developer.workbench.logs.clear",
+            "developer.workbench.logs.close",
+            "developer.workbench.logs.empty",
+            "developer.workbench.newDialog.title",
+            "developer.workbench.newDialog.type",
+            "developer.workbench.newDialog.webType",
+            "developer.workbench.newDialog.scriptType",
+            "developer.workbench.newDialog.name",
+            "developer.workbench.newDialog.namePlaceholder",
+            "developer.workbench.newDialog.id",
+            "developer.workbench.newDialog.capabilities",
+            "action.create",
+            "action.cancel",
+        ];
+
         private readonly WebView2 _webView;
         private readonly string _pluginsRoot;
+        private bool _pageReady;
+        private bool _languageSubscribed;
 
         public PluginDevTools()
         {
@@ -33,6 +71,10 @@ namespace LongBetterWindows.Host.Views
                 {
                     await _webView.EnsureCoreWebView2Async();
                     _webView.CoreWebView2.WebMessageReceived += OnJsMessage;
+                    _webView.CoreWebView2.NavigationStarting += OnNavigationStarting;
+                    _webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
+                    ServicesInitializer.I18n.LanguageChanged += OnLanguageChanged;
+                    _languageSubscribed = true;
 
                     var htmlPath = FindHtmlPath();
                     if (htmlPath != null && File.Exists(htmlPath))
@@ -46,8 +88,62 @@ namespace LongBetterWindows.Host.Views
 
             Closed += (_, _) =>
             {
+                if (_languageSubscribed)
+                    ServicesInitializer.I18n.LanguageChanged -= OnLanguageChanged;
+                if (_webView.CoreWebView2 != null)
+                {
+                    _webView.CoreWebView2.WebMessageReceived -= OnJsMessage;
+                    _webView.CoreWebView2.NavigationStarting -= OnNavigationStarting;
+                    _webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
+                }
                 _webView.Dispose();
             };
+        }
+
+        private void OnNavigationStarting(
+            object? sender,
+            Microsoft.Web.WebView2.Core.CoreWebView2NavigationStartingEventArgs e)
+        {
+            _pageReady = false;
+        }
+
+        private void OnNavigationCompleted(
+            object? sender,
+            Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs e)
+        {
+            _pageReady = e.IsSuccess;
+            if (_pageReady)
+                SendLocalization();
+        }
+
+        private void OnLanguageChanged(string language)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => OnLanguageChanged(language));
+                return;
+            }
+
+            Title = ServicesInitializer.I18n.T("developer.workbench.windowTitle");
+            SendLocalization();
+        }
+
+        private void SendLocalization()
+        {
+            if (!_pageReady)
+                return;
+
+            var strings = WorkbenchLocalizationKeys.ToDictionary(
+                key => key,
+                key => ServicesInitializer.I18n.T(key),
+                StringComparer.Ordinal);
+            SendJs(
+                "localization",
+                new
+                {
+                    language = ServicesInitializer.I18n.CurrentLanguage,
+                    strings,
+                });
         }
 
         public static void Open(Window owner)
