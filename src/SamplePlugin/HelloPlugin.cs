@@ -23,13 +23,20 @@ namespace SamplePlugin;
 ///   4. InitializeAsync 返回 false → 状态变为 Error
 ///   5. StartAsync 返回 false → 插件不会进入 Running
 /// </summary>
-public class HelloPlugin : ILongPlugin, IHasMainUI, IPluginCommandHandler
+public class HelloPlugin :
+    ILongPlugin,
+    IHasMainUI,
+    IPluginCommandHandler,
+    IPluginLanguageLifecycle
 {
+    private IReadOnlyDictionary<string, string> _strings =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     // ═══════════════════════════════════════════════
     // 元数据 — 必须与 manifest.json 保持一致
     // ═══════════════════════════════════════════════
     public string Id => "com.long.sample";
-    public string Name => "示例插件";
+    public string Name => Text("plugin.name", "示例插件");
     public string Version => "1.1.0";
 
     // 当前状态：Loaded → Running → Disabled
@@ -87,7 +94,9 @@ public class HelloPlugin : ILongPlugin, IHasMainUI, IPluginCommandHandler
     }
 
     // 统一主入口：插件卡片和命令中心最终复用同一个行为。
-    public void ShowMainUI() => FloatingHudWindow.ShowToast("示例插件运行正常");
+    public void ShowMainUI()
+        => FloatingHudWindow.ShowToast(
+            Text("toast.ready", "示例插件运行正常"));
 
     // 声明式命令处理器：command_id 来自 manifest.json。
     public Task<PluginCommandResult> ExecuteCommandAsync(
@@ -96,11 +105,33 @@ public class HelloPlugin : ILongPlugin, IHasMainUI, IPluginCommandHandler
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (invocation.CommandId != "sample.hello")
-            return Task.FromResult(PluginCommandResult.Failure($"未知示例命令: {invocation.CommandId}"));
+        {
+            return Task.FromResult(PluginCommandResult.Failure(
+                string.Format(
+                    Text("error.unknownCommand", "未知示例命令: {0}"),
+                    invocation.CommandId)));
+        }
 
         ShowMainUI();
-        return Task.FromResult(PluginCommandResult.Success("示例命令执行成功"));
+        return Task.FromResult(PluginCommandResult.Success(
+            Text("result.success", "示例命令执行成功")));
     }
+
+    // 语言切换只更新展示资源，不重复启动插件或执行示例命令。
+    public Task OnLanguageChangedAsync(
+        PluginLanguageContext context,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _strings = context.Resources;
+        return Task.CompletedTask;
+    }
+
+    private string Text(string key, string fallback)
+        => _strings.TryGetValue(key, out var value)
+            && !string.IsNullOrWhiteSpace(value)
+                ? value
+                : fallback;
 
     // ═══════════════════════════════════════════════
     // 扩展提示：

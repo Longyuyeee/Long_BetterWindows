@@ -21,12 +21,14 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("HardwareMonitor")]
     [InlineData("JsonFormatterPlugin")]
     [InlineData("MarkdownPreview")]
+    [InlineData("MacroPlugin")]
     [InlineData("PasswordGenerator")]
     [InlineData("PortManager")]
     [InlineData("QuickLaunchPlugin")]
     [InlineData("QuickNotePlugin")]
     [InlineData("RegexTester")]
     [InlineData("ScreenshotPlugin")]
+    [InlineData("SamplePlugin")]
     [InlineData("TimestampConverter")]
     [InlineData("TextDiffPlugin")]
     [InlineData("TranslatePlugin")]
@@ -408,6 +410,43 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.DoesNotContain("PlayOnce", languageBody);
         Assert.Contains("PluginLocalization Include=\"i18n\\*.json\"", project);
         Assert.Contains("MacroPlugin\\i18n", hostProject);
+    }
+
+    [Fact]
+    public void SamplePlugin_IsLocalizedReferenceImplementation()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "SamplePlugin",
+            "HelloPlugin.cs"));
+        var project = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "SamplePlugin",
+            "SamplePlugin.csproj"));
+        var hostProject = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "LongBetterWindows.Host.csproj"));
+        var start = source.IndexOf(
+            "public Task OnLanguageChangedAsync(",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(
+            "private string Text(",
+            start,
+            StringComparison.Ordinal);
+
+        Assert.True(start >= 0);
+        Assert.True(end > start);
+        var languageBody = source[start..end];
+        Assert.Contains("IPluginLanguageLifecycle", source);
+        Assert.DoesNotContain("ShowMainUI", languageBody);
+        Assert.DoesNotContain("StartAsync", languageBody);
+        Assert.Contains("PluginLocalization Include=\"i18n\\*.json\"", project);
+        Assert.Contains("SamplePlugin\\i18n", hostProject);
     }
 
     [Theory]

@@ -14,17 +14,22 @@
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>
+    <PluginLocalization Include="i18n\*.json" />
   </ItemGroup>
 
   <!-- 构建后复制到解决方案级 Plugins 目录 -->
   <Target Name="CopyToPlugins" AfterTargets="Build">
     <MakeDir Directories="$(ProjectDir)..\..\Plugins\SamplePlugin" />
+    <MakeDir Directories="$(ProjectDir)..\..\Plugins\SamplePlugin\i18n" />
     <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\SamplePlugin" />
+    <MakeDir Directories="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\SamplePlugin\i18n" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\..\Plugins\SamplePlugin" />
     <Copy SourceFiles="$(TargetPath).pdb" DestinationFolder="$(ProjectDir)..\..\Plugins\SamplePlugin" Condition="Exists('$(TargetPath).pdb')" />
     <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\..\Plugins\SamplePlugin" />
+    <Copy SourceFiles="@(PluginLocalization)" DestinationFolder="$(ProjectDir)..\..\Plugins\SamplePlugin\i18n" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\SamplePlugin" />
     <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\SamplePlugin" />
+    <Copy SourceFiles="@(PluginLocalization)" DestinationFolder="$(ProjectDir)..\LongBetterWindows.Host\bin\$(Configuration)\net8.0-windows\Plugins\SamplePlugin\i18n" />
   </Target>
 
 </Project>
