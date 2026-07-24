@@ -251,6 +251,8 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
   min-width: 400px; max-width: 480px; box-shadow: 0 18px 48px rgba(0,0,0,0.38);
 }
 .dialog h3 { margin-bottom: 16px; color: var(--text); font-size: 15px; }
+.dialog p { margin: 0 0 20px; color: var(--text2); font-size: 12px; line-height: 1.5; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .dialog label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 4px; font-weight: 500; }
 .dialog input, .dialog select {
   width: 100%; padding: 6px 10px; margin-bottom: 12px;
@@ -268,6 +270,8 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
 .dialog .btn-primary:hover { background: var(--accent-h); }
 .dialog .btn-secondary { background: var(--divider); color: var(--text2); }
 .dialog .btn-secondary:hover { background: var(--hover); }
+.dialog .btn-danger { background: var(--red); color: #fff; }
+.dialog .btn-danger:hover { filter: brightness(1.08); }
 
 /* 能力勾选区域 */
 .caps-grid {
@@ -364,9 +368,9 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
 </div>
 
 <!-- ══════════ 新建对话框 ══════════ -->
-<div id="newDialog" class="overlay">
+<div id="newDialog" class="overlay" role="dialog" aria-modal="true" aria-labelledby="newDialogTitle">
   <div class="dialog">
-    <h3 data-i18n="developer.workbench.newDialog.title"></h3>
+    <h3 id="newDialogTitle" data-i18n="developer.workbench.newDialog.title"></h3>
     <label data-i18n="developer.workbench.newDialog.type"></label>
     <select id="newType" onchange="onTypeChange()">
       <option value="web" data-i18n="developer.workbench.newDialog.webType"></option>
@@ -381,6 +385,20 @@ li.CodeMirror-hint-active { background: rgba(0,122,255,.3); color: #fff; }
     <br>
     <button class="btn-primary" onclick="createPlugin()" data-i18n="action.create"></button>
     <button class="btn-secondary" onclick="closeNewDialog()" data-i18n="action.cancel"></button>
+  </div>
+</div>
+
+<div id="confirmDialog" class="overlay" role="alertdialog" aria-modal="true"
+     aria-labelledby="confirmDialogTitle" aria-describedby="confirmDialogMessage">
+  <div class="dialog">
+    <h3 id="confirmDialogTitle" data-i18n="developer.workbench.confirm.title"></h3>
+    <p id="confirmDialogMessage" data-i18n="developer.workbench.closeUnsaved"></p>
+    <div class="dialog-actions">
+      <button id="confirmCancel" class="btn-secondary" onclick="resolveDiscard(false)"
+              data-i18n="action.cancel"></button>
+      <button id="confirmDiscard" class="btn-danger" onclick="resolveDiscard(true)"
+              data-i18n="developer.workbench.confirm.discard"></button>
+    </div>
   </div>
 </div>
 
@@ -406,6 +424,8 @@ var statusState = null;
 var lastPlugins = null;
 var lastFiles = null;
 var capabilitySelectionToRestore = null;
+var pendingDiscardTab = null;
+var focusBeforeConfirm = null;
 
 function t(key) {
   return localizedStrings[key] || key;
@@ -720,8 +740,19 @@ function switchTab(i) {
 }
 
 function closeTab(i) {
-  if (tabs[i].dirty && !confirm(t('developer.workbench.closeUnsaved'))) return;
-  if (fileCache[tabs[i].path]) delete fileCache[tabs[i].path];
+  var tab = tabs[i];
+  if (!tab) return;
+  if (tab.dirty) {
+    showDiscardConfirm(tab);
+    return;
+  }
+  closeTabNow(tab);
+}
+
+function closeTabNow(tab) {
+  var i = tabs.indexOf(tab);
+  if (i < 0) return;
+  if (fileCache[tab.path]) delete fileCache[tab.path];
   tabs.splice(i, 1);
   if (currentTab >= tabs.length) currentTab = tabs.length - 1;
   renderTabs();
@@ -733,6 +764,46 @@ function closeTab(i) {
   }
   updateFileInfo();
 }
+
+function showDiscardConfirm(tab) {
+  pendingDiscardTab = tab;
+  focusBeforeConfirm = document.activeElement;
+  document.getElementById('confirmDialog').classList.add('show');
+  setTimeout(function() { document.getElementById('confirmCancel').focus(); }, 0);
+}
+
+function resolveDiscard(confirmed) {
+  var tab = pendingDiscardTab;
+  pendingDiscardTab = null;
+  document.getElementById('confirmDialog').classList.remove('show');
+  if (confirmed && tab) {
+    closeTabNow(tab);
+  } else if (focusBeforeConfirm && typeof focusBeforeConfirm.focus === 'function') {
+    focusBeforeConfirm.focus();
+  }
+  focusBeforeConfirm = null;
+}
+
+document.addEventListener('keydown', function(event) {
+  var dialog = document.getElementById('confirmDialog');
+  if (!dialog.classList.contains('show')) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    resolveDiscard(false);
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  var cancel = document.getElementById('confirmCancel');
+  var discard = document.getElementById('confirmDiscard');
+  if (event.shiftKey && document.activeElement === cancel) {
+    event.preventDefault();
+    discard.focus();
+  } else if (!event.shiftKey && document.activeElement === discard) {
+    event.preventDefault();
+    cancel.focus();
+  }
+}, true);
 
 function showEditor() {
   if (currentTab < 0) return;

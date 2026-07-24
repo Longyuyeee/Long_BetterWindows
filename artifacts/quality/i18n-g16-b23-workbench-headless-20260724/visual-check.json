@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "mode": "headless-local-html-system-edge",
+  "results": [
+    {
+      "name": "en-wide",
+      "path": "en-wide.png",
+      "focus": "confirmCancel",
+      "dialog": {
+        "x": 250,
+        "y": 251,
+        "w": 400,
+        "h": 148
+      },
+      "titleOverflow": false,
+      "messageOverflow": false,
+      "viewport": {
+        "w": 900,
+        "h": 650
+      },
+      "tabCount": 1,
+      "dirty": true,
+      "overlay": true
+    },
+    {
+      "name": "en-compact",
+      "path": "en-compact.png",
+      "focus": "confirmCancel",
+      "dialog": {
+        "x": 100,
+        "y": 126,
+        "w": 400,
+        "h": 148
+      },
+      "titleOverflow": false,
+      "messageOverflow": false,
+      "viewport": {
+        "w": 600,
+        "h": 400
+      },
+      "tabCount": 1,
+      "dirty": true,
+      "overlay": true
+    },
+    {
+      "name": "zh-compact",
+      "path": "zh-compact.png",
+      "focus": "confirmCancel",
+      "dialog": {
+        "x": 100,
+        "y": 125,
+        "w": 400,
+        "h": 150
+      },
+      "titleOverflow": false,
+      "messageOverflow": false,
+      "viewport": {
+        "w": 600,
+        "h": 400
+      },
+      "tabCount": 1,
+      "dirty": true,
+      "overlay": true
+    }
+  ]
+}

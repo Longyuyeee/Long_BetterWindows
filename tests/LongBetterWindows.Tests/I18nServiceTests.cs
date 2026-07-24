@@ -394,7 +394,6 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("removeAttribute('data-i18n')", html);
         Assert.Contains("setConsoleState('developer.workbench.logs.loading')", html);
         Assert.Contains("window.t('developer.workbench.readOnly')", html);
-        Assert.Contains("confirm(t('developer.workbench.closeUnsaved'))", html);
         Assert.Contains("data.errorKey || 'developer.workbench.error.save'", html);
         Assert.Contains("document.documentElement.lang = data.language", html);
         Assert.Contains("renderTabs();", html);
@@ -420,6 +419,13 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("developer.workbench.template.readyDescription", source);
         Assert.Contains("BuildScriptPluginTemplate(", source);
         Assert.DoesNotContain("<html lang=\"zh-CN\">", source);
+        Assert.Contains("role=\"alertdialog\"", html);
+        Assert.Contains("aria-modal=\"true\"", html);
+        Assert.Contains("pendingDiscardTab = tab", html);
+        Assert.Contains("tabs.indexOf(tab)", html);
+        Assert.Contains("confirmCancel').focus()", html);
+        Assert.Contains("event.key === 'Escape'", html);
+        Assert.DoesNotContain("confirm(t('developer.workbench.closeUnsaved'))", html);
         Assert.DoesNotContain("OnLanguageChanged(string language)\n        {\n            location.reload", source);
         Assert.DoesNotContain("<h3>新建插件</h3>", html);
         Assert.DoesNotContain(">运行日志</strong>", html);

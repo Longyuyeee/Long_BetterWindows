@@ -730,5 +730,7 @@
   "developer.workbench.template.toastSent": "Toast sent",
   "developer.workbench.template.script.variables": "Available variables",
   "developer.workbench.template.script.start": "Runs when the plugin starts",
-  "developer.workbench.template.script.stop": "Runs when the plugin stops"
+  "developer.workbench.template.script.stop": "Runs when the plugin stops",
+  "developer.workbench.confirm.title": "Discard unsaved changes?",
+  "developer.workbench.confirm.discard": "Discard and close"
 }

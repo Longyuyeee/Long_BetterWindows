@@ -51,6 +51,8 @@ namespace LongBetterWindows.Host.Views
             "developer.workbench.files",
             "developer.workbench.readOnly",
             "developer.workbench.closeUnsaved",
+            "developer.workbench.confirm.title",
+            "developer.workbench.confirm.discard",
             "developer.workbench.status.saved",
             "developer.workbench.status.created",
             "developer.workbench.status.previewing",

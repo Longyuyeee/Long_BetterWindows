@@ -730,5 +730,7 @@
   "developer.workbench.template.toastSent": "Toast 已发送",
   "developer.workbench.template.script.variables": "可用变量",
   "developer.workbench.template.script.start": "插件启动时执行",
-  "developer.workbench.template.script.stop": "插件停止时执行"
+  "developer.workbench.template.script.stop": "插件停止时执行",
+  "developer.workbench.confirm.title": "放弃未保存的更改？",
+  "developer.workbench.confirm.discard": "放弃并关闭"
 }
