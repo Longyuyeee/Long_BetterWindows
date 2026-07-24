@@ -10,28 +10,28 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">DEVELOPER TOOL</div>
-        <h1 class="long-page-title">JSON 格式化</h1>
-        <p class="long-page-description">格式化、校验或压缩 JSON，所有数据仅在本地处理。</p>
+        <h1 class="long-page-title" data-i18n="page.title">JSON 格式化</h1>
+        <p class="long-page-description" data-i18n="page.description">格式化、校验或压缩 JSON，所有数据仅在本地处理。</p>
       </div>
       <span class="long-badge" id="stat">等待输入</span>
     </header>
 
-    <section class="long-grid" aria-label="JSON 编辑器">
+    <section class="long-grid" id="editorSection" aria-label="JSON 编辑器">
       <div class="long-card long-field">
-        <label class="long-field-label" for="input">输入</label>
+        <label class="long-field-label" for="input" data-i18n="field.input">输入</label>
         <textarea class="long-editor" id="input" placeholder="粘贴 JSON 字符串…" autofocus></textarea>
       </div>
       <div class="long-card long-field">
-        <label class="long-field-label" for="output">处理结果</label>
+        <label class="long-field-label" for="output" data-i18n="field.output">处理结果</label>
         <textarea class="long-editor" id="output" placeholder="格式化结果将在这里显示" readonly></textarea>
       </div>
     </section>
 
     <div class="long-toolbar long-toolbar--spaced">
-      <button class="long-button long-button--primary btn-primary" id="formatButton" type="button">格式化</button>
-      <button class="long-button long-button--secondary btn-secondary" id="minifyButton" type="button">压缩</button>
-      <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button">粘贴</button>
-      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button">复制结果</button>
+      <button class="long-button long-button--primary btn-primary" id="formatButton" type="button" data-i18n="action.format">格式化</button>
+      <button class="long-button long-button--secondary btn-secondary" id="minifyButton" type="button" data-i18n="action.minify">压缩</button>
+      <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button" data-i18n="action.paste">粘贴</button>
+      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制结果</button>
       <span class="long-toolbar__spacer"></span>
       <span class="long-kbd">Ctrl Enter</span>
     </div>
@@ -43,32 +43,86 @@
     const output = document.getElementById('output');
     const status = document.getElementById('status');
     const stat = document.getElementById('stat');
+    let strings = {};
+    let hasResult = false;
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
 
-    function setStatus(message, kind) {
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function renderStat() {
+      stat.textContent = hasResult
+        ? t('stat.characters', '{count} 字符', {
+            count: output.value.length.toLocaleString(document.documentElement.lang)
+          })
+        : t('page.waiting', '等待输入');
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback, values: values || {} };
+      const message = t(key, fallback, currentStatus.values);
       status.textContent = message;
       status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
       window.LongUI?.announce(message);
+      return message;
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', 'JSON 格式化');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('editorSection').setAttribute(
+        'aria-label',
+        t('editor.ariaLabel', 'JSON 编辑器'));
+      input.placeholder = t('field.inputPlaceholder', '粘贴 JSON 字符串…');
+      output.placeholder = t(
+        'field.outputPlaceholder',
+        '格式化结果将在这里显示');
+      renderStat();
+      if (currentStatus.key) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback,
+          currentStatus.values);
+      }
     }
 
     function transform(spaces) {
       try {
         const result = JSON.stringify(JSON.parse(input.value), null, spaces);
         output.value = result;
-        stat.textContent = result.length.toLocaleString() + ' 字符';
-        const message = spaces ? 'JSON 格式化完成' : 'JSON 压缩完成';
+        hasResult = true;
+        renderStat();
         if (result.length > 65536) {
-          setStatus('处理结果超过 65,536 个字符，无法作为命令输出', 'danger');
-          return { success: false, message: 'JSON 处理结果超过命令输出上限', outputs: {} };
+          setStatus('error.outputTooLong', 'danger', '处理结果超过 65,536 个字符，无法作为命令输出');
+          return {
+            success: false,
+            message: t('error.commandOutputTooLong', 'JSON 处理结果超过命令输出上限'),
+            outputs: {}
+          };
         }
-        setStatus(message, 'success');
+        const message = spaces
+          ? setStatus('status.formatted', 'success', 'JSON 格式化完成')
+          : setStatus('status.minified', 'success', 'JSON 压缩完成');
         return {
           success: true,
           message: message,
           outputs: { result: { type: 'text', value: result } }
         };
       } catch (error) {
-        const message = 'JSON 解析失败：' + error.message;
-        setStatus(message, 'danger');
+        const message = setStatus(
+          'error.parse',
+          'danger',
+          'JSON 解析失败：{detail}',
+          { detail: error && error.message ? error.message : String(error) });
         return { success: false, message: message, outputs: {} };
       }
     }
@@ -77,13 +131,13 @@
       try {
         const result = await long.clipboard.getText();
         if (result.success && result.data) { input.value = result.data; transform(2); }
-      } catch (_) { setStatus('无法读取剪贴板', 'danger'); }
+      } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); }
     }
 
     async function copy() {
       if (!output.value) return;
-      try { await long.clipboard.setText(output.value); setStatus('结果已复制', 'success'); }
-      catch (_) { setStatus('复制失败', 'danger'); }
+      try { const response = await long.clipboard.setText(output.value); if (!response || !response.success) throw new Error(response && response.error); setStatus('status.copied', 'success', '结果已复制'); }
+      catch (_) { setStatus('error.copy', 'danger', '复制失败'); }
     }
 
     document.getElementById('formatButton').addEventListener('click', function () { transform(2); });
@@ -97,6 +151,9 @@
       const text = window.LongUI.commandText(command);
       if (text) input.value = text;
       return transform(command.command_id === 'json.minify' ? 0 : 2);
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
   </script>
 </body>

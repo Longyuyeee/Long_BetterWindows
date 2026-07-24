@@ -13,9 +13,12 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("Base64Tool")]
     [InlineData("ClipboardTool")]
     [InlineData("FolderNotePlugin")]
+    [InlineData("JsonFormatterPlugin")]
     [InlineData("PasswordGenerator")]
     [InlineData("QuickNotePlugin")]
+    [InlineData("RegexTester")]
     [InlineData("TimestampConverter")]
+    [InlineData("UrlToolkit")]
     [InlineData("UuidGenerator")]
     public async Task SamplePlugin_HasValidBilingualResources(string plugin)
     {
@@ -218,9 +221,12 @@ public sealed class BuiltInPluginLocalizationTests
     [Theory]
     [InlineData("Base64Tool")]
     [InlineData("ClipboardTool")]
+    [InlineData("JsonFormatterPlugin")]
     [InlineData("PasswordGenerator")]
     [InlineData("QuickNotePlugin")]
+    [InlineData("RegexTester")]
     [InlineData("TimestampConverter")]
+    [InlineData("UrlToolkit")]
     [InlineData("UuidGenerator")]
     public async Task LocalizedWebPlugin_DeclaresEveryReferencedResourceKey(
         string plugin)
@@ -249,13 +255,17 @@ public sealed class BuiltInPluginLocalizationTests
     }
 
     [Theory]
-    [InlineData("PasswordGenerator", "function secureIndex", "renderStrength();")]
-    [InlineData("TimestampConverter", "function parse", "renderResult();")]
-    [InlineData("UuidGenerator", "function uuid", "output.setAttribute")]
+    [InlineData("JsonFormatterPlugin", "function transform", "renderStat();", "transform(")]
+    [InlineData("PasswordGenerator", "function secureIndex", "renderStrength();", "generate();")]
+    [InlineData("RegexTester", "function test", "renderMatches();", "test();")]
+    [InlineData("TimestampConverter", "function parse", "renderResult();", "convert();")]
+    [InlineData("UrlToolkit", "function transform", "renderStat();", "transform(")]
+    [InlineData("UuidGenerator", "function uuid", "output.setAttribute", "generate();")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
         string plugin,
         string nextFunction,
-        string projectionCall)
+        string projectionCall,
+        string prohibitedCall)
     {
         var source = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
@@ -271,6 +281,7 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.True(end > start);
         var localizationBody = source[start..end];
         Assert.Contains(projectionCall, localizationBody);
+        Assert.DoesNotContain(prohibitedCall, localizationBody);
         Assert.DoesNotContain("generate();", localizationBody);
         Assert.DoesNotContain("convert();", localizationBody);
         Assert.DoesNotContain("useNow();", localizationBody);

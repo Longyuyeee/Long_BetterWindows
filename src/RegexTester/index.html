@@ -3,66 +3,160 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>正则测试器</title></head>
 <body>
   <main class="long-page">
-    <header class="long-page-header"><div><div class="long-eyebrow">DEVELOPER TOOL</div><h1 class="long-page-title">正则测试器</h1><p class="long-page-description">使用 JavaScript 正则语法检查文本，展示匹配内容、位置和捕获组。</p></div><span class="long-badge" id="count">0 个匹配</span></header>
-    <section class="long-stack" aria-label="正则表达式测试器">
-      <div class="long-grid"><div class="long-card long-field"><label class="long-field-label" for="pattern">表达式</label><input class="long-input" id="pattern" placeholder="例如 (Long)\\s+(Window)" autofocus></div><div class="long-card long-field"><label class="long-field-label" for="flags">标志</label><input class="long-input" id="flags" value="gi" aria-describedby="flagHelp"><span class="long-muted" id="flagHelp">常用：g 全局、i 忽略大小写、m 多行</span></div></div>
-      <div class="long-card long-field"><label class="long-field-label" for="input">测试文本</label><textarea class="long-editor" id="input" placeholder="输入需要匹配的文本…"></textarea></div>
-      <div class="long-toolbar"><button class="long-button long-button--primary btn-primary" id="testButton" type="button">开始匹配</button><button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button">粘贴文本</button><span class="long-toolbar__spacer"></span><span class="long-kbd">Ctrl Enter</span></div>
-      <div class="long-card"><div class="long-field-label">匹配结果</div><div class="long-list" id="matches"></div></div>
+    <header class="long-page-header"><div><div class="long-eyebrow">DEVELOPER TOOL</div><h1 class="long-page-title" data-i18n="page.title">正则测试器</h1><p class="long-page-description" data-i18n="page.description">使用 JavaScript 正则语法检查文本，展示匹配内容、位置和捕获组。</p></div><span class="long-badge" id="count">0 个匹配</span></header>
+    <section class="long-stack" id="testerSection" aria-label="正则表达式测试器">
+      <div class="long-grid"><div class="long-card long-field"><label class="long-field-label" for="pattern" data-i18n="field.pattern">表达式</label><input class="long-input" id="pattern" placeholder="例如 (Long)\\s+(Window)" autofocus></div><div class="long-card long-field"><label class="long-field-label" for="flags" data-i18n="field.flags">标志</label><input class="long-input" id="flags" value="gi" aria-describedby="flagHelp"><span class="long-muted" id="flagHelp" data-i18n="field.flagsHelp">常用：g 全局、i 忽略大小写、m 多行</span></div></div>
+      <div class="long-card long-field"><label class="long-field-label" for="input" data-i18n="field.input">测试文本</label><textarea class="long-editor" id="input" placeholder="输入需要匹配的文本…"></textarea></div>
+      <div class="long-toolbar"><button class="long-button long-button--primary btn-primary" id="testButton" type="button" data-i18n="action.test">开始匹配</button><button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button" data-i18n="action.paste">粘贴文本</button><span class="long-toolbar__spacer"></span><span class="long-kbd">Ctrl Enter</span></div>
+      <div class="long-card"><div class="long-field-label" data-i18n="results.title">匹配结果</div><div class="long-list" id="matches"></div></div>
       <div id="status" class="long-status" role="status" aria-live="polite"></div>
     </section>
   </main>
   <script>
     const pattern = document.getElementById('pattern'); const flags = document.getElementById('flags'); const input = document.getElementById('input'); const matches = document.getElementById('matches'); const count = document.getElementById('count'); const status = document.getElementById('status');
-    function test() {
+    let strings = {};
+    let matchState = 'idle';
+    let matchSnapshot = [];
+    let matchErrorDetail = '';
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback, values: values || {} };
+      const message = t(key, fallback, currentStatus.values);
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      window.LongUI?.announce(message);
+      return message;
+    }
+
+    function renderMatches() {
       matches.replaceChildren();
+      if (matchState === 'idle') {
+        count.textContent = t('count.matches', '{count} 个匹配', { count: 0 });
+        window.LongUI?.renderState(matches, {
+          kind: 'empty',
+          title: t('state.waiting', '等待匹配'),
+          detail: t('state.waitingDetail', '输入表达式和测试文本后开始匹配')
+        });
+        return;
+      }
+      if (matchState === 'error') {
+        count.textContent = t('count.error', '表达式错误');
+        window.LongUI?.renderState(matches, {
+          kind: 'error',
+          title: t('state.invalid', '正则表达式无效'),
+          detail: matchErrorDetail
+        });
+        return;
+      }
+      count.textContent = t(
+        'count.matches',
+        '{count} 个匹配',
+        { count: matchSnapshot.length });
+      if (!matchSnapshot.length) {
+        window.LongUI?.renderState(matches, {
+          kind: 'empty',
+          title: t('state.empty', '没有找到匹配内容'),
+          detail: t('state.emptyDetail', '表达式有效，请检查测试文本或匹配条件')
+        });
+        return;
+      }
+      matchSnapshot.forEach(function (match, index) {
+        const row = document.createElement('div');
+        row.className = 'long-list-item';
+        const content = document.createElement('div');
+        content.className = 'long-list-item__content';
+        content.textContent = (index + 1) + '. ' + match.text;
+        const meta = document.createElement('div');
+        meta.className = 'long-list-item__meta';
+        meta.textContent = t(
+          'match.position',
+          '位置 {index}',
+          { index: match.index });
+        if (match.groupCount > 0) {
+          meta.textContent += ' · ' + t(
+            'match.groups',
+            '捕获组 {count}',
+            { count: match.groupCount });
+        }
+        row.append(content, meta);
+        matches.appendChild(row);
+      });
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '正则测试器');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('testerSection').setAttribute(
+        'aria-label',
+        t('tester.ariaLabel', '正则表达式测试器'));
+      pattern.placeholder = t(
+        'field.patternPlaceholder',
+        '例如 (Long)\\s+(Window)');
+      input.placeholder = t(
+        'field.inputPlaceholder',
+        '输入需要匹配的文本…');
+      renderMatches();
+      if (currentStatus.key) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback,
+          currentStatus.values);
+      }
+    }
+
+    function test() {
       try {
         const normalizedFlags = flags.value.includes('g') ? flags.value : flags.value + 'g';
         const expression = new RegExp(pattern.value, normalizedFlags);
         const found = Array.from(input.value.matchAll(expression)).slice(0, 200);
-        count.textContent = found.length + ' 个匹配';
-        if (!found.length) {
-          window.LongUI?.renderState(matches, {
-            kind: 'empty',
-            title: '没有找到匹配内容',
-            detail: '表达式有效，请检查测试文本或匹配条件'
-          });
+        matchSnapshot = found.map(function (match) {
+          return {
+            text: match[0],
+            index: match.index,
+            groupCount: match.length - 1
+          };
+        });
+        matchState = 'success';
+        matchErrorDetail = '';
+        renderMatches();
+        if (found.length) {
+          setStatus('status.completed', 'success', '匹配完成');
+        } else {
+          setStatus('status.noMatches', 'success', '表达式有效，但没有匹配');
         }
-        found.forEach(function (match, index) {
-          const row = document.createElement('div');
-          row.className = 'long-list-item';
-          const content = document.createElement('div');
-          content.className = 'long-list-item__content';
-          content.textContent = (index + 1) + '. ' + match[0];
-          const meta = document.createElement('div');
-          meta.className = 'long-list-item__meta';
-          meta.textContent = '位置 ' + match.index + (match.length > 1 ? ' · 捕获组 ' + (match.length - 1) : '');
-          row.append(content, meta);
-          matches.appendChild(row);
-        });
-        status.textContent = found.length ? '匹配完成' : '表达式有效，但没有匹配';
-        status.className = 'long-status long-status--success';
-        window.LongUI?.announce(status.textContent);
       } catch (error) {
-        count.textContent = '表达式错误';
-        status.textContent = error.message;
-        status.className = 'long-status long-status--danger';
-        window.LongUI?.renderState(matches, {
-          kind: 'error',
-          title: '正则表达式无效',
-          detail: error && error.message ? error.message : String(error)
-        });
+        matchState = 'error';
+        matchSnapshot = [];
+        matchErrorDetail = error && error.message ? error.message : String(error);
+        renderMatches();
+        setStatus(
+          'error.expression',
+          'danger',
+          '正则表达式错误：{detail}',
+          { detail: matchErrorDetail });
       }
     }
-    async function paste() { try { const value = await long.clipboard.getText(); if (value.success) input.value = value.data || ''; } catch (_) { status.textContent = '无法读取剪贴板'; } }
+    async function paste() { try { const value = await long.clipboard.getText(); if (value.success) input.value = value.data || ''; else setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } }
     document.getElementById('testButton').addEventListener('click', test); document.getElementById('pasteButton').addEventListener('click', paste);
     document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); test(); } });
     window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) input.value = text; pattern.focus(); });
-    window.LongUI?.renderState(matches, {
-      kind: 'empty',
-      title: '等待匹配',
-      detail: '输入表达式和测试文本后开始匹配'
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
+    renderMatches();
   </script>
 </body>
 </html>
