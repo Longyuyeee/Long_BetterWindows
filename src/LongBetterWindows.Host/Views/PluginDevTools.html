@@ -419,6 +419,9 @@ function setRuntimeText(id, value) {
 function applyLocalization(data) {
   if (!data || !data.strings) return;
   localizedStrings = data.strings;
+  longApiCatalog = (data.apiCatalog || []).map(function(item) {
+    return [item.api, item.description, item.capability];
+  });
   document.documentElement.lang = data.language || 'zh-CN';
   document.title = t('developer.workbench.pageTitle');
   document.querySelectorAll('[data-i18n]').forEach(function(element) {
@@ -434,52 +437,10 @@ function applyLocalization(data) {
   if (lastFiles) renderFileTree(lastFiles);
   if (consoleStateKey) setRuntimeText('consoleOutput', t(consoleStateKey));
   if (statusState) showLocalizedStatus(statusState.key, statusState.success);
+  renderApiExplorer();
   renderTabs();
 }
-var longApiCatalog = [
-  ['long.app.getVersion()', '读取宿主版本', ''],
-  ['long.app.log()', '写入插件运行日志', ''],
-  ['long.clipboard.getText()', '读取剪贴板', 'system.clipboard'],
-  ['long.clipboard.setText()', '写入剪贴板', 'system.clipboard'],
-  ['long.hotkey.register()', '注册全局热键', 'system.hotkey'],
-  ['long.shell.getSelectedItems()', '获取资源管理器选中项', 'shell.selection'],
-  ['long.process.start()', '启动进程', 'system.process'],
-  ['long.process.getList()', '获取进程列表', 'system.process'],
-  ['long.process.kill()', '结束进程', 'system.process'],
-  ['long.fileOps.copy()', '复制文件', 'file.ops'],
-  ['long.fileOps.move()', '移动文件', 'file.ops'],
-  ['long.fileOps.delete()', '删除文件', 'file.ops'],
-  ['long.fileSystem.enumerate()', '遍历目录', 'filesystem.advanced'],
-  ['long.fileSystem.hash()', '计算文件哈希', 'filesystem.advanced'],
-  ['long.fileSystem.findDuplicates()', '查找重复文件', 'filesystem.advanced'],
-  ['long.fileSystem.searchContent()', '搜索文件内容', 'filesystem.advanced'],
-  ['long.performance.getCpuUsage()', '读取 CPU 使用率', 'system.performance'],
-  ['long.performance.getMemoryInfo()', '读取内存信息', 'system.performance'],
-  ['long.performance.getSystemInfo()', '读取系统信息', 'system.performance'],
-  ['long.networkPort.getTcpListeners()', '获取 TCP 监听端口', 'network.ports'],
-  ['long.networkPort.findPortOwner()', '查找端口占用进程', 'network.ports'],
-  ['long.network.getSpeed()', '读取实时网速', 'network.monitor'],
-  ['long.audio.getVolume()', '读取音量', 'system.audio'],
-  ['long.audio.setVolume()', '设置音量', 'system.audio'],
-  ['long.power.getStatus()', '读取电源状态', 'system.power'],
-  ['long.power.lock()', '锁定屏幕', 'system.power'],
-  ['long.theme.get()', '读取系统主题', 'system.theme'],
-  ['long.theme.set()', '设置系统主题', 'system.theme'],
-  ['long.wallpaper.set()', '设置桌面壁纸', 'system.wallpaper'],
-  ['long.brightness.set()', '设置屏幕亮度', 'display.brightness'],
-  ['long.pinyin.get()', '获取完整拼音', 'text.pinyin'],
-  ['long.pinyin.match()', '拼音模糊匹配', 'text.pinyin'],
-  ['long.input.keyPress()', '模拟按键', 'system.input'],
-  ['long.input.mouseClick()', '模拟鼠标点击', 'system.input'],
-  ['long.cache.getStatistics()', '读取缓存统计', 'system.cache'],
-  ['long.cache.cleanTemp()', '清理临时文件', 'system.cache'],
-  ['long.schedule.create()', '创建计划任务', 'system.schedule'],
-  ['long.schedule.getAll()', '读取计划任务', 'system.schedule'],
-  ['long.ui.showToast()', '显示轻提示', 'system.notification'],
-  ['long.ui.confirm()', '显示确认对话框', 'ui.window'],
-  ['long.ui.prompt()', '显示输入对话框', 'ui.window'],
-  ['long.ui.createWindow()', '创建插件窗口', 'ui.window']
-];
+var longApiCatalog = [];
 
 var codeMirrorEditor = CodeMirror.fromTextArea(document.getElementById('codeEditor'), {
   theme: 'material-darker',

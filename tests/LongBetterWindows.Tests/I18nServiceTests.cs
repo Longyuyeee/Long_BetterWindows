@@ -405,6 +405,11 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("\"localization\"", source);
         Assert.Contains("errorKey = \"developer.workbench.error.save\"", source);
         Assert.Contains("developer.workbench.error.dllUnsupported", source);
+        Assert.Contains("WorkbenchApiCatalog", source);
+        Assert.Contains("apiCatalog,", source);
+        Assert.Contains("data.apiCatalog || []", html);
+        Assert.Contains("renderApiExplorer();", html);
+        Assert.DoesNotContain("['long.app.getVersion()', '读取宿主版本'", html);
         Assert.DoesNotContain("error = ex.Message", source);
         Assert.DoesNotContain("OnLanguageChanged(string language)\n        {\n            location.reload", source);
         Assert.DoesNotContain("<h3>新建插件</h3>", html);

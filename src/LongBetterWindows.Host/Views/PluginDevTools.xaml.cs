@@ -61,6 +61,52 @@ namespace LongBetterWindows.Host.Views
             "action.cancel",
         ];
 
+        private static readonly (string Api, string DescriptionKey, string Capability)[] WorkbenchApiCatalog =
+        [
+            ("long.app.getVersion()", "developer.workbench.api.getVersion", ""),
+            ("long.app.log()", "developer.workbench.api.log", ""),
+            ("long.clipboard.getText()", "developer.workbench.api.clipboardGet", "system.clipboard"),
+            ("long.clipboard.setText()", "developer.workbench.api.clipboardSet", "system.clipboard"),
+            ("long.hotkey.register()", "developer.workbench.api.hotkeyRegister", "system.hotkey"),
+            ("long.shell.getSelectedItems()", "developer.workbench.api.shellSelection", "shell.selection"),
+            ("long.process.start()", "developer.workbench.api.processStart", "system.process"),
+            ("long.process.getList()", "developer.workbench.api.processList", "system.process"),
+            ("long.process.kill()", "developer.workbench.api.processKill", "system.process"),
+            ("long.fileOps.copy()", "developer.workbench.api.fileCopy", "file.ops"),
+            ("long.fileOps.move()", "developer.workbench.api.fileMove", "file.ops"),
+            ("long.fileOps.delete()", "developer.workbench.api.fileDelete", "file.ops"),
+            ("long.fileSystem.enumerate()", "developer.workbench.api.fsEnumerate", "filesystem.advanced"),
+            ("long.fileSystem.hash()", "developer.workbench.api.fsHash", "filesystem.advanced"),
+            ("long.fileSystem.findDuplicates()", "developer.workbench.api.fsDuplicates", "filesystem.advanced"),
+            ("long.fileSystem.searchContent()", "developer.workbench.api.fsSearch", "filesystem.advanced"),
+            ("long.performance.getCpuUsage()", "developer.workbench.api.cpuUsage", "system.performance"),
+            ("long.performance.getMemoryInfo()", "developer.workbench.api.memoryInfo", "system.performance"),
+            ("long.performance.getSystemInfo()", "developer.workbench.api.systemInfo", "system.performance"),
+            ("long.networkPort.getTcpListeners()", "developer.workbench.api.tcpListeners", "network.ports"),
+            ("long.networkPort.findPortOwner()", "developer.workbench.api.portOwner", "network.ports"),
+            ("long.network.getSpeed()", "developer.workbench.api.networkSpeed", "network.monitor"),
+            ("long.audio.getVolume()", "developer.workbench.api.volumeGet", "system.audio"),
+            ("long.audio.setVolume()", "developer.workbench.api.volumeSet", "system.audio"),
+            ("long.power.getStatus()", "developer.workbench.api.powerStatus", "system.power"),
+            ("long.power.lock()", "developer.workbench.api.powerLock", "system.power"),
+            ("long.theme.get()", "developer.workbench.api.themeGet", "system.theme"),
+            ("long.theme.set()", "developer.workbench.api.themeSet", "system.theme"),
+            ("long.wallpaper.set()", "developer.workbench.api.wallpaperSet", "system.wallpaper"),
+            ("long.brightness.set()", "developer.workbench.api.brightnessSet", "display.brightness"),
+            ("long.pinyin.get()", "developer.workbench.api.pinyinGet", "text.pinyin"),
+            ("long.pinyin.match()", "developer.workbench.api.pinyinMatch", "text.pinyin"),
+            ("long.input.keyPress()", "developer.workbench.api.keyPress", "system.input"),
+            ("long.input.mouseClick()", "developer.workbench.api.mouseClick", "system.input"),
+            ("long.cache.getStatistics()", "developer.workbench.api.cacheStats", "system.cache"),
+            ("long.cache.cleanTemp()", "developer.workbench.api.cacheClean", "system.cache"),
+            ("long.schedule.create()", "developer.workbench.api.scheduleCreate", "system.schedule"),
+            ("long.schedule.getAll()", "developer.workbench.api.scheduleList", "system.schedule"),
+            ("long.ui.showToast()", "developer.workbench.api.showToast", "system.notification"),
+            ("long.ui.confirm()", "developer.workbench.api.confirm", "ui.window"),
+            ("long.ui.prompt()", "developer.workbench.api.prompt", "ui.window"),
+            ("long.ui.createWindow()", "developer.workbench.api.createWindow", "ui.window"),
+        ];
+
         private readonly WebView2 _webView;
         private readonly string _pluginsRoot;
         private bool _pageReady;
@@ -151,12 +197,19 @@ namespace LongBetterWindows.Host.Views
                 key => key,
                 key => ServicesInitializer.I18n.T(key),
                 StringComparer.Ordinal);
+            var apiCatalog = WorkbenchApiCatalog.Select(entry => new
+            {
+                api = entry.Api,
+                description = ServicesInitializer.I18n.T(entry.DescriptionKey),
+                capability = entry.Capability,
+            });
             SendJs(
                 "localization",
                 new
                 {
                     language = ServicesInitializer.I18n.CurrentLanguage,
                     strings,
+                    apiCatalog,
                 });
         }
 
