@@ -11,6 +11,7 @@ public sealed class BuiltInPluginLocalizationTests
 {
     [Theory]
     [InlineData("Base64Tool")]
+    [InlineData("ClipboardHistory")]
     [InlineData("ClipboardTool")]
     [InlineData("FileRenamerPlugin")]
     [InlineData("FolderNotePlugin")]
@@ -226,6 +227,7 @@ public sealed class BuiltInPluginLocalizationTests
 
     [Theory]
     [InlineData("Base64Tool")]
+    [InlineData("ClipboardHistory")]
     [InlineData("ClipboardTool")]
     [InlineData("FileRenamerPlugin")]
     [InlineData("HardwareMonitor")]
@@ -279,6 +281,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("FileRenamerPlugin", "async function loadSelection", "renderListState(false);", "loadSelection();")]
     [InlineData("HardwareMonitor", "async function initialize", "renderMetricsProjection();", "updateMetrics(")]
     [InlineData("PortManager", "async function initialize", "renderPorts();", "refreshPorts(")]
+    [InlineData("ClipboardHistory", "function responseData", "renderListState();", "startMonitoring();")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
         string plugin,
         string nextFunction,
@@ -305,6 +308,8 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.DoesNotContain("useNow();", localizationBody);
         Assert.DoesNotContain("startPolling();", localizationBody);
         Assert.DoesNotContain("setInterval", localizationBody);
+        Assert.DoesNotContain("captureClipboard(", localizationBody);
+        Assert.DoesNotContain("persistSnapshot(", localizationBody);
         Assert.DoesNotContain("location.reload", source);
     }
 

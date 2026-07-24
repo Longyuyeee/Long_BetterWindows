@@ -31,6 +31,13 @@
     "min_width": 620,
     "min_height": 500
   },
+  "localization": {
+    "default_language": "zh-CN",
+    "resources": {
+      "zh-CN": "i18n/zh-CN.json",
+      "en-US": "i18n/en-US.json"
+    }
+  },
   "lifecycle": {
     "start_with_host": true,
     "close_behavior": "background",

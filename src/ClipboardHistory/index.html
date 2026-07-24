@@ -10,8 +10,8 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">BACKGROUND CAPTURE</div>
-        <h1 class="long-page-title">剪贴板历史</h1>
-        <p class="long-page-description">持续记录复制过的文本，支持本地检索与快速重新复制。历史只保存在这台设备。</p>
+        <h1 class="long-page-title" data-i18n="page.title">剪贴板历史</h1>
+        <p class="long-page-description" data-i18n="page.description">持续记录复制过的文本，支持本地检索与快速重新复制。历史只保存在这台设备。</p>
       </div>
       <div class="long-toolbar">
         <span class="long-badge long-badge--neutral" id="monitorBadge">正在启动</span>
@@ -19,24 +19,24 @@
       </div>
     </header>
 
-    <section class="long-panel long-stack" aria-label="历史记录筛选">
+    <section class="long-panel long-stack" id="filterSection" aria-label="历史记录筛选">
       <div class="long-toolbar">
         <input class="long-toolbar__field" id="searchInput" type="search"
           placeholder="搜索复制过的文本" aria-label="搜索剪贴板历史">
         <button class="long-button long-button--secondary" id="captureButton" type="button">读取当前剪贴板</button>
-        <button class="long-button long-button--secondary" id="clearButton" type="button">清空历史</button>
+        <button class="long-button long-button--secondary" id="clearButton" type="button" data-i18n="action.clear">清空历史</button>
       </div>
-      <nav class="long-segment" aria-label="记录时间范围">
-        <button type="button" data-range="all" aria-selected="true">全部</button>
-        <button type="button" data-range="today" aria-selected="false">今天</button>
-        <button type="button" data-range="week" aria-selected="false">最近 7 天</button>
+      <nav class="long-segment" id="rangeTabs" aria-label="记录时间范围">
+        <button type="button" data-range="all" data-i18n="range.all" aria-selected="true">全部</button>
+        <button type="button" data-range="today" data-i18n="range.today" aria-selected="false">今天</button>
+        <button type="button" data-range="week" data-i18n="range.week" aria-selected="false">最近 7 天</button>
       </nav>
     </section>
 
     <section class="long-panel long-stack" aria-labelledby="historyTitle">
       <div class="long-section-header">
         <div>
-          <h2 class="long-section-title" id="historyTitle">历史记录</h2>
+          <h2 class="long-section-title" id="historyTitle" data-i18n="history.title">历史记录</h2>
           <p class="long-section-description" id="resultSummary">等待读取本地记录</p>
         </div>
       </div>
@@ -48,11 +48,11 @@
 
   <dialog class="long-dialog" id="clearDialog" aria-labelledby="clearDialogTitle">
     <div class="long-dialog__header">
-      <h2 class="long-dialog__title" id="clearDialogTitle">清空剪贴板历史</h2>
+      <h2 class="long-dialog__title" id="clearDialogTitle" data-i18n="dialog.clear.title">清空剪贴板历史</h2>
     </div>
-    <div class="long-dialog__body">此操作只删除 Long 本地保存的历史，不会清空 Windows 当前剪贴板。</div>
+    <div class="long-dialog__body" data-i18n="dialog.clear.description">此操作只删除 Long 本地保存的历史，不会清空 Windows 当前剪贴板。</div>
     <div class="long-dialog__actions">
-      <button class="long-button long-button--secondary" id="cancelClearButton" type="button">取消</button>
+      <button class="long-button long-button--secondary" id="cancelClearButton" type="button" data-i18n="dialog.clear.cancel">取消</button>
       <button class="long-button long-button--primary" id="confirmClearButton" type="button">确认清空</button>
     </div>
   </dialog>
@@ -79,6 +79,127 @@
     let fallbackTimer = 0;
     let captureRequest = null;
     let mutationQueue = Promise.resolve();
+    let strings = {};
+    let listState = 'loading';
+    let listErrorDetail = '';
+    let monitorMode = 'starting';
+    let monitoringError = '';
+    let isManualCapture = false;
+    let isClearing = false;
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
+      const message = key
+        ? t(key, fallback, currentStatus.values)
+        : currentStatus.fallback;
+      status.textContent = message;
+      status.className = 'long-status' + (kind ? ' long-status--' + kind : '');
+      if (message) window.LongUI?.announce(message);
+      return message;
+    }
+
+    function renderMonitorState() {
+      if (monitorMode === 'active') {
+        monitorBadge.textContent = t(
+          'monitor.active',
+          '监听中 · {hotkey}',
+          { hotkey: hotkey });
+        monitorBadge.className = 'long-badge long-badge--success';
+        return;
+      }
+      if (monitorMode === 'no-hotkey') {
+        monitorBadge.textContent = t('monitor.noHotkey', '监听中 · 热键不可用');
+        monitorBadge.className = 'long-badge long-badge--warning';
+        return;
+      }
+      if (monitorMode === 'fallback') {
+        monitorBadge.textContent = t(
+          'monitor.fallback',
+          '事件监听不可用 · 定时同步');
+        monitorBadge.className = 'long-badge long-badge--warning';
+        return;
+      }
+      if (monitorMode === 'stopped') {
+        monitorBadge.textContent = t('monitor.stopped', '未启动');
+        monitorBadge.className = 'long-badge long-badge--danger';
+        return;
+      }
+      monitorBadge.textContent = t('monitor.starting', '正在启动');
+      monitorBadge.className = 'long-badge long-badge--neutral';
+    }
+
+    function renderActionState() {
+      captureButton.textContent = isManualCapture
+        ? t('action.capturing', '读取中…')
+        : t('action.capture', '读取当前剪贴板');
+      confirmClearButton.textContent = isClearing
+        ? t('dialog.clear.clearing', '清空中…')
+        : t('dialog.clear.confirm', '确认清空');
+    }
+
+    function renderListState() {
+      if (listState === 'loading') {
+        countBadge.textContent = t('history.count', '{count} 条记录', { count: 0 });
+        resultSummary.textContent = t('history.waiting', '等待读取本地记录');
+        window.LongUI?.renderState(historyList, {
+          kind: 'loading',
+          title: t('history.loading', '正在加载剪贴板历史')
+        });
+        return;
+      }
+      if (listState === 'error') {
+        countBadge.textContent = t('history.count', '{count} 条记录', { count: 0 });
+        resultSummary.textContent = t('history.waiting', '等待读取本地记录');
+        window.LongUI?.renderState(historyList, {
+          kind: 'error',
+          title: t('history.loadFailed', '剪贴板历史读取失败'),
+          detail: listErrorDetail,
+          actionLabel: t('action.retry', '重试'),
+          onAction: initialize
+        });
+        return;
+      }
+      renderHistory();
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '剪贴板历史');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('filterSection').setAttribute(
+        'aria-label',
+        t('filter.ariaLabel', '历史记录筛选'));
+      searchInput.placeholder = t(
+        'filter.searchPlaceholder',
+        '搜索复制过的文本');
+      searchInput.setAttribute(
+        'aria-label',
+        t('filter.searchAriaLabel', '搜索剪贴板历史'));
+      document.getElementById('rangeTabs').setAttribute(
+        'aria-label',
+        t('range.ariaLabel', '记录时间范围'));
+      renderMonitorState();
+      renderActionState();
+      renderListState();
+      if (currentStatus.key || currentStatus.fallback) {
+        setStatus(
+          currentStatus.key,
+          currentStatus.kind,
+          currentStatus.fallback,
+          currentStatus.values);
+      }
+    }
 
     function responseData(response, fallbackMessage) {
       if (!response || !response.success) {
@@ -113,31 +234,22 @@
         : Date.now().toString(36) + '-' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
     }
 
-    function setStatus(message, kind) {
-      status.textContent = message;
-      status.className = 'long-status' + (kind ? ' long-status--' + kind : '');
-      window.LongUI?.announce(message);
-    }
-
-    function setMonitorState(label, kind) {
-      monitorBadge.textContent = label;
-      monitorBadge.className = 'long-badge long-badge--' + kind;
-    }
-
     async function loadHistory() {
       const response = await long.storage.get(storageKey);
-      const stored = responseData(response, '历史记录读取失败');
+      const stored = responseData(
+        response,
+        t('error.historyRead', '历史记录读取失败'));
       if (!stored) return [];
       try {
         return normalizeHistory(JSON.parse(stored));
       } catch (_) {
-        throw new Error('本地历史数据格式无效');
+        throw new Error(t('error.historyFormat', '本地历史数据格式无效'));
       }
     }
 
     async function persistSnapshot(snapshot) {
       const response = await long.storage.set(storageKey, JSON.stringify(snapshot));
-      responseData(response, '历史记录保存失败');
+      responseData(response, t('error.historySave', '历史记录保存失败'));
     }
 
     function queueMutation(transform, options) {
@@ -150,12 +262,26 @@
         renderHistory();
         try {
           await persistSnapshot(next);
-          if (settings.success) setStatus(settings.success, 'success');
+          if (settings.successKey) {
+            setStatus(
+              settings.successKey,
+              'success',
+              settings.successFallback || settings.successKey,
+              settings.successValues);
+          }
           return true;
         } catch (error) {
           history = previous;
           renderHistory();
-          setStatus(error.message || '历史记录保存失败，已恢复原记录', 'danger');
+          setStatus(
+            'status.persistenceRollback',
+            'danger',
+            '历史记录保存失败，已恢复原记录：{detail}',
+            {
+              detail: error && error.message
+                ? error.message
+                : t('error.historySave', '历史记录保存失败')
+            });
           return false;
         }
       });
@@ -175,7 +301,12 @@
           timestamp: new Date().toISOString()
         });
         return next.slice(0, maxItems);
-      }, { success: announce ? '当前剪贴板已加入历史' : '' });
+      }, announce
+        ? {
+          successKey: 'status.currentAdded',
+          successFallback: '当前剪贴板已加入历史'
+        }
+        : {});
     }
 
     function inSelectedRange(item) {
@@ -198,18 +329,36 @@
     function renderHistory() {
       const visible = visibleHistory();
       const hasFilter = searchInput.value.trim() || currentRange !== 'all';
-      countBadge.textContent = history.length + ' 条记录';
+      document.querySelectorAll('[data-range]').forEach(function (button) {
+        button.setAttribute(
+          'aria-selected',
+          String(button.dataset.range === currentRange));
+      });
+      countBadge.textContent = t(
+        'history.count',
+        '{count} 条记录',
+        { count: history.length });
       resultSummary.textContent = hasFilter
-        ? '显示 ' + visible.length + ' / ' + history.length + ' 条'
-        : '共 ' + history.length + ' 条本地记录';
+        ? t(
+          'history.filteredSummary',
+          '显示 {visible} / {total} 条',
+          { visible: visible.length, total: history.length })
+        : t(
+          'history.totalSummary',
+          '共 {count} 条本地记录',
+          { count: history.length });
       clearButton.disabled = history.length === 0;
       historyList.replaceChildren();
 
       if (!visible.length) {
         window.LongUI?.renderState(historyList, {
           kind: 'empty',
-          title: hasFilter ? '没有匹配的记录' : '暂无剪贴板历史',
-          detail: hasFilter ? '请调整搜索词或时间范围' : '复制文本后会自动记录在这里'
+          title: hasFilter
+            ? t('history.noMatch', '没有匹配的记录')
+            : t('history.empty', '暂无剪贴板历史'),
+          detail: hasFilter
+            ? t('history.noMatchDetail', '请调整搜索词或时间范围')
+            : t('history.emptyDetail', '复制文本后会自动记录在这里')
         });
         return;
       }
@@ -224,22 +373,27 @@
         value.textContent = item.content.length > 360
           ? item.content.slice(0, 360) + '…'
           : item.content;
-        value.title = '复制此记录';
+        value.title = t('item.copyTitle', '复制此记录');
         value.addEventListener('click', function () { copyItem(item, value); });
 
         const meta = document.createElement('div');
         meta.className = 'long-list-item__meta long-stack';
         const type = document.createElement('span');
         type.className = 'long-badge long-badge--neutral';
-        type.textContent = '文本';
+        type.textContent = t('item.typeText', '文本');
         const time = document.createElement('time');
         time.dateTime = item.timestamp;
         time.textContent = formatTime(item.timestamp);
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'long-button long-button--small';
-        remove.textContent = '删除';
-        remove.setAttribute('aria-label', '删除 ' + formatTime(item.timestamp) + ' 的记录');
+        remove.textContent = t('item.delete', '删除');
+        remove.setAttribute(
+          'aria-label',
+          t(
+            'item.deleteAriaLabel',
+            '删除 {time} 的记录',
+            { time: formatTime(item.timestamp) }));
         remove.addEventListener('click', function () { deleteItem(item.id, remove); });
         meta.append(type, time, remove);
         row.append(value, meta);
@@ -251,11 +405,23 @@
       window.LongUI?.setBusy(button, true);
       try {
         const response = await long.clipboard.setText(item.content);
-        responseData(response, '写入剪贴板失败');
+        responseData(response, t('error.clipboardWrite', '写入剪贴板失败'));
         await addText(item.content, false);
-        setStatus('已复制 · ' + item.content.length + ' 个字符', 'success');
+        setStatus(
+          'status.copied',
+          'success',
+          '已复制 · {count} 个字符',
+          { count: item.content.length });
       } catch (error) {
-        setStatus(error.message || '写入剪贴板失败', 'danger');
+        setStatus(
+          'status.writeFailed',
+          'danger',
+          '写入剪贴板失败：{detail}',
+          {
+            detail: error && error.message
+              ? error.message
+              : t('error.clipboardWrite', '写入剪贴板失败')
+          });
       } finally {
         window.LongUI?.setBusy(button, false);
       }
@@ -265,7 +431,10 @@
       window.LongUI?.setBusy(button, true);
       await queueMutation(function (items) {
         return items.filter(function (item) { return item.id !== id; });
-      }, { success: '记录已删除' });
+      }, {
+        successKey: 'status.deleted',
+        successFallback: '记录已删除'
+      });
       window.LongUI?.setBusy(button, false);
     }
 
@@ -273,17 +442,46 @@
       if (captureRequest) return captureRequest;
       const announce = options && options.announce;
       captureRequest = (async function () {
-        if (announce) window.LongUI?.setBusy(captureButton, true);
+        if (announce) {
+          isManualCapture = true;
+          window.LongUI?.setBusy(captureButton, true);
+          renderActionState();
+        }
         try {
           const response = await long.clipboard.getText();
-          const text = responseData(response, '读取剪贴板失败') || '';
+          const text = responseData(
+            response,
+            t('error.clipboardRead', '读取剪贴板失败')) || '';
           const added = await addText(text, announce);
-          if (announce && !text.trim()) setStatus('当前剪贴板没有文本内容', 'warning');
-          else if (announce && !added) setStatus('当前内容已是最新记录', 'success');
+          if (announce && !text.trim()) {
+            setStatus(
+              'status.clipboardEmpty',
+              'warning',
+              '当前剪贴板没有文本内容');
+          } else if (announce && !added) {
+            setStatus(
+              'status.alreadyLatest',
+              'success',
+              '当前内容已是最新记录');
+          }
         } catch (error) {
-          if (announce) setStatus(error.message || '读取剪贴板失败', 'danger');
+          if (announce) {
+            setStatus(
+              'status.readFailed',
+              'danger',
+              '读取剪贴板失败：{detail}',
+              {
+                detail: error && error.message
+                  ? error.message
+                  : t('error.clipboardRead', '读取剪贴板失败')
+              });
+          }
         } finally {
-          if (announce) window.LongUI?.setBusy(captureButton, false);
+          if (announce) {
+            isManualCapture = false;
+            window.LongUI?.setBusy(captureButton, false);
+            renderActionState();
+          }
           captureRequest = null;
         }
       })();
@@ -297,32 +495,39 @@
     }
 
     async function startMonitoring() {
-      let monitoringError = '';
+      monitoringError = '';
       try {
         const response = await long.clipboard.startMonitoring(handleClipboardChanged);
-        responseData(response, '剪贴板监听启动失败');
+        responseData(response, t('error.monitor', '剪贴板监听启动失败'));
         monitorStarted = true;
       } catch (error) {
-        monitoringError = error.message || '剪贴板监听启动失败';
+        monitoringError = error && error.message
+          ? error.message
+          : t('error.monitor', '剪贴板监听启动失败');
       }
 
       try {
         const response = await long.hotkey.register(hotkey, function () {
           searchInput.focus();
-          setStatus('剪贴板历史已就绪', 'success');
+          setStatus('status.ready', 'success', '剪贴板历史已就绪');
         });
-        responseData(response, '热键注册失败');
+        responseData(response, t('error.hotkey', '热键注册失败'));
         hotkeyRegistered = true;
       } catch (_) {
         hotkeyRegistered = false;
       }
 
-      if (monitorStarted && hotkeyRegistered) setMonitorState('监听中 · ' + hotkey, 'success');
-      else if (monitorStarted) setMonitorState('监听中 · 热键不可用', 'warning');
+      if (monitorStarted && hotkeyRegistered) monitorMode = 'active';
+      else if (monitorStarted) monitorMode = 'no-hotkey';
       else {
-        setMonitorState('事件监听不可用 · 定时同步', 'warning');
-        setStatus(monitoringError, 'warning');
+        monitorMode = 'fallback';
+        setStatus(
+          'status.monitorFallback',
+          'warning',
+          '剪贴板事件监听不可用，已启用定时同步：{detail}',
+          { detail: monitoringError });
       }
+      renderMonitorState();
 
       if (!fallbackTimer) {
         fallbackTimer = window.setInterval(function () {
@@ -333,34 +538,46 @@
     }
 
     async function initialize() {
-      window.LongUI?.renderState(historyList, {
-        kind: 'loading',
-        title: '正在加载剪贴板历史'
-      });
+      listState = 'loading';
+      monitorMode = 'starting';
+      renderMonitorState();
+      renderListState();
       try {
         history = await loadHistory();
-        renderHistory();
+        listState = 'ready';
+        listErrorDetail = '';
+        renderListState();
         await startMonitoring();
       } catch (error) {
-        setMonitorState('未启动', 'danger');
-        window.LongUI?.renderState(historyList, {
-          kind: 'error',
-          title: '剪贴板历史读取失败',
-          detail: error.message || String(error),
-          actionLabel: '重试',
-          onAction: initialize
-        });
-        setStatus('无法读取本地历史，监听尚未启动', 'danger');
+        monitorMode = 'stopped';
+        listState = 'error';
+        listErrorDetail = error && error.message ? error.message : String(error);
+        renderMonitorState();
+        renderListState();
+        setStatus(
+          'status.historyUnavailable',
+          'danger',
+          '无法读取本地历史，监听尚未启动');
       }
     }
 
     function formatTime(timestamp) {
       const date = new Date(timestamp);
       const difference = Date.now() - date.getTime();
-      if (difference < 60000) return '刚刚';
-      if (difference < 3600000) return Math.floor(difference / 60000) + ' 分钟前';
-      if (difference < 86400000) return Math.floor(difference / 3600000) + ' 小时前';
-      return date.toLocaleString('zh-CN', {
+      if (difference < 60000) return t('time.justNow', '刚刚');
+      if (difference < 3600000) {
+        return t(
+          'time.minutesAgo',
+          '{count} 分钟前',
+          { count: Math.floor(difference / 60000) });
+      }
+      if (difference < 86400000) {
+        return t(
+          'time.hoursAgo',
+          '{count} 小时前',
+          { count: Math.floor(difference / 3600000) });
+      }
+      return date.toLocaleString(document.documentElement.lang, {
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
@@ -377,19 +594,21 @@
       clearDialog.close();
     });
     confirmClearButton.addEventListener('click', async function () {
+      isClearing = true;
       window.LongUI?.setBusy(confirmClearButton, true);
+      renderActionState();
       const cleared = await queueMutation(function () { return []; }, {
-        success: '剪贴板历史已清空'
+        successKey: 'status.cleared',
+        successFallback: '剪贴板历史已清空'
       });
+      isClearing = false;
       window.LongUI?.setBusy(confirmClearButton, false);
+      renderActionState();
       if (cleared) clearDialog.close();
     });
     document.querySelectorAll('[data-range]').forEach(function (button) {
       button.addEventListener('click', function () {
         currentRange = button.dataset.range;
-        document.querySelectorAll('[data-range]').forEach(function (candidate) {
-          candidate.setAttribute('aria-selected', String(candidate === button));
-        });
         renderHistory();
       });
     });
@@ -408,12 +627,20 @@
       if (text) searchInput.value = text;
       renderHistory();
       searchInput.focus();
-      return { success: true, message: text ? '已按命令输入筛选历史' : '剪贴板历史已打开' };
+      return {
+        success: true,
+        message: text
+          ? t('command.filtered', '已按命令输入筛选历史')
+          : t('command.opened', '剪贴板历史已打开')
+      };
     });
     window.addEventListener('beforeunload', function () {
       window.clearInterval(fallbackTimer);
       if (hotkeyRegistered) long.hotkey.unregister(hotkey).catch(function () { });
       if (monitorStarted) long.clipboard.stopMonitoring().catch(function () { });
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
 
     initialize();
