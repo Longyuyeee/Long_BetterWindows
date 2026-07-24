@@ -53,13 +53,20 @@ namespace LongBetterWindows.Host.Engine
             MarketplacePackageMetadata? metadata)
         {
             if (!File.Exists(lpakPath))
-                return InstallResult.Fail("文件不存在：" + lpakPath);
+                return InstallResult.Fail(
+                    InstallErrorCode.SourceNotFound,
+                    "文件不存在：" + lpakPath);
             if (!lpakPath.EndsWith(".lpak", StringComparison.OrdinalIgnoreCase))
-                return InstallResult.Fail("不是 .lpak 文件。");
+                return InstallResult.Fail(
+                    InstallErrorCode.InvalidPackageExtension,
+                    "不是 .lpak 文件。");
 
             var validation = await _validator.ValidateAsync(lpakPath, metadata);
             if (!validation.IsSuccess)
-                return InstallResult.Fail(validation.Error ?? "插件包校验失败。", validation);
+                return InstallResult.Fail(
+                    InstallErrorCode.PackageValidationFailed,
+                    validation.Error ?? "插件包校验失败。",
+                    validation);
 
             var manifest = validation.Manifest!;
             var targetDir = GetPluginDirectory(manifest.Id);
@@ -143,9 +150,14 @@ namespace LongBetterWindows.Host.Engine
                     preserveBackup = Directory.Exists(backupDir);
                     Log.Error(rollbackError, "插件回滚失败: {PluginId}", manifest.Id);
                     return InstallResult.Fail(
-                        $"安装失败且回滚失败：{ex.Message}；{rollbackError.Message}", validation);
+                        InstallErrorCode.InstallRollbackFailed,
+                        $"安装失败且回滚失败：{ex.Message}；{rollbackError.Message}",
+                        validation);
                 }
-                return InstallResult.Fail($"安装失败，已恢复旧版本：{ex.Message}", validation);
+                return InstallResult.Fail(
+                    InstallErrorCode.InstallFailedRolledBack,
+                    $"安装失败，已恢复旧版本：{ex.Message}",
+                    validation);
             }
             finally
             {
@@ -171,11 +183,16 @@ namespace LongBetterWindows.Host.Engine
         {
             var targetDir = GetPluginDirectory(pluginId);
             if (!Directory.Exists(targetDir))
-                return InstallResult.Fail("插件未安装。");
+                return InstallResult.Fail(
+                    InstallErrorCode.PluginNotInstalled,
+                    "插件未安装。");
 
             var existing = await ManifestReader.ReadAsync(targetDir);
             if (!existing.IsSuccess)
-                return InstallResult.Fail($"已安装插件 Manifest 无效：{existing.Error}");
+                return InstallResult.Fail(
+                    InstallErrorCode.InstalledManifestInvalid,
+                    $"已安装插件 Manifest 无效：{existing.Error}",
+                    manifestFailureCode: existing.ErrorCode);
 
             var parentDir = Directory.GetParent(_pluginsDir)?.FullName ?? _pluginsDir;
             var transactionDir = Path.Combine(parentDir, $".long-transaction-{Guid.NewGuid():N}");
@@ -211,9 +228,12 @@ namespace LongBetterWindows.Host.Engine
                 {
                     preserveBackup = Directory.Exists(backupDir);
                     return InstallResult.Fail(
+                        InstallErrorCode.UninstallRollbackFailed,
                         $"卸载失败且回滚失败：{ex.Message}；{rollbackError.Message}");
                 }
-                return InstallResult.Fail($"卸载失败，已恢复插件：{ex.Message}");
+                return InstallResult.Fail(
+                    InstallErrorCode.UninstallFailedRolledBack,
+                    $"卸载失败，已恢复插件：{ex.Message}");
             }
             finally
             {
@@ -421,39 +441,4 @@ namespace LongBetterWindows.Host.Engine
         }
     }
 
-    public enum InstallAction
-    {
-        Install,
-        Replace,
-        Uninstall,
-    }
-
-    public class InstallResult
-    {
-        public bool IsSuccess { get; init; }
-        public string? PluginName { get; init; }
-        public string? PluginId { get; init; }
-        public string? PluginVersion { get; init; }
-        public string? Error { get; init; }
-        public InstallAction Action { get; init; }
-        public PackageValidationResult? Validation { get; init; }
-        public PermissionDiff PermissionDiff { get; init; } = new();
-
-        public static InstallResult Ok(
-            string name, string id, string version, InstallAction action,
-            PackageValidationResult? validation, PermissionDiff permissionDiff)
-            => new()
-            {
-                IsSuccess = true,
-                PluginName = name,
-                PluginId = id,
-                PluginVersion = version,
-                Action = action,
-                Validation = validation,
-                PermissionDiff = permissionDiff,
-            };
-
-        public static InstallResult Fail(string error, PackageValidationResult? validation = null)
-            => new() { Error = error, Validation = validation };
-    }
 }

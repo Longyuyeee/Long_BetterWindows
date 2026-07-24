@@ -76,6 +76,21 @@ namespace LongBetterWindows.Host.Interaction
                 PublisherKeyId = version.PublisherKeyId,
             };
 
+        public static string GetInstallErrorResourceKey(InstallErrorCode code)
+            => code switch
+            {
+                InstallErrorCode.SourceNotFound => "market.error.install.sourceNotFound",
+                InstallErrorCode.InvalidPackageExtension => "market.error.install.invalidExtension",
+                InstallErrorCode.PackageValidationFailed => "market.error.install.packageValidation",
+                InstallErrorCode.InstallFailedRolledBack => "market.error.install.failedRolledBack",
+                InstallErrorCode.InstallRollbackFailed => "market.error.install.rollbackFailed",
+                InstallErrorCode.PluginNotInstalled => "market.error.install.notInstalled",
+                InstallErrorCode.InstalledManifestInvalid => "market.error.install.manifestInvalid",
+                InstallErrorCode.UninstallFailedRolledBack => "market.error.install.uninstallFailedRolledBack",
+                InstallErrorCode.UninstallRollbackFailed => "market.error.install.uninstallRollbackFailed",
+                _ => "market.error.unknown",
+            };
+
         public static Version ParseVersion(string? value)
         {
             var normalized = (value ?? "0.0.0").TrimStart('v', 'V').Split('-', '+')[0];

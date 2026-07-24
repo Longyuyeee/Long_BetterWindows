@@ -64,7 +64,9 @@ public class MarketplaceSessionCoordinatorTests
         Assert.NotNull(session.PendingAction);
 
         var failed = await session.ExecutePendingAsync((_, _) =>
-            Task.FromResult(InstallResult.Fail("simulated failure")));
+            Task.FromResult(InstallResult.Fail(
+                InstallErrorCode.InstallFailedRolledBack,
+                "simulated failure")));
         Assert.False(failed.Result!.IsSuccess);
         Assert.NotNull(session.PendingAction);
 

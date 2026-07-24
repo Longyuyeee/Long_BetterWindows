@@ -731,7 +731,8 @@ WIP UI visual draft before audited implementation
 - [x] G16-B2.2-B2 迁移实际 32 项能力名称/说明和能力空态，语言切换保留权限勾选；中英文各 723 个业务键，Release 0 警告/0 错误，521 / 521 测试通过。
 - [x] G16-B2.3-A 将 Web 与 C# Script 生成模板按创建时宿主语言投影，保持 HTML 与 JavaScript 编码边界；中英文各 731 个业务键，Release 0 警告/0 错误，522 / 522 测试通过。
 - [x] G16-B2.3-B 工程实现：未保存确认改为可访问自定义对话框；系统 Edge 无头英文宽屏/紧凑及中文紧凑验证通过，证据位于 `artifacts/quality/i18n-g16-b23-workbench-headless-20260724/`。
-- [ ] G16-B2.3-B 真实 WPF/WebView2 候选视觉证据待补录；G16-C 下一步统一跨模块错误码。
+- [x] G16-C1 / C2-A 已完成 Manifest、包校验传播和安装器稳定错误码；市场安装执行失败按中英文资源键展示，不再直显技术摘要。
+- [ ] G16-B2.3-B 真实 WPF/WebView2 候选视觉证据待补录；G16-C2-B 下一步统一市场仓库、下载与准备错误码，之后处理工作流验证器。
 - [ ] G3 为内置 Web 插件建立可选语言声明与宿主语言通知；不实现 uTools 插件兼容层。
 
 详细边界与后续顺序见 `docs/国际化_UI集成.md`。

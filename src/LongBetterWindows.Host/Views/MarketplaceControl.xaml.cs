@@ -455,7 +455,8 @@ namespace LongBetterWindows.Host.Views
 
                 if (!result.IsSuccess)
                 {
-                    ConfirmErrorText.Text = result.Error;
+                    ConfirmErrorText.Text = I18n(
+                        MarketplacePresentation.GetInstallErrorResourceKey(result.ErrorCode));
                     return;
                 }
 
