@@ -71,6 +71,7 @@
     <Exec Command="if exist &quot;$(RepoRoot)src\SamplePlugin\bin\$(Configuration)\net8.0-windows\SamplePlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\SamplePlugin\bin\$(Configuration)\net8.0-windows\SamplePlugin.dll&quot; &quot;$(OutputPath)Plugins\SamplePlugin\&quot; &gt; nul" />
 
     <Copy SourceFiles="$(RepoRoot)src\FolderNotePlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\FolderNotePlugin" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\FolderNotePlugin\i18n&quot; &quot;$(OutputPath)Plugins\FolderNotePlugin\i18n&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="if exist &quot;$(RepoRoot)src\FolderNotePlugin\bin\$(Configuration)\net8.0-windows\FolderNotePlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\FolderNotePlugin\bin\$(Configuration)\net8.0-windows\FolderNotePlugin.dll&quot; &quot;$(OutputPath)Plugins\FolderNotePlugin\&quot; &gt; nul" />
 
     <Copy SourceFiles="$(RepoRoot)src\QuickLaunchPlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\QuickLaunchPlugin" />

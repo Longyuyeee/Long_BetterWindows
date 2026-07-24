@@ -7,7 +7,12 @@ namespace LongBetterWindows.Host.Interaction
         string Key,
         string PluginId,
         string PluginName,
-        PluginCommand Command);
+        PluginCommand Command)
+    {
+        public string ManifestPluginName { get; init; } = PluginName;
+        public string Title { get; init; } = Command.Title;
+        public string Description { get; init; } = Command.Description ?? string.Empty;
+    }
 
     /// <summary>统一入口的搜索结果及其可解释得分。</summary>
     public sealed record CommandSearchResult(CommandDescriptor Descriptor, int Score);
@@ -49,13 +54,45 @@ namespace LongBetterWindows.Host.Interaction
             lock (_lock) RemovePluginCommands(pluginId);
         }
 
+        internal void ApplyLocalization(
+            string pluginId,
+            PluginLanguageContext context)
+        {
+            lock (_lock)
+            {
+                foreach (var key in _commands.Keys
+                             .Where(key => key.StartsWith(
+                                 pluginId + ":",
+                                 StringComparison.OrdinalIgnoreCase))
+                             .ToArray())
+                {
+                    var descriptor = _commands[key];
+                    _commands[key] = descriptor with
+                    {
+                        PluginName = GetResource(
+                            context,
+                            "plugin.name",
+                            descriptor.ManifestPluginName),
+                        Title = GetResource(
+                            context,
+                            $"commands.{descriptor.Command.Id}.title",
+                            descriptor.Command.Title),
+                        Description = GetResource(
+                            context,
+                            $"commands.{descriptor.Command.Id}.description",
+                            descriptor.Command.Description),
+                    };
+                }
+            }
+        }
+
         public IReadOnlyList<CommandDescriptor> GetAll()
         {
             lock (_lock)
             {
                 return _commands.Values
                     .OrderBy(x => x.PluginName, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(x => x.Command.Title, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(x => x.Title, StringComparer.OrdinalIgnoreCase)
                     .ToList();
             }
         }
@@ -100,7 +137,7 @@ namespace LongBetterWindows.Host.Interaction
                 .Select(x => new CommandSearchResult(x, Score(x, normalized, inputTypes)))
                 .Where(x => x.Score > 0)
                 .OrderByDescending(x => x.Score)
-                .ThenBy(x => x.Descriptor.Command.Title, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.Descriptor.Title, StringComparer.OrdinalIgnoreCase)
                 .Take(maxResults)
                 .ToList();
         }
@@ -111,7 +148,7 @@ namespace LongBetterWindows.Host.Interaction
             IReadOnlyCollection<AcceptedInputType> inputTypes)
         {
             var command = descriptor.Command;
-            var title = Normalize(command.Title);
+            var title = Normalize(descriptor.Title);
             var aliases = command.Aliases.Select(Normalize).Where(x => x.Length > 0).ToList();
             var score = 0;
 
@@ -157,5 +194,14 @@ namespace LongBetterWindows.Host.Interaction
 
         private static string Normalize(string value)
             => value.Trim().ToLowerInvariant();
+
+        private static string GetResource(
+            PluginLanguageContext context,
+            string key,
+            string? fallback)
+            => context.Resources.TryGetValue(key, out var value)
+                && !string.IsNullOrWhiteSpace(value)
+                    ? value
+                    : fallback ?? string.Empty;
     }
 }

@@ -14,6 +14,9 @@ namespace LongBetterWindows.Host.Engine
         };
 
         public string Id => Manifest.Id;
+        public string DisplayName => GetLocalizedString(
+            "plugin.name",
+            Manifest.Name);
         public PluginManifest Manifest { get; }
         public object Instance { get; }
         public PluginState State { get; set; } = PluginState.Loaded;
@@ -37,6 +40,17 @@ namespace LongBetterWindows.Host.Engine
 
         public bool HasCapability(string capability)
             => Manifest.Capabilities.Contains(capability, StringComparer.OrdinalIgnoreCase);
+
+        public PluginLanguageContext? LanguageContext { get; private set; }
+
+        internal void ApplyLanguageContext(PluginLanguageContext context)
+            => LanguageContext = context;
+
+        public string GetLocalizedString(string key, string fallback)
+            => LanguageContext?.Resources.TryGetValue(key, out var value) == true
+                && !string.IsNullOrWhiteSpace(value)
+                    ? value
+                    : fallback;
 
         public string? GetSetting(string key)
         {

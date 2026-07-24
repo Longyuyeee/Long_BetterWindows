@@ -72,7 +72,7 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     var started = await _plugins.StartPluginAsync(entry.Id);
                     if (!started && entry.State != PluginState.Running)
-                        return PluginCommandResult.Failure($"插件启动失败: {entry.Manifest.Name}");
+                        return PluginCommandResult.Failure($"插件启动失败: {entry.DisplayName}");
                 }
 
                 using (PluginAccessContext.Enter(entry.Id))
@@ -90,7 +90,7 @@ namespace LongBetterWindows.Host.Interaction
                 }
 
                 return PluginCommandResult.Failure(
-                    $"插件尚未实现命令执行接口: {entry.Manifest.Name}");
+                    $"插件尚未实现命令执行接口: {entry.DisplayName}");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {

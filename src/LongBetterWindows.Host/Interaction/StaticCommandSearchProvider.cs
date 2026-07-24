@@ -53,8 +53,8 @@ namespace LongBetterWindows.Host.Interaction
             {
                 Id = "command:" + descriptor.Key,
                 ProviderId = Id,
-                Title = descriptor.Command.Title,
-                Subtitle = descriptor.Command.Description,
+                Title = descriptor.Title,
+                Subtitle = descriptor.Description,
                 Source = descriptor.PluginName,
                 Score = score,
                 Kind = SearchResultKind.Command,

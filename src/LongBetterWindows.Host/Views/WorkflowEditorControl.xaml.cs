@@ -1330,7 +1330,7 @@ namespace LongBetterWindows.Host.Views
         private sealed record CommandOption(string Key, string Display)
         {
             public static CommandOption From(CommandDescriptor descriptor)
-                => new(descriptor.Key, $"{descriptor.Command.Title} · {descriptor.PluginName}");
+                => new(descriptor.Key, $"{descriptor.Title} · {descriptor.PluginName}");
         }
         private sealed record WorkflowListItem(string Id, string Name, string Detail)
         {

@@ -356,6 +356,10 @@ namespace LongBetterWindows.Host.Engine
                 return;
             }
 
+            var registry = HostProvider.Instance.PluginStore;
+            if (!registry.ApplyLocalization(entry.Id, context!))
+                entry.ApplyLanguageContext(context!);
+
             try
             {
                 using (PluginAccessContext.Enter(entry.Id))

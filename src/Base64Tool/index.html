@@ -10,33 +10,33 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">TEXT TRANSFORM</div>
-        <h1 class="long-page-title">Base64 编解码</h1>
-        <p class="long-page-description">在纯文本与 Base64 之间快速转换，结果可直接复制。</p>
+        <h1 class="long-page-title" data-i18n="page.title">Base64 编解码</h1>
+        <p class="long-page-description" data-i18n="page.description">在纯文本与 Base64 之间快速转换，结果可直接复制。</p>
       </div>
-      <span class="long-badge">本地处理</span>
+      <span class="long-badge" data-i18n="page.localBadge">本地处理</span>
     </header>
 
-    <section class="long-stack" aria-label="Base64 转换器">
+    <section class="long-stack" id="converterSection" aria-label="Base64 转换器">
       <div class="long-card long-field">
-        <label class="long-field-label" for="input">原始内容</label>
+        <label class="long-field-label" for="input" data-i18n="field.input">原始内容</label>
         <textarea class="long-editor" id="input" placeholder="输入文本，或从命令中心携带剪贴板内容…" autofocus></textarea>
       </div>
 
       <div class="long-toolbar">
-        <button class="long-button long-button--primary btn-primary" id="encodeButton" type="button">编码</button>
-        <button class="long-button long-button--secondary btn-secondary" id="decodeButton" type="button">解码</button>
-        <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button">粘贴</button>
+        <button class="long-button long-button--primary btn-primary" id="encodeButton" type="button" data-i18n="action.encode">编码</button>
+        <button class="long-button long-button--secondary btn-secondary" id="decodeButton" type="button" data-i18n="action.decode">解码</button>
+        <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button" data-i18n="action.paste">粘贴</button>
         <span class="long-toolbar__spacer"></span>
         <span class="long-kbd">Ctrl Enter</span>
       </div>
 
       <div class="long-card long-field">
-        <label class="long-field-label" for="output">转换结果</label>
+        <label class="long-field-label" for="output" data-i18n="field.output">转换结果</label>
         <textarea class="long-editor" id="output" placeholder="结果将在这里显示" readonly></textarea>
         <div class="long-toolbar">
           <div id="status" class="long-status" role="status" aria-live="polite"></div>
           <span class="long-toolbar__spacer"></span>
-          <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button">复制结果</button>
+          <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制结果</button>
         </div>
       </div>
     </section>
@@ -46,40 +46,84 @@
     const input = document.getElementById('input');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
+    let strings = {};
+    let currentStatusKey = '';
+    let currentStatusFallback = '';
+    let currentStatusKind = '';
 
-    function setStatus(message, kind) {
+    function t(key, fallback) {
+      return strings[key] || fallback || key;
+    }
+
+    function renderStatus() {
+      const message = currentStatusKey
+        ? t(currentStatusKey, currentStatusFallback)
+        : '';
       status.textContent = message;
-      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      status.className = 'long-status ' +
+        (currentStatusKind ? 'long-status--' + currentStatusKind : '');
+      return message;
+    }
+
+    function setStatus(key, kind, fallback) {
+      currentStatusKey = key;
+      currentStatusFallback = fallback;
+      currentStatusKind = kind;
+      const message = renderStatus();
       window.LongUI?.announce(message);
+      return message;
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', 'Base64 编解码');
+      document.querySelectorAll('[data-i18n]').forEach(element => {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('converterSection').setAttribute(
+        'aria-label',
+        t('converter.ariaLabel', 'Base64 转换器'));
+      input.placeholder = t(
+        'field.inputPlaceholder',
+        '输入文本，或从命令中心携带剪贴板内容…');
+      output.placeholder = t('field.outputPlaceholder', '结果将在这里显示');
+      renderStatus();
     }
 
     function encode() {
       try {
         output.value = btoa(unescape(encodeURIComponent(input.value)));
-        setStatus('编码完成', 'success');
+        const message = setStatus('status.encoded', 'success', '编码完成');
         return {
           success: true,
-          message: '编码完成',
+          message,
           outputs: { result: { type: 'text', value: output.value } }
         };
       } catch (_) {
-        setStatus('无法编码当前内容', 'danger');
-        return { success: false, message: '无法编码当前内容', outputs: {} };
+        const message = setStatus(
+          'error.encode',
+          'danger',
+          '无法编码当前内容');
+        return { success: false, message, outputs: {} };
       }
     }
 
     function decode() {
       try {
         output.value = decodeURIComponent(escape(atob(input.value.trim())));
-        setStatus('解码完成', 'success');
+        const message = setStatus('status.decoded', 'success', '解码完成');
         return {
           success: true,
-          message: '解码完成',
+          message,
           outputs: { result: { type: 'text', value: output.value } }
         };
       } catch (_) {
-        setStatus('请输入有效的 Base64 内容', 'danger');
-        return { success: false, message: '请输入有效的 Base64 内容', outputs: {} };
+        const message = setStatus(
+          'error.invalidBase64',
+          'danger',
+          '请输入有效的 Base64 内容');
+        return { success: false, message, outputs: {} };
       }
     }
 
@@ -87,13 +131,18 @@
       try {
         const result = await long.clipboard.getText();
         if (result.success && result.data) { input.value = result.data; input.focus(); }
-      } catch (_) { setStatus('无法读取剪贴板', 'danger'); }
+        else if (!result.success) setStatus('error.clipboardRead', 'danger', '无法读取剪贴板');
+      } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); }
     }
 
     async function copy() {
       if (!output.value) return;
-      try { await long.clipboard.setText(output.value); setStatus('结果已复制', 'success'); }
-      catch (_) { setStatus('复制失败', 'danger'); }
+      try {
+        const result = await long.clipboard.setText(output.value);
+        if (result.success) setStatus('status.copied', 'success', '结果已复制');
+        else setStatus('error.copy', 'danger', '复制失败');
+      }
+      catch (_) { setStatus('error.copy', 'danger', '复制失败'); }
     }
 
     document.getElementById('encodeButton').addEventListener('click', encode);
@@ -107,6 +156,9 @@
       const text = window.LongUI.commandText(command);
       if (text) input.value = text;
       return command.command_id === 'base64.decode' ? decode() : encode();
+    });
+    window.chrome?.webview?.addEventListener('message', ({ data }) => {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
   </script>
 </body>

@@ -132,6 +132,22 @@ namespace LongBetterWindows.Host.Engine
             return true;
         }
 
+        internal bool ApplyLocalization(
+            string pluginId,
+            PluginLanguageContext context)
+        {
+            lock (_lock)
+            {
+                if (!_entries.TryGetValue(pluginId, out var entry))
+                    return false;
+                entry.ApplyLanguageContext(context);
+                Commands.ApplyLocalization(pluginId, context);
+            }
+
+            NotifyChanged();
+            return true;
+        }
+
         public bool HasCapability(string pluginId, string capability)
         {
             var entry = Get(pluginId);

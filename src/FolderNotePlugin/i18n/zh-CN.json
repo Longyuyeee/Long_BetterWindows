@@ -1,0 +1,13 @@
+{
+  "plugin.name": "文件夹备注助手",
+  "commands.folder-note.edit.title": "编辑文件夹备注",
+  "commands.folder-note.edit.description": "为当前文件夹或 Explorer 选区编辑备注",
+  "hud.title": "备注",
+  "hud.inputAutomationName": "文件夹备注内容",
+  "hud.emptyHint": "输入备注内容...",
+  "hud.modifiedHint": "已修改 · Ctrl+Enter 保存",
+  "settings.commandCenter": "命令中心",
+  "error.selectFolder": "请先打开资源管理器并选中文件夹。",
+  "error.folderMissing": "目标文件夹不存在。",
+  "error.unknownCommand": "未知文件夹备注命令: {0}"
+}

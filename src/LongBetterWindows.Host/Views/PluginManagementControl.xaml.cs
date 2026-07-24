@@ -27,7 +27,7 @@ namespace LongBetterWindows.Host.Views
             var filtered = string.IsNullOrEmpty(filter)
                 ? plugins
                 : plugins.Where(plugin =>
-                    plugin.Manifest.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                    plugin.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase)
                     || plugin.Manifest.Id.Contains(filter, StringComparison.OrdinalIgnoreCase))
                     .ToList();
             var items = filtered.Select(PluginCardItem.Create).ToArray();
@@ -138,7 +138,7 @@ namespace LongBetterWindows.Host.Views
                 if (content is null) return;
 
                 new PluginWindowHost(
-                    string.Format(I18n("plugins.settingsTitle"), entry.Manifest.Name),
+                    string.Format(I18n("plugins.settingsTitle"), entry.DisplayName),
                     content,
                     entry.Manifest.Window)
                 {
@@ -160,9 +160,9 @@ namespace LongBetterWindows.Host.Views
             if (sender is not Button { Tag: PluginCardItem { Entry: var entry } }) return;
 
             var panel = new CapabilityDetailPanel();
-            panel.LoadCapabilities(entry.Id, entry.Manifest.Name, entry.Manifest.Capabilities);
+            panel.LoadCapabilities(entry.Id, entry.DisplayName, entry.Manifest.Capabilities);
             new PluginWindowHost(
-                string.Format(I18n("plugins.capabilitiesTitle"), entry.Manifest.Name),
+                string.Format(I18n("plugins.capabilitiesTitle"), entry.DisplayName),
                 panel,
                 new PluginWindowPreference
                 {
@@ -183,7 +183,7 @@ namespace LongBetterWindows.Host.Views
             private PluginCardItem(PluginEntry entry)
             {
                 Entry = entry;
-                Name = entry.Manifest.Name;
+                Name = entry.DisplayName;
                 RuntimeLabel = entry.Manifest.Runtime switch
                 {
                     "webview" => "Web",

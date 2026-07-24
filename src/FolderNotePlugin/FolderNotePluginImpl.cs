@@ -4,20 +4,29 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using LongBetterWindows.Host.Capabilities;
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Views;
 using Serilog;
 
 namespace FolderNotePlugin;
 
-public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginCommandHandler
+public class FolderNotePluginImpl :
+    ILongPlugin,
+    IHasSettingsUI,
+    IHasMainUI,
+    IPluginCommandHandler,
+    IPluginLanguageLifecycle
 {
     private IHostApi _host = null!;
     private IHotKeyService _hotKey = null!;
     private string? _registeredHotkey;
+    private FloatingHudWindow? _activeHud;
+    private IReadOnlyDictionary<string, string> _strings =
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.folder-note";
-    public string Name => "文件夹备注助手";
+    public string Name => Text("plugin.name", "文件夹备注助手");
     public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
@@ -95,7 +104,9 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
             var folderResult = await shell.GetActiveExplorerFolderPathAsync();
             if (!folderResult.IsSuccess || folderResult.Data == null)
             {
-                FloatingHudWindow.ShowToast("请先打开资源管理器并选中文件夹。");
+                FloatingHudWindow.ShowToast(Text(
+                    "error.selectFolder",
+                    "请先打开资源管理器并选中文件夹。"));
                 return;
             }
 
@@ -104,7 +115,9 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
 
         if (!Directory.Exists(folderPath))
         {
-            FloatingHudWindow.ShowToast("目标文件夹不存在。");
+            FloatingHudWindow.ShowToast(Text(
+                "error.folderMissing",
+                "目标文件夹不存在。"));
             return;
         }
 
@@ -131,7 +144,11 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
 
         Application.Current.Dispatcher.Invoke(() =>
         {
-            FloatingHudWindow.ShowAt(hudX, hudY, existingNote, folderPath,
+            var window = FloatingHudWindow.ShowAt(
+                hudX,
+                hudY,
+                existingNote,
+                folderPath,
                 async (text) =>
                 {
                     if (string.IsNullOrEmpty(text))
@@ -140,7 +157,14 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
                         await ads.WriteAsync(folderPath, "long_note", text);
 
                     Log.Information("[FolderNotePlugin] 备注已保存: {Path}", folderPath);
-                });
+                },
+                CreateHudLocalization());
+            _activeHud = window;
+            window.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_activeHud, window))
+                    _activeHud = null;
+            };
         });
     }
 
@@ -151,7 +175,11 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
         if (invocation.CommandId != "folder-note.edit")
         {
             return LongBetterWindows.Host.Contracts.PluginCommandResult.Failure(
-                $"未知文件夹备注命令: {invocation.CommandId}");
+                string.Format(
+                    Text(
+                        "error.unknownCommand",
+                        "未知文件夹备注命令: {0}"),
+                    invocation.CommandId));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -177,12 +205,44 @@ public class FolderNotePluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPl
     public FrameworkElement CreateSettingsUI()
     {
         return new LongBetterWindows.Host.Views.HotkeySettingsControl(
-            "文件夹备注助手", Id, _registeredHotkey ?? "命令中心",
+            Name,
+            Id,
+            _registeredHotkey ?? Text("settings.commandCenter", "命令中心"),
             newHotkey =>
             {
                 // 热键变更时的回调——由 HotkeySettingsControl 内部处理
             });
     }
+
+    public Task OnLanguageChangedAsync(
+        PluginLanguageContext context,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _strings = context.Resources;
+        var window = _activeHud;
+        if (window is null) return Task.CompletedTask;
+
+        if (window.Dispatcher.CheckAccess())
+            window.ApplyLocalization(CreateHudLocalization());
+        else
+            window.Dispatcher.Invoke(
+                () => window.ApplyLocalization(CreateHudLocalization()));
+        return Task.CompletedTask;
+    }
+
+    private FloatingHudLocalization CreateHudLocalization()
+        => new(
+            Text("hud.title", "备注"),
+            Text("hud.inputAutomationName", "文件夹备注内容"),
+            Text("hud.emptyHint", "输入备注内容..."),
+            Text("hud.modifiedHint", "已修改 · Ctrl+Enter 保存"));
+
+    private string Text(string key, string fallback)
+        => _strings.TryGetValue(key, out var value)
+            && !string.IsNullOrWhiteSpace(value)
+                ? value
+                : fallback;
 
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out POINT lpPoint);

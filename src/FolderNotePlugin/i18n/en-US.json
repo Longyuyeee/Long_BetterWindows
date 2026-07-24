@@ -1,0 +1,13 @@
+{
+  "plugin.name": "Folder Notes",
+  "commands.folder-note.edit.title": "Edit Folder Note",
+  "commands.folder-note.edit.description": "Edit the note for the current folder or Explorer selection",
+  "hud.title": "Folder note",
+  "hud.inputAutomationName": "Folder note content",
+  "hud.emptyHint": "Enter a note...",
+  "hud.modifiedHint": "Modified · Ctrl+Enter to save",
+  "settings.commandCenter": "Command center",
+  "error.selectFolder": "Open File Explorer and select a folder first.",
+  "error.folderMissing": "The target folder no longer exists.",
+  "error.unknownCommand": "Unknown folder note command: {0}"
+}

@@ -55,7 +55,7 @@ namespace LongBetterWindows.Host.Views
             var plugins = HostProvider.Instance.PluginStore.GetAll();
             var rows = snapshot.Plugins.Take(10).Select(data => new PluginPerformanceRow(
                 data.PluginId,
-                plugins.FirstOrDefault(plugin => plugin.Manifest.Id == data.PluginId)?.Manifest.Name ?? data.PluginId,
+                plugins.FirstOrDefault(plugin => plugin.Manifest.Id == data.PluginId)?.DisplayName ?? data.PluginId,
                 data.TotalApiCalls,
                 $"{data.AverageApiDurationMs:F1} ms")).ToArray();
 

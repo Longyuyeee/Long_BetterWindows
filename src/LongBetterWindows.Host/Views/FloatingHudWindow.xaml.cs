@@ -1,16 +1,32 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 
 namespace LongBetterWindows.Host.Views
 {
+    public sealed record FloatingHudLocalization(
+        string Title,
+        string InputAutomationName,
+        string EmptyHint,
+        string ModifiedHint)
+    {
+        public static FloatingHudLocalization Default { get; } = new(
+            "备注",
+            "文件夹备注内容",
+            "输入备注内容...",
+            "已修改 · Ctrl+Enter 保存");
+    }
+
     public partial class FloatingHudWindow : Window
     {
         private Action<string>? _onSave;
         private bool _dirty;
         private bool _isClosing;
         private System.Threading.CancellationTokenSource? _closeCts;
+        private FloatingHudLocalization _localization =
+            FloatingHudLocalization.Default;
 
         public FloatingHudWindow()
         {
@@ -21,7 +37,8 @@ namespace LongBetterWindows.Host.Views
             double x, double y,
             string? existingNote,
             string? folderPath,
-            Action<string> onSave)
+            Action<string> onSave,
+            FloatingHudLocalization? localization = null)
         {
             var window = new FloatingHudWindow
             {
@@ -29,6 +46,8 @@ namespace LongBetterWindows.Host.Views
                 Top = y,
                 _onSave = onSave,
             };
+            window.ApplyLocalization(
+                localization ?? FloatingHudLocalization.Default);
 
             if (!string.IsNullOrEmpty(folderPath))
             {
@@ -38,6 +57,8 @@ namespace LongBetterWindows.Host.Views
             if (!string.IsNullOrEmpty(existingNote))
             {
                 window.NoteTextBox.Text = existingNote;
+                window._dirty = false;
+                window.HintText.Text = window._localization.EmptyHint;
             }
 
             window.Show();
@@ -45,6 +66,18 @@ namespace LongBetterWindows.Host.Views
             window.NoteTextBox.CaretIndex = window.NoteTextBox.Text.Length;
 
             return window;
+        }
+
+        public void ApplyLocalization(FloatingHudLocalization localization)
+        {
+            _localization = localization;
+            TitleLabel.Text = localization.Title;
+            AutomationProperties.SetName(
+                NoteTextBox,
+                localization.InputAutomationName);
+            HintText.Text = _dirty
+                ? localization.ModifiedHint
+                : localization.EmptyHint;
         }
 
         public static void ShowToast(string message)
@@ -96,7 +129,7 @@ namespace LongBetterWindows.Host.Views
             object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
             _dirty = true;
-            HintText.Text = _dirty ? "已修改 · Ctrl+Enter 保存" : "";
+            HintText.Text = _localization.ModifiedHint;
         }
 
         private void SaveAndClose()

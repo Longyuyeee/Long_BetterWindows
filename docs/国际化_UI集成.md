@@ -208,6 +208,14 @@
 
 下一批选择一个 Web 内置插件和一个 DLL 内置插件作为双语样板，同时验证 Manifest 显示元数据与插件内部 UI 使用同一资源目录。
 
+2026-07-24 G17-B 双运行时样板已完成：
+
+1. Base64Tool 使用 24 组中英文插件资源，覆盖插件/命令元数据、页面、ARIA、占位符、操作、成功状态和错误反馈；语言切换原位重绘并保留输入、输出和当前状态。
+2. FolderNotePlugin 使用 11 组中英文插件资源，实现 `IPluginLanguageLifecycle`，动态更新插件名称、命令元数据、Toast、设置入口和当前活动备注 HUD；备注内容、热键注册和 ADS 状态不变。
+3. `PluginEntry` 与 `CommandDescriptor` 增加只读显示投影，插件管理、平台诊断、命令搜索和工作流命令选择统一消费本地化名称；原 Manifest、`PluginCommand` 和目录修订保持不变。
+4. Release 输出已验证包含两个样板的 `zh-CN.json` / `en-US.json`。Base64 无头 Edge 英文 `760×680`、中文 `620×560` 验证无水平溢出，双向切换后输入、结果和状态保持。
+5. 下一批 G17-C 按使用频率迁移 ClipboardTool、QuickNotePlugin 等 Web 插件；其后再分组处理剩余 DLL 插件，避免一次提交混入全部 25 个插件。
+
 ### G4：完成门禁
 
 只有满足以下条件才把 README 国际化标记为完成：
