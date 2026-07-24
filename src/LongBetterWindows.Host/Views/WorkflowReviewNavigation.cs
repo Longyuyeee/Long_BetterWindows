@@ -1,5 +1,6 @@
 using System.Windows;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -11,11 +12,11 @@ namespace LongBetterWindows.Host.Views
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(workflowId))
-                return PluginCommandResult.Failure("组合动作标识无效。");
+                return Failure("workflow.error.invalidId");
 
             var application = Application.Current;
             if (application is null)
-                return PluginCommandResult.Failure("应用窗口当前不可用。");
+                return Failure("workflow.error.applicationUnavailable");
 
             if (!application.Dispatcher.CheckAccess())
             {
@@ -30,7 +31,7 @@ namespace LongBetterWindows.Host.Views
             var mainWindow = application.Windows.OfType<MainWindow>().FirstOrDefault()
                 ?? application.MainWindow as MainWindow;
             if (mainWindow is null)
-                return PluginCommandResult.Failure("主窗口当前不可用。");
+                return Failure("workflow.error.mainWindowUnavailable");
 
             if (!mainWindow.IsVisible) mainWindow.Show();
             if (mainWindow.WindowState == WindowState.Minimized)
@@ -42,8 +43,13 @@ namespace LongBetterWindows.Host.Views
                 expectedStateFingerprint,
                 cancellationToken);
             return error is null
-                ? PluginCommandResult.Success("请审查权限后确认运行。")
+                ? PluginCommandResult.Success(
+                    ServicesInitializer.I18n.T(
+                        "workflow.review.readyForApproval"))
                 : PluginCommandResult.Failure(error);
         }
+
+        private static PluginCommandResult Failure(string key)
+            => PluginCommandResult.Failure(ServicesInitializer.I18n.T(key));
     }
 }

@@ -762,11 +762,11 @@ public class QualityGateTests
         var gestures = Read("src", "LongBetterWindows.Host", "Services", "MouseGestureService.cs");
 
         Assert.Contains("EmbeddedPluginSurface", mainXaml);
-        Assert.Contains("分离插件窗口", mainXaml);
+        Assert.Contains("i18n.pluginWindow.detachAutomation", mainXaml);
         Assert.Contains("ShowEmbeddedPlugin", mainSource);
         Assert.Contains("CloseEmbeddedSurfaceAsync", mainSource);
         Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", pluginXaml);
-        Assert.Contains("返回管理中心", pluginXaml);
+        Assert.Contains("i18n.pluginWindow.back", pluginXaml);
         Assert.Contains("Key.Escape", pluginSource);
         Assert.Contains("DefaultPresentation", presentation);
         Assert.Contains("ShowDetachedWindow", presentation);

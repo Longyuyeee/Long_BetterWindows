@@ -27,7 +27,8 @@
                             Width="30" Height="30" Click="Back_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             AutomationProperties.AutomationId="Long.Plugin.DetachedBack"
-                            ToolTip="返回管理中心" AutomationProperties.Name="返回管理中心">
+                            ToolTip="{DynamicResource i18n.pluginWindow.back}"
+                            AutomationProperties.Name="{DynamicResource i18n.pluginWindow.back}">
                         <TextBlock Text="‹" FontSize="22" Margin="0,-3,0,0" />
                     </Button>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="40,0,42,0">
@@ -40,7 +41,7 @@
                         <TextBlock x:Name="PluginTitle" Margin="9,0,0,0" FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource Long.Brush.Text.Primary}" />
                         <Border Style="{StaticResource LongBadge}" Margin="9,0,0,0">
-                            <TextBlock Text="分离窗口" FontSize="9"
+                            <TextBlock Text="{DynamicResource i18n.pluginWindow.detachedMode}" FontSize="9"
                                        Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                         </Border>
                     </StackPanel>
@@ -48,7 +49,7 @@
                             Width="32" Height="30" Click="Close_Click"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             AutomationProperties.AutomationId="Long.Plugin.DetachedClose"
-                            AutomationProperties.Name="关闭插件窗口">
+                            AutomationProperties.Name="{DynamicResource i18n.pluginWindow.close}">
                         <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}" Width="13" Height="13" />
                     </Button>
                 </Grid>

@@ -139,9 +139,9 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <Button Style="{StaticResource LongIconButton}" Width="32" Height="30"
-                                    Click="EmbeddedBack_Click" ToolTip="返回管理中心"
+                                    Click="EmbeddedBack_Click" ToolTip="{DynamicResource i18n.pluginWindow.back}"
                                     AutomationProperties.AutomationId="Long.Plugin.EmbeddedBack"
-                                    AutomationProperties.Name="返回管理中心">
+                                    AutomationProperties.Name="{DynamicResource i18n.pluginWindow.back}">
                                 <TextBlock Text="‹" FontSize="22" Margin="0,-3,0,0" />
                             </Button>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="11,0,0,0"
@@ -156,18 +156,18 @@
                                            AutomationProperties.AutomationId="Long.Plugin.EmbeddedTitle"
                                            FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 <Border Style="{StaticResource LongBadge}" Margin="9,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="嵌入模式" FontSize="9"
+                                    <TextBlock Text="{DynamicResource i18n.pluginWindow.embeddedMode}" FontSize="9"
                                                Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                 </Border>
                             </StackPanel>
-                            <Button Grid.Column="2" Content="分离窗口" Style="{StaticResource LongButton}"
+                            <Button Grid.Column="2" Content="{DynamicResource i18n.pluginWindow.detach}" Style="{StaticResource LongButton}"
                                     Height="30" Margin="0,0,7,0" Click="DetachEmbedded_Click"
                                     AutomationProperties.AutomationId="Long.Plugin.Detach"
-                                    AutomationProperties.Name="分离插件窗口" />
+                                    AutomationProperties.Name="{DynamicResource i18n.pluginWindow.detachAutomation}" />
                             <Button Grid.Column="3" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                                     Click="EmbeddedClose_Click"
                                     AutomationProperties.AutomationId="Long.Plugin.EmbeddedClose"
-                                    AutomationProperties.Name="关闭插件界面">
+                                    AutomationProperties.Name="{DynamicResource i18n.pluginWindow.close}">
                                 <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}"
                                       Width="13" Height="13" />
                             </Button>
