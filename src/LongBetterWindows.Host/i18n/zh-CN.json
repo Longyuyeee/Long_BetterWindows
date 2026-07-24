@@ -722,5 +722,13 @@
   "capability.display.brightness.name": "屏幕亮度",
   "capability.display.brightness.description": "读取和调整显示器亮度",
   "capability.ui.window.name": "自定义窗口",
-  "capability.ui.window.description": "创建自定义 UI 窗口"
+  "capability.ui.window.description": "创建自定义 UI 窗口",
+  "developer.workbench.template.readyDescription": "插件已就绪。界面会自动继承 Long 主题、动效和无障碍状态。",
+  "developer.workbench.template.welcomeTitle": "开始创作",
+  "developer.workbench.template.guide": "使用 Long Web UI Kit 组件，并通过 long.* API 调用宿主能力。",
+  "developer.workbench.template.testToast": "测试 Toast",
+  "developer.workbench.template.toastSent": "Toast 已发送",
+  "developer.workbench.template.script.variables": "可用变量",
+  "developer.workbench.template.script.start": "插件启动时执行",
+  "developer.workbench.template.script.stop": "插件停止时执行"
 }

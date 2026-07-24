@@ -417,6 +417,9 @@ public sealed class I18nServiceTests : IDisposable
         Assert.DoesNotContain("['long.app.getVersion()', '读取宿主版本'", html);
         Assert.DoesNotContain("无可用能力</span>", html);
         Assert.DoesNotContain("error = ex.Message", source);
+        Assert.Contains("developer.workbench.template.readyDescription", source);
+        Assert.Contains("BuildScriptPluginTemplate(", source);
+        Assert.DoesNotContain("<html lang=\"zh-CN\">", source);
         Assert.DoesNotContain("OnLanguageChanged(string language)\n        {\n            location.reload", source);
         Assert.DoesNotContain("<h3>新建插件</h3>", html);
         Assert.DoesNotContain(">运行日志</strong>", html);

@@ -439,7 +439,9 @@ namespace LongBetterWindows.Host.Views
                 File.WriteAllText(Path.Combine(pluginDir, "manifest.json"),
                     $"{{\n  \"id\": \"{id}\",\n  \"version\": \"1.0.0\",\n  \"name\": \"{name}\",\n  \"entry_point\": \"plugin.csx\",\n  \"runtime\": \"csharp-script\",\n  \"capabilities\": [{capsJson}]\n}}\n");
                 File.WriteAllText(Path.Combine(pluginDir, "plugin.csx"),
-                    "// " + name + "\n// 可用变量: Host (IHostApi), Id, Name\n\nStart = async () =>\n{\n    // 插件启动时执行\n    // Host.Notification.Show(\"Hello!\");\n};\n\nStop = async () =>\n{\n    // 插件停止时执行\n};\n");
+                    BuildScriptPluginTemplate(
+                        name,
+                        key => ServicesInitializer.I18n.T(key)));
             }
 
             SendJs("pluginCreated", new { dir = pluginDir.Replace("\\", "/"), name, id });
@@ -470,13 +472,29 @@ namespace LongBetterWindows.Host.Views
             SendJs("capabilitiesListed", caps);
         }
 
-        public static string BuildWebPluginTemplate(string name)
+        public static string BuildWebPluginTemplate(
+            string name,
+            string? language = null,
+            Func<string, string>? translate = null)
         {
+            language ??= ServicesInitializer.I18n.CurrentLanguage;
+            translate ??= key => ServicesInitializer.I18n.T(key);
             var safeTitle = System.Net.WebUtility.HtmlEncode(name);
             var safeJsName = JsonSerializer.Serialize(name);
+            var safeLanguage = System.Net.WebUtility.HtmlEncode(language);
+            var readyDescription = System.Net.WebUtility.HtmlEncode(
+                translate("developer.workbench.template.readyDescription"));
+            var welcomeTitle = System.Net.WebUtility.HtmlEncode(
+                translate("developer.workbench.template.welcomeTitle"));
+            var guide = System.Net.WebUtility.HtmlEncode(
+                translate("developer.workbench.template.guide"));
+            var testToast = System.Net.WebUtility.HtmlEncode(
+                translate("developer.workbench.template.testToast"));
+            var toastSent = JsonSerializer.Serialize(
+                translate("developer.workbench.template.toastSent"));
             return $$"""
                 <!DOCTYPE html>
-                <html lang="zh-CN">
+                <html lang="{{safeLanguage}}">
                 <head>
                   <meta charset="UTF-8">
                   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -488,16 +506,16 @@ namespace LongBetterWindows.Host.Views
                       <div>
                         <div class="long-eyebrow">LONG PLUGIN</div>
                         <h1 class="long-page-title">{{safeTitle}}</h1>
-                        <p class="long-page-description">插件已就绪。界面会自动继承 Long 主题、动效和无障碍状态。</p>
+                        <p class="long-page-description">{{readyDescription}}</p>
                       </div>
                     </header>
                     <section class="long-card long-stack" aria-labelledby="welcome-title">
                       <div>
-                        <h2 id="welcome-title">开始创作</h2>
-                        <p class="long-secondary">使用 Long Web UI Kit 组件，并通过 long.* API 调用宿主能力。</p>
+                        <h2 id="welcome-title">{{welcomeTitle}}</h2>
+                        <p class="long-secondary">{{guide}}</p>
                       </div>
                       <div class="long-toolbar">
-                        <button class="long-button--primary" id="helloButton">测试 Toast</button>
+                        <button class="long-button--primary" id="helloButton">{{testToast}}</button>
                         <span class="long-badge">UI Kit 1.0</span>
                       </div>
                       <div class="long-status" id="status" role="status" aria-live="polite"></div>
@@ -507,12 +525,28 @@ namespace LongBetterWindows.Host.Views
                     const pluginName = {{safeJsName}};
                     document.getElementById('helloButton').addEventListener('click', async () => {
                       await long.ui.showToast(`Hello from ${pluginName}`);
-                      document.getElementById('status').textContent = 'Toast 已发送';
+                      document.getElementById('status').textContent = {{toastSent}};
                     });
                   </script>
                 </body>
                 </html>
                 """;
+        }
+
+        private static string BuildScriptPluginTemplate(
+            string name,
+            Func<string, string> translate)
+        {
+            return
+                $"// {name}\n" +
+                $"// {translate("developer.workbench.template.script.variables")}: Host (IHostApi), Id, Name\n\n" +
+                "Start = async () =>\n{\n" +
+                $"    // {translate("developer.workbench.template.script.start")}\n" +
+                "    // Host.Notification.Show(\"Hello!\");\n" +
+                "};\n\n" +
+                "Stop = async () =>\n{\n" +
+                $"    // {translate("developer.workbench.template.script.stop")}\n" +
+                "};\n";
         }
 
         private static string? FindSrcDir()

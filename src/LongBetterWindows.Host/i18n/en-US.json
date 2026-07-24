@@ -722,5 +722,13 @@
   "capability.display.brightness.name": "Display brightness",
   "capability.display.brightness.description": "Read and adjust display brightness",
   "capability.ui.window.name": "Custom windows",
-  "capability.ui.window.description": "Create custom UI windows"
+  "capability.ui.window.description": "Create custom UI windows",
+  "developer.workbench.template.readyDescription": "Your plugin is ready. The UI automatically inherits Long theme, motion, and accessibility settings.",
+  "developer.workbench.template.welcomeTitle": "Start building",
+  "developer.workbench.template.guide": "Use Long Web UI Kit components and call host capabilities through the long.* API.",
+  "developer.workbench.template.testToast": "Test toast",
+  "developer.workbench.template.toastSent": "Toast sent",
+  "developer.workbench.template.script.variables": "Available variables",
+  "developer.workbench.template.script.start": "Runs when the plugin starts",
+  "developer.workbench.template.script.stop": "Runs when the plugin stops"
 }

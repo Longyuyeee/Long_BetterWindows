@@ -58,6 +58,23 @@ public sealed class LocalFileSearchProviderTests : IDisposable
         Assert.DoesNotContain("#1E1F22", html, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void WebPluginTemplate_UsesExplicitLanguageAndEscapesLocalizedText()
+    {
+        var html = PluginDevTools.BuildWebPluginTemplate(
+            "Demo",
+            "en-US",
+            key => key.EndsWith("toastSent", StringComparison.Ordinal)
+                ? "Sent 'safely'"
+                : "<Localized>");
+
+        Assert.Contains("<html lang=\"en-US\">", html);
+        Assert.Contains("&lt;Localized&gt;", html);
+        Assert.Contains("\"Sent \\u0027safely\\u0027\"", html);
+        Assert.DoesNotContain(">开始创作<", html);
+        Assert.DoesNotContain("Toast 已发送", html);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_root, true); } catch { }
