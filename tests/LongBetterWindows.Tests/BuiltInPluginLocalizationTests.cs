@@ -13,7 +13,9 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("Base64Tool")]
     [InlineData("ClipboardTool")]
     [InlineData("FolderNotePlugin")]
+    [InlineData("PasswordGenerator")]
     [InlineData("QuickNotePlugin")]
+    [InlineData("TimestampConverter")]
     public async Task SamplePlugin_HasValidBilingualResources(string plugin)
     {
         var root = FindRepositoryRoot();
@@ -139,7 +141,9 @@ public sealed class BuiltInPluginLocalizationTests
     [Theory]
     [InlineData("Base64Tool")]
     [InlineData("ClipboardTool")]
+    [InlineData("PasswordGenerator")]
     [InlineData("QuickNotePlugin")]
+    [InlineData("TimestampConverter")]
     public async Task LocalizedWebPlugin_DeclaresEveryReferencedResourceKey(
         string plugin)
     {
@@ -164,6 +168,34 @@ public sealed class BuiltInPluginLocalizationTests
 
         Assert.NotEmpty(referencedKeys);
         Assert.Empty(referencedKeys.Except(declaredKeys, StringComparer.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("PasswordGenerator", "function secureIndex", "renderStrength();")]
+    [InlineData("TimestampConverter", "function parse", "renderResult();")]
+    public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
+        string plugin,
+        string nextFunction,
+        string projectionCall)
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            plugin,
+            "index.html"));
+        var start = source.IndexOf(
+            "function applyLocalization(message)",
+            StringComparison.Ordinal);
+        var end = source.IndexOf(nextFunction, start, StringComparison.Ordinal);
+
+        Assert.True(start >= 0);
+        Assert.True(end > start);
+        var localizationBody = source[start..end];
+        Assert.Contains(projectionCall, localizationBody);
+        Assert.DoesNotContain("generate();", localizationBody);
+        Assert.DoesNotContain("convert();", localizationBody);
+        Assert.DoesNotContain("useNow();", localizationBody);
+        Assert.DoesNotContain("location.reload", source);
     }
 
     [Fact]

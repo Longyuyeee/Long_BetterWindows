@@ -224,6 +224,14 @@
 4. 无头 Edge 中英文往返验证无水平溢出且状态保持；双语资源、页面引用键、Manifest 元数据键和禁止重载门禁纳入自动化，Release 0 警告/0 错误，568 / 568 测试通过。
 5. 下一批 G17-D 处理 TimestampConverter、UuidGenerator、PasswordGenerator、UrlToolkit、JsonFormatterPlugin 和 RegexTester 等较小纯 Web 工具；HardwareMonitor、ClipboardHistory、DevToolkit 与 PortManager 等复杂页面后置单独审计。
 
+2026-07-24 G17-D1 轻量生成/转换工具已完成：
+
+1. TimestampConverter 使用 22 组中英文插件资源；转换状态保存原 `Date`，语言变化重新投影本地时间和摘要标签，秒、毫秒与 UTC 语义不变。
+2. PasswordGenerator 使用 19 组中英文插件资源；语言变化只刷新页面、强度和状态，不调用 `generate()`，现有密码及选项保持不变。
+3. 自动化检查页面所有字面资源键均存在，并从 `applyLocalization` 代码段拒绝 `generate()`、`convert()`、`useNow()` 和页面重载。
+4. 无头 Edge 在两个插件最小窗口完成中英文往返，无水平溢出且结果保持；Release 0 警告/0 错误，574 / 574 测试通过。
+5. UuidGenerator 暂不做半迁移：其 Manifest 还包含参数名称、参数说明和预设名称。G17-D2-A 先为这些宿主表单元数据建立不修改原命令对象的显示投影，再同步迁移插件页面。
+
 ### G4：完成门禁
 
 只有满足以下条件才把 README 国际化标记为完成：

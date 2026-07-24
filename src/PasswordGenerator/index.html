@@ -10,16 +10,16 @@
     <header class="long-page-header">
       <div>
         <div class="long-eyebrow">SECURITY</div>
-        <h1 class="long-page-title">密码生成器</h1>
-        <p class="long-page-description">使用浏览器安全随机源生成高强度密码，不上传任何数据。</p>
+        <h1 class="long-page-title" data-i18n="page.title">密码生成器</h1>
+        <p class="long-page-description" data-i18n="page.description">使用浏览器安全随机源生成高强度密码，不上传任何数据。</p>
       </div>
       <span class="long-badge" id="strength">强</span>
     </header>
 
-    <section class="long-card long-stack" aria-label="密码生成选项">
+    <section class="long-card long-stack" id="optionsSection" aria-label="密码生成选项">
       <div class="long-field">
         <div class="long-toolbar">
-          <label class="long-field-label" for="length">密码长度</label>
+          <label class="long-field-label" for="length" data-i18n="field.length">密码长度</label>
           <span class="long-toolbar__spacer"></span>
           <strong id="lengthValue">20</strong>
         </div>
@@ -27,15 +27,15 @@
       </div>
 
       <div class="long-option-list">
-        <label class="long-option"><input type="checkbox" id="uppercase" checked>包含大写字母 <span class="long-muted">A–Z</span></label>
-        <label class="long-option"><input type="checkbox" id="numbers" checked>包含数字 <span class="long-muted">0–9</span></label>
-        <label class="long-option"><input type="checkbox" id="symbols" checked>包含常用符号 <span class="long-muted">! @ # $ %</span></label>
+        <label class="long-option"><input type="checkbox" id="uppercase" checked><span data-i18n="option.uppercase">包含大写字母</span> <span class="long-muted">A-Z</span></label>
+        <label class="long-option"><input type="checkbox" id="numbers" checked><span data-i18n="option.numbers">包含数字</span> <span class="long-muted">0-9</span></label>
+        <label class="long-option"><input type="checkbox" id="symbols" checked><span data-i18n="option.symbols">包含常用符号</span> <span class="long-muted">! @ # $ %</span></label>
       </div>
 
       <div class="long-result" id="password" tabindex="0" aria-label="生成的密码"></div>
       <div class="long-toolbar">
-        <button class="long-button long-button--primary btn-primary" id="generateButton" type="button">生成新密码</button>
-        <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button">复制密码</button>
+        <button class="long-button long-button--primary btn-primary" id="generateButton" type="button" data-i18n="action.generate">生成新密码</button>
+        <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制密码</button>
         <span class="long-toolbar__spacer"></span>
         <span class="long-kbd">Ctrl Enter</span>
       </div>
@@ -50,6 +50,46 @@
     const password = document.getElementById('password');
     const status = document.getElementById('status');
     const strength = document.getElementById('strength');
+    let strings = {};
+    let currentStatus = { key: '', fallback: '', kind: '' };
+
+    function t(key, fallback) {
+      return strings[key] || fallback || key;
+    }
+
+    function renderStrength() {
+      const size = Number(lengthInput.value);
+      strength.textContent = size < 10
+        ? t('strength.basic', '基础')
+        : size < 16
+          ? t('strength.good', '良好')
+          : t('strength.strong', '强');
+    }
+
+    function setStatus(key, kind, fallback) {
+      currentStatus = { key, kind, fallback };
+      const message = key ? t(key, fallback) : '';
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      return message;
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '密码生成器');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('optionsSection').setAttribute(
+        'aria-label',
+        t('options.ariaLabel', '密码生成选项'));
+      password.setAttribute('aria-label', t('result.ariaLabel', '生成的密码'));
+      renderStrength();
+      if (currentStatus.key) {
+        setStatus(currentStatus.key, currentStatus.kind, currentStatus.fallback);
+      }
+    }
 
     function secureIndex(max) {
       const value = new Uint32Array(1);
@@ -67,21 +107,22 @@
       for (let index = 0; index < size; index++) value += pool[secureIndex(pool.length)];
       password.textContent = value;
       lengthValue.textContent = size;
-      strength.textContent = size < 10 ? '基础' : size < 16 ? '良好' : '强';
-      status.textContent = '';
-      window.LongUI?.announce('新密码已生成');
+      renderStrength();
+      setStatus('', '', '');
+      window.LongUI?.announce(t('status.generated', '新密码已生成'));
     }
 
     async function copy() {
       if (!password.textContent) return;
       try {
         await long.clipboard.setText(password.textContent);
-        status.textContent = '密码已复制到剪贴板';
-        status.className = 'long-status long-status--success';
-        window.LongUI?.announce(status.textContent);
+        const message = setStatus(
+          'status.copied',
+          'success',
+          '密码已复制到剪贴板');
+        window.LongUI?.announce(message);
       } catch (_) {
-        status.textContent = '复制失败';
-        status.className = 'long-status long-status--danger';
+        setStatus('error.copy', 'danger', '复制失败');
       }
     }
 
@@ -94,6 +135,9 @@
     });
     window.LongUI?.onCommand(function (command) {
       if (command.command_id === 'password.generate') generate();
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
     });
     generate();
   </script>

@@ -3,23 +3,97 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>时间戳转换</title></head>
 <body>
   <main class="long-page">
-    <header class="long-page-header"><div><div class="long-eyebrow">DATE &amp; TIME</div><h1 class="long-page-title">时间戳转换</h1><p class="long-page-description">自动识别秒、毫秒时间戳或日期文本，同时展示本地与 UTC 时间。</p></div><span class="long-badge" id="clock">现在</span></header>
-    <section class="long-card long-stack" aria-label="时间戳转换器">
-      <div class="long-field"><label class="long-field-label" for="input">时间戳或日期</label><input class="long-input" id="input" placeholder="例如 1721380800 或 2026-07-19 12:00" autofocus></div>
-      <div class="long-toolbar"><button class="long-button long-button--primary btn-primary" id="convertButton" type="button">转换</button><button class="long-button long-button--secondary btn-secondary" id="nowButton" type="button">使用当前时间</button><span class="long-toolbar__spacer"></span><span class="long-kbd">Ctrl Enter</span></div>
+    <header class="long-page-header"><div><div class="long-eyebrow">DATE &amp; TIME</div><h1 class="long-page-title" data-i18n="page.title">时间戳转换</h1><p class="long-page-description" data-i18n="page.description">自动识别秒、毫秒时间戳或日期文本，同时展示本地与 UTC 时间。</p></div><span class="long-badge" id="clock" data-i18n="page.nowBadge">现在</span></header>
+    <section class="long-card long-stack" id="converterSection" aria-label="时间戳转换器">
+      <div class="long-field"><label class="long-field-label" for="input" data-i18n="field.input">时间戳或日期</label><input class="long-input" id="input" placeholder="例如 1721380800 或 2026-07-19 12:00" autofocus></div>
+      <div class="long-toolbar"><button class="long-button long-button--primary btn-primary" id="convertButton" type="button" data-i18n="action.convert">转换</button><button class="long-button long-button--secondary btn-secondary" id="nowButton" type="button" data-i18n="action.useNow">使用当前时间</button><span class="long-toolbar__spacer"></span><span class="long-kbd">Ctrl Enter</span></div>
       <div class="long-result long-result--body" id="result" tabindex="0" aria-label="时间转换结果"></div>
-      <div class="long-toolbar"><div id="status" class="long-status" role="status" aria-live="polite"></div><span class="long-toolbar__spacer"></span><button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button">复制摘要</button></div>
+      <div class="long-toolbar"><div id="status" class="long-status" role="status" aria-live="polite"></div><span class="long-toolbar__spacer"></span><button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制摘要</button></div>
     </section>
   </main>
   <script>
-    const input = document.getElementById('input'); const result = document.getElementById('result'); const status = document.getElementById('status'); let summary = '';
+    const input = document.getElementById('input'); const result = document.getElementById('result'); const status = document.getElementById('status');
+    let summary = '';
+    let convertedDate = null;
+    let strings = {};
+    let currentStatus = { key: '', fallback: '', kind: '' };
+
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function setStatus(key, kind, fallback) {
+      currentStatus = { key, kind, fallback };
+      const message = key ? t(key, fallback) : '';
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      return message;
+    }
+
+    function renderResult() {
+      if (!convertedDate) return;
+      const seconds = Math.floor(convertedDate.getTime() / 1000);
+      const locale = document.documentElement.lang || 'zh-CN';
+      summary = [
+        t('result.seconds', '秒级时间戳：{value}', { value: seconds }),
+        t('result.milliseconds', '毫秒时间戳：{value}', { value: convertedDate.getTime() }),
+        t('result.local', '本地时间：{value}', { value: convertedDate.toLocaleString(locale) }),
+        t('result.utc', 'UTC：{value}', { value: convertedDate.toISOString() })
+      ].join('\n');
+      result.textContent = summary;
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '时间戳转换');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.getElementById('converterSection').setAttribute(
+        'aria-label',
+        t('converter.ariaLabel', '时间戳转换器'));
+      input.placeholder = t(
+        'field.inputPlaceholder',
+        '例如 1721380800 或 2026-07-19 12:00');
+      result.setAttribute('aria-label', t('result.ariaLabel', '时间转换结果'));
+      renderResult();
+      if (currentStatus.key) {
+        setStatus(currentStatus.key, currentStatus.kind, currentStatus.fallback);
+      }
+    }
+
     function parse(value) { const text = value.trim(); if (/^-?\d+(\.\d+)?$/.test(text)) { const number = Number(text); return new Date(Math.abs(number) < 100000000000 ? number * 1000 : number); } return new Date(text); }
-    function convert() { const date = parse(input.value); if (Number.isNaN(date.getTime())) { status.textContent = '无法识别当前时间'; status.className = 'long-status long-status--danger'; return { success: false, message: '无法识别当前时间', outputs: {} }; } const seconds = Math.floor(date.getTime() / 1000); summary = '秒级时间戳：' + seconds + '\n毫秒时间戳：' + date.getTime() + '\n本地时间：' + date.toLocaleString() + '\nUTC：' + date.toISOString(); result.textContent = summary; status.textContent = '转换完成'; status.className = 'long-status long-status--success'; window.LongUI?.announce('时间转换完成'); return { success: true, message: '时间转换完成', outputs: { result: { type: 'text', value: summary } } }; }
+    function convert() {
+      const date = parse(input.value);
+      if (Number.isNaN(date.getTime())) {
+        convertedDate = null;
+        summary = '';
+        result.textContent = '';
+        const message = setStatus('status.invalid', 'danger', '无法识别当前时间');
+        return { success: false, message, outputs: {} };
+      }
+      convertedDate = date;
+      renderResult();
+      const message = setStatus('status.completed', 'success', '转换完成');
+      window.LongUI?.announce(t('status.announcement', '时间转换完成'));
+      return {
+        success: true,
+        message,
+        outputs: { result: { type: 'text', value: summary } }
+      };
+    }
     function useNow() { input.value = Date.now().toString(); return convert(); }
-    async function copy() { if (!summary) return; try { await long.clipboard.setText(summary); status.textContent = '摘要已复制'; } catch (_) { status.textContent = '复制失败'; status.className = 'long-status long-status--danger'; } }
+    async function copy() { if (!summary) return; try { await long.clipboard.setText(summary); setStatus('status.copied', 'success', '摘要已复制'); } catch (_) { setStatus('error.copy', 'danger', '复制失败'); } }
     document.getElementById('convertButton').addEventListener('click', convert); document.getElementById('nowButton').addEventListener('click', useNow); document.getElementById('copyButton').addEventListener('click', copy);
     document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); convert(); } });
     window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) { input.value = text; return convert(); } return useNow(); });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
+    });
     useNow();
   </script>
 </body>

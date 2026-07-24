@@ -1,0 +1,21 @@
+{
+  "plugin.name": "密码生成器",
+  "commands.password.generate.title": "生成安全密码",
+  "commands.password.generate.description": "打开密码生成器并立即生成一组安全密码",
+  "page.title": "密码生成器",
+  "page.description": "使用浏览器安全随机源生成高强度密码，不上传任何数据。",
+  "options.ariaLabel": "密码生成选项",
+  "field.length": "密码长度",
+  "option.uppercase": "包含大写字母",
+  "option.numbers": "包含数字",
+  "option.symbols": "包含常用符号",
+  "result.ariaLabel": "生成的密码",
+  "strength.basic": "基础",
+  "strength.good": "良好",
+  "strength.strong": "强",
+  "action.generate": "生成新密码",
+  "action.copy": "复制密码",
+  "status.generated": "新密码已生成",
+  "status.copied": "密码已复制到剪贴板",
+  "error.copy": "复制失败"
+}

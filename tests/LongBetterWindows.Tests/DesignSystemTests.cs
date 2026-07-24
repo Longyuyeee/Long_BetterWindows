@@ -581,7 +581,10 @@ public class DesignSystemTests
         Assert.Equal("result", output.Key);
         Assert.Equal(PluginCommandOutputType.Text, output.Type);
         Assert.Contains("outputs: { result: { type: 'text', value: summary } }", page);
-        Assert.Contains("return { success: false, message: '无法识别当前时间'", page);
+        Assert.Contains(
+            "setStatus('status.invalid', 'danger', '无法识别当前时间')",
+            page);
+        Assert.Contains("return { success: false, message, outputs: {} }", page);
         Assert.Contains("return useNow();", page);
     }
 
