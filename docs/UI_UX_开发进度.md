@@ -749,8 +749,11 @@ WIP UI visual draft before audited implementation
 - [x] G17-D4-B 完成 PortManager；语言切换保留端口快照、页签、搜索词、自动刷新开关、查询结果和终止确认，不重复端口请求、不重启轮询、不执行进程终止。`760 × 520` 无水平溢出，Release 0 警告/0 错误，605 / 605 测试通过。
 - [x] G17-D4-C 完成 ClipboardHistory；语言切换保留历史、搜索词、时间范围、相对时间和清空确认，不重复监听、热键、兜底定时器、剪贴板读取或持久化写入。`620 × 500` 无水平溢出，Release 0 警告/0 错误，608 / 608 测试通过。
 - [x] G17-D4-D 完成 DevToolkit；语言切换保留当前页签、全部输入和结果快照，不重新转换、生成 UUID 或调用剪贴板。日期、进制和错误投影正确更新，`760 × 560` 无水平溢出，Release 0 警告/0 错误，611 / 611 测试通过。
-- [ ] G17-D5-A 迁移最后一个 Web 插件 FileOrganizer，保持文件列表、分类预览、规则和执行事务。
-- [ ] G17-D5-B/C 分批迁移 ColorPicker、Macro、QuickLaunch、Screenshot、WindowManager 五个 DLL 产品插件，SamplePlugin 最后作为 SDK 示例收口。
+- [x] G17-D5-A 完成 FileOrganizer 功能补全与双语迁移。审计确认该包此前只有 Manifest，Git 历史中从未提交 `index.html`，因此不存在可保持的既有前端事务；本批新增宿主托管的顶层文件计划/执行 API、可复核目标路径、冲突提示、二次确认和部分失败保留。源文件/目标规则会在执行时重新计算，拒绝越界、重解析点、重复项和覆盖。语言切换不重新分析或执行。Release 0 警告/0 错误，621 / 621 测试通过；本机浏览器连接不可用，`780 × 560` 真实渲染复核并入下一批视觉门禁，不伪造完成证据。
+- [ ] G17-D5-B 迁移 ColorPicker 与 Screenshot 两个捕获类 DLL 插件，同时补录 FileOrganizer 最小窗口双语视觉证据。
+- [ ] G17-D5-C 迁移 QuickLaunch 与 WindowManager 两个启动/窗口状态 DLL 插件。
+- [ ] G17-D5-D 单独迁移高副作用 MacroPlugin，验证语言切换不重新注册、录制或回放输入。
+- [ ] G17-D5-E 迁移 SamplePlugin 作为 SDK 示例，并执行 25 个内置插件的资源、硬编码、生命周期和双语视觉总审计。
 - [x] G3 插件语言声明与宿主通知协议基础由 G17-A 完成；内置插件内容迁移继续由 G17-B 分批实施，不实现 uTools 插件兼容层。
 
 详细边界与后续顺序见 `docs/国际化_UI集成.md`。

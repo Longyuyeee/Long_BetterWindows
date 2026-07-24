@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>文件整理器</title>
+</head>
+<body>
+  <main class="long-page long-page--wide">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">FILE ORGANIZER</div>
+        <h1 class="long-page-title" data-i18n="page.title">文件整理器</h1>
+        <p class="long-page-description" data-i18n="page.description">分析文件夹顶层文件，确认预览后整理到 Long Organized 目录。</p>
+      </div>
+      <span class="long-badge long-badge--neutral" id="planBadge">0 个文件</span>
+    </header>
+
+    <div class="long-stack">
+      <section class="long-card long-stack" aria-labelledby="sourceTitle">
+        <h2 class="long-section-title" id="sourceTitle" data-i18n="source.title">整理范围</h2>
+        <div class="long-field">
+          <label class="long-field-label" for="folderPath" data-i18n="source.pathLabel">文件夹路径</label>
+          <div class="long-toolbar">
+            <input class="long-toolbar__field" id="folderPath" type="text" autocomplete="off"
+                   placeholder="输入文件夹路径" data-i18n-placeholder="source.pathPlaceholder">
+            <button class="long-button long-button--secondary btn-secondary" id="activeFolderButton" type="button"
+                    data-i18n="action.activeFolder">使用 Explorer 文件夹</button>
+          </div>
+        </div>
+        <div class="long-toolbar">
+          <label class="long-field-label" for="organizeMode" data-i18n="source.ruleLabel">分类规则</label>
+          <select id="organizeMode">
+            <option value="ByExtension" data-i18n="rule.extension">按扩展名</option>
+            <option value="ByDate" data-i18n="rule.date">按修改月份</option>
+            <option value="BySize" data-i18n="rule.size">按文件大小</option>
+          </select>
+          <span class="long-toolbar__spacer"></span>
+          <button class="long-button long-button--secondary btn-secondary" id="resetButton" type="button"
+                  data-i18n="action.reset">清除预览</button>
+          <button class="long-button long-button--primary btn-primary" id="analyzeButton" type="button"
+                  data-i18n="action.analyze">分析文件</button>
+        </div>
+        <p class="long-status" data-i18n="source.scope">仅处理所选目录的顶层文件，不递归处理子目录，也不会覆盖已有文件。</p>
+      </section>
+
+      <section class="long-stack" aria-labelledby="planTitle">
+        <div class="long-toolbar">
+          <h2 class="long-section-title" id="planTitle" data-i18n="plan.title">整理预览</h2>
+          <span class="long-toolbar__spacer"></span>
+          <span class="long-badge long-badge--neutral" id="conflictBadge">0 个冲突</span>
+        </div>
+        <div class="long-data-grid" role="table" id="planGrid" aria-label="文件整理预览">
+          <div role="rowgroup">
+            <div class="long-data-grid__header" role="row" style="--long-data-columns: 1.2fr .7fr 1.5fr .65fr">
+              <div role="columnheader" data-i18n="column.source">源文件</div>
+              <div role="columnheader" data-i18n="column.category">分类</div>
+              <div role="columnheader" data-i18n="column.destination">目标位置</div>
+              <div role="columnheader" data-i18n="column.state">状态</div>
+            </div>
+          </div>
+          <div id="planRows" role="rowgroup"></div>
+        </div>
+      </section>
+
+      <div class="long-toolbar">
+        <div class="long-status" id="status" role="status" aria-live="polite"></div>
+        <span class="long-toolbar__spacer"></span>
+        <button class="long-button long-button--primary btn-primary" id="executeButton" type="button" disabled
+                data-i18n="action.execute">执行整理</button>
+      </div>
+    </div>
+  </main>
+
+  <dialog class="long-dialog" id="executeDialog" aria-labelledby="executeDialogTitle">
+    <div class="long-dialog__header">
+      <h2 class="long-dialog__title" id="executeDialogTitle" data-i18n="dialog.title">确认执行整理</h2>
+    </div>
+    <div class="long-dialog__body">
+      <p id="executeDialogMessage"></p>
+      <p class="long-status long-status--warning" data-i18n="dialog.warning">文件将被移动到当前目录下的 Long Organized 子目录。已完成的移动不会因后续失败而自动撤销。</p>
+    </div>
+    <div class="long-dialog__actions">
+      <button class="long-button long-button--secondary btn-secondary" id="cancelButton" type="button"
+              data-i18n="dialog.cancel">取消</button>
+      <button class="long-button long-button--primary btn-primary" id="confirmButton" type="button"
+              data-i18n="dialog.confirm">确认移动</button>
+    </div>
+  </dialog>
+
+  <script>
+    const folderPath = document.getElementById('folderPath');
+    const organizeMode = document.getElementById('organizeMode');
+    const analyzeButton = document.getElementById('analyzeButton');
+    const activeFolderButton = document.getElementById('activeFolderButton');
+    const executeButton = document.getElementById('executeButton');
+    const executeDialog = document.getElementById('executeDialog');
+    const confirmButton = document.getElementById('confirmButton');
+    const planRows = document.getElementById('planRows');
+    const status = document.getElementById('status');
+    let strings = {};
+    let plan = [];
+    let planState = 'empty';
+    let planErrorDetail = '';
+    let isAnalyzing = false;
+    let isExecuting = false;
+    let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+
+    function t(key, fallback, values) {
+      const template = strings[key] || fallback || key;
+      return Object.entries(values || {}).reduce(function (text, entry) {
+        return text.replaceAll('{' + entry[0] + '}', String(entry[1]));
+      }, template);
+    }
+
+    function setStatus(key, kind, fallback, values) {
+      currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
+      const message = key ? t(key, fallback, currentStatus.values) : currentStatus.fallback;
+      status.textContent = message;
+      status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
+      if (message) window.LongUI?.announce(message);
+    }
+
+    function responseData(response, fallbackMessage) {
+      if (!response || !response.success) {
+        throw new Error(response && response.error ? response.error : fallbackMessage);
+      }
+      return response.data;
+    }
+
+    function property(value, camel, pascal) {
+      return value && value[camel] !== undefined ? value[camel] : value && value[pascal];
+    }
+
+    function normalizeItem(item) {
+      return {
+        sourcePath: String(property(item, 'sourcePath', 'SourcePath') || ''),
+        destinationPath: String(property(item, 'destinationPath', 'DestinationPath') || ''),
+        category: String(property(item, 'category', 'Category') || ''),
+        name: String(property(item, 'name', 'Name') || ''),
+        size: Number(property(item, 'size', 'Size') || 0),
+        hasConflict: Boolean(property(item, 'hasConflict', 'HasConflict'))
+      };
+    }
+
+    function payloadItem(item) {
+      return {
+        SourcePath: item.sourcePath,
+        DestinationPath: item.destinationPath,
+        Category: item.category,
+        Name: item.name,
+        Size: item.size,
+        HasConflict: item.hasConflict
+      };
+    }
+
+    function appendText(parent, tagName, className, text) {
+      const element = document.createElement(tagName);
+      if (className) element.className = className;
+      element.textContent = text;
+      parent.appendChild(element);
+      return element;
+    }
+
+    function categoryLabel(item) {
+      const labels = {
+        '_no-extension': t('category.noExtension', '无扩展名'),
+        '_small': t('category.small', '小文件'),
+        '_medium': t('category.medium', '中等文件'),
+        '_large': t('category.large', '大文件')
+      };
+      if (labels[item.category]) return labels[item.category];
+      return organizeMode.value === 'ByExtension' ? '.' + item.category : item.category;
+    }
+
+    function relativeDestination(item) {
+      const marker = 'Long Organized';
+      const index = item.destinationPath.lastIndexOf(marker);
+      return index >= 0 ? item.destinationPath.slice(index) : item.destinationPath;
+    }
+
+    function formatBytes(size) {
+      if (size < 1024) return size + ' B';
+      if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
+      if (size < 1024 * 1024 * 1024) return (size / 1024 / 1024).toFixed(1) + ' MB';
+      return (size / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+    }
+
+    function renderActionState() {
+      const busy = isAnalyzing || isExecuting;
+      folderPath.disabled = busy;
+      organizeMode.disabled = busy;
+      activeFolderButton.disabled = isAnalyzing || isExecuting;
+      analyzeButton.disabled = isAnalyzing || isExecuting || !folderPath.value.trim();
+      document.getElementById('resetButton').disabled = busy || (planState === 'empty' && !plan.length);
+      analyzeButton.textContent = isAnalyzing
+        ? t('action.analyzing', '分析中...')
+        : t('action.analyze', '分析文件');
+      executeButton.disabled = isAnalyzing || isExecuting || planState !== 'ready' || !plan.length;
+      executeButton.textContent = isExecuting
+        ? t('action.executing', '整理中...')
+        : t('action.execute', '执行整理');
+      confirmButton.disabled = isExecuting;
+      confirmButton.textContent = isExecuting
+        ? t('action.executing', '整理中...')
+        : t('dialog.confirm', '确认移动');
+    }
+
+    function renderPlanState(updateStatus) {
+      if (updateStatus === undefined) updateStatus = true;
+      planRows.replaceChildren();
+      const conflicts = plan.filter(function (item) { return item.hasConflict; }).length;
+      document.getElementById('planBadge').textContent = t('plan.count', '{count} 个文件', { count: plan.length });
+      document.getElementById('conflictBadge').textContent = t('plan.conflicts', '{count} 个冲突', { count: conflicts });
+      if (planState !== 'ready' || !plan.length) {
+        const states = {
+          loading: {
+            kind: 'loading',
+            title: t('state.loading', '正在分析文件'),
+            detail: t('state.loadingDetail', '正在生成可复核的目标路径')
+          },
+          error: {
+            kind: 'error',
+            title: t('state.error', '无法生成预览'),
+            detail: planErrorDetail || t('state.errorDetail', '请检查文件夹路径后重试')
+          },
+          empty: {
+            kind: 'empty',
+            title: t('state.empty', '等待分析'),
+            detail: t('state.emptyDetail', '选择文件夹和分类规则后生成整理预览')
+          },
+          noFiles: {
+            kind: 'empty',
+            title: t('state.noFiles', '没有可整理的文件'),
+            detail: t('state.noFilesDetail', '所选目录顶层没有文件')
+          }
+        };
+        window.LongUI?.renderState(planRows, states[planState] || states.empty);
+      } else {
+        plan.forEach(function (item) {
+          const row = document.createElement('div');
+          row.className = 'long-data-grid__row';
+          row.setAttribute('role', 'row');
+          row.style.setProperty('--long-data-columns', '1.2fr .7fr 1.5fr .65fr');
+          const sourceCell = appendText(row, 'div', 'long-data-grid__cell long-code', item.name);
+          sourceCell.dataset.label = t('column.source', '源文件');
+          sourceCell.title = item.sourcePath + ' · ' + formatBytes(item.size);
+          const category = appendText(row, 'div', 'long-data-grid__cell', categoryLabel(item));
+          category.dataset.label = t('column.category', '分类');
+          const destination = appendText(row, 'div', 'long-data-grid__cell long-code', relativeDestination(item));
+          destination.dataset.label = t('column.destination', '目标位置');
+          destination.title = item.destinationPath;
+          const state = appendText(
+            row,
+            'div',
+            'long-data-grid__cell long-badge ' + (item.hasConflict ? 'long-badge--danger' : 'long-badge--success'),
+            item.hasConflict ? t('state.conflict', '目标已存在') : t('state.ready', '可移动'));
+          state.dataset.label = t('column.state', '状态');
+          planRows.appendChild(row);
+        });
+      }
+      renderActionState();
+      if (updateStatus && planState === 'ready') {
+        setStatus(
+          conflicts ? 'status.previewWithConflicts' : 'status.previewReady',
+          conflicts ? 'warning' : 'success',
+          conflicts ? '预览已生成，{count} 项存在冲突' : '预览已生成，共 {count} 个文件',
+          { count: conflicts || plan.length });
+      }
+    }
+
+    function renderDialog() {
+      document.getElementById('executeDialogMessage').textContent = t(
+        'dialog.message',
+        '将按当前预览移动 {count} 个文件，其中 {conflicts} 个目标已存在。',
+        {
+          count: plan.length,
+          conflicts: plan.filter(function (item) { return item.hasConflict; }).length
+        });
+      renderActionState();
+    }
+
+    function applyLocalization(message) {
+      strings = message.resources || {};
+      document.documentElement.lang = message.resolved_language || 'zh-CN';
+      document.title = t('plugin.name', '文件整理器');
+      document.querySelectorAll('[data-i18n]').forEach(function (element) {
+        element.textContent = t(element.dataset.i18n, element.textContent);
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(function (element) {
+        element.placeholder = t(element.dataset.i18nPlaceholder, element.placeholder);
+      });
+      document.getElementById('planGrid').setAttribute('aria-label', t('plan.ariaLabel', '文件整理预览'));
+      renderPlanState(false);
+      renderDialog();
+      if (currentStatus.key || currentStatus.fallback) {
+        setStatus(currentStatus.key, currentStatus.kind, currentStatus.fallback, currentStatus.values);
+      }
+    }
+
+    async function loadActiveFolder() {
+      try {
+        const path = responseData(
+          await long.shell.getActiveFolder(),
+          t('error.activeFolder', '无法读取 Explorer 当前文件夹'));
+        if (!path) throw new Error(t('error.activeFolderEmpty', 'Explorer 当前没有可用文件夹'));
+        folderPath.value = path;
+        renderActionState();
+        setStatus('status.folderLoaded', 'success', '已读取 Explorer 当前文件夹');
+      } catch (error) {
+        setStatus('status.folderFailed', 'danger', '读取 Explorer 文件夹失败：{detail}', {
+          detail: error && error.message ? error.message : String(error)
+        });
+      }
+    }
+
+    async function analyzeFolder() {
+      if (isAnalyzing || isExecuting || !folderPath.value.trim()) return;
+      isAnalyzing = true;
+      plan = [];
+      planState = 'loading';
+      planErrorDetail = '';
+      renderPlanState(false);
+      try {
+        const result = responseData(
+          await long.fileSystem.planOrganization(folderPath.value.trim(), organizeMode.value),
+          t('error.analyze', '文件分析失败'));
+        plan = Array.isArray(result) ? result.map(normalizeItem) : [];
+        planState = plan.length ? 'ready' : 'noFiles';
+        renderPlanState(true);
+        if (!plan.length) setStatus('status.noFiles', '', '所选目录顶层没有可整理的文件');
+      } catch (error) {
+        planErrorDetail = error && error.message ? error.message : String(error);
+        planState = 'error';
+        renderPlanState(false);
+        setStatus('status.analyzeFailed', 'danger', '分析失败：{detail}', { detail: planErrorDetail });
+      } finally {
+        isAnalyzing = false;
+        renderActionState();
+      }
+    }
+
+    async function executePlan() {
+      if (isExecuting || planState !== 'ready' || !plan.length) return;
+      isExecuting = true;
+      renderDialog();
+      const submitted = plan.slice();
+      try {
+        const result = responseData(
+          await long.fileSystem.executeOrganization(
+            folderPath.value.trim(),
+            organizeMode.value,
+            submitted.map(payloadItem)),
+          t('error.execute', '文件整理失败'));
+        const failures = property(result, 'failures', 'Failures') || [];
+        const moved = Number(property(result, 'movedCount', 'MovedCount') || 0);
+        const failedSources = new Set(failures.map(function (failure) {
+          return String(property(failure, 'sourcePath', 'SourcePath') || '').toLocaleLowerCase();
+        }));
+        plan = submitted.filter(function (item) {
+          return failedSources.has(item.sourcePath.toLocaleLowerCase());
+        });
+        if (plan.length) {
+          planState = 'ready';
+          plan.forEach(function (item) { item.hasConflict = true; });
+          const detail = property(failures[0], 'detail', 'Detail') || t('error.execute', '文件整理失败');
+          setStatus('status.partial', 'warning', '已移动 {moved} 个，失败 {failed} 个：{detail}', {
+            moved: moved,
+            failed: plan.length,
+            detail: detail
+          });
+        } else {
+          planState = 'empty';
+          setStatus('status.completed', 'success', '已完成 {count} 个文件的整理', { count: moved });
+        }
+      } catch (error) {
+        setStatus('status.executeFailed', 'danger', '整理失败：{detail}', {
+          detail: error && error.message ? error.message : String(error)
+        });
+      } finally {
+        isExecuting = false;
+        executeDialog.close();
+        renderPlanState(false);
+      }
+    }
+
+    activeFolderButton.addEventListener('click', loadActiveFolder);
+    analyzeButton.addEventListener('click', analyzeFolder);
+    executeButton.addEventListener('click', function () {
+      renderDialog();
+      executeDialog.showModal();
+    });
+    document.getElementById('cancelButton').addEventListener('click', function () { executeDialog.close(); });
+    confirmButton.addEventListener('click', executePlan);
+    document.getElementById('resetButton').addEventListener('click', function () {
+      plan = [];
+      planState = 'empty';
+      planErrorDetail = '';
+      renderPlanState(false);
+      setStatus('', '', '');
+    });
+    folderPath.addEventListener('input', function () {
+      plan = [];
+      planState = 'empty';
+      renderPlanState(false);
+    });
+    organizeMode.addEventListener('change', function () {
+      plan = [];
+      planState = 'empty';
+      renderPlanState(false);
+    });
+    document.addEventListener('keydown', function (event) {
+      if (!event.ctrlKey || event.key !== 'Enter') return;
+      if (!executeButton.disabled) {
+        event.preventDefault();
+        renderDialog();
+        executeDialog.showModal();
+      } else if (!analyzeButton.disabled) {
+        event.preventDefault();
+        analyzeFolder();
+      }
+    });
+    window.LongUI?.onCommand(function (command) {
+      const paths = window.LongUI.commandPaths(command);
+      if (paths.length) {
+        folderPath.value = paths[0];
+        renderActionState();
+        setStatus('status.contextLoaded', 'success', '已从命令上下文读取文件夹');
+      } else {
+        loadActiveFolder();
+      }
+    });
+    window.chrome?.webview?.addEventListener('message', function ({ data }) {
+      if (data?.type === 'long.language-changed') applyLocalization(data);
+    });
+    renderPlanState(false);
+  </script>
+</body>
+</html>

@@ -8,6 +8,8 @@ namespace LongBetterWindows.Host.Services
 {
     public class FileSystemService : IFileSystemService
     {
+        private const string OrganizedDirectoryName = "Long Organized";
+
         public Task<HostApiResponse<List<FileItem>>> EnumerateFilesAsync(string path, string searchPattern = "*.*", bool recursive = true)
         {
             return Task.Run(() =>
@@ -265,6 +267,182 @@ namespace LongBetterWindows.Host.Services
                     return HostApiResponse<List<SearchResult>>.Failure(ApiErrorCode.Unknown, ex.Message);
                 }
             });
+        }
+
+        public Task<HostApiResponse<List<FileOrganizationItem>>> PlanFileOrganizationAsync(
+            string path,
+            ClassifyMode mode)
+        {
+            return Task.Run(() =>
+            {
+                try
+                {
+                    var root = NormalizeExistingRoot(path);
+                    var items = Directory.GetFiles(root, "*", SearchOption.TopDirectoryOnly)
+                        .Select(file => BuildOrganizationItem(root, new FileInfo(file), mode))
+                        .OrderBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    return HostApiResponse<List<FileOrganizationItem>>.Success(items);
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse<List<FileOrganizationItem>>.Failure(
+                        ApiErrorCode.Unknown,
+                        ex.Message);
+                }
+            });
+        }
+
+        public Task<HostApiResponse<FileOrganizationResult>> ExecuteFileOrganizationAsync(
+            string path,
+            ClassifyMode mode,
+            List<FileOrganizationItem> items)
+        {
+            return Task.Run(() =>
+            {
+                try
+                {
+                    var root = NormalizeExistingRoot(path);
+                    var result = new FileOrganizationResult
+                    {
+                        PlannedCount = items.Count,
+                    };
+                    var seenSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var seenDestinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var requested in items)
+                    {
+                        if (requested is null)
+                        {
+                            result.Failures.Add(new FileOrganizationFailure
+                            {
+                                Detail = "Organization item is required.",
+                            });
+                            continue;
+                        }
+
+                        try
+                        {
+                            var source = Path.GetFullPath(requested.SourcePath);
+                            if (!seenSources.Add(source))
+                                throw new IOException("Duplicate source path.");
+                            if (!File.Exists(source))
+                                throw new FileNotFoundException("Source file no longer exists.", source);
+                            if (!Path.GetDirectoryName(source)!.Equals(
+                                    root,
+                                    StringComparison.OrdinalIgnoreCase))
+                                throw new UnauthorizedAccessException(
+                                    "Source must be a top-level file in the selected folder.");
+                            if ((File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
+                                throw new UnauthorizedAccessException(
+                                    "Reparse-point files cannot be organized.");
+
+                            var expected = BuildOrganizationItem(root, new FileInfo(source), mode);
+                            var destination = Path.GetFullPath(requested.DestinationPath);
+                            if (!destination.Equals(
+                                    expected.DestinationPath,
+                                    StringComparison.OrdinalIgnoreCase))
+                                throw new UnauthorizedAccessException(
+                                    "Destination does not match the current organization rule.");
+                            if (!seenDestinations.Add(destination))
+                                throw new IOException("Duplicate destination path.");
+
+                            var destinationDirectory = Path.GetDirectoryName(destination)!;
+                            EnsureDirectoryIsNotReparsePoint(
+                                Path.Combine(root, OrganizedDirectoryName));
+                            EnsureDirectoryIsNotReparsePoint(destinationDirectory);
+                            if (File.Exists(destination))
+                                throw new IOException("Destination file already exists.");
+
+                            Directory.CreateDirectory(destinationDirectory);
+                            EnsureDirectoryIsNotReparsePoint(destinationDirectory);
+                            File.Move(source, destination);
+                            result.MovedCount++;
+                        }
+                        catch (Exception ex)
+                        {
+                            result.Failures.Add(new FileOrganizationFailure
+                            {
+                                SourcePath = requested.SourcePath,
+                                DestinationPath = requested.DestinationPath,
+                                Detail = ex.Message,
+                            });
+                        }
+                    }
+
+                    return HostApiResponse<FileOrganizationResult>.Success(result);
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse<FileOrganizationResult>.Failure(
+                        ApiErrorCode.Unknown,
+                        ex.Message);
+                }
+            });
+        }
+
+        private static string NormalizeExistingRoot(string path)
+        {
+            var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+            if (!Directory.Exists(root))
+                throw new DirectoryNotFoundException("Selected folder does not exist.");
+            if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+                throw new UnauthorizedAccessException(
+                    "Selected folder cannot be a reparse point.");
+            return root;
+        }
+
+        private static FileOrganizationItem BuildOrganizationItem(
+            string root,
+            FileInfo file,
+            ClassifyMode mode)
+        {
+            var category = mode switch
+            {
+                ClassifyMode.ByDate => file.LastWriteTime.ToString("yyyy-MM"),
+                ClassifyMode.BySize => file.Length switch
+                {
+                    < 1024 * 1024 => "_small",
+                    < 1024 * 1024 * 100 => "_medium",
+                    _ => "_large",
+                },
+                _ => ExtensionCategory(file.Extension),
+            };
+            var destination = Path.GetFullPath(Path.Combine(
+                root,
+                OrganizedDirectoryName,
+                category,
+                file.Name));
+            return new FileOrganizationItem
+            {
+                SourcePath = file.FullName,
+                DestinationPath = destination,
+                Category = category,
+                Name = file.Name,
+                Size = file.Length,
+                HasConflict = File.Exists(destination),
+            };
+        }
+
+        private static string ExtensionCategory(string extension)
+        {
+            var category = extension.TrimStart('.').ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(category))
+                return "_no-extension";
+            foreach (var character in Path.GetInvalidFileNameChars())
+                category = category.Replace(character, '_');
+            return category;
+        }
+
+        private static void EnsureDirectoryIsNotReparsePoint(string path)
+        {
+            if (Directory.Exists(path)
+                && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new UnauthorizedAccessException(
+                    "Organization target cannot be a reparse point.");
+            }
         }
 
         private string GetContext(string[] lines, int index, int contextLines)

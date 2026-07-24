@@ -111,7 +111,7 @@ dotnet run --project src/LongBetterWindows.Host
 | `INetworkPortService` | `network.ports` | TCP/UDP 端口与占用进程 |
 | `INetworkMonitorService` | `network.monitor` | 网络接口、流量与速度 |
 | `IHttpService` | `network.http` | 受控 HTTP 请求与下载 |
-| `IFileSystemService` | `filesystem.advanced` | 搜索、哈希、分类、批量重命名 |
+| `IFileSystemService` | `filesystem.advanced` | 搜索、哈希、分类、批量重命名、受控整理计划与执行 |
 | `ICacheService` | `system.cache` | 系统缓存统计与清理 |
 | `IScheduleService` | `system.schedule` | 计划任务管理 |
 | `IAudioService` | `system.audio` | 音量、静音与音频设备 |

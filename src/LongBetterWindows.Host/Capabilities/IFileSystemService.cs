@@ -27,6 +27,15 @@ namespace LongBetterWindows.Host.Capabilities
 
         /// <summary>搜索文件内容（全文搜索）</summary>
         Task<HostApiResponse<List<SearchResult>>> SearchFileContentAsync(string path, string keyword, List<string> extensions);
+
+        /// <summary>为目录顶层文件生成可审查的整理计划</summary>
+        Task<HostApiResponse<List<FileOrganizationItem>>> PlanFileOrganizationAsync(string path, ClassifyMode mode);
+
+        /// <summary>执行已审查的整理计划，不覆盖现有文件</summary>
+        Task<HostApiResponse<FileOrganizationResult>> ExecuteFileOrganizationAsync(
+            string path,
+            ClassifyMode mode,
+            List<FileOrganizationItem> items);
     }
 
     public class FileItem
@@ -71,6 +80,31 @@ namespace LongBetterWindows.Host.Capabilities
         public int LineNumber { get; set; }
         public string MatchedLine { get; set; } = "";
         public string Context { get; set; } = "";
+    }
+
+    public class FileOrganizationItem
+    {
+        public string SourcePath { get; set; } = "";
+        public string DestinationPath { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Name { get; set; } = "";
+        public long Size { get; set; }
+        public bool HasConflict { get; set; }
+    }
+
+    public class FileOrganizationFailure
+    {
+        public string SourcePath { get; set; } = "";
+        public string DestinationPath { get; set; } = "";
+        public string Detail { get; set; } = "";
+    }
+
+    public class FileOrganizationResult
+    {
+        public int PlannedCount { get; set; }
+        public int MovedCount { get; set; }
+        public List<FileOrganizationFailure> Failures { get; set; } = new();
+        public int FailedCount => Failures.Count;
     }
 
     public enum ClassifyMode

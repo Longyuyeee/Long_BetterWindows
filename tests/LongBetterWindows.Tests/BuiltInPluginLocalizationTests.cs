@@ -14,6 +14,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("ClipboardHistory")]
     [InlineData("ClipboardTool")]
     [InlineData("DevToolkit")]
+    [InlineData("FileOrganizer")]
     [InlineData("FileRenamerPlugin")]
     [InlineData("FolderNotePlugin")]
     [InlineData("HardwareMonitor")]
@@ -231,6 +232,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("ClipboardHistory")]
     [InlineData("ClipboardTool")]
     [InlineData("DevToolkit")]
+    [InlineData("FileOrganizer")]
     [InlineData("FileRenamerPlugin")]
     [InlineData("HardwareMonitor")]
     [InlineData("JsonFormatterPlugin")]
@@ -285,6 +287,7 @@ public sealed class BuiltInPluginLocalizationTests
     [InlineData("PortManager", "async function initialize", "renderPorts();", "refreshPorts(")]
     [InlineData("ClipboardHistory", "function responseData", "renderListState();", "startMonitoring();")]
     [InlineData("DevToolkit", "function base64Encode", "renderAllResults();", "base64Encode();")]
+    [InlineData("FileOrganizer", "async function loadActiveFolder", "renderPlanState(false);", "analyzeFolder();")]
     public void LightweightWebPlugin_LocalizesProjectionWithoutRegeneratingValue(
         string plugin,
         string nextFunction,

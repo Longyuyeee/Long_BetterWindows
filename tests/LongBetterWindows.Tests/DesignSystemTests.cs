@@ -311,6 +311,7 @@ public class DesignSystemTests
             "ClipboardTool",
             "MarkdownPreview",
             "FileRenamerPlugin",
+            "FileOrganizer",
             "UrlToolkit",
             "TimestampConverter",
             "RegexTester",
@@ -346,6 +347,7 @@ public class DesignSystemTests
             "ClipboardTool",
             "MarkdownPreview",
             "FileRenamerPlugin",
+            "FileOrganizer",
             "UrlToolkit",
             "TimestampConverter",
             "RegexTester",
@@ -461,6 +463,33 @@ public class DesignSystemTests
         Assert.Contains(".long-progress__fill", uiKit);
         Assert.Contains(".long-key-value__row", uiKit);
         Assert.Contains(".long-data-grid__row", uiKit);
+    }
+
+    [Fact]
+    public void FileOrganizer_UsesReviewedHostOwnedOrganizationPlan()
+    {
+        var root = FindRepositoryRoot();
+        var page = File.ReadAllText(Path.Combine(
+            root, "src", "FileOrganizer", "index.html"));
+        using var manifest = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root, "src", "FileOrganizer", "manifest.json")));
+
+        Assert.DoesNotContain("<style", page, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotMatch("#[0-9A-Fa-f]{3,8}", page);
+        Assert.DoesNotContain("innerHTML", page);
+        Assert.DoesNotContain("confirm(", page);
+        Assert.Contains("long.fileSystem.planOrganization(", page);
+        Assert.Contains("long.fileSystem.executeOrganization(", page);
+        Assert.Contains("executeDialog.showModal()", page);
+        Assert.Contains("LongUI?.onCommand", page);
+
+        var capabilities = manifest.RootElement.GetProperty("capabilities")
+            .EnumerateArray()
+            .Select(element => element.GetString())
+            .ToArray();
+        Assert.Contains("filesystem.advanced", capabilities);
+        Assert.Contains("shell.selection", capabilities);
+        Assert.DoesNotContain("file.ops", capabilities);
     }
 
     [Fact]

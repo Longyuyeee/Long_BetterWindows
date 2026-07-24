@@ -216,7 +216,8 @@ namespace LongBetterWindows.Host.Engine
                 => "system.input",
             "fileSystem.enumerate" or "fileSystem.hash" or "fileSystem.metadata" or
             "fileSystem.findDuplicates" or "fileSystem.batchRename" or "fileSystem.classify" or
-            "fileSystem.findLarge" or "fileSystem.searchContent"
+            "fileSystem.findLarge" or "fileSystem.searchContent" or
+            "fileSystem.planOrganization" or "fileSystem.executeOrganization"
                 => "filesystem.advanced",
             "cache.cleanTemp" or "cache.cleanWindowsUpdate" or "cache.cleanBrowser" or
             "cache.emptyRecycleBin" or "cache.getStatistics" or "cache.cleanAll"
@@ -387,7 +388,9 @@ window.long = {
     batchRename: function(operations){return call('fileSystem.batchRename',[operations||[]]);},
     classify: function(path,mode){return call('fileSystem.classify',[path,mode||'ByExtension']);},
     findLarge: function(path,minSizeBytes){return call('fileSystem.findLarge',[path,minSizeBytes]);},
-    searchContent: function(path,keyword,extensions){return call('fileSystem.searchContent',[path,keyword,extensions||[]]);}
+    searchContent: function(path,keyword,extensions){return call('fileSystem.searchContent',[path,keyword,extensions||[]]);},
+    planOrganization: function(path,mode){return call('fileSystem.planOrganization',[path,mode||'ByExtension']);},
+    executeOrganization: function(path,mode,items){return call('fileSystem.executeOrganization',[path,mode||'ByExtension',items||[]]);}
   },
   cache: {
     cleanTemp: function(){return call('cache.cleanTemp',[]);},

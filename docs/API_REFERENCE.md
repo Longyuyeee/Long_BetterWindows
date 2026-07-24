@@ -128,6 +128,34 @@ await long.notification.show('请注意', 'warning');
 
 ---
 
+## 📁 fileSystem - 高级文件系统
+
+### planOrganization(path: string, mode?: string)
+
+为所选目录的顶层文件生成整理计划，不移动文件。`mode` 支持
+`ByExtension`、`ByDate` 和 `BySize`。每个计划项包含源路径、目标路径、
+分类、文件名、大小和冲突标记。
+
+```javascript
+const preview = await long.fileSystem.planOrganization(
+    'C:\\Users\\Alice\\Downloads',
+    'ByExtension');
+```
+
+### executeOrganization(path: string, mode: string, items: array)
+
+执行用户已经复核的计划。宿主会按当前文件状态重新计算每个目标，目标固定在
+`Long Organized/{category}`，不会接受前端提供的任意移动路径，也不会覆盖现有文件。
+结果包含 `plannedCount`、`movedCount`、`failedCount` 和逐项 `failures`。
+
+执行采用部分成功语义：先前成功的移动不会因后续项失败而回滚，调用方必须向用户展示
+失败项。源文件必须是根目录的顶层普通文件；根目录、源文件和已有目标目录中的重解析点
+会被拒绝。
+
+**权限**: `filesystem.advanced`
+
+---
+
 ## 📝 registry - 注册表
 
 ### read(key: string): Promise<string>

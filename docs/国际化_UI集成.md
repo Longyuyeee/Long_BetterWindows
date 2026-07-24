@@ -256,6 +256,21 @@
 4. 无头 Edge 最小窗口中英文往返验证 Markdown 输入/DOM、文本两侧输入/操作行/计数和复制状态保持，无水平溢出；Release 0 警告/0 错误，593 / 593 测试通过。
 5. 下一批 G17-D3-B 单独处理 TranslatePlugin 网络请求进行中/完成状态和 FileRenamerPlugin 文件预览/部分失败事务，避免语言切换重复副作用。
 
+2026-07-24 G17-D3-B 至 G17-D4-D 复杂 Web 插件迁移已完成：
+
+1. TranslatePlugin、FileRenamerPlugin、HardwareMonitor、PortManager、ClipboardHistory 和 DevToolkit 已完成双语资源、运行时状态投影及副作用隔离。
+2. 网络请求、文件重命名、性能轮询、端口刷新/进程终止、剪贴板监听/持久化和开发工具转换均只由原用户动作或生命周期触发；语言切换不重复执行。
+3. 各批最小窗口无水平溢出，资源键与状态保持进入自动化；阶段基线由 599 / 599 递增至 611 / 611。
+
+2026-07-24 G17-D5-A FileOrganizer 功能补全与双语迁移已完成：
+
+1. 审计纠正旧进度假设：`src/FileOrganizer/manifest.json` 声明了 `index.html`，但该入口在当前目录和 Git 历史中均不存在，因此此前没有可运行前端，也没有可保持的文件列表或执行事务。
+2. 新增 `long.fileSystem.planOrganization` / `executeOrganization`，由宿主生成并重新验证计划。范围限定为所选目录顶层文件，目标固定在 `Long Organized/{category}`；拒绝源路径越界、规则篡改、重复源/目标、重解析点和覆盖现有文件。
+3. 页面支持 Explorer 当前目录、按扩展名/修改月份/大小分类、目标预览、冲突标识和原生确认对话框。执行返回移动数与逐项失败，成功项不回滚，失败项留在预览中供复核。
+4. 中英文各 61 个资源键覆盖插件/命令元数据、页面、状态、错误和确认文本。语言切换只调用 `renderPlanState(false)` 等投影函数，不触发目录读取、分析或文件移动。
+5. Release 构建 0 警告、0 错误，全量自动化 621 / 621 通过。当前本机浏览器连接不可用，未把 `780 × 560` 真实渲染写成已完成；该证据与 G17-D5-B 一并补录。
+6. 当前 19 / 25 个内置插件完成本地化。下一步按副作用边界拆分：D5-B 为 ColorPicker + Screenshot，D5-C 为 QuickLaunch + WindowManager，D5-D 单独处理 MacroPlugin，D5-E 以 SamplePlugin 和全插件总审计收口。
+
 ### G4：完成门禁
 
 只有满足以下条件才把 README 国际化标记为完成：

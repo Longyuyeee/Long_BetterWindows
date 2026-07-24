@@ -214,6 +214,8 @@ public class CoreTests
     [InlineData("wallpaper.set", "system.wallpaper")]
     [InlineData("brightness.set", "display.brightness")]
     [InlineData("fileSystem.enumerate", "filesystem.advanced")]
+    [InlineData("fileSystem.planOrganization", "filesystem.advanced")]
+    [InlineData("fileSystem.executeOrganization", "filesystem.advanced")]
     [InlineData("cache.cleanTemp", "system.cache")]
     [InlineData("schedule.create", "system.schedule")]
     [InlineData("input.keyPress", "system.input")]
@@ -234,6 +236,8 @@ public class CoreTests
         Assert.Contains("audio:", script);
         Assert.Contains("power:", script);
         Assert.Contains("fileSystem:", script);
+        Assert.Contains("planOrganization: function", script);
+        Assert.Contains("executeOrganization: function", script);
         Assert.Contains("cache:", script);
         Assert.Contains("schedule:", script);
         Assert.Contains("input:", script);

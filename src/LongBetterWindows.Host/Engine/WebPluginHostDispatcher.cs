@@ -177,6 +177,14 @@ namespace LongBetterWindows.Host.Engine
                     WebPluginArguments.GetString(args, 0), WebPluginArguments.GetLong(args, 1))),
                 "fileSystem.searchContent" => OkList(h.FileSystem.SearchFileContentAsync(
                     WebPluginArguments.GetString(args, 0), WebPluginArguments.GetString(args, 1), WebPluginArguments.GetStringList(args, 2))),
+                "fileSystem.planOrganization" => OkList(h.FileSystem.PlanFileOrganizationAsync(
+                    WebPluginArguments.GetString(args, 0),
+                    WebPluginArguments.GetEnum(args, 1, ClassifyMode.ByExtension))),
+                "fileSystem.executeOrganization" => Ok(h.FileSystem.ExecuteFileOrganizationAsync(
+                    WebPluginArguments.GetString(args, 0),
+                    WebPluginArguments.GetEnum(args, 1, ClassifyMode.ByExtension),
+                    WebPluginArguments.GetJson<List<FileOrganizationItem>>(args, 2)
+                        ?? new List<FileOrganizationItem>())),
 
                 // === long.cache ===
                 "cache.cleanTemp" => Ok(h.Cache.CleanTempFilesAsync()),
