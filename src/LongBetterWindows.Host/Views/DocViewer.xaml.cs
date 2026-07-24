@@ -56,7 +56,11 @@ namespace LongBetterWindows.Host.Views
                 await _webView.EnsureCoreWebView2Async();
                 var isDark = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme()
                     == Wpf.Ui.Appearance.ApplicationTheme.Dark;
-                var html = BuildHtml(title: Title, markdown: markdown, isDark: isDark);
+                var html = BuildHtml(
+                    title: Title,
+                    markdown: markdown,
+                    isDark: isDark,
+                    language: Services.ServicesInitializer.I18n.CurrentLanguage);
                 _webView.CoreWebView2.NavigateToString(html);
             }
             catch (Exception ex)
@@ -65,7 +69,11 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
-        private static string BuildHtml(string title, string markdown, bool isDark)
+        private static string BuildHtml(
+            string title,
+            string markdown,
+            bool isDark,
+            string language)
         {
             var escaped = EscapeHtml(markdown);
             var sb = new StringBuilder();
@@ -78,7 +86,7 @@ namespace LongBetterWindows.Host.Views
             var blockquote = isDark ? "#888888" : "#666666";
             var accent = "#007AFF";
 
-            sb.AppendLine("<!DOCTYPE html><html><head><meta charset='UTF-8'>");
+            sb.AppendLine($"<!DOCTYPE html><html lang='{language}'><head><meta charset='UTF-8'>");
             sb.AppendLine("<style>");
             sb.AppendLine($"body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:720px;margin:32px auto;padding:0 24px;color:{text};line-height:1.7;background:{bg};}}");
             sb.AppendLine($"h1{{font-size:24px;border-bottom:2px solid {accent};padding-bottom:8px;color:{accent};}}");

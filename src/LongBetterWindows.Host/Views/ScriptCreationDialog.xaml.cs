@@ -4,9 +4,13 @@ namespace LongBetterWindows.Host.Views
 {
     public partial class ScriptCreationDialog : Window
     {
+        public const string HotkeyTemplate = "hotkey";
+        public const string NoteTemplate = "note";
+        public const string BlankTemplate = "blank";
+
         public string ScriptPath { get; private set; } = string.Empty;
         public string SelectedLanguage { get; private set; } = "JavaScript";
-        public string SelectedTemplate { get; private set; } = "热键插件";
+        public string SelectedTemplate { get; private set; } = HotkeyTemplate;
         public bool OpenInEditor { get; private set; }
 
         public ScriptCreationDialog()
@@ -19,23 +23,20 @@ namespace LongBetterWindows.Host.Views
             var name = ScriptNameBox.Text.Trim();
             if (string.IsNullOrEmpty(name))
             {
-                MessageBox.Show("请输入文件名", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowValidationMessage("developer.script.validation.fileNameRequired");
                 return;
             }
 
-            // 移除扩展名（如果用户输入了）
             name = name.Replace(".csx", "").Replace(".js", "").Replace(".ts", "");
 
-            // 验证文件名合法性
             if (name.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
             {
-                MessageBox.Show("文件名包含非法字符", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowValidationMessage("developer.script.validation.invalidFileName");
                 return;
             }
 
             ScriptPath = name;
 
-            // 获取选中的语言
             if (LangCSharp.IsChecked == true)
                 SelectedLanguage = "C#";
             else if (LangJS.IsChecked == true)
@@ -43,13 +44,12 @@ namespace LongBetterWindows.Host.Views
             else if (LangTS.IsChecked == true)
                 SelectedLanguage = "TypeScript";
 
-            // 获取选中的模板
             if (TplHotkey.IsChecked == true)
-                SelectedTemplate = "热键插件";
+                SelectedTemplate = HotkeyTemplate;
             else if (TplNote.IsChecked == true)
-                SelectedTemplate = "笔记插件";
+                SelectedTemplate = NoteTemplate;
             else if (TplBlank.IsChecked == true)
-                SelectedTemplate = "空白";
+                SelectedTemplate = BlankTemplate;
 
             OpenInEditor = OpenEditorCheck.IsChecked == true;
 
@@ -61,6 +61,15 @@ namespace LongBetterWindows.Host.Views
         {
             DialogResult = false;
             Close();
+        }
+
+        private static void ShowValidationMessage(string messageKey)
+        {
+            MessageBox.Show(
+                Services.ServicesInitializer.I18n.T(messageKey),
+                Services.ServicesInitializer.I18n.T("developer.script.validation.title"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 }

@@ -1,7 +1,7 @@
 <Window x:Class="LongBetterWindows.Host.Views.ScriptCreationDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="新建脚本" Height="380" Width="450"
+        Title="{DynamicResource i18n.developer.script.title}" Height="410" Width="500"
         WindowStartupLocation="CenterScreen"
         Background="#1E1F22"
         ResizeMode="NoResize"
@@ -29,25 +29,24 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- 标题 -->
-            <TextBlock Grid.Row="0" Text="✨ 新建脚本" FontSize="18" FontWeight="SemiBold"
+            <TextBlock Grid.Row="0" Text="{DynamicResource i18n.developer.script.heading}" FontSize="18" FontWeight="SemiBold"
                        Foreground="#F8FAFC" Margin="0,0,0,20" />
 
-            <!-- 文件名 -->
             <StackPanel Grid.Row="1" Margin="0,0,0,16">
-                <TextBlock Text="文件名" FontSize="12" Foreground="#94A3B8" Margin="0,0,0,6" />
+                <TextBlock Text="{DynamicResource i18n.developer.script.fileName}" FontSize="12" Foreground="#94A3B8" Margin="0,0,0,6" />
                 <TextBox x:Name="ScriptNameBox" Height="32" FontSize="13"
                          Background="#2B2D30" Foreground="#F8FAFC"
                          BorderBrush="#3C3F41" BorderThickness="1"
                          Padding="8,6" Text="my-plugin"
+                         AutomationProperties.Name="{DynamicResource i18n.developer.script.fileName}"
                          CaretBrush="#3B82F6" />
-                <TextBlock Text="* 不需要输入扩展名，系统会根据语言自动添加"
-                           FontSize="10" Foreground="#6B7280" Margin="0,4,0,0" />
+                <TextBlock Text="{DynamicResource i18n.developer.script.extensionHint}"
+                           FontSize="10" Foreground="#6B7280" Margin="0,4,0,0"
+                           TextWrapping="Wrap" />
             </StackPanel>
 
-            <!-- 语言选择 -->
             <StackPanel Grid.Row="2" Margin="0,0,0,16">
-                <TextBlock Text="语言" FontSize="12" Foreground="#94A3B8" Margin="0,0,0,8" />
+                <TextBlock Text="{DynamicResource i18n.developer.script.language}" FontSize="12" Foreground="#94A3B8" Margin="0,0,0,8" />
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="LangCSharp" Content="C# Script (.csx)"
                                  GroupName="Language" IsChecked="False"
@@ -61,34 +60,31 @@
                 </StackPanel>
             </StackPanel>
 
-            <!-- 模板选择 -->
             <StackPanel Grid.Row="3" Margin="0,0,0,16">
-                <TextBlock Text="模板" FontSize="12" Foreground="#94A3B8" Margin="0,0,0,8" />
+                <TextBlock Text="{DynamicResource i18n.developer.script.template}" FontSize="12" Foreground="#94A3B8" Margin="0,0,0,8" />
                 <StackPanel>
-                    <RadioButton x:Name="TplHotkey" Content="热键插件 (快捷键触发)"
+                    <RadioButton x:Name="TplHotkey" Content="{DynamicResource i18n.developer.script.template.hotkey}"
                                  GroupName="Template" IsChecked="True"
                                  Style="{StaticResource RadioButtonStyle}"
                                  Margin="0,0,0,6" />
-                    <RadioButton x:Name="TplNote" Content="笔记插件 (文件备注)"
+                    <RadioButton x:Name="TplNote" Content="{DynamicResource i18n.developer.script.template.note}"
                                  GroupName="Template" IsChecked="False"
                                  Style="{StaticResource RadioButtonStyle}"
                                  Margin="0,0,0,6" />
-                    <RadioButton x:Name="TplBlank" Content="空白脚本"
+                    <RadioButton x:Name="TplBlank" Content="{DynamicResource i18n.developer.script.template.blank}"
                                  GroupName="Template" IsChecked="False"
                                  Style="{StaticResource RadioButtonStyle}" />
                 </StackPanel>
             </StackPanel>
 
-            <!-- 额外选项 -->
-            <CheckBox x:Name="OpenEditorCheck" Grid.Row="4" Content="创建后在编辑器中打开"
+            <CheckBox x:Name="OpenEditorCheck" Grid.Row="4" Content="{DynamicResource i18n.developer.script.openEditor}"
                       Foreground="#94A3B8" FontSize="11" IsChecked="False" Margin="0,0,0,16" />
 
-            <!-- 按钮 -->
             <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="取消" Width="80" Height="32" Margin="0,0,8,0"
+                <Button Content="{DynamicResource i18n.action.cancel}" Width="80" Height="32" Margin="0,0,8,0"
                         Background="#3A3A3D" Foreground="#CCCCCC" BorderThickness="0"
                         FontSize="12" Cursor="Hand" Click="Cancel_Click" />
-                <Button Content="创建" Width="80" Height="32"
+                <Button Content="{DynamicResource i18n.action.create}" Width="80" Height="32"
                         Background="#3B82F6" Foreground="White" BorderThickness="0"
                         FontSize="12" Cursor="Hand" Click="Create_Click" />
             </StackPanel>

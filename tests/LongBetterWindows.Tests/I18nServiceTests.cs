@@ -338,6 +338,40 @@ public sealed class I18nServiceTests : IDisposable
     }
 
     [Fact]
+    public void DeveloperNativeDialogs_UseDynamicLanguageResources()
+    {
+        var root = FindRepositoryRoot();
+        var views = Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views");
+        var scriptXaml = File.ReadAllText(Path.Combine(
+            views,
+            "ScriptCreationDialog.xaml"));
+        var scriptSource = File.ReadAllText(Path.Combine(
+            views,
+            "ScriptCreationDialog.xaml.cs"));
+        var designXaml = File.ReadAllText(Path.Combine(
+            views,
+            "DesignSystemPreview.xaml"));
+        var docViewerSource = File.ReadAllText(Path.Combine(
+            views,
+            "DocViewer.xaml.cs"));
+
+        Assert.Contains("i18n.developer.script.title", scriptXaml);
+        Assert.Contains("i18n.developer.script.template.hotkey", scriptXaml);
+        Assert.Contains("HotkeyTemplate = \"hotkey\"", scriptSource);
+        Assert.Contains("developer.script.validation.fileNameRequired", scriptSource);
+        Assert.Contains("i18n.developer.design.hero.title", designXaml);
+        Assert.Contains("i18n.developer.design.completed", designXaml);
+        Assert.Contains("<html lang='{language}'>", docViewerSource);
+        Assert.DoesNotMatch("[一-龥]", scriptXaml);
+        Assert.DoesNotContain("SelectedTemplate = \"热键插件\"", scriptSource);
+        Assert.DoesNotContain("克制华丽，清晰高效", designXaml);
+    }
+
+    [Fact]
     public void WorkflowInvocationAndBindingEditors_UseHostLanguageResources()
     {
         var root = FindRepositoryRoot();
