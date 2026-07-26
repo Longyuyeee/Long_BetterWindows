@@ -37,7 +37,7 @@ public sealed class UpdateServiceTests
         var manifest = JsonSerializer.SerializeToUtf8Bytes(new
         {
             schema_version = 1,
-            product = "Long窗口·全能助手",
+            product = "Long Assistant",
             version = "1.10.0-rc.3",
             channel = "prerelease",
             published_at = "2026-07-26T00:00:00Z",

@@ -293,7 +293,7 @@ await long.screenshot.captureRegion(x, y, width, height)
 ## 热插拔流程
 
 1. 创建 `.js` 或 `.ts` 文件
-2. 拖放到 Long窗口的插件管理面板
+2. 拖放到 Long助手的插件管理面板
 3. 等待 1-2 秒自动加载
 4. 立即使用热键测试功能
 

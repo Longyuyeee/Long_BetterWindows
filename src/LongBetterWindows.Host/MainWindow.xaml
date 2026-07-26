@@ -39,12 +39,10 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="26" Height="26" CornerRadius="8"
-                                Background="{DynamicResource Long.Brush.Accent.Gradient}">
-                            <Path Data="{StaticResource Long.Icon.Sparkle}" Style="{StaticResource LongIcon}"
-                                  Width="15" Height="15" Stroke="White"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <Image Width="26" Height="26"
+                               Source="/LongBetterWindows.Host;component/Assets/app-icon.png"
+                               SnapsToDevicePixels="True"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
                         <TextBlock Text="{DynamicResource i18n.app.brand}" Margin="10,0,0,0" FontSize="14" FontWeight="SemiBold"
                                    Foreground="{DynamicResource Long.Brush.Text.Primary}" VerticalAlignment="Center" />
                         <TextBlock Text="{DynamicResource i18n.app.management}" Margin="8,0,0,0" FontSize="11"

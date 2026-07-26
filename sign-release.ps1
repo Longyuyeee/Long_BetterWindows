@@ -109,7 +109,7 @@ try {
         }
         $targets = @(Get-ProductSigningTargets $packageRoot)
         foreach ($target in $targets) {
-            $arguments = @('sign','/sha1',$thumbprint,'/s','My','/fd','SHA256','/tr',$TimestampUrl.AbsoluteUri,'/td','SHA256','/d','Long窗口·全能助手')
+            $arguments = @('sign','/sha1',$thumbprint,'/s','My','/fd','SHA256','/tr',$TimestampUrl.AbsoluteUri,'/td','SHA256','/d','Long助手')
             if ($CertificateStoreLocation -eq 'LocalMachine') { $arguments += '/sm' }
             $arguments += $target
             & $signToolResolver @arguments

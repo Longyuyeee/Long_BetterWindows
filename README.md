@@ -1,6 +1,8 @@
 <div align="center">
 
-# Long窗口 · 全能助手
+<img src="Assets/app-icon.png" width="128" alt="Long助手图标">
+
+# Long助手
 
 ### 一个优雅、华丽、扁平、灵动的 Windows 效率与插件平台
 
@@ -22,9 +24,9 @@
 
 ---
 
-## 为什么是 Long窗口
+## 为什么是 Long助手
 
-Long窗口不是 uTools 插件兼容层。我们参考的是成熟的统一入口、上下文感知和插件化交互逻辑，并在自己的 Windows 原生能力、权限模型、视觉语言与工作流体系上继续扩展。
+Long助手不是 uTools 插件兼容层。我们参考的是成熟的统一入口、上下文感知和插件化交互逻辑，并在自己的 Windows 原生能力、权限模型、视觉语言与工作流体系上继续扩展。
 
 | 体验方向 | 当前实现 |
 |---|---|
@@ -185,6 +187,6 @@ dotnet run --project src/LongBetterWindows.Host
 
 <div align="center">
 
-**Long窗口** — 让 Windows 的能力真正汇聚到一个入口。
+**Long助手** — 让 Windows 的能力真正汇聚到一个入口。
 
 </div>

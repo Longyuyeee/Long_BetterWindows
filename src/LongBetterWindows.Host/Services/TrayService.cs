@@ -72,7 +72,7 @@ namespace LongBetterWindows.Host.Services
                 uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP,
                 uCallbackMessage = WM_TRAYICON,
                 hIcon = LoadAppIcon(),
-                szTip = "Long窗口·全能助手",
+                szTip = "Long助手",
             };
 
             _visible = Shell_NotifyIcon(NIM_ADD, ref nid);

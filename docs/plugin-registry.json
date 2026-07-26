@@ -1,5 +1,5 @@
 {
-  "_comment": "Long窗口 插件注册表 —— 插件市场预留字段",
+  "_comment": "Long助手 插件注册表 —— 插件市场预留字段",
   "_usage": "将此文件部署到服务器，PluginStoreService 通过 HTTP GET 获取列表",
   "_todo": "插件市场后端就绪后取消注释 server_url 字段",
 

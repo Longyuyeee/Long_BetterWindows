@@ -100,12 +100,21 @@
                                     <ColumnDefinition x:Name="WelcomeTextColumn" Width="*"/>
                                     <ColumnDefinition x:Name="WelcomeActionColumn" Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Text="{DynamicResource i18n.overview.welcome.title}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.OnAccent}" />
-                                    <TextBlock Text="{DynamicResource i18n.overview.welcome.desc}"
-                                               Margin="0,6,10,0" FontSize="12" TextWrapping="Wrap"
-                                               Foreground="{DynamicResource Long.Brush.Text.OnAccentMuted}" />
-                                </StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="48"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Image Width="38" Height="38" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                           Source="/LongBetterWindows.Host;component/Assets/app-icon.png"
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{DynamicResource i18n.overview.welcome.title}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Text.OnAccent}" />
+                                        <TextBlock Text="{DynamicResource i18n.overview.welcome.desc}"
+                                                   Margin="0,6,10,0" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.OnAccentMuted}" />
+                                    </StackPanel>
+                                </Grid>
                                 <Button x:Name="WelcomeDismissButton" Grid.Column="1"
                                         Content="{DynamicResource i18n.overview.welcome.dismiss}" Style="{StaticResource LongButton}"
                                         Background="{DynamicResource Long.Brush.Surface.OnAccent}"
@@ -221,7 +230,7 @@
                             <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.developer.workbench.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.workbench.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.action.open}" Style="{StaticResource LongButton.Primary}" Click="DevTools_Click" AutomationProperties.Name="{DynamicResource i18n.developer.workbench.openA11y}"/></Grid></Border>
                             <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.developer.design.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.design.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.developer.design.preview}" Style="{StaticResource LongButton}" Click="DesignSystemPreview_Click" AutomationProperties.Name="{DynamicResource i18n.developer.design.previewA11y}"/></Grid></Border>
                             <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><StackPanel><TextBlock Text="{DynamicResource i18n.developer.docs.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.docs.desc}" Margin="0,5,0,8" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><StackPanel x:Name="DocLinksPanel"/></StackPanel></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><StackPanel><TextBlock Text="{DynamicResource i18n.developer.about.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock x:Name="AboutVersion" Margin="0,6,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="AboutStats" Margin="0,4,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel></Border>
+                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Image Width="32" Height="32" HorizontalAlignment="Left" VerticalAlignment="Top" Source="/LongBetterWindows.Host;component/Assets/app-icon.png" RenderOptions.BitmapScalingMode="HighQuality"/><StackPanel Grid.Column="1"><TextBlock Text="{DynamicResource i18n.developer.about.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock x:Name="AboutVersion" Margin="0,6,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="AboutStats" Margin="0,4,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel></Grid></Border>
                         </UniformGrid>
                     </StackPanel>
 

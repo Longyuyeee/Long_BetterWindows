@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-  构建、验证并打包 Long窗口 Windows x64 发布候选版本。
+  构建、验证并打包 Long助手 Windows x64 发布候选版本。
 .EXAMPLE
   .\release.ps1
 .EXAMPLE
@@ -243,7 +243,7 @@ try {
     # change the reproducible source tree used by this release.
     $sourceDirty = @((git status --porcelain --untracked-files=no 2>$null)).Count -gt 0
     $manifest = [ordered]@{
-        product = 'Long窗口·全能助手'
+        product = 'Long Assistant'
         version = $Version
         runtime = 'win-x64'
         created_at = [DateTimeOffset]::Now.ToString('o')

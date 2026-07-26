@@ -64,7 +64,7 @@ if ($packages.Count -eq 0) {
 
 $manifest = [ordered]@{
     schema_version = 1
-    product = 'LongBetterWindows'
+    product = 'Long Assistant'
     version = $version
     channel = if ($version -match '-') { 'prerelease' } else { 'stable' }
     published_at = [DateTimeOffset]::UtcNow.ToString('o')

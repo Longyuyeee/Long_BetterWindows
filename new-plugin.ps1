@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-  Long窗口·全能助手 — 插件脚手架
+  Long助手 — 插件脚手架
 .DESCRIPTION
   从模板创建新插件项目，自动配置 manifest、csproj、加入 .sln。
 .PARAMETER Name
@@ -48,7 +48,7 @@ if (Test-Path $pluginDir) {
 }
 
 Write-Host ""
-Write-Host "  Long窗口·全能助手 — 插件脚手架" -ForegroundColor Cyan
+Write-Host "  Long助手 — 插件脚手架" -ForegroundColor Cyan
 Write-Host "  ─────────────────────────────────" -ForegroundColor DarkGray
 Write-Host "  名称   : $Name"
 Write-Host "  ID     : $Id"

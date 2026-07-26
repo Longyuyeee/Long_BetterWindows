@@ -329,7 +329,7 @@ long.hotkey.register('Alt+T', async () => {
 });
 ```
 
-拖入 Long窗口 → 等待 2 秒 → 按 Alt+T → ✅ 完成
+拖入 Long助手 → 等待 2 秒 → 按 Alt+T → ✅ 完成
 
 **不需要学**:
 - ❌ C# 语法
@@ -410,7 +410,7 @@ long.hotkey.register('Alt+C', async () => {
 ```javascript
 // 保存为 hello.js
 long.hotkey.register('Ctrl+Shift+H', async () => {
-    await long.notification.show('Hello, Long窗口!', 'success');
+    await long.notification.show('Hello, Long助手!', 'success');
 });
 ```
 

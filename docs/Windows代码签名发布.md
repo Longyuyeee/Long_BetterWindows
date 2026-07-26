@@ -1,4 +1,4 @@
-# Long窗口 Windows 代码签名发布
+# Long助手 Windows 代码签名发布
 
 > 适用版本：v1.9.0 及以后
 > 目标：提供可选的 Authenticode 增强通道；当前公开 `unsigned` 通道不依赖本流程。

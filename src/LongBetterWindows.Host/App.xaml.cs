@@ -63,7 +63,7 @@ namespace LongBetterWindows.Host
                 .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
-            Log.Information("Long窗口·全能助手 正在启动...");
+            Log.Information("Long助手 正在启动...");
 
             _startupOptions = AppStartupOptions.Parse(e.Args);
             ServicesInitializer.Initialize(_startupOptions.QualityWorkflowsDirectory);
@@ -338,7 +338,7 @@ namespace LongBetterWindows.Host
             _pluginRuntime?.Dispose();
             // 清理服务资源
             ServicesInitializer.DisposeAll();
-            Log.Information("Long窗口·全能助手 已退出。");
+            Log.Information("Long助手 已退出。");
             Log.CloseAndFlush();
             base.OnExit(e);
         }

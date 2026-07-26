@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <Content Include="..\..\Assets\app.ico" Link="Assets\app.ico" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <Resource Include="..\..\Assets\app-icon.png" Link="Assets\app-icon.png" />
     <Content Include="Views\PluginDevTools.html" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\typescript.js" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\typescript.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
@@ -35,10 +36,12 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>LongBetterWindows.Host</RootNamespace>
     <AssemblyName>LongBetterWindows.Host</AssemblyName>
-    <Title>Long窗口·全能助手</Title>
+    <AssemblyTitle>Long助手</AssemblyTitle>
+    <Title>Long助手</Title>
     <Company>Long</Company>
-    <Product>Long窗口·全能助手</Product>
+    <Product>Long助手</Product>
     <Description>优雅、华丽、扁平、动效化的 Windows 插件效率平台</Description>
+    <ApplicationIcon>..\..\Assets\app.ico</ApplicationIcon>
     <Version>1.10.0-rc.3</Version>
     <AssemblyVersion>1.10.0.0</AssemblyVersion>
     <FileVersion>1.10.0.0</FileVersion>
