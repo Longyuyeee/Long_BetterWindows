@@ -793,8 +793,8 @@ public class QualityGateTests
         Assert.Contains("<RemoveDir Directories=\"$(OutputPath)Plugins", project);
         Assert.Contains("CopyPluginsToPublish", project);
         Assert.Contains("$(PublishDir)Plugins", project);
-        Assert.Contains("<Version>1.9.0</Version>", project);
-        Assert.Contains("<AssemblyVersion>1.9.0.0</AssemblyVersion>", project);
+        Assert.Contains("<Version>1.10.0</Version>", project);
+        Assert.Contains("<AssemblyVersion>1.10.0.0</AssemblyVersion>", project);
     }
 
     [Fact]
