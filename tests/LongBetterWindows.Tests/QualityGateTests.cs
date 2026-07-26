@@ -795,7 +795,7 @@ public class QualityGateTests
         Assert.Contains("<RemoveDir Directories=\"$(OutputPath)Plugins", project);
         Assert.Contains("CopyPluginsToPublish", project);
         Assert.Contains("$(PublishDir)Plugins", project);
-        Assert.Contains("<Version>1.11.0-rc.1</Version>", project);
+        Assert.Contains("<Version>1.11.0-rc.2</Version>", project);
         Assert.Contains("<AssemblyVersion>1.11.0.0</AssemblyVersion>", project);
     }
 
@@ -836,6 +836,34 @@ public class QualityGateTests
         Assert.DoesNotContain("Compress-Archive", release);
         Assert.Contains("WaitForExit($smokeTimeoutMilliseconds)", release);
         Assert.Contains("pluginCount -ne $expectedPluginCount", release);
+        Assert.Contains("Remove-PublishRuntimeState", release);
+        Assert.Contains("runtime-generated WebView2 state was packaged", release);
+        Assert.Contains("build-installer.ps1", release);
+        Assert.Contains("installers = $installers", release);
+    }
+
+    [Fact]
+    public void InstallerPipeline_ProducesPerUserExeWithUpgradeAndUninstallSupport()
+    {
+        var build = Read("build-installer.ps1");
+        var installer = Read("installer", "LongAssistant.iss");
+
+        Assert.Contains("expectedPluginCount = 25", build);
+        Assert.Contains("expectedCommandCount = 42", build);
+        Assert.Contains("JRSoftware.InnoSetup", build);
+        Assert.Contains("inno-setup-exe", build);
+        Assert.Contains("requires_elevation = $false", build);
+        Assert.Contains("Get-FileHash", build);
+        Assert.Contains("AppId={{7B95AC62-8C5A-45E3-B0F0-A77EA8CF318A}", installer);
+        Assert.Contains(@"DefaultDirName={localappdata}\Programs\LongAssistant", installer);
+        Assert.Contains("PrivilegesRequired=lowest", installer);
+        Assert.Contains("UsePreviousAppDir=yes", installer);
+        Assert.Contains("UninstallDisplayIcon={app}\\LongBetterWindows.Host.exe", installer);
+        Assert.Contains(
+            @"Type: filesandordirs; Name: ""{app}\LongBetterWindows.Host.exe.WebView2""",
+            installer);
+        Assert.Contains("LongAssistant-Setup-v{#AppVersion}", installer);
+        Assert.Contains("SetupIconFile=..\\Assets\\app.ico", installer);
     }
 
     [Fact]

@@ -8,7 +8,7 @@
   .\release.ps1 -PackageKind SelfContained
 #>
 param(
-    [string] $Version = '1.11.0-rc.1',
+    [string] $Version = '1.11.0-rc.2',
     [ValidateSet('All', 'FrameworkDependent', 'SelfContained')]
     [string] $PackageKind = 'All',
     [switch] $Force
@@ -85,8 +85,28 @@ function Assert-ReleaseZipLayout([string] $ZipPath) {
         if ($hostCount -ne 1 -or $manifestCount -ne $expectedPluginCount) {
             throw "ZIP layout check failed: Hosts=$hostCount, PluginManifests=$manifestCount"
         }
+        $runtimeStateEntries = @($archive.Entries | Where-Object {
+            $_.FullName -match '(^|/)LongBetterWindows\.Host\.exe\.WebView2/'
+        })
+        if ($runtimeStateEntries.Count -gt 0) {
+            throw "ZIP layout check failed: runtime-generated WebView2 state was packaged."
+        }
     }
     finally { $archive.Dispose() }
+}
+
+function Remove-PublishRuntimeState([string] $PublishDirectory) {
+    $publishRoot = [IO.Path]::GetFullPath($PublishDirectory).TrimEnd('\') + '\'
+    $webViewState = [IO.Path]::GetFullPath(
+        (Join-Path $PublishDirectory 'LongBetterWindows.Host.exe.WebView2'))
+    if (-not ($webViewState + '\').StartsWith(
+        $publishRoot,
+        [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clean runtime state outside the publish directory: $webViewState"
+    }
+    if (Test-Path -LiteralPath $webViewState) {
+        Remove-Item -LiteralPath $webViewState -Recurse -Force
+    }
 }
 
 if (-not (Test-Path -LiteralPath $dotnet)) {
@@ -206,6 +226,7 @@ try {
         if ($addedWebViewProcessIds.Count -gt 0) {
             throw "$($variant.Name) 真实命令退出后残留 WebView2 进程：$($addedWebViewProcessIds -join ', ')"
         }
+        Remove-PublishRuntimeState -PublishDirectory $publishDirectory
 
         $productVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($hostExecutable).ProductVersion
         $semanticProductVersion = $productVersion.Split('+')[0]
@@ -236,7 +257,21 @@ try {
         }
     }
 
-    $checksumLines = $packages | ForEach-Object { "$($_.sha256)  $($_.file)" }
+    $installers = @()
+    $selfContainedDirectory = Join-Path $releaseRoot 'self-contained'
+    if (Test-Path -LiteralPath $selfContainedDirectory -PathType Container) {
+        $installerResultJson = & (Join-Path $repoRoot 'build-installer.ps1') `
+            -SourceDirectory $selfContainedDirectory `
+            -OutputDirectory $releaseRoot `
+            -Version $Version `
+            -NumericVersion "$(([version]($Version -replace '-.*$','')).ToString(3)).0"
+        if ($LASTEXITCODE -ne 0) { throw 'Setup.exe 安装器构建失败。' }
+        $installerResult = $installerResultJson | ConvertFrom-Json
+        $installers += $installerResult
+    }
+
+    $checksumLines = @($packages) + @($installers) |
+        ForEach-Object { "$($_.sha256)  $($_.file)" }
     $checksumLines | Set-Content -LiteralPath (Join-Path $releaseRoot 'SHA256SUMS.txt') -Encoding UTF8
 
     # Generated evidence and local secrets are intentionally untracked and do not
@@ -250,6 +285,7 @@ try {
         commit = (git rev-parse HEAD 2>$null)
         source_dirty = $sourceDirty
         packages = $packages
+        installers = $installers
         distribution_channel = 'unsigned'
         publisher_identity = 'unverified'
         security_notice = 'Windows publisher identity is not verified; validate the SHA-256 checksums before running.'
