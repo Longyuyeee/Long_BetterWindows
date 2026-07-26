@@ -30,6 +30,8 @@ powershell.exe -ExecutionPolicy Bypass -File .\capture-physical-dpi-evidence.ps1
 4. 亮色与暗色的信息层级一致。
 5. Web 插件内容真实可见，不是空白 HWND 截图。
 
+采集器为每个视图保留 90 秒进程预算，以覆盖高 DPI 下 WebView2 冷启动和连续视图采集；如设备性能较慢，可显式传入 `-ProcessTimeoutSeconds 120`，但不得使用 `-NoBuild` 绕过候选重建。
+
 检查完成后显式批准现有证据：
 
 ```powershell

@@ -16,6 +16,7 @@ param(
     [string[]] $Views = @('main','market','palette','plugin'),
     [string] $PluginCommandKey = 'com.long.url-toolkit:url.encode',
     [ValidateRange(100,10000)] [int] $CaptureDelayMilliseconds = 1500,
+    [ValidateRange(30,180)] [int] $ProcessTimeoutSeconds = 90,
     [switch] $ApproveAfterVisualReview,
     [string] $Reviewer,
     [string] $ReviewNotes,
@@ -82,9 +83,9 @@ foreach ($theme in $Themes) {
 
         $process = Start-Process -FilePath $executable -ArgumentList $arguments `
             -WorkingDirectory $outputRoot -PassThru
-        if (-not $process.WaitForExit(30000)) {
+        if (-not $process.WaitForExit($ProcessTimeoutSeconds * 1000)) {
             Stop-Process -Id $process.Id -Force
-            throw "Physical DPI capture timed out: $fileName"
+            throw "Physical DPI capture timed out after $ProcessTimeoutSeconds seconds: $fileName"
         }
         if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $capturePath)) {
             throw "Physical DPI capture failed with exit code $($process.ExitCode): $fileName"
