@@ -246,6 +246,25 @@
                         <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.theme.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.theme.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.theme.action}" Style="{StaticResource LongButton}" Click="ThemeToggle_Click"/></Grid></Border>
                         <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.motion.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.motion.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><ToggleButton Grid.Column="1" Style="{StaticResource LongToggle}" IsChecked="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}, Mode=OneWay}" IsEnabled="False"/></Grid></Border>
                         <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,16,0">
+                                    <TextBlock Text="{DynamicResource i18n.settings.update.title}" FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{DynamicResource i18n.settings.update.desc}" Margin="0,5,0,0"
+                                               TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
+                                    <TextBlock x:Name="UpdateStatusText" Margin="0,8,0,0"
+                                               Text="{DynamicResource i18n.settings.update.status.ready}"
+                                               TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                               AutomationProperties.LiveSetting="Polite"/>
+                                </StackPanel>
+                                <Button x:Name="UpdateActionButton" Grid.Column="1"
+                                        Content="{DynamicResource i18n.settings.update.action.check}"
+                                        Style="{StaticResource LongButton.Primary}"
+                                        Click="UpdateAction_Click"
+                                        AutomationProperties.Name="{DynamicResource i18n.settings.update.action.check}"/>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="{DynamicResource i18n.settings.gesture.title}" FontSize="14" FontWeight="SemiBold"/>
                                 <TextBlock Text="{DynamicResource i18n.settings.gesture.desc}"

@@ -23,6 +23,7 @@ logs/
 # Marketplace signing secrets and generated bundles
 *.private.pem
 *.private.key
+local-secrets/
 artifacts/marketplace/
 artifacts/publish/
 artifacts/releases/

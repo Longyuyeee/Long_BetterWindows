@@ -1,257 +1,190 @@
-# Long窗口·全能助手
+<div align="center">
 
-> 打造极致优雅、深度集成的 Windows 效率增强中枢。
+# Long窗口 · 全能助手
 
-Long窗口 是一个运行在 Windows 原生系统之上的轻量级效率工具平台。产品交互参考 uTools 的统一入口与插件化工作流，视觉采用 Long 自有的优雅、华丽、扁平、动效化设计语言。
+### 一个优雅、华丽、扁平、灵动的 Windows 效率与插件平台
 
-当前主线已完成 **v1.10.0 工程候选冻结**，包含 27 个宿主能力接口、25 个内置插件，以及统一命令中心、超级面板、可信插件市场、命令参数 Schema 和宿主国际化。历史测试候选 `v1.9.0-rc.1` 继续保持不可变。当前开发状态见 [`docs/当前开发状态.md`](docs/当前开发状态.md)。
+统一入口连接命令、应用、文件、系统能力与本地插件。
 
----
+交互逻辑参考 uTools 的统一入口与插件化工作流，视觉和技术实现采用 Long 自有设计体系。
 
-## 特性
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-1677ff?logo=windows11&logoColor=white)](https://github.com/Longyuyeee/Long_BetterWindows/releases)
+[![.NET](https://img.shields.io/badge/.NET-8.0-7c3aed?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/download/dotnet/8.0)
+[![Release](https://img.shields.io/github/v/release/Longyuyeee/Long_BetterWindows?include_prereleases&label=release&color=8b5cf6)](https://github.com/Longyuyeee/Long_BetterWindows/releases)
+[![Tests](https://img.shields.io/badge/tests-automated-10b981)](#开发与验证)
 
-- **插件驱动架构** — 宿主提供原子级系统能力（热键、Shell 感知、NTFS ADS、注册表），插件实现具体功能
-- **文件夹备注助手** — 为任意文件夹添加隐藏备注，数据存入 NTFS 备用数据流，完全不可见
-- **统一搜索与快捷启动** — 混排命令、开始菜单应用、Windows 设置和常用目录深层文件，并提供主/次级快捷动作
-- **宏录制器** — 录制鼠标点击序列并回放，支持循环执行
-- **Long Design System** — 优雅的亮暗主题、扁平层级、克制光影与语义化动效
-- **统一命令中心** — 使用 `Alt + Space` 搜索并执行全部插件能力
-- **系统托盘** — 关闭窗口后台运行，热键始终可用
-- **插件热重载** — 修改插件 DLL 自动检测并重载，无需重启
-- **分层权限边界** — Web 插件的宿主 API、页面导航与消息桥受能力和本地来源约束；DLL / C# 脚本属于本地完全信任扩展
-- **原子化回滚** — 卸载插件时自动清除所有系统修改
-- **离线优先** — 核心功能不依赖网络
+[下载最新版本](https://github.com/Longyuyeee/Long_BetterWindows/releases) ·
+[用户指南](docs/USER_GUIDE.md) ·
+[插件开发](docs/插件开发指南.md) ·
+[开发状态](docs/当前开发状态.md)
+
+</div>
 
 ---
+
+## 为什么是 Long窗口
+
+Long窗口不是 uTools 插件兼容层。我们参考的是成熟的统一入口、上下文感知和插件化交互逻辑，并在自己的 Windows 原生能力、权限模型、视觉语言与工作流体系上继续扩展。
+
+| 体验方向 | 当前实现 |
+|---|---|
+| 一个入口 | `Alt + Space` 唤起命令中心，混排插件命令、应用、Windows 设置、常用目录与文件 |
+| 上下文感知 | 支持文本、URL、文件、文件夹、图片及 Explorer 选区上下文 |
+| 插件平台 | DLL、C# 脚本和 HTML/JS 三种运行时，统一能力 API 与生命周期 |
+| 超级面板 | 鼠标手势呼出、智能分组、固定、最近使用和拖拽排序 |
+| 工作流 | 多步骤组合、参数 Schema、执行审查、终端输出和安全导出 |
+| 原生集成 | 热键、托盘、NTFS ADS、右键菜单、进程、网络、窗口、输入与显示能力 |
+| 可信分发 | 插件市场签名链、发布校验、应用更新清单签名与 SHA-256 下载验证 |
+
+## 产品体验
+
+### 统一命令中心
+
+在同一个搜索框里定位并执行命令、应用、设置和文件。支持主操作、次级操作、键盘导航、动态结果和本地智能排序。
+
+### Long Design System
+
+亮色与暗色主题、清晰的扁平层级、克制的光影、语义化动效、响应式布局，以及高对比度、减少动画、键盘路径和屏幕阅读器语义。
+
+### 内置插件生态
+
+当前发布基线包含 **25 个内置插件、42 条命令、27 项宿主能力接口**，覆盖文件夹备注、快速启动、截图、窗口管理、剪贴板、文本处理、开发工具、硬件与网络等场景。
+
+### 安全更新
+
+软件启动后会自动发现当前更新通道的新版本。发布端使用仅保存在维护者本机的 RSA 私钥签署更新清单；客户端内置公钥，并在下载前后验证：
+
+- 更新清单签名与发布版本一致性
+- Release、资源地址和源码提交边界
+- 更新包文件名、大小与 SHA-256
+- 临时文件完整性，校验失败不会留下可安装包
+
+更新包验证通过后仍由用户确认安装，不静默执行来自网络的程序。
 
 ## 快速开始
 
-### 用户环境要求
+### 下载
 
-- Windows 10/11
-- 自包含包：无需安装 .NET
-- 精简包：需要 [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0)
+前往 [GitHub Releases](https://github.com/Longyuyeee/Long_BetterWindows/releases)：
+
+- 普通用户选择 `self-contained`：已包含 .NET 运行时
+- 已安装 [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0) 的用户可选择 `framework-dependent`
 - Web 插件需要 Microsoft Edge WebView2 Runtime
 
-推荐普通用户下载 `self-contained` 自包含便携包。安装、升级、卸载和校验方法见 [`docs/安装升级与卸载.md`](docs/安装升级与卸载.md)。
+当前公开测试通道为 `v1.10.0-rc`。它用于真实下载、干净 Windows 和外部门禁验收，并非最终稳定版。Windows 安装包暂未使用 Authenticode 商业证书；首次运行可能出现 SmartScreen 提示，请只从本仓库 Release 下载。
 
-Windows 包采用公开的未签名分发通道；首次下载或启动时可能出现“未知发布者”或 SmartScreen 提示。请只从本仓库 Release 下载，并在运行前按发布页提供的 `SHA256SUMS.txt` 校验文件。Windows Authenticode 签名保留为未来可选增强，不作为当前发布阻塞项。
+完整安装、升级、校验和卸载说明见 [安装升级与卸载](docs/安装升级与卸载.md)。
 
-当前测试版本：[v1.10.0-rc.2 unsigned prerelease](https://github.com/Longyuyeee/Long_BetterWindows/releases/tag/v1.10.0-rc.2)。它固定在源码提交 `54baa08`，用于真实下载与干净 Windows 验收，不是最终正式版本；`v1.10.0-rc.1` 与 `v1.9.0-rc.1` 保持为不可变历史候选。
-
-### 开发环境要求
-
-- .NET 8 SDK 或更高版本
-
-### 构建运行
-
-```powershell
-git clone https://github.com/Longyuyeee/Long_BetterWindows.git
-cd Long_BetterWindows
-dotnet build
-dotnet run --project src/LongBetterWindows.Host
-```
-
-### 使用方式
+### 常用操作
 
 | 操作 | 快捷键 |
 |---|---|
-| 打开统一命令中心 | `Alt + Space`，冲突时 `Ctrl + Alt + Space` |
+| 打开统一命令中心 | `Alt + Space` |
+| 备用命令中心热键 | `Ctrl + Alt + Space` |
 | 文件夹备注 | `Alt + M` |
-| 宏录制 开始/停止 | `F6` |
-| 宏回放 单次 | `F7` |
-| 宏回放 循环 | `F8` |
+| 宏录制开始 / 停止 | `F6` |
+| 宏回放一次 / 循环 | `F7` / `F8` |
 | 全屏截图 | `Ctrl + Shift + S` |
-
-也可以通过**右键文件夹 → 备注此文件夹**触发。
-
----
-
-## 架构
-
-```
-┌─────────────────────────────────────────┐
-│  宿主 (Host)                             │
-│  ┌───────────────────────────────────┐  │
-│  │  能力服务层 (Capability Services)  │  │
-│  │  HotKey │ Shell │ ADS │ Registry  │  │
-│  │  Storage │ Rollback │ Tray       │  │
-│  └───────────────┬───────────────────┘  │
-│                  │ IHostApi              │
-│  ┌───────────────┴───────────────────┐  │
-│  │  插件引擎 (Plugin Engine)         │  │
-│  │  Scanner → Loader → Registry      │  │
-│  │ Web 能力边界 · 热重载 · 配置持久化 │  │
-│  └───────────────┬───────────────────┘  │
-│                  │ ILongPlugin           │
-│  ┌───────────────┴───────────────────┐  │
-│  │  插件层 (Plugins)                 │  │
-│  │  FolderNote │ QuickLaunch │ Macro │  │
-│  └───────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-```
-
-### 宿主能力 API（27 项）
-
-| 接口 | 能力 ID | 说明 |
-|---|---|---|
-| `IHotKeyService` | `system.hotkey` | 全局热键注册/冲突/所有权 |
-| `IClipboardService` | `system.clipboard` | 剪贴板读写 |
-| `IShellSelectionService` | `shell.selection` | Explorer 文件夹感知/选中项坐标 |
-| `IADSService` | `fs.ads.access` | NTFS 备用数据流读写 |
-| `IRegistryService` | `system.registry.*` | 安全注册表操作 + 回滚 |
-| `IStorageService` | `storage.local` | 本地 Key-Value 持久化存储 |
-| `INotificationService` | `system.notification` | Toast 通知 |
-| `IFileOpsService` | `file.ops` | 文件复制/移动/删除 |
-| `IWindowInfoService` | `window.info` | 前台窗口信息/可见窗口列表 |
-| `IScreenCaptureService` | `system.screenshot` | 全屏截图 |
-| `IInputService` | `system.input` | 模拟按键/鼠标点击 |
-| `IProcessService` | `system.process` | 进程启动/列表/终止 |
-| `IPerformanceService` | `system.performance` | CPU、内存、磁盘与进程性能 |
-| `INetworkPortService` | `network.ports` | TCP/UDP 端口与占用进程 |
-| `INetworkMonitorService` | `network.monitor` | 网络接口、流量与速度 |
-| `IHttpService` | `network.http` | 受控 HTTP 请求与下载 |
-| `IFileSystemService` | `filesystem.advanced` | 搜索、哈希、分类、批量重命名、受控整理计划与执行 |
-| `ICacheService` | `system.cache` | 系统缓存统计与清理 |
-| `IScheduleService` | `system.schedule` | 计划任务管理 |
-| `IAudioService` | `system.audio` | 音量、静音与音频设备 |
-| `IPowerService` | `system.power` | 锁定、睡眠、休眠与电源状态 |
-| `IThemeService` | `system.theme` | 系统主题与强调色 |
-| `IWallpaperService` | `system.wallpaper` | 壁纸与显示样式 |
-| `IBrightnessService` | `display.brightness` | 屏幕亮度控制 |
-| `IPinyinService` | `text.pinyin` | 拼音转换、首字母与匹配 |
-| `IUICapability` | `ui.window` | 插件窗口和交互控件 |
-
----
 
 ## 插件开发
 
-### 三种方式，自由选择
+| 运行时 | 开发体验 | 适合场景 |
+|---|---|---|
+| HTML / JS | 无需编译，内置 WebView2 | 富交互小工具 |
+| C# Script | 单文件、快速迭代 | 自动化与能力组合 |
+| .NET DLL | 强类型、完整性能 | 复杂原生插件 |
 
-| 方式 | 语言 | 编译 | 适合 |
-|---|---|---|---|
-| **HTML/JS** | HTML+CSS+JS | 不需要 | Web 开发者、富 UI 工具 |
-| **C# 脚本** | C# (.csx) | 不需要 | 快速自动化 |
-| **DLL 插件** | C# (.NET) | 需要 | 复杂系统插件 |
-
-### HTML/JS 插件 — 1 分钟上手
+最小 Web 插件示例：
 
 ```html
-<!-- index.html -->
-<button onclick="go()">备注此文件夹</button>
+<button onclick="saveNote()">备注当前文件夹</button>
 <script>
-async function go() {
-  let f = await long.shell.getActiveFolder();
-  let t = await long.clipboard.getText();
-  await long.fs.ads.write(f.data, t.data);
-  long.ui.showToast('已保存！');
+async function saveNote() {
+  const folder = await long.shell.getActiveFolder();
+  const text = await long.clipboard.getText();
+  await long.fs.ads.write(folder.data, text.data);
+  long.ui.showToast("已保存");
 }
 </script>
 ```
 
-### 打包分发
+创建和打包：
 
 ```powershell
-.\pack-plugin.ps1 -PluginDir "src/MyPlugin"   # → dist/MyPlugin-v1.0.0.lpak
+.\new-plugin.ps1
+.\pack-plugin.ps1 -PluginDir "src/MyPlugin"
 ```
 
-用户拖放 `.lpak` 文件到 ToolCenter 即完成安装。
+继续阅读 [插件开发指南](docs/插件开发指南.md)、[宿主能力 API 手册](docs/基础能力_API_手册.md) 与 [Long Design System 使用指南](docs/Long_Design_System_使用指南.md)。
 
-详细文档见 [`docs/插件开发指南.md`](docs/插件开发指南.md)
+## 架构
 
----
-
-## 项目结构
-
-```
-Long_BetterWindows/
-├── src/
-│   ├── LongBetterWindows.Host/    # 宿主应用 (WPF .NET 8)
-│   │   ├── Core/                  #   插件接口契约
-│   │   ├── Capabilities/          #   原子能力接口
-│   │   ├── Contracts/             #   数据模型
-│   │   ├── Engine/                #   插件引擎
-│   │   ├── Services/              #   能力与平台服务实现
-│   │   └── Views/                 #   UI 组件
-│   ├── SamplePlugin/              # 教学参考插件
-│   ├── FolderNotePlugin/          # 文件夹备注插件
-│   ├── QuickLaunchPlugin/         # 快捷启动器插件
-│   ├── MacroPlugin/               # 宏录制器插件
-│   └── Templates/                 # 插件开发模板 (3 级)
-├── Plugins/                       # 插件输出目录
-├── docs/                          # 设计 + 开发文档
-└── new-plugin.ps1                 # 插件脚手架脚本
+```text
+统一命令中心 / 超级面板 / ToolCenter / 插件窗口
+                        │
+             上下文、搜索与工作流协调层
+                        │
+              插件引擎与可信市场链路
+         ┌──────────────┼──────────────┐
+       DLL            C# Script       WebView2
+         └──────────────┼──────────────┘
+                        │
+     27 项 Windows 原子能力与本地存储 / 回滚服务
 ```
 
----
+核心目录：
 
-## 技术栈
+```text
+src/LongBetterWindows.Host/   WPF 宿主、交互平台、能力与服务
+src/*Plugin/                  内置原生与 Web 插件
+src/Templates/                插件脚手架模板
+tests/LongBetterWindows.Tests 自动化测试与质量门禁
+docs/                         设计、开发、发布和验收文档
+```
 
-| 技术 | 用途 |
-|---|---|
-| .NET 8.0 + WPF | 应用框架 |
-| WPF-UI 3.0.4 | Fluent Design 主题 |
-| Serilog | 结构化日志 |
-| Win32 P/Invoke | 系统级集成 (热键、ADS、全局钩子) |
-| COM Interop | Explorer Shell 感知 (IShellWindows) |
+## 开发与验证
 
----
+环境要求：Windows 10/11 与 .NET 8 SDK。
 
-## 版本历史
+```powershell
+git clone https://github.com/Longyuyeee/Long_BetterWindows.git
+cd Long_BetterWindows
+dotnet build LongBetterWindows.sln
+dotnet test tests/LongBetterWindows.Tests
+dotnet run --project src/LongBetterWindows.Host
+```
 
-| 版本 | 日期 | 内容 |
-|---|---|---|
-| v0.1.0 | 2026-03 | 宿主框架 + 5 项能力 + 插件引擎 |
-| v0.2.0 | 2026-06 | 12 项能力 + 16 插件 + 3 运行时 + 内置 IDE + 30 测试 |
-| v0.5.0-rc.1 | 2026-07 | 统一命令中心 + Long Design System + 16 插件 UI 迁移 + 质量与发布基线 |
-| v1.8.0 | 2026-07 | 27 个宿主能力接口 + 21 个内置插件 |
-| v1.9.0 | 2026-07 | 合并交互平台、超级面板、可信插件市场与 25 插件发布基线 |
+构建发布候选：
 
-## 路线图
+```powershell
+.\release.ps1 -Version 1.10.0-rc.3
+```
 
-### 已完成
-- [x] 插件引擎（扫描/加载/热重载/Web 能力边界与本地高信任提示）
-- [x] 三种运行时（DLL / .csx 脚本 / WebView2 HTML/JS）
-- [x] 27 个宿主能力接口
-- [x] 25 个互不重复的内置插件
-- [x] 内置插件开发 IDE
-- [x] 插件脚手架 + 5 种模板
-- [x] .lpak 打包分发
-- [x] 640 个自动化测试
-- [x] 插件开发指南 + 内置文档浏览器
+项目使用自动化单元测试、真实宿主启动与命令冒烟、WebView2 退出清理、插件数量与命令契约、双语键集合、视觉矩阵、DPI 与辅助功能门禁。发布状态和仍需外部环境完成的项目见 [v1.10 开发审计与发布交接](docs/v1.10开发审计与发布交接_2026-07-26.md)。
 
-### 进行中 / 预留
-- [x] v1.9 统一上下文快照（文本/URL/文件/文件夹/Explorer 选区）
-- [x] v0.6 图片上下文与动态搜索基础设施（统一结果、超时、去重、增量刷新）
-- [x] v0.6 快捷启动器真实动态数据源与二次搜索闭环
-- [x] v0.6 固定、最近使用、本地智能排序与隐私清除入口
-- [x] v0.6 首批结果性能复核与最终验收
-- [x] v0.7 第一批声明式插件生命周期与兼容状态机
-- [x] v0.7 第二批 Long 超级面板外壳与共享搜索闭环
-- [x] v0.7 第三批智能/固定/最近分组、滚轮切组与拖拽排序
-- [x] v0.7 第四批自定义文件夹分组、组间移动与插件窗口资源释放
-- [x] v0.7 第五批嵌入/分离窗口会话、统一返回与安全鼠标手势
-- [x] v1.9 Long 超级面板与完整插件生命周期
-- [x] v1.9 Long 原生插件市场核心功能与可信分发链
-- [ ] v1.9 真实 Registry/CDN 生产演练与正式凭据签核
-- [x] v1.9 之后的组合动作编排首轮闭环（输入、导入、权限、执行、报告、一次性终端输出与安全导出）
-- [x] Win11 Sparse Package 一级右键菜单工程闭环（原生实现、受控签名/注册、双通道 UI 和三段式 Explorer 验收门禁已完成；正式证书与干净 Windows 真实证据只影响该可选通道，不阻塞 unsigned 主产品）
-- [ ] CI/CD（workflow 已就绪，待 Token 权限修复）
-- [ ] 国际化（语言服务、持久化及主窗口/导航/概览/插件管理/插件市场/系统集成/设置已接入；工作流编辑基础与参数/绑定输入层已迁移，待导入及执行审查/结果、诊断、开发者页与统一对话框）
+## 设计与发布原则
 
-当前完整开发审计、风险分级与后续顺序见 [开发审计与后续计划（2026-07-24）](docs/开发审计与后续计划_2026-07-24.md)。
-- [x] 主题切换（Dark / Light / System）
+- 核心能力离线优先，用户数据默认保留在本机
+- Web 插件受能力声明与来源边界约束；DLL / C# 插件视为本地高信任扩展
+- 系统修改必须可追踪、可撤销，危险工作流执行前必须审查
+- uTools 仅作为产品交互参考，不提供其插件兼容性
+- 预发布版不冒充稳定版；外部门禁与 Windows 发布者身份状态公开记录
 
-后续交互平台路线见 [`docs/Long_交互平台演进路线_v0.6-v0.8.md`](docs/Long_交互平台演进路线_v0.6-v0.8.md)。Long 不计划兼容 uTools 插件；两者仅在统一入口、上下文匹配等产品交互层面相互参考。
+## 文档导航
+
+- [用户指南](docs/USER_GUIDE.md)
+- [开发者指南](docs/DEVELOPER_GUIDE.md)
+- [API Reference](docs/API_REFERENCE.md)
+- [UI / UX 设计与开发规范](docs/UI_UX_设计与开发规范_v1.0.md)
+- [安全审计报告](docs/安全审计报告.md)
+- [安全更新与签名发布](docs/安全更新与签名发布.md)
+- [发布候选检查表](docs/发布候选检查表.md)
+- [当前开发状态](docs/当前开发状态.md)
 
 ---
 
-## 许可证
+<div align="center">
 
-MIT License
+**Long窗口** — 让 Windows 的能力真正汇聚到一个入口。
 
----
-
-## 致谢
-
-Long窗口 的统一入口与插件交互参考 uTools；视觉系统与实现为 Long 自有设计。
+</div>

@@ -10,6 +10,7 @@
     <Content Include="Marketplace\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="WorkflowTemplates\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="i18n\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Update\update-public-key.xml" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\manage-sparse-package.ps1"
              Link="Scripts\manage-sparse-package.ps1"
              CopyToOutputDirectory="PreserveNewest"
@@ -38,10 +39,10 @@
     <Company>Long</Company>
     <Product>Long窗口·全能助手</Product>
     <Description>优雅、华丽、扁平、动效化的 Windows 插件效率平台</Description>
-    <Version>1.10.0</Version>
+    <Version>1.10.0-rc.3</Version>
     <AssemblyVersion>1.10.0.0</AssemblyVersion>
     <FileVersion>1.10.0.0</FileVersion>
-    <InformationalVersion>1.10.0</InformationalVersion>
+    <InformationalVersion>1.10.0-rc.3</InformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 

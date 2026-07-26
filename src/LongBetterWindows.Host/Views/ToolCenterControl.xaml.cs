@@ -1,5 +1,7 @@
 using System.IO;
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using LongBetterWindows.Host.Interaction;
 using System.Windows.Input;
@@ -24,6 +26,10 @@ namespace LongBetterWindows.Host.Views
         private bool _startupEnabled;
         private bool? _isNarrowLayout;
         private bool _languageSelectorReady;
+        private UpdateService? _updateService;
+        private UpdateCheckResult? _availableUpdate;
+        private string? _downloadedUpdatePath;
+        private bool _automaticUpdateCheckStarted;
 
         public ToolCenterControl()
         {
@@ -32,7 +38,16 @@ namespace LongBetterWindows.Host.Views
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             RefreshColumnStatus();
             RefreshContextMenuStatus();
-            Loaded += async (_, _) => await RefreshSparsePackageStatusAsync();
+            Loaded += async (_, _) =>
+            {
+                await RefreshSparsePackageStatusAsync();
+                await StartAutomaticUpdateCheckAsync();
+            };
+            Unloaded += (_, _) =>
+            {
+                _updateService?.Dispose();
+                _updateService = null;
+            };
             RefreshStartupStatus();
             RefreshMouseGestureControls();
             ShowPage("overview");
@@ -177,6 +192,119 @@ namespace LongBetterWindows.Host.Views
             SearchPreferenceStatusText.Text =
                 I18n("settings.searchPreferences.cleared");
             button.IsEnabled = true;
+        }
+
+        private async Task StartAutomaticUpdateCheckAsync()
+        {
+            if (_automaticUpdateCheckStarted) return;
+            _automaticUpdateCheckStarted = true;
+            await CheckForUpdatesAsync(silent: true);
+        }
+
+        private async void UpdateAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (_downloadedUpdatePath is not null
+                && File.Exists(_downloadedUpdatePath))
+            {
+                OpenUpdatePackage(_downloadedUpdatePath);
+                return;
+            }
+            if (_availableUpdate?.Package is { } package)
+            {
+                await DownloadUpdateAsync(package);
+                return;
+            }
+            await CheckForUpdatesAsync(silent: false);
+        }
+
+        private async Task CheckForUpdatesAsync(bool silent)
+        {
+            UpdateActionButton.IsEnabled = false;
+            if (!silent)
+                UpdateStatusText.Text = I18n("settings.update.status.checking");
+            try
+            {
+                _updateService ??= UpdateService.CreateDefault();
+                var includePrereleases = App.ProductVersion.Contains(
+                    '-',
+                    StringComparison.Ordinal);
+                var result = await _updateService.CheckAsync(includePrereleases);
+                _availableUpdate = result.State == UpdateCheckState.Available
+                    ? result
+                    : null;
+                _downloadedUpdatePath = null;
+                if (_availableUpdate is not null)
+                {
+                    UpdateStatusText.Text = string.Format(
+                        I18n("settings.update.status.available"),
+                        _availableUpdate.AvailableVersion);
+                    UpdateActionButton.Content = I18n("settings.update.action.download");
+                    AutomationProperties.SetName(
+                        UpdateActionButton,
+                        I18n("settings.update.action.download"));
+                }
+                else if (!silent)
+                {
+                    UpdateStatusText.Text = string.Format(
+                        I18n("settings.update.status.current"),
+                        App.ProductVersion);
+                }
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(exception, "Automatic update check failed");
+                if (!silent)
+                    UpdateStatusText.Text = I18n("settings.update.status.failed");
+            }
+            finally
+            {
+                UpdateActionButton.IsEnabled = true;
+            }
+        }
+
+        private async Task DownloadUpdateAsync(UpdatePackage package)
+        {
+            if (_updateService is null) return;
+            UpdateActionButton.IsEnabled = false;
+            UpdateStatusText.Text = I18n("settings.update.status.downloading");
+            try
+            {
+                var updateDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "LongBetterWindows",
+                    "Updates",
+                    _availableUpdate?.AvailableVersion ?? "latest");
+                var packagePath = await _updateService.DownloadAsync(
+                    package,
+                    updateDirectory);
+                _downloadedUpdatePath = packagePath;
+                UpdateStatusText.Text = I18n("settings.update.status.downloaded");
+                UpdateActionButton.Content = I18n("settings.update.action.open");
+                AutomationProperties.SetName(
+                    UpdateActionButton,
+                    I18n("settings.update.action.open"));
+                _availableUpdate = null;
+                OpenUpdatePackage(packagePath);
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(exception, "Verified update download failed");
+                UpdateStatusText.Text = I18n("settings.update.status.failed");
+            }
+            finally
+            {
+                UpdateActionButton.IsEnabled = true;
+            }
+        }
+
+        private static void OpenUpdatePackage(string packagePath)
+        {
+            Process.Start(new ProcessStartInfo(
+                    "explorer.exe",
+                    $"/select,\"{packagePath}\"")
+            {
+                UseShellExecute = true,
+            });
         }
 
         #region Navigation

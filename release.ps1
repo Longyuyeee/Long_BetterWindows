@@ -8,7 +8,7 @@
   .\release.ps1 -PackageKind SelfContained
 #>
 param(
-    [string] $Version = '1.10.0',
+    [string] $Version = '1.10.0-rc.3',
     [ValidateSet('All', 'FrameworkDependent', 'SelfContained')]
     [string] $PackageKind = 'All',
     [switch] $Force
@@ -239,7 +239,9 @@ try {
     $checksumLines = $packages | ForEach-Object { "$($_.sha256)  $($_.file)" }
     $checksumLines | Set-Content -LiteralPath (Join-Path $releaseRoot 'SHA256SUMS.txt') -Encoding UTF8
 
-    $sourceDirty = @((git status --porcelain 2>$null)).Count -gt 0
+    # Generated evidence and local secrets are intentionally untracked and do not
+    # change the reproducible source tree used by this release.
+    $sourceDirty = @((git status --porcelain --untracked-files=no 2>$null)).Count -gt 0
     $manifest = [ordered]@{
         product = 'Long窗口·全能助手'
         version = $Version
