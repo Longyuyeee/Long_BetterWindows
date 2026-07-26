@@ -28,11 +28,11 @@ if (-not (Test-Path -LiteralPath $PrivateKeyPath -PathType Leaf)) {
 if ($Tag -notmatch '^v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$') {
     throw "Tag must be a semantic version prefixed with v: $Tag"
 }
+$version = $Matches.version
 if ($Repository -notmatch '^(?<owner>[A-Za-z0-9_.-]+)/(?<name>[A-Za-z0-9_.-]+)$') {
     throw "Repository must use owner/name form."
 }
 
-$version = $Matches.version
 $commit = (git -C $repoRoot rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') {
     throw 'Unable to resolve the source commit.'
@@ -64,7 +64,7 @@ if ($packages.Count -eq 0) {
 
 $manifest = [ordered]@{
     schema_version = 1
-    product = 'Long窗口·全能助手'
+    product = 'LongBetterWindows'
     version = $version
     channel = if ($version -match '-') { 'prerelease' } else { 'stable' }
     published_at = [DateTimeOffset]::UtcNow.ToString('o')
