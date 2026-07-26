@@ -37,7 +37,7 @@ Long窗口 是一个运行在 Windows 原生系统之上的轻量级效率工具
 
 Windows 包采用公开的未签名分发通道；首次下载或启动时可能出现“未知发布者”或 SmartScreen 提示。请只从本仓库 Release 下载，并在运行前按发布页提供的 `SHA256SUMS.txt` 校验文件。Windows Authenticode 签名保留为未来可选增强，不作为当前发布阻塞项。
 
-当前测试版本：[v1.9.0-rc.1 unsigned prerelease](https://github.com/Longyuyeee/Long_BetterWindows/releases/tag/v1.9.0-rc.1)。它用于真实下载与干净 Windows 验收，不是最终正式版本。
+当前测试版本：[v1.10.0-rc.1 unsigned prerelease](https://github.com/Longyuyeee/Long_BetterWindows/releases/tag/v1.10.0-rc.1)。它固定在源码提交 `f3a998e`，用于真实下载与干净 Windows 验收，不是最终正式版本；历史 `v1.9.0-rc.1` 保持不可变。
 
 ### 开发环境要求
 
