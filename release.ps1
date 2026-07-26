@@ -8,7 +8,7 @@
   .\release.ps1 -PackageKind SelfContained
 #>
 param(
-    [string] $Version = '1.9.0',
+    [string] $Version = '1.10.0',
     [ValidateSet('All', 'FrameworkDependent', 'SelfContained')]
     [string] $PackageKind = 'All',
     [switch] $Force
