@@ -42,10 +42,10 @@
     <Product>Long助手</Product>
     <Description>优雅、华丽、扁平、动效化的 Windows 插件效率平台</Description>
     <ApplicationIcon>..\..\Assets\app.ico</ApplicationIcon>
-    <Version>1.10.0-rc.3</Version>
-    <AssemblyVersion>1.10.0.0</AssemblyVersion>
-    <FileVersion>1.10.0.0</FileVersion>
-    <InformationalVersion>1.10.0-rc.3</InformationalVersion>
+    <Version>1.11.0-rc.1</Version>
+    <AssemblyVersion>1.11.0.0</AssemblyVersion>
+    <FileVersion>1.11.0.0</FileVersion>
+    <InformationalVersion>1.11.0-rc.1</InformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 

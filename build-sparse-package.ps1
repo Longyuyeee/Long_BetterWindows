@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [string] $ExternalLocation,
     [string] $Publisher = 'CN=Long-Development',
-    [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')] [string] $Version = '1.9.0.0',
+    [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')] [string] $Version = '1.11.0.0',
     [switch] $NoHostBuild
 )
 

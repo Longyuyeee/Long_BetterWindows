@@ -73,7 +73,7 @@ Long助手不是 uTools 插件兼容层。我们参考的是成熟的统一入�
 - 已安装 [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0) 的用户可选择 `framework-dependent`
 - Web 插件需要 Microsoft Edge WebView2 Runtime
 
-当前公开测试通道为 `v1.10.0-rc`。它用于真实下载、干净 Windows 和外部门禁验收，并非最终稳定版。Windows 安装包暂未使用 Authenticode 商业证书；首次运行可能出现 SmartScreen 提示，请只从本仓库 Release 下载。
+当前源码候选版本为 `v1.11.0-rc.1`，包含“Long助手”品牌、全局图标和安全更新链路；最新公开下载仍以 Releases 页面实际列出的版本为准。候选版用于真实下载、干净 Windows 和外部门禁验收，并非最终稳定版。Windows 安装包暂未使用 Authenticode 商业证书；首次运行可能出现 SmartScreen 提示，请只从本仓库 Release 下载。
 
 完整安装、升级、校验和卸载说明见 [安装升级与卸载](docs/安装升级与卸载.md)。
 
@@ -159,10 +159,10 @@ dotnet run --project src/LongBetterWindows.Host
 构建发布候选：
 
 ```powershell
-.\release.ps1 -Version 1.10.0-rc.3
+.\release.ps1 -Version 1.11.0-rc.1
 ```
 
-项目使用自动化单元测试、真实宿主启动与命令冒烟、WebView2 退出清理、插件数量与命令契约、双语键集合、视觉矩阵、DPI 与辅助功能门禁。发布状态和仍需外部环境完成的项目见 [v1.10 开发审计与发布交接](docs/v1.10开发审计与发布交接_2026-07-26.md)。
+项目使用自动化单元测试、真实宿主启动与命令冒烟、WebView2 退出清理、插件数量与命令契约、双语键集合、视觉矩阵、DPI 与辅助功能门禁。v1.11 候选继承 [v1.10 开发审计与发布交接](docs/v1.10开发审计与发布交接_2026-07-26.md) 中尚未关闭的外部门禁。
 
 ## 设计与发布原则
 
