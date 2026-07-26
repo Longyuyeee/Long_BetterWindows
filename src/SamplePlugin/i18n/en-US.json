@@ -1,0 +1,8 @@
+{
+  "plugin.name": "Sample Plugin",
+  "commands.sample.hello.title": "Run sample command",
+  "commands.sample.hello.description": "Verify the plugin lifecycle, unified command protocol, and status feedback",
+  "toast.ready": "The sample plugin is working",
+  "result.success": "Sample command completed successfully",
+  "error.unknownCommand": "Unknown sample command: {0}"
+}

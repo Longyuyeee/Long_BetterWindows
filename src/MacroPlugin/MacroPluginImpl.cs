@@ -3,11 +3,17 @@ using System.Windows.Controls;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
+using LongBetterWindows.Host.Views;
 using Serilog;
 
 namespace MacroPlugin;
 
-public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginCommandHandler
+public class MacroPluginImpl :
+    ILongPlugin,
+    IHasSettingsUI,
+    IHasMainUI,
+    IPluginCommandHandler,
+    IPluginLanguageLifecycle
 {
     private IHostApi? _host;
     private MacroEngine? _engine;
@@ -16,9 +22,14 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginC
     private string _recordHotkey = "F6";
     private string _playHotkey = "F7";
     private string _loopHotkey = "F8";
+    private readonly List<(
+        WeakReference<HotkeySettingsControl> Reference,
+        string LabelKey)> _settings = [];
+    private IReadOnlyDictionary<string, string> _strings =
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.macro";
-    public string Name => "宏录制器";
+    public string Name => Text("plugin.name", "宏录制器");
     public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
@@ -77,7 +88,7 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginC
 
         Log.Warning("[Macro] 热键 {Preferred}/{Fallback} 均不可用，功能仍可从命令中心执行",
             preferred, fallback);
-        return "命令中心";
+        return Text("settings.commandCenter", "命令中心");
     }
 
     public async Task<bool> StopAsync()
@@ -158,7 +169,7 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginC
             Application.Current.Dispatcher.Invoke(() =>
             {
                 _overlay?.Close();
-                _overlay = MacroOverlay.ShowOverlay();
+                _overlay = MacroOverlay.ShowOverlay(CreateOverlayLocalization());
             });
         }
     }
@@ -188,10 +199,27 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginC
     public FrameworkElement CreateSettingsUI()
     {
         var panel = new StackPanel { Margin = new Thickness(16) };
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("录制", Id, _recordHotkey, _ => { }));
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("播放单次", Id, _playHotkey, _ => { }));
-        panel.Children.Add(new LongBetterWindows.Host.Views.HotkeySettingsControl("循环播放", Id, _loopHotkey, _ => { }));
+        AddSettingsControl(panel, "settings.record", "录制", _recordHotkey);
+        AddSettingsControl(panel, "settings.playOnce", "播放单次", _playHotkey);
+        AddSettingsControl(panel, "settings.loop", "循环播放", _loopHotkey);
         return panel;
+    }
+
+    private void AddSettingsControl(
+        Panel panel,
+        string labelKey,
+        string fallback,
+        string hotkey)
+    {
+        var control = new HotkeySettingsControl(
+            Text(labelKey, fallback),
+            Id,
+            hotkey,
+            _ => { },
+            CreateSettingsLocalization());
+        _settings.RemoveAll(item => !item.Reference.TryGetTarget(out _));
+        _settings.Add((new WeakReference<HotkeySettingsControl>(control), labelKey));
+        panel.Children.Add(control);
     }
 
     public void ShowMainUI()
@@ -209,15 +237,71 @@ public class MacroPluginImpl : ILongPlugin, IHasSettingsUI, IHasMainUI, IPluginC
         {
             case "macro.record-toggle":
                 ToggleRecording();
-                return PluginCommandResult.Success("宏录制状态已切换");
+                return PluginCommandResult.Success(
+                    Text("result.recordToggled", "宏录制状态已切换"));
             case "macro.play-once":
                 await PlayOnce();
-                return PluginCommandResult.Success("宏播放已执行");
+                return PluginCommandResult.Success(
+                    Text("result.playedOnce", "宏播放已执行"));
             case "macro.loop-toggle":
                 ToggleLoopPlay();
-                return PluginCommandResult.Success("循环播放状态已切换");
+                return PluginCommandResult.Success(
+                    Text("result.loopToggled", "循环播放状态已切换"));
             default:
-                return PluginCommandResult.Failure("未知宏命令");
+                return PluginCommandResult.Failure(
+                    Text("error.unknownCommand", "未知宏命令"));
         }
     }
+
+    public Task OnLanguageChangedAsync(
+        PluginLanguageContext context,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _strings = context.Resources;
+        var application = Application.Current;
+        if (application is null)
+            return Task.CompletedTask;
+
+        application.Dispatcher.Invoke(() =>
+        {
+            _overlay?.ApplyLocalization(CreateOverlayLocalization());
+            _settings.RemoveAll(item => !item.Reference.TryGetTarget(out _));
+            foreach (var item in _settings)
+            {
+                if (item.Reference.TryGetTarget(out var control))
+                {
+                    control.ApplyLocalization(
+                        Text(item.LabelKey, item.LabelKey),
+                        CreateSettingsLocalization());
+                }
+            }
+        });
+        return Task.CompletedTask;
+    }
+
+    private MacroOverlayLocalization CreateOverlayLocalization()
+        => new(
+            Text("overlay.recording", "录制"),
+            Text("overlay.playing", "播放"),
+            Text("overlay.looping", "循环"),
+            Text("overlay.stopped", "停止"));
+
+    private HotkeySettingsLocalization CreateSettingsLocalization()
+        => new(
+            Text("settings.currentHotkey", "当前快捷键"),
+            Text("settings.apply", "应用"),
+            Text("settings.unchanged", "未修改"),
+            Text("settings.conflict", "冲突: 已被「{0}」占用"),
+            Text("settings.updated", "已更新"),
+            Text("settings.changeFailed", "修改失败: {0}"),
+            Text(
+                "settings.formatHint",
+                "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6"));
+
+    private string Text(string key, string fallback)
+        => _strings.TryGetValue(key, out var value)
+            && !string.IsNullOrWhiteSpace(value)
+                ? value
+                : fallback;
 }

@@ -5,16 +5,26 @@ using System.Windows.Threading;
 
 namespace MacroPlugin;
 
+public sealed record MacroOverlayLocalization(
+    string Recording,
+    string Playing,
+    string Looping,
+    string Stopped);
+
 public partial class MacroOverlay : Window
 {
     private DispatcherTimer? _hideTimer;
+    private MacroOverlayLocalization _localization =
+        new("录制", "播放", "循环", "停止");
+    private MacroOverlayState _state = MacroOverlayState.Recording;
+    private int _actionCount;
 
     public MacroOverlay()
     {
         InitializeComponent();
     }
 
-    public static MacroOverlay ShowOverlay()
+    public static MacroOverlay ShowOverlay(MacroOverlayLocalization localization)
     {
         var area = LongBetterWindows.Host.Services.MonitorHelper.GetCursorWorkArea();
         var window = new MacroOverlay
@@ -22,6 +32,7 @@ public partial class MacroOverlay : Window
             Left = area.Right - 120,
             Top = area.Top + 16,
         };
+        window.ApplyLocalization(localization);
 
         window.Show();
         return window;
@@ -31,10 +42,12 @@ public partial class MacroOverlay : Window
     {
         Dispatcher.Invoke(() =>
         {
+            _state = MacroOverlayState.Recording;
+            _actionCount = count;
             CancelPendingHide();
             StatusBorder.Background = (Brush)FindResource("Long.Brush.State.Danger");
             SetForeground("Long.Brush.Text.OnAccent", "Long.Brush.Text.OnAccentMuted");
-            StatusText.Text = "REC";
+            StatusText.Text = _localization.Recording;
             CountText.Text = count > 0 ? $"{count}" : "";
 
             // 录制时闪烁红点
@@ -59,10 +72,15 @@ public partial class MacroOverlay : Window
     {
         Dispatcher.Invoke(() =>
         {
+            _state = isLoop
+                ? MacroOverlayState.Looping
+                : MacroOverlayState.Playing;
             CancelPendingHide();
             StatusBorder.Background = (Brush)FindResource("Long.Brush.Accent.Primary");
             SetForeground("Long.Brush.Text.OnAccent", "Long.Brush.Text.OnAccentMuted");
-            StatusText.Text = isLoop ? "LOOP" : "PLAY";
+            StatusText.Text = isLoop
+                ? _localization.Looping
+                : _localization.Playing;
             StatusDot.BeginAnimation(OpacityProperty, null);
             StatusDot.Opacity = 1;
         });
@@ -72,7 +90,9 @@ public partial class MacroOverlay : Window
     {
         Dispatcher.Invoke(() =>
         {
-            StatusText.Text = "STOP";
+            _state = MacroOverlayState.Stopped;
+            _actionCount = 0;
+            StatusText.Text = _localization.Stopped;
             CountText.Text = "";
             StatusBorder.Background = (Brush)FindResource("Long.Brush.Surface.Card");
             SetForeground("Long.Brush.Text.Primary", "Long.Brush.Text.Muted");
@@ -104,6 +124,19 @@ public partial class MacroOverlay : Window
         });
     }
 
+    public void ApplyLocalization(MacroOverlayLocalization localization)
+    {
+        _localization = localization;
+        StatusText.Text = _state switch
+        {
+            MacroOverlayState.Recording => localization.Recording,
+            MacroOverlayState.Playing => localization.Playing,
+            MacroOverlayState.Looping => localization.Looping,
+            _ => localization.Stopped,
+        };
+        CountText.Text = _actionCount > 0 ? _actionCount.ToString() : string.Empty;
+    }
+
     private void SetForeground(string primaryKey, string secondaryKey)
     {
         StatusDot.Fill = (Brush)FindResource(primaryKey);
@@ -117,5 +150,13 @@ public partial class MacroOverlay : Window
         _hideTimer = null;
         BeginAnimation(OpacityProperty, null);
         Opacity = 1;
+    }
+
+    private enum MacroOverlayState
+    {
+        Recording,
+        Playing,
+        Looping,
+        Stopped,
     }
 }

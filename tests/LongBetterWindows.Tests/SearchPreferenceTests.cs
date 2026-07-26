@@ -308,6 +308,35 @@ public class SearchPreferenceTests
     }
 
     [Fact]
+    public void SuperPanelCoordinator_ProjectsCurrentLanguage()
+    {
+        var storage = new MemoryStorage();
+        var coordinator = new SuperPanelGroupCoordinator(
+            new SearchPreferenceService(storage),
+            new SuperPanelGroupService(storage),
+            key => key switch
+            {
+                "superPanel.group.smart" => "Smart",
+                "superPanel.group.smartHint" => "Context aware",
+                "superPanel.empty.context" => "No matching actions",
+                "superPanel.status.groupEmpty" => "Group is empty",
+                "superPanel.hint.default" => "Click to run",
+                _ => key,
+            });
+        coordinator.SetResults(
+            Array.Empty<SearchResultItem>(),
+            completed: true);
+
+        var view = coordinator.BuildView();
+
+        Assert.Equal("Smart", view.Groups[0].Title);
+        Assert.Equal("Context aware", view.Groups[0].Hint);
+        Assert.Equal("No matching actions", view.EmptyStateText);
+        Assert.Equal("Group is empty", view.StatusText);
+        Assert.Equal("Click to run", view.InteractionHint);
+    }
+
+    [Fact]
     public async Task SuperPanelCoordinator_CreatesRenamesAndDeletesActiveGroup()
     {
         var storage = new MemoryStorage();

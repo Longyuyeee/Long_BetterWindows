@@ -647,7 +647,7 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Interaction", "SuperPanelViewProjection.cs");
         var palette = Read("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml.cs");
 
-        Assert.Contains("Long 超级面板", xaml);
+        Assert.Contains("i18n.superPanel.title", xaml);
         Assert.Contains("new SuperPanelSearchSession", source);
         Assert.Contains("_contextCapture.CaptureAsync", session);
         Assert.Contains("_search.SearchIncrementalAsync", session);
@@ -762,11 +762,11 @@ public class QualityGateTests
         var gestures = Read("src", "LongBetterWindows.Host", "Services", "MouseGestureService.cs");
 
         Assert.Contains("EmbeddedPluginSurface", mainXaml);
-        Assert.Contains("分离插件窗口", mainXaml);
+        Assert.Contains("i18n.pluginWindow.detachAutomation", mainXaml);
         Assert.Contains("ShowEmbeddedPlugin", mainSource);
         Assert.Contains("CloseEmbeddedSurfaceAsync", mainSource);
         Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", pluginXaml);
-        Assert.Contains("返回管理中心", pluginXaml);
+        Assert.Contains("i18n.pluginWindow.back", pluginXaml);
         Assert.Contains("Key.Escape", pluginSource);
         Assert.Contains("DefaultPresentation", presentation);
         Assert.Contains("ShowDetachedWindow", presentation);
@@ -1055,7 +1055,8 @@ public class QualityGateTests
     [Fact]
     public void CoreNativeInputs_HaveAutomationNames()
     {
-        Assert.Contains("AutomationProperties.Name=\"文件夹备注内容\"",
+        Assert.Contains(
+            "AutomationProperties.Name=\"{DynamicResource i18n.folderNote.hud.inputAutomationName}\"",
             Read("src", "LongBetterWindows.Host", "Views", "FloatingHudWindow.xaml"));
         Assert.Contains("AutomationProperties.Name=\"截图区域选择器\"",
             Read("src", "ScreenshotPlugin", "RegionSelectorWindow.xaml"));

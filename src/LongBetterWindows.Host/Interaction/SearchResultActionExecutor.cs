@@ -14,6 +14,7 @@ namespace LongBetterWindows.Host.Interaction
             string?,
             CancellationToken,
             Task<PluginCommandResult>>? _workflowReviewLauncher;
+        private readonly Func<string, string>? _localize;
 
         public SearchResultActionExecutor(
             PluginRegistry plugins,
@@ -21,11 +22,13 @@ namespace LongBetterWindows.Host.Interaction
                 string,
                 string?,
                 CancellationToken,
-                Task<PluginCommandResult>>? workflowReviewLauncher = null)
+                Task<PluginCommandResult>>? workflowReviewLauncher = null,
+            Func<string, string>? localize = null)
         {
             _plugins = plugins;
             _commands = new CommandExecutor(plugins);
             _workflowReviewLauncher = workflowReviewLauncher;
+            _localize = localize;
         }
 
         public async Task<PluginCommandResult> ExecuteAsync(
@@ -38,7 +41,9 @@ namespace LongBetterWindows.Host.Interaction
                 case SearchActionKind.ExecuteCommand:
                     var descriptor = _plugins.Commands.Get(action.Target);
                     if (descriptor is null)
-                        return PluginCommandResult.Failure("结果对应的命令已经失效。");
+                        return Failure(
+                            "search.error.commandExpired",
+                            "结果对应的命令已经失效。");
                     var invocation = action.Invocation
                         ?? CommandInvocationFactory.Create(descriptor, context);
                     return await _commands.ExecuteAsync(
@@ -46,7 +51,9 @@ namespace LongBetterWindows.Host.Interaction
 
                 case SearchActionKind.OpenWorkflowReview:
                     if (_workflowReviewLauncher is null)
-                        return PluginCommandResult.Failure("组合动作审查入口当前不可用。");
+                        return Failure(
+                            "search.error.workflowReviewUnavailable",
+                            "组合动作审查入口当前不可用。");
                     return await _workflowReviewLauncher(
                         action.Target,
                         action.ExpectedStateFingerprint,
@@ -61,35 +68,54 @@ namespace LongBetterWindows.Host.Interaction
                         ? action.Target
                         : Path.GetDirectoryName(action.Target);
                     if (string.IsNullOrWhiteSpace(folder))
-                        return PluginCommandResult.Failure("无法确定结果所在文件夹。");
+                        return Failure(
+                            "search.error.folderUnavailable",
+                            "无法确定结果所在文件夹。");
                     return FromHostResponse(
                         await ServicesInitializer.ShellExecute.OpenFolderAsync(folder));
 
                 case SearchActionKind.OpenUri:
                     if (!Uri.TryCreate(action.Target, UriKind.Absolute, out var uri)
                         || !IsAllowedHostUriScheme(uri.Scheme))
-                        return PluginCommandResult.Failure("不支持或无效的链接地址。");
+                        return Failure(
+                            "search.error.invalidUri",
+                            "不支持或无效的链接地址。");
                     return FromHostResponse(
                         await ServicesInitializer.ShellExecute.OpenUrlAsync(action.Target));
 
                 case SearchActionKind.CopyText:
                     return FromHostResponse(
                         await ServicesInitializer.Clipboard.SetTextAsync(action.Target),
-                        "已复制到剪贴板。",
+                        Text("search.result.copied", "已复制到剪贴板。"),
                         keepOpen: true);
 
                 default:
-                    return PluginCommandResult.Failure("该动作不能直接执行。");
+                    return Failure(
+                        "search.error.actionUnsupported",
+                        "该动作不能直接执行。");
             }
         }
 
-        private static PluginCommandResult FromHostResponse(
+        private PluginCommandResult FromHostResponse(
             HostApiResponse response,
             string? successMessage = null,
             bool keepOpen = false)
             => response.IsSuccess
                 ? PluginCommandResult.Success(successMessage, keepOpen)
-                : PluginCommandResult.Failure(response.ErrorMessage ?? "操作失败。");
+                : PluginCommandResult.Failure(
+                    response.ErrorMessage
+                    ?? Text("search.error.operationFailed", "操作失败。"));
+
+        private PluginCommandResult Failure(string key, string fallback)
+            => PluginCommandResult.Failure(Text(key, fallback));
+
+        private string Text(string key, string fallback)
+        {
+            var value = _localize?.Invoke(key);
+            return string.IsNullOrWhiteSpace(value) || value == key
+                ? fallback
+                : value;
+        }
 
         internal static bool IsAllowedHostUriScheme(string scheme)
             => scheme.Equals("ms-settings", StringComparison.OrdinalIgnoreCase)

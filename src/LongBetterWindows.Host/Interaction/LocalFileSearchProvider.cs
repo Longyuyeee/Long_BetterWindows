@@ -9,16 +9,20 @@ namespace LongBetterWindows.Host.Interaction
         private const int MaximumIndexedEntries = 75000;
         private readonly IReadOnlyList<string> _roots;
         private readonly object _indexLock = new();
+        private readonly Func<string, string>? _localize;
         private Task<IReadOnlyList<IndexedPath>>? _indexTask;
         private IReadOnlyList<IndexedPath> _snapshot = Array.Empty<IndexedPath>();
 
-        public LocalFileSearchProvider(IEnumerable<string>? roots = null)
+        public LocalFileSearchProvider(
+            IEnumerable<string>? roots = null,
+            Func<string, string>? localize = null)
         {
             _roots = (roots ?? GetDefaultRoots())
                 .Where(path => !string.IsNullOrWhiteSpace(path))
                 .Select(Path.GetFullPath)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            _localize = localize;
         }
 
         public string Id => "local-files";
@@ -113,24 +117,38 @@ namespace LongBetterWindows.Host.Interaction
                 ProviderId = Id,
                 Title = item.Name,
                 Subtitle = item.Path,
-                Source = item.IsDirectory ? "本地文件夹" : "本地文件",
+                Source = item.IsDirectory
+                    ? Text("search.local.directory", "本地文件夹")
+                    : Text("search.local.file", "本地文件"),
                 Score = score,
                 Kind = SearchResultKind.Data,
                 PrimaryAction = new SearchResultAction(
-                    SearchActionKind.OpenPath, item.Path, Label: "打开"),
+                    SearchActionKind.OpenPath,
+                    item.Path,
+                    Label: Text("search.action.open", "打开")),
                 SecondaryActions = new[]
                 {
                     new SearchResultAction(
                         SearchActionKind.OpenContainingFolder,
                         item.Path,
-                        Label: "打开所在文件夹"),
+                        Label: Text(
+                            "search.action.openContainingFolder",
+                            "打开所在文件夹")),
                     new SearchResultAction(
                         SearchActionKind.CopyText,
                         item.Path,
-                        Label: "复制路径"),
+                        Label: Text("search.action.copyPath", "复制路径")),
                 },
                 CanPin = true,
             };
+
+        private string Text(string key, string fallback)
+        {
+            var value = _localize?.Invoke(key);
+            return string.IsNullOrWhiteSpace(value) || value == key
+                ? fallback
+                : value;
+        }
 
         private static string StableId(string path)
         {

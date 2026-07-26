@@ -174,7 +174,8 @@ namespace LongBetterWindows.Host.Views
             button.IsEnabled = false;
             await ServicesInitializer.SearchPreferences.ClearAsync();
             await ServicesInitializer.SuperPanelGroups.ClearAsync();
-            SearchPreferenceStatusText.Text = "固定、最近使用与自定义分组已清除";
+            SearchPreferenceStatusText.Text =
+                I18n("settings.searchPreferences.cleared");
             button.IsEnabled = true;
         }
 
@@ -206,7 +207,7 @@ namespace LongBetterWindows.Host.Views
         {
             ShowPage("workflows");
             if (WorkflowEditorHost.Content is not WorkflowEditorControl editor)
-                return "组合动作编辑器当前不可用。";
+                return I18n("workflow.error.editorUnavailable");
             return await editor.OpenExecutionReviewAsync(
                 workflowId,
                 expectedStateFingerprint,
@@ -219,7 +220,7 @@ namespace LongBetterWindows.Host.Views
         {
             ShowPage("workflows");
             if (WorkflowEditorHost.Content is not WorkflowEditorControl editor)
-                return "组合动作编辑器当前不可用。";
+                return I18n("workflow.error.editorUnavailable");
             return await editor.OpenEditorAsync(workflowId, cancellationToken);
         }
 
@@ -606,20 +607,24 @@ namespace LongBetterWindows.Host.Views
             var dialog = new OpenFileDialog
             {
                 Title = _sparsePackageInstalled
-                    ? "选择已签名的 Long Sparse Package 升级包"
-                    : "选择已签名的 Long Sparse Package",
-                Filter = "Long Sparse Package (*.msix;*.appx)|*.msix;*.appx",
+                    ? I18n("system.sparse.dialog.chooseUpgrade")
+                    : I18n("system.sparse.dialog.chooseRegister"),
+                Filter = I18n("system.sparse.dialog.filter"),
                 CheckFileExists = true,
                 Multiselect = false,
             };
             if (dialog.ShowDialog() != true) return;
 
-            var action = _sparsePackageInstalled ? "升级" : "注册";
+            var action = _sparsePackageInstalled
+                ? I18n("system.sparse.action.upgrade")
+                : I18n("system.sparse.action.register");
             var answer = MessageBox.Show(
-                $"将为当前 Windows 用户{action} Win11 一级右键菜单。\n\n" +
-                "系统会验证包签名、Publisher、x64 架构和当前安装目录，" +
-                "不会修改兼容旧右键菜单。是否继续？",
-                $"确认{action} Win11 一级菜单",
+                string.Format(
+                    I18n("system.sparse.confirm.registerOrUpgrade.message"),
+                    action),
+                string.Format(
+                    I18n("system.sparse.confirm.registerOrUpgrade.title"),
+                    action),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
             if (answer != MessageBoxResult.Yes) return;
@@ -635,9 +640,8 @@ namespace LongBetterWindows.Host.Views
         {
             if (_sparsePackageBusy || !_sparsePackageInstalled) return;
             var answer = MessageBox.Show(
-                "将卸载当前用户的 Win11 一级右键菜单包身份。\n\n" +
-                "兼容旧右键菜单不会被修改。是否继续？",
-                "确认卸载 Win11 一级菜单",
+                I18n("system.sparse.confirm.uninstall.message"),
+                I18n("system.sparse.confirm.uninstall.title"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
             if (answer != MessageBoxResult.Yes) return;

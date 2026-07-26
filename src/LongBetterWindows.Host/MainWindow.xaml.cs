@@ -48,7 +48,7 @@ namespace LongBetterWindows.Host
                 _workflowTerminalOutputCleared = false;
                 _workflowExecutionRejected = string.Equals(
                     result.Title,
-                    "执行已拒绝",
+                    I18n("workflow.execution.status.rejected"),
                     StringComparison.Ordinal);
                 AutomationProperties.SetItemStatus(
                     this,
@@ -141,7 +141,8 @@ namespace LongBetterWindows.Host
                 _workflowTerminalOutputCleared = false;
                 _workflowExecutionRejected = false;
                 WorkflowTerminalClearButton.Visibility = Visibility.Collapsed;
-                WorkflowTerminalApprovalButton.Content = "允许终端输出";
+                WorkflowTerminalApprovalButton.Content =
+                    I18n("workflow.review.allowTerminalOutput");
                 SetWorkflowLayoutAutomationStatus(
                     ToolCenter.IsWorkflowLayoutCompact,
                     ToolCenter.WorkflowLayoutWidth);
@@ -320,8 +321,8 @@ namespace LongBetterWindows.Host
             var approved = ToolCenter.ToggleWorkflowTerminalOutputApproval();
             _workflowTerminalOutputApproved = approved;
             WorkflowTerminalApprovalButton.Content = approved
-                ? "已允许终端输出 ✓"
-                : "允许终端输出";
+                ? I18n("workflow.review.terminalOutputAllowed")
+                : I18n("workflow.review.allowTerminalOutput");
             SetWorkflowLayoutAutomationStatus(
                 ToolCenter.IsWorkflowLayoutCompact,
                 ToolCenter.WorkflowLayoutWidth,
@@ -346,8 +347,12 @@ namespace LongBetterWindows.Host
             OpenSuperPanelButton.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
             OpenPaletteButton.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
             if (!visible)
-                WorkflowTerminalApprovalButton.Content = "允许终端输出";
+                WorkflowTerminalApprovalButton.Content =
+                    I18n("workflow.review.allowTerminalOutput");
         }
+
+        private static string I18n(string key)
+            => ServicesInitializer.I18n.T(key);
 
         private void ClearWorkflowTerminalOutputs_Click(object sender, RoutedEventArgs e)
             => ToolCenter.ClearWorkflowTerminalOutputs();
