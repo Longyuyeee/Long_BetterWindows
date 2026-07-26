@@ -238,6 +238,8 @@ public class QualityGateTests
         Assert.Contains("must rebuild the expected source commit", capture);
         Assert.Contains("source_commit = $expectedCommit", capture);
         Assert.Contains("ApproveAfterVisualReview", capture);
+        Assert.Contains("ProcessTimeoutSeconds = 90", capture);
+        Assert.Contains("WaitForExit($ProcessTimeoutSeconds * 1000)", capture);
         Assert.Contains("no_clipping_or_overflow", capture);
         Assert.Contains("webview_preview", capture);
         Assert.Contains("wpf_render_target", capture);
