@@ -30,6 +30,7 @@ namespace LongBetterWindows.Host
                ?? "0.0.0";
         private AppStartupOptions _startupOptions = new();
         private QualityRuntimeService? _qualityRuntime;
+        private StartupPerformanceTrace? _startupTrace;
         private int _pluginRuntimeStarted;
         private PluginRuntimeCoordinator? _pluginRuntime;
         private static bool _currentIsLight;
@@ -66,9 +67,18 @@ namespace LongBetterWindows.Host
             Log.Information("Long助手 正在启动...");
 
             _startupOptions = AppStartupOptions.Parse(e.Args);
+            if (!string.IsNullOrWhiteSpace(_startupOptions.QualityStartupReportPath))
+            {
+                _startupTrace = new StartupPerformanceTrace(
+                    _startupOptions.QualityStartupReportPath);
+                _startupTrace.Mark("options_parsed");
+            }
+            _startupTrace?.Mark("services_initialize_begin");
             ServicesInitializer.Initialize(_startupOptions.QualityWorkflowsDirectory);
+            _startupTrace?.Mark("services_initialize_end");
             ServicesInitializer.I18n.Initialize(_startupOptions.LanguageOverride);
             ServicesInitializer.I18n.ApplyTo(Resources);
+            _startupTrace?.Mark("localization_applied");
             Log.Information("所有服务已初始化。");
 
             _qualityRuntime = new QualityRuntimeService(this);
@@ -101,6 +111,7 @@ namespace LongBetterWindows.Host
             UpdateThemeResources(isLight);
             UpdateMotionResources();
             SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
+            _startupTrace?.Mark("theme_applied");
 
             // 检查命令行 --note 参数（右键菜单触发）
             if (_startupOptions.ShowDesignSystemPreview)
@@ -116,8 +127,12 @@ namespace LongBetterWindows.Host
                 Log.Error(args.Exception, "未处理的 UI 线程异常");
                 args.Handled = true;
             };
+            _startupTrace?.Mark("app_startup_end");
 
         }
+
+        internal static void MarkStartupStage(string stage)
+            => (Current as App)?._startupTrace?.Mark(stage);
 
         internal void StartPluginRuntime()
         {
@@ -125,6 +140,7 @@ namespace LongBetterWindows.Host
                 Interlocked.Exchange(ref _pluginRuntimeStarted, 1) != 0)
                 return;
 
+            _startupTrace?.Mark("plugin_runtime_scheduled");
             // Wait until the main window handle and hotkey service are ready.
             Dispatcher.BeginInvoke(
                 new Action(() => _ = RunPluginStartupAsync()),
@@ -135,13 +151,16 @@ namespace LongBetterWindows.Host
         {
             try
             {
+                _startupTrace?.Mark("plugin_runtime_begin");
                 _pluginRuntime = new PluginRuntimeCoordinator(
-                    _startupOptions.RequestedPluginsDirectory);
+                    _startupOptions.RequestedPluginsDirectory,
+                    startupTrace: _startupTrace);
                 var runtimeResult = await _pluginRuntime.StartAsync(
                     new PluginRuntimeStartRequest(
                         _startupOptions.RequestedCommandKey,
                         _startupOptions.RequestedCommandText,
                         _startupOptions.ExitAfterCommand));
+                _startupTrace?.Mark("plugin_runtime_ready");
                 if (runtimeResult.ExitCode is int exitCode)
                 {
                     Shutdown(exitCode);
@@ -206,6 +225,13 @@ namespace LongBetterWindows.Host
                     return;
                 }
 
+                if (_startupTrace is not null)
+                {
+                    await _startupTrace.WriteAsync(runtimeResult);
+                    Shutdown(0);
+                    return;
+                }
+
                 if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath))
                     await _qualityRuntime!.CaptureAsync(
                         _startupOptions,
@@ -226,7 +252,9 @@ namespace LongBetterWindows.Host
                 Log.Error(ex, "插件加载失败");
                 if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath)
                     || !string.IsNullOrWhiteSpace(
-                        _startupOptions.QualityPluginPageReleaseReportPath))
+                        _startupOptions.QualityPluginPageReleaseReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityStartupReportPath))
                 {
                     Shutdown(3);
                     return;

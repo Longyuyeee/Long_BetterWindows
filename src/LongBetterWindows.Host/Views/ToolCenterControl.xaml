@@ -5,9 +5,10 @@
              xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
              Focusable="True" PreviewKeyDown="UserControl_PreviewKeyDown">
     <UserControl.Resources>
-        <Style x:Key="OverviewCard" TargetType="Border" BasedOn="{StaticResource LongCard}">
+        <Style x:Key="ManagementCard" TargetType="Border" BasedOn="{StaticResource LongCard}">
             <Setter Property="Effect" Value="{x:Null}" />
         </Style>
+        <Style x:Key="OverviewCard" TargetType="Border" BasedOn="{StaticResource ManagementCard}" />
     </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -52,7 +53,7 @@
                                  Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="settings" />
                 </StackPanel>
 
-                <Border Grid.Row="2" Style="{StaticResource LongCard}" Padding="12" Effect="{x:Null}">
+                <Border Grid.Row="2" Style="{StaticResource ManagementCard}" Padding="12">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="7" Height="7" Fill="{DynamicResource Long.Brush.State.Success}" VerticalAlignment="Center" />
@@ -199,8 +200,8 @@
                     <!-- 系统集成 -->
                     <StackPanel x:Name="PanelSystem" Visibility="Collapsed">
                         <UniformGrid x:Name="SystemIntegrationGrid" Columns="2">
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.column.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.column.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ColumnStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="ColumnButton" Grid.Column="1" Content="{DynamicResource i18n.action.enable}" Style="{StaticResource LongButton.Primary}" Click="ColumnButton_Click"/></Grid></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.column.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.column.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ColumnStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="ColumnButton" Grid.Column="1" Content="{DynamicResource i18n.action.enable}" Style="{StaticResource LongButton.Primary}" Click="ColumnButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12">
                                 <Grid>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,12,0">
@@ -220,9 +221,9 @@
                                     </StackPanel>
                                 </Grid>
                             </Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.legacy.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.legacy.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ContextMenuStatusText" Margin="0,8,0,0" automation:AutomationProperties.LiveSetting="Polite"/></StackPanel><Button x:Name="ContextMenuButton" Grid.Column="1" Content="{DynamicResource i18n.action.register}" Style="{StaticResource LongButton.Primary}" Click="ContextMenuButton_Click"/></Grid></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.startup.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.startup.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="StartupStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="StartupButton" Grid.Column="1" Content="{DynamicResource i18n.action.enable}" Style="{StaticResource LongButton.Primary}" Click="StartupButton_Click"/></Grid></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><StackPanel><TextBlock Text="{DynamicResource i18n.system.hotkey.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.hotkey.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><Border Style="{StaticResource LongHotkeyBadge}" HorizontalAlignment="Left" Margin="0,10,0,0"><TextBlock Text="Alt + Space" FontFamily="{DynamicResource Long.Font.Mono}"/></Border></StackPanel></Border>
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.legacy.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.legacy.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="ContextMenuStatusText" Margin="0,8,0,0" automation:AutomationProperties.LiveSetting="Polite"/></StackPanel><Button x:Name="ContextMenuButton" Grid.Column="1" Content="{DynamicResource i18n.action.register}" Style="{StaticResource LongButton.Primary}" Click="ContextMenuButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.system.startup.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.startup.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="StartupStatusText" Margin="0,8,0,0"/></StackPanel><Button x:Name="StartupButton" Grid.Column="1" Content="{DynamicResource i18n.action.enable}" Style="{StaticResource LongButton.Primary}" Click="StartupButton_Click"/></Grid></Border>
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,12,12"><StackPanel><TextBlock Text="{DynamicResource i18n.system.hotkey.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.system.hotkey.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><Border Style="{StaticResource LongHotkeyBadge}" HorizontalAlignment="Left" Margin="0,10,0,0"><TextBlock Text="Alt + Space" FontFamily="{DynamicResource Long.Font.Mono}"/></Border></StackPanel></Border>
                         </UniformGrid>
                     </StackPanel>
 
@@ -234,16 +235,16 @@
                     <!-- 开发者 -->
                     <StackPanel x:Name="PanelDev" Visibility="Collapsed">
                         <UniformGrid x:Name="DeveloperGrid" Columns="2">
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.developer.workbench.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.workbench.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.action.open}" Style="{StaticResource LongButton.Primary}" Click="DevTools_Click" AutomationProperties.Name="{DynamicResource i18n.developer.workbench.openA11y}"/></Grid></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.developer.design.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.design.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.developer.design.preview}" Style="{StaticResource LongButton}" Click="DesignSystemPreview_Click" AutomationProperties.Name="{DynamicResource i18n.developer.design.previewA11y}"/></Grid></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,12"><StackPanel><TextBlock Text="{DynamicResource i18n.developer.docs.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.docs.desc}" Margin="0,5,0,8" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><StackPanel x:Name="DocLinksPanel"/></StackPanel></Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Image Width="32" Height="32" HorizontalAlignment="Left" VerticalAlignment="Top" Source="/LongBetterWindows.Host;component/Assets/app-icon.png" RenderOptions.BitmapScalingMode="HighQuality"/><StackPanel Grid.Column="1"><TextBlock Text="{DynamicResource i18n.developer.about.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock x:Name="AboutVersion" Margin="0,6,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="AboutStats" Margin="0,4,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel></Grid></Border>
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,12,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.developer.workbench.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.workbench.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.action.open}" Style="{StaticResource LongButton.Primary}" Click="DevTools_Click" AutomationProperties.Name="{DynamicResource i18n.developer.workbench.openA11y}"/></Grid></Border>
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.developer.design.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.design.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.developer.design.preview}" Style="{StaticResource LongButton}" Click="DesignSystemPreview_Click" AutomationProperties.Name="{DynamicResource i18n.developer.design.previewA11y}"/></Grid></Border>
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,12,12"><StackPanel><TextBlock Text="{DynamicResource i18n.developer.docs.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.developer.docs.desc}" Margin="0,5,0,8" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><StackPanel x:Name="DocLinksPanel"/></StackPanel></Border>
+                            <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Image Width="32" Height="32" HorizontalAlignment="Left" VerticalAlignment="Top" Source="/LongBetterWindows.Host;component/Assets/app-icon.png" RenderOptions.BitmapScalingMode="HighQuality"/><StackPanel Grid.Column="1"><TextBlock Text="{DynamicResource i18n.developer.about.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock x:Name="AboutVersion" Margin="0,6,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="AboutStats" Margin="0,4,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel></Grid></Border>
                         </UniformGrid>
                     </StackPanel>
 
                     <!-- 设置 -->
                     <StackPanel x:Name="PanelSettings" Visibility="Collapsed">
-                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
+                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,16,0">
@@ -259,9 +260,9 @@
                                 </ComboBox>
                             </Grid>
                         </Border>
-                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.theme.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.theme.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.theme.action}" Style="{StaticResource LongButton}" Click="ThemeToggle_Click"/></Grid></Border>
-                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.motion.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.motion.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><ToggleButton Grid.Column="1" Style="{StaticResource LongToggle}" IsChecked="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}, Mode=OneWay}" IsEnabled="False"/></Grid></Border>
-                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
+                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.theme.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.theme.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.theme.action}" Style="{StaticResource LongButton}" Click="ThemeToggle_Click"/></Grid></Border>
+                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.motion.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.motion.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><ToggleButton Grid.Column="1" Style="{StaticResource LongToggle}" IsChecked="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}, Mode=OneWay}" IsEnabled="False"/></Grid></Border>
+                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,16,0">
@@ -280,7 +281,7 @@
                                         AutomationProperties.Name="{DynamicResource i18n.settings.update.action.check}"/>
                             </Grid>
                         </Border>
-                        <Border Style="{StaticResource LongCard}" Margin="0,0,0,12">
+                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="{DynamicResource i18n.settings.gesture.title}" FontSize="14" FontWeight="SemiBold"/>
                                 <TextBlock Text="{DynamicResource i18n.settings.gesture.desc}"
@@ -298,7 +299,7 @@
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource LongCard}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.privacy.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.privacy.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="SearchPreferenceStatusText" Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.privacy.clear}" Style="{StaticResource LongButton}" Click="ClearSearchPreferences_Click"/></Grid></Border>
+                        <Border Style="{StaticResource ManagementCard}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.privacy.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.privacy.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="SearchPreferenceStatusText" Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.privacy.clear}" Style="{StaticResource LongButton}" Click="ClearSearchPreferences_Click"/></Grid></Border>
                     </StackPanel>
                 </Grid>
                 </Border>

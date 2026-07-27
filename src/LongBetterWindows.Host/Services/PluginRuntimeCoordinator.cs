@@ -10,20 +10,24 @@ namespace LongBetterWindows.Host.Services
         private readonly PluginScanner _scanner;
         private readonly PluginRegistry _registry;
         private readonly I18nService _i18n;
+        private readonly StartupPerformanceTrace? _startupTrace;
         private bool _disposed;
 
         public PluginRuntimeCoordinator(
             string? pluginsDirectory = null,
             PluginRegistry? registry = null,
-            I18nService? i18n = null)
+            I18nService? i18n = null,
+            StartupPerformanceTrace? startupTrace = null)
         {
             _i18n = i18n ?? ServicesInitializer.I18n;
+            _startupTrace = startupTrace;
             _scanner = new PluginScanner(
                 pluginsDirectory,
                 () => _i18n.CurrentLanguage);
             _registry = registry ?? HostProvider.Instance.PluginStore;
             PackageInstaller = new LpakInstaller(_scanner, pluginsDirectory);
             _i18n.LanguageChanged += OnLanguageChanged;
+            _startupTrace?.Mark("plugin_runtime_constructed");
         }
 
         public LpakInstaller PackageInstaller { get; }
@@ -33,17 +37,23 @@ namespace LongBetterWindows.Host.Services
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
+            _startupTrace?.Mark("transaction_recovery_begin");
             var recovered = await PackageInstaller.RecoverInterruptedTransactionsAsync();
+            _startupTrace?.Mark("transaction_recovery_end");
             if (recovered > 0)
                 Log.Warning(
                     "Recovered {Count} interrupted plugin transactions during startup",
                     recovered);
 
+            _startupTrace?.Mark("package_install_begin");
             var installed = await PackageInstaller.InstallAllFromDirectoryAsync();
+            _startupTrace?.Mark("package_install_end");
             if (installed > 0)
                 Log.Information("Installed {Count} .lpak plugins during startup", installed);
 
+            _startupTrace?.Mark("plugin_scan_begin");
             await _scanner.ScanAsync();
+            _startupTrace?.Mark("plugin_scan_end");
             Log.Information(
                 "Plugin runtime started with {Count} loaded plugins",
                 _scanner.LoadedPlugins.Count);

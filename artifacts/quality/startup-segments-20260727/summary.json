@@ -1,0 +1,42 @@
+{
+  "captured_at": "2026-07-27",
+  "configuration": "Release",
+  "runs_per_variant": 5,
+  "baseline": {
+    "runtime_ready_elapsed_average_ms": 2427.5,
+    "runtime_ready_elapsed_median_ms": 2084.9,
+    "runtime_ready_cpu_average_ms": 2734.4,
+    "runtime_ready_cpu_median_ms": 2593.8,
+    "runtime_ready_working_set_average_mb": 187.4,
+    "runtime_ready_working_set_max_mb": 198.6,
+    "runtime_ready_private_memory_average_mb": 141.5,
+    "runtime_ready_private_memory_max_mb": 149.8,
+    "services_elapsed_average_ms": 89.6,
+    "window_elapsed_average_ms": 1206.0,
+    "plugin_scan_elapsed_average_ms": 656.4
+  },
+  "optimized": {
+    "runtime_ready_elapsed_average_ms": 2147.3,
+    "runtime_ready_elapsed_median_ms": 1970.6,
+    "runtime_ready_cpu_average_ms": 2503.1,
+    "runtime_ready_cpu_median_ms": 2562.5,
+    "runtime_ready_working_set_average_mb": 187.2,
+    "runtime_ready_working_set_max_mb": 198.6,
+    "runtime_ready_private_memory_average_mb": 142.1,
+    "runtime_ready_private_memory_max_mb": 153.3,
+    "services_elapsed_average_ms": 74.6,
+    "window_elapsed_average_ms": 1089.2,
+    "plugin_scan_elapsed_average_ms": 588.7
+  },
+  "decision": {
+    "runtime_ready_elapsed_average_change_percent": -11.5,
+    "runtime_ready_elapsed_median_change_percent": -5.5,
+    "runtime_ready_cpu_average_change_percent": -8.5,
+    "working_set_average_change_mb": -0.2,
+    "private_memory_average_change_mb": 0.6,
+    "observed_startup_improvement": true,
+    "memory_improved": false,
+    "causal_attribution_limited_by_sequential_file_cache": true,
+    "strict_idle_memory_gate_passed": false
+  }
+}

@@ -911,8 +911,11 @@ public class QualityGateTests
     {
         var xaml = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
 
-        Assert.Contains("x:Key=\"OverviewCard\"", xaml);
+        Assert.Contains("x:Key=\"ManagementCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource LongCard}\"", xaml);
+        Assert.Equal(16, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
+        Assert.Contains("x:Key=\"OverviewCard\"", xaml);
+        Assert.Contains("BasedOn=\"{StaticResource ManagementCard}\"", xaml);
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
         Assert.Equal(5, xaml.Split("Style=\"{StaticResource OverviewCard}\"").Length - 1);
     }

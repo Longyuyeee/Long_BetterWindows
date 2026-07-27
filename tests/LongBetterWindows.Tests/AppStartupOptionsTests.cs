@@ -29,6 +29,7 @@ public class AppStartupOptionsTests
             "--quality-workflow-upgrade-package", "quality-v2.lpak",
             "--quality-terminal-export-dir", "quality-exports",
             "--quality-plugin-page-release-report", "plugin-release.json",
+            "--quality-startup-report", "startup.json",
             "--quality-show-welcome",
             "--quality-market-list",
         ]);
@@ -56,6 +57,7 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "plugin-release.json",
             options.QualityPluginPageReleaseReportPath);
+        Assert.Equal("startup.json", options.QualityStartupReportPath);
         Assert.True(options.ShowWelcomeForQuality);
         Assert.True(options.ShowMarketListForQuality);
     }

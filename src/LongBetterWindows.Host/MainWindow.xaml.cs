@@ -28,6 +28,7 @@ namespace LongBetterWindows.Host
 
         public MainWindow()
         {
+            App.MarkStartupStage("main_window_constructor_begin");
             InitializeComponent();
             _tray = new TrayService(this);
             ToolCenter.WorkflowReviewClosed += (_, _) =>
@@ -64,10 +65,12 @@ namespace LongBetterWindows.Host
                 AutomationProperties.SetItemStatus(this, "workflow-result:terminal-cleared");
                 WorkflowTerminalClearButton.Visibility = Visibility.Collapsed;
             };
+            App.MarkStartupStage("main_window_constructor_end");
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            App.MarkStartupStage("main_window_loaded");
             if ((Application.Current as App)?.ShowMarketForQualityRequested == true)
                 ToolCenter.OpenMarketForQuality();
             if ((Application.Current as App)?.ShowDiagnosticsForQualityRequested == true)
@@ -452,6 +455,7 @@ namespace LongBetterWindows.Host
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
+            App.MarkStartupStage("main_window_source_initialized");
 
             var hwnd = new WindowInteropHelper(this).Handle;
             HwndSource.FromHwnd(hwnd)?.AddHook(WorkflowAutomationWndProc);
