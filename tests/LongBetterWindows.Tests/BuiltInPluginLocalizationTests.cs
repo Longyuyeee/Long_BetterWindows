@@ -610,7 +610,8 @@ public sealed class BuiltInPluginLocalizationTests
 
         Assert.Contains("Category = \"application\"", window);
         Assert.Contains("Category = \"calculation\"", window);
-        Assert.Contains("entry.Category == \"calculation\"", implementation);
+        Assert.Contains("category == \"calculation\"", implementation);
+        Assert.Contains("_targetPolicy.Validate(category, target)", implementation);
         Assert.DoesNotContain("Category = \"应用\"", window);
         Assert.DoesNotContain("entry.Category == \"计算\"", implementation);
         Assert.Contains("ApplyResultsProjection();", languageBody);

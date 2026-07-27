@@ -19,6 +19,9 @@
     ],
     "high_transaction_required_plugin_count": 4,
     "high_transaction_required_command_count": 4,
+    "quick_launch_isolation_script": "verify-quick-launch-isolation.ps1",
+    "quick_launch_isolation_test_path": "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
+    "quick_launch_isolation_required_case_count": 6,
     "release_rule": "Every required manual check must be passed with an existing evidence file and matching SHA-256 before a new release candidate is eligible."
   },
   "plugins": [
@@ -366,8 +369,8 @@
       "automated_evidence": [
         {
           "level": "component",
-          "path": "tests/LongBetterWindows.Tests/LocalFileSearchProviderTests.cs",
-          "symbol": "SearchAsync_FindsNestedFilesAndProvidesSecondaryActions"
+          "path": "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
+          "symbol": "LargeDirectorySearch_FindsNestedTargetWithoutMutation"
         }
       ],
       "manual_checks": [

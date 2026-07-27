@@ -21,12 +21,12 @@
     {
       "id": "com.long.quicklaunch",
       "name": "快捷启动器",
-      "version": "1.0.0",
-      "description": "万能搜索——应用+计算器+URL",
+      "version": "1.1.1",
+      "description": "有界本地搜索、过期查询抑制与安全目标启动",
       "author": "Long",
       "download_url": null,
       "min_api_version": "1.0.0",
-      "capabilities": ["system.hotkey"],
+      "capabilities": ["shell.execute", "system.clipboard"],
       "tags": ["搜索", "启动", "计算"]
     },
     {

@@ -18,12 +18,13 @@ public class QuickLaunchPluginImpl :
     private IHostApi? _host;
     private bool _isActive;
     private LaunchWindow? _window;
+    private readonly QuickLaunchTargetPolicy _targetPolicy = new();
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.quicklaunch";
     public string Name => Text("plugin.name", "快捷启动器");
-    public string Version => "1.1.0";
+    public string Version => "1.1.1";
     public int Priority => 180;
     public PluginState State { get; private set; } = PluginState.Loaded;
 
@@ -62,21 +63,13 @@ public class QuickLaunchPluginImpl :
             && action == "open-result"
             && !string.IsNullOrWhiteSpace(invocation.Text))
         {
-            if (_host is null)
-                return PluginCommandResult.Failure(Text(
-                    "error.notInitialized",
-                    "快捷启动器尚未初始化。"));
-
             var category = invocation.Arguments.TryGetValue("category", out var value)
                 ? value
                 : "application";
-            if (category == "calculation")
-                await _host.Clipboard.SetTextAsync(invocation.Text);
-            else
-                await _host.ShellExecute.OpenWithDefaultAsync(invocation.Text);
-
-            Log.Information("[QuickLaunch] 已执行动态搜索结果: {Category}", category);
-            return PluginCommandResult.Success();
+            return await ExecuteTargetAsync(
+                category,
+                invocation.Text,
+                cancellationToken);
         }
 
         ShowLauncher(invocation.Text);
@@ -235,17 +228,58 @@ public class QuickLaunchPluginImpl :
 
         try
         {
-            if (entry.Category == "calculation")
-                await _host.Clipboard.SetTextAsync(path);
-            else
-                await _host.ShellExecute.OpenWithDefaultAsync(path);
-
-            Log.Information("[QuickLaunch] 已处理: {Path}", path);
+            var result = await ExecuteTargetAsync(
+                entry.Category,
+                path,
+                CancellationToken.None);
+            if (!result.IsSuccess)
+                Log.Warning(
+                    "[QuickLaunch] 目标执行被拒绝或失败: {Category}, {Error}",
+                    entry.Category,
+                    result.Message);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "[QuickLaunch] 操作失败: {Path}", path);
         }
+    }
+
+    private async Task<PluginCommandResult> ExecuteTargetAsync(
+        string category,
+        string target,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_host is null)
+            return PluginCommandResult.Failure(Text(
+                "error.notInitialized",
+                "快捷启动器尚未初始化。"));
+
+        var validation = _targetPolicy.Validate(category, target);
+        if (!validation.IsValid)
+        {
+            return PluginCommandResult.Failure(string.Format(
+                Text(
+                    "error.targetRejected",
+                    "目标已被安全策略拒绝：{0}"),
+                validation.Error));
+        }
+
+        var response = category == "calculation"
+            ? await _host.Clipboard.SetTextAsync(validation.NormalizedTarget!)
+            : await _host.ShellExecute.OpenWithDefaultAsync(
+                validation.NormalizedTarget!);
+        if (!response.IsSuccess)
+        {
+            return PluginCommandResult.Failure(
+                response.ErrorMessage
+                ?? Text("error.openFailed", "无法打开目标。"));
+        }
+
+        Log.Information(
+            "[QuickLaunch] 已执行动态搜索结果: {Category}",
+            category);
+        return PluginCommandResult.Success();
     }
 
     public Task OnLanguageChangedAsync(

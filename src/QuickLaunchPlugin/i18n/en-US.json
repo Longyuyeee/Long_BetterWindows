@@ -3,6 +3,8 @@
   "commands.launcher.open.title": "Quick Launch",
   "commands.launcher.open.description": "Search and quickly open local apps, files, and common locations",
   "error.notInitialized": "Quick Launch is not initialized.",
+  "error.targetRejected": "The target was rejected by the safety policy: {0}",
+  "error.openFailed": "Unable to open the target.",
   "search.scopePrefix": "Quick Launch: ",
   "search.recallingSubtitle": "Pinned or recently used Start menu app",
   "search.scopedSubtitle": "From the system Start menu · Enter to open",

@@ -383,6 +383,41 @@ public sealed class PluginPositiveFunctionMatrixTests
                 item.GetProperty("expected_workspace_unchanged").GetBoolean()));
     }
 
+    [Fact]
+    public void QuickLaunchIsolationEvidence_IsBoundToProductionPlugin()
+    {
+        var root = FindRepositoryRoot();
+        using var matrix = LoadMatrix(root);
+        var policy = matrix.RootElement.GetProperty("policy");
+        var scriptPath = Path.Combine(
+            root,
+            policy.GetProperty("quick_launch_isolation_script").GetString()!);
+        var testPath = Path.Combine(
+            root,
+            policy.GetProperty("quick_launch_isolation_test_path").GetString()!);
+        var plugin = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Single(item =>
+                item.GetProperty("id").GetString()
+                == "com.long.quicklaunch");
+        var evidence = Assert.Single(
+            plugin.GetProperty("automated_evidence").EnumerateArray());
+
+        Assert.True(File.Exists(scriptPath));
+        Assert.True(File.Exists(testPath));
+        Assert.Equal(
+            6,
+            policy.GetProperty(
+                "quick_launch_isolation_required_case_count").GetInt32());
+        Assert.Equal(
+            "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
+            evidence.GetProperty("path").GetString());
+        Assert.Equal(
+            "LargeDirectorySearch_FindsNestedTargetWithoutMutation",
+            evidence.GetProperty("symbol").GetString());
+    }
+
     private static JsonDocument LoadMatrix(string root)
         => JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,

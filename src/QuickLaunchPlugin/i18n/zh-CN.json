@@ -3,6 +3,8 @@
   "commands.launcher.open.title": "快捷启动",
   "commands.launcher.open.description": "搜索并快速打开本机应用、文件和常用位置",
   "error.notInitialized": "快捷启动器尚未初始化。",
+  "error.targetRejected": "目标已被安全策略拒绝：{0}",
+  "error.openFailed": "无法打开目标。",
   "search.scopePrefix": "快捷启动：",
   "search.recallingSubtitle": "固定或最近使用的开始菜单应用",
   "search.scopedSubtitle": "来自系统开始菜单 · Enter 立即打开",

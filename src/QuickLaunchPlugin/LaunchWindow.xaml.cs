@@ -33,13 +33,15 @@ public partial class LaunchWindow : Window
     private LaunchWindowLocalization _localization;
     private Action<SmartEntry?>? _onSelect;
     private CancellationTokenSource? _searchCancellation;
-    private const int MaxFileCandidates = 5_000;
-    private const int MaxContentCandidates = 500;
-    private const long MaxContentFileBytes = 1_048_576;
+    private readonly QuickLaunchDiskSearchEngine _diskSearch;
+    private readonly QuickLaunchQueryGeneration _queryGeneration = new();
 
-    public LaunchWindow(LaunchWindowLocalization localization)
+    public LaunchWindow(
+        LaunchWindowLocalization localization,
+        QuickLaunchDiskSearchEngine? diskSearch = null)
     {
         _localization = localization;
+        _diskSearch = diskSearch ?? new QuickLaunchDiskSearchEngine();
         InitializeComponent();
         Loaded += LaunchWindow_Loaded;
         Closed += (_, _) =>
@@ -47,6 +49,7 @@ public partial class LaunchWindow : Window
             _searchCancellation?.Cancel();
             _searchCancellation?.Dispose();
             _searchCancellation = null;
+            _queryGeneration.Invalidate();
         };
         ApplyLocalization(localization);
     }
@@ -147,6 +150,7 @@ public partial class LaunchWindow : Window
         _searchCancellation?.Dispose();
         _searchCancellation = new CancellationTokenSource();
         var cancellationToken = _searchCancellation.Token;
+        var generation = _queryGeneration.Begin();
 
         if (string.IsNullOrEmpty(query))
         {
@@ -196,18 +200,28 @@ public partial class LaunchWindow : Window
         try
         {
             await Task.Delay(180, cancellationToken);
-            var fileResults = await Task.Run(
+            var diskResult = await Task.Run(
                 () => query.StartsWith(">") && query.Length > 2
-                    ? SearchContent(query[1..].Trim(), cancellationToken).Take(4).ToList()
+                    ? _diskSearch.SearchContent(
+                        query[1..].Trim(),
+                        4,
+                        cancellationToken)
                     : query.Length >= 2
-                        ? SearchFiles(query, cancellationToken).Take(3).ToList()
-                        : [],
+                        ? _diskSearch.SearchFiles(
+                            query,
+                            3,
+                            cancellationToken)
+                        : new QuickLaunchDiskSearchResult([], 0, false),
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!string.Equals(SearchBox.Text.Trim(), query, StringComparison.Ordinal))
+            if (!_queryGeneration.IsCurrent(generation)
+                || !string.Equals(
+                    SearchBox.Text.Trim(),
+                    query,
+                    StringComparison.Ordinal))
                 return;
 
-            var results = immediateResults.Concat(fileResults).ToList();
+            var results = immediateResults.Concat(diskResult.Entries).ToList();
             ApplySearchResults(results);
         }
         catch (OperationCanceledException)
@@ -251,128 +265,6 @@ public partial class LaunchWindow : Window
         {
             return false;
         }
-    }
-
-    private static IEnumerable<SmartEntry> SearchFiles(
-        string query,
-        CancellationToken cancellationToken)
-    {
-        var dirs = new[]
-        {
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
-        };
-
-        var remaining = 8;
-        var enumeration = new EnumerationOptions
-        {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint,
-        };
-        foreach (var dir in dirs)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (remaining <= 0) yield break;
-            if (!Directory.Exists(dir)) continue;
-            IEnumerable<string> files;
-            try
-            {
-                files = Directory.EnumerateFiles(dir, "*", enumeration);
-            }
-            catch { continue; }
-
-            var inspected = 0;
-            foreach (var f in files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (++inspected > MaxFileCandidates)
-                    break;
-                if (!Path.GetFileName(f).Contains(
-                        query,
-                        StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                remaining--;
-                var name = Path.GetFileName(f);
-                var ext = Path.GetExtension(f).ToLower();
-                var icon = ext switch
-                {
-                    ".pdf" => "📕", ".doc" or ".docx" => "📝", ".xls" or ".xlsx" => "📊",
-                    ".png" or ".jpg" or ".jpeg" or ".gif" => "🖼",
-                    ".txt" or ".md" => "📄", ".zip" or ".rar" or ".7z" => "📦",
-                    _ => "📁"
-                };
-                yield return new SmartEntry
-                {
-                    Name = name,
-                    Path = f,
-                    Icon = icon,
-                    Category = "file",
-                    Subtitle = dir,
-                };
-                if (remaining <= 0)
-                    yield break;
-            }
-        }
-    }
-
-    private static List<SmartEntry> SearchContent(
-        string query,
-        CancellationToken cancellationToken)
-    {
-        var results = new List<SmartEntry>();
-        var dirs = new[] { Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) };
-        var exts = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".txt", ".md", ".cs", ".json", ".xml", ".html", ".css", ".js", ".py", ".log", ".csv" };
-
-        foreach (var dir in dirs)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!Directory.Exists(dir)) continue;
-            IEnumerable<string> files;
-            try
-            {
-                files = Directory.EnumerateFiles(dir, "*", new EnumerationOptions
-                {
-                    RecurseSubdirectories = true,
-                    IgnoreInaccessible = true,
-                    AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint,
-                });
-            }
-            catch { continue; }
-
-            var inspected = 0;
-            foreach (var f in files)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (++inspected > MaxContentCandidates)
-                    break;
-                if (results.Count >= 4) return results;
-                if (!exts.Contains(Path.GetExtension(f))) continue;
-                try
-                {
-                    if (new FileInfo(f).Length > MaxContentFileBytes)
-                        continue;
-                    var content = File.ReadAllText(f);
-                    var idx = content.IndexOf(query, StringComparison.OrdinalIgnoreCase);
-                    if (idx >= 0)
-                    {
-                        var start = Math.Max(0, idx - 20);
-                        var len = Math.Min(80, content.Length - start);
-                        var preview = content.Substring(start, len).Replace("\n", " ").Replace("\r", "");
-                        results.Add(new SmartEntry
-                        {
-                            Name = Path.GetFileName(f), Path = f, Icon = "🔍",
-                            Category = "content",
-                            Subtitle = "..." + preview + "...",
-                        });
-                    }
-                }
-                catch { }
-            }
-        }
-        return results;
     }
 
     private static bool IsUrl(string text)

@@ -84,6 +84,8 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains("await Task.Delay(180, cancellationToken)", source);
         Assert.Contains("await Task.Run(", source);
         Assert.Contains("cancellationToken.ThrowIfCancellationRequested()", source);
+        Assert.Contains("QuickLaunchDiskSearchEngine", source);
+        Assert.Contains("_queryGeneration.IsCurrent(generation)", source);
     }
 
     [Fact]
