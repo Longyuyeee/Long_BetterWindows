@@ -38,7 +38,7 @@ namespace LongBetterWindows.Host.Services
                 "plugin" => _application.Windows.OfType<PluginWindowHost>()
                     .FirstOrDefault(window => window.IsVisible) ?? _application.MainWindow,
                 "main" or "market" or "diagnostics" or "plugins" or "system"
-                    or "settings"
+                    or "settings" or "developer"
                     => _application.MainWindow,
                 _ => throw new InvalidDataException(
                     $"Unsupported quality capture view: {options.QualityCaptureView}"),

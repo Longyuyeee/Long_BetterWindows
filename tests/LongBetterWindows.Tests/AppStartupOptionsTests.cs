@@ -96,5 +96,7 @@ public class AppStartupOptionsTests
             ["--quality-capture-view", "system"]).OpenSystemForQuality);
         Assert.True(AppStartupOptions.Parse(
             ["--quality-capture-view", "settings"]).OpenSettingsForQuality);
+        Assert.True(AppStartupOptions.Parse(
+            ["--quality-capture-view", "developer"]).OpenDeveloperForQuality);
     }
 }

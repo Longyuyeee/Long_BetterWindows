@@ -43,6 +43,7 @@ namespace LongBetterWindows.Host
         internal bool ShowPluginsForQualityRequested => _startupOptions.OpenPluginsForQuality;
         internal bool ShowSystemForQualityRequested => _startupOptions.OpenSystemForQuality;
         internal bool ShowSettingsForQualityRequested => _startupOptions.OpenSettingsForQuality;
+        internal bool ShowDeveloperForQualityRequested => _startupOptions.OpenDeveloperForQuality;
         internal bool ShowWelcomeForQualityRequested => _startupOptions.ShowWelcomeForQuality;
         internal static bool ShowManagementCardShadowsForQuality
             => Current is App { _startupOptions.QualityManagementCardShadows: true };

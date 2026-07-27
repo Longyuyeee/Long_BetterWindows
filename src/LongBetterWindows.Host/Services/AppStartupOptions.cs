@@ -21,6 +21,7 @@ namespace LongBetterWindows.Host.Services
         public bool QualityManagementCardShadows { get; private init; }
         public bool OpenSystemForQuality { get; private init; }
         public bool OpenSettingsForQuality { get; private init; }
+        public bool OpenDeveloperForQuality { get; private init; }
         public bool ShowWelcomeForQuality { get; private init; }
         public bool ShowMarketListForQuality { get; private init; }
         public string? MarketplaceCatalogPath { get; private init; }
@@ -86,6 +87,7 @@ namespace LongBetterWindows.Host.Services
                     "--quality-management-card-shadows"),
                 OpenSystemForQuality = HasSwitch(arguments, "--quality-open-system") || captureView == "system",
                 OpenSettingsForQuality = HasSwitch(arguments, "--quality-open-settings") || captureView == "settings",
+                OpenDeveloperForQuality = HasSwitch(arguments, "--quality-open-developer") || captureView == "developer",
                 ShowWelcomeForQuality = HasSwitch(arguments, "--quality-show-welcome"),
                 ShowMarketListForQuality = HasSwitch(arguments, "--quality-market-list"),
                 MarketplaceCatalogPath = ReadArgument(arguments, "--quality-market-catalog"),

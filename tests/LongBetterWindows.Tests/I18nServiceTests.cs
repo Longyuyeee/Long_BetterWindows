@@ -314,6 +314,12 @@ public sealed class I18nServiceTests : IDisposable
         var toolCenterSource = File.ReadAllText(Path.Combine(
             views,
             "ToolCenterControl.xaml.cs"));
+        var developerXaml = File.ReadAllText(Path.Combine(
+            views,
+            "DeveloperPageControl.xaml"));
+        var developerSource = File.ReadAllText(Path.Combine(
+            views,
+            "DeveloperPageControl.xaml.cs"));
         var devToolsSource = File.ReadAllText(Path.Combine(
             views,
             "PluginDevTools.xaml.cs"));
@@ -326,10 +332,11 @@ public sealed class I18nServiceTests : IDisposable
         Assert.Contains("LanguageChanged += OnLanguageChanged", diagnosticsSource);
         Assert.Contains("RenderSnapshot(_lastSnapshot)", diagnosticsSource);
         Assert.Contains("MetricsGrid.Columns = compact ? 1 : 3", diagnosticsSource);
-        Assert.Contains("i18n.developer.workbench.title", toolCenterXaml);
-        Assert.Contains("i18n.developer.about.title", toolCenterXaml);
-        Assert.Contains("DeveloperGrid.Columns = isNarrow ? 1 : 2", toolCenterSource);
-        Assert.Contains("developer.docs.empty", toolCenterSource);
+        Assert.Contains("i18n.developer.workbench.title", developerXaml);
+        Assert.Contains("i18n.developer.about.title", developerXaml);
+        Assert.Contains("ApplyResponsiveLayout(e.NewSize.Width)", developerSource);
+        Assert.Contains("developer.docs.empty", developerSource);
+        Assert.Contains("LanguageChanged -= OnLanguageChanged", developerSource);
         Assert.Contains("developer.workbench.windowTitle", devToolsSource);
         Assert.Contains("i18n.toast.name", toast);
         Assert.DoesNotContain("CPU 使用率", diagnosticsXaml);

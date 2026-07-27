@@ -50,6 +50,11 @@ namespace LongBetterWindows.Host.Views
             Unloaded += (_, _) =>
             {
                 ReleasePluginManagementPage();
+                if (DeveloperHost.Content is DeveloperPageControl developerPage)
+                {
+                    DeveloperHost.Content = null;
+                    developerPage.Dispose();
+                }
                 _updateService?.Dispose();
                 _updateService = null;
             };
@@ -64,14 +69,14 @@ namespace LongBetterWindows.Host.Views
                 WelcomeBanner.Visibility = Visibility.Visible;
 
             // 动态更新关于信息
-            UpdateAboutInfo();
+            RefreshOverviewMetrics();
 
             // 插件管理控件自行刷新列表；ToolCenter 只同步全局概览数据。
             HostProvider.Instance.PluginStore.PluginsChanged += () =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    UpdateAboutInfo();
+                    RefreshOverviewMetrics();
                 });
             };
         }
@@ -123,7 +128,6 @@ namespace LongBetterWindows.Host.Views
                 ? new Thickness(18, 0, 18, 18)
                 : new Thickness(32, 0, 32, 32);
             SystemIntegrationGrid.Columns = isNarrow ? 1 : 2;
-            DeveloperGrid.Columns = isNarrow ? 1 : 2;
 
             if (isNarrow)
             {
@@ -169,18 +173,10 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
-        private void UpdateAboutInfo()
+        private void RefreshOverviewMetrics()
         {
             var plugins = HostProvider.Instance.PluginStore.GetAll();
             var capCount = Engine.ManifestReader.KnownCapabilities.Count;
-            AboutVersion.Text = string.Format(
-                I18n("developer.about.version"),
-                App.ProductVersion);
-            AboutStats.Text = string.Format(
-                I18n("developer.about.stats"),
-                capCount,
-                plugins.Count,
-                3);
             OverviewPluginCount.Text = plugins.Count.ToString();
             OverviewCommandCount.Text = HostProvider.Instance.PluginStore.Commands.Count.ToString();
             OverviewCapabilityCount.Text = capCount.ToString();
@@ -317,6 +313,7 @@ namespace LongBetterWindows.Host.Views
         internal void OpenMarketForQuality() => ShowPage("market");
         internal void OpenDiagnosticsForQuality() => ShowPage("diagnostics");
         internal void OpenPluginsForQuality() => ShowPage("plugins");
+        internal void OpenDeveloperForQuality() => ShowPage("developer");
         internal WeakReference ReleasePluginsForQuality()
         {
             ShowPage("plugins");
@@ -498,8 +495,7 @@ namespace LongBetterWindows.Host.Views
                     _ = EnsureSystemStatusInitializedAsync();
                 else if (key == "developer")
                 {
-                    UpdateAboutInfo();
-                    RefreshDocLinks();
+                    DeveloperHost.Content ??= new DeveloperPageControl();
                 }
                 else if (key == "settings")
                     _ = EnsureSettingsStatusInitializedAsync();
@@ -561,24 +557,9 @@ namespace LongBetterWindows.Host.Views
 
         private Brush GreenBrush => (Brush)FindResource("SuccessGreenBrush");
         private Brush GrayBrush => (Brush)FindResource("TextSecondaryBrush");
-        private Brush BlueBrush => (Brush)FindResource("AccentBlueBrush");
         private Brush RedBrush => (Brush)FindResource("DangerRedBrush");
 
         #endregion
-
-        private void DevTools_Click(object sender, RoutedEventArgs e)
-        {
-            PluginDevTools.Open(Window.GetWindow(this)!);
-        }
-
-        private void DesignSystemPreview_Click(object sender, RoutedEventArgs e)
-        {
-            var preview = new DesignSystemPreview
-            {
-                Owner = Window.GetWindow(this),
-            };
-            preview.Show();
-        }
 
         private void OpenPalette_Click(object sender, RoutedEventArgs e)
             => CommandPaletteWindow.ShowPalette();
@@ -600,68 +581,6 @@ namespace LongBetterWindows.Host.Views
                 btn.Content = _isLightMode
                     ? I18n("action.darkMode")
                     : I18n("action.lightMode");
-        }
-
-        private void RefreshDocLinks()
-        {
-            DocLinksPanel.Children.Clear();
-
-            var docsDir = Path.GetFullPath(Path.Combine(
-                AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "docs"));
-
-            if (!Directory.Exists(docsDir))
-                docsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "docs");
-
-            if (!Directory.Exists(docsDir))
-            {
-                DocLinksPanel.Children.Add(new TextBlock
-                {
-                    Text = I18n("developer.docs.unavailable"),
-                    FontSize = 11,
-                    Foreground = GrayBrush,
-                });
-                return;
-            }
-
-            var docFiles = Directory.GetFiles(docsDir, "*.md")
-                .OrderBy(f => f)
-                .ToList();
-            if (docFiles.Count == 0)
-            {
-                DocLinksPanel.Children.Add(new TextBlock
-                {
-                    Text = I18n("developer.docs.empty"),
-                    FontSize = 11,
-                    Foreground = GrayBrush,
-                });
-                return;
-            }
-
-            foreach (var file in docFiles)
-            {
-                var name = Path.GetFileNameWithoutExtension(file);
-
-                var link = new TextBlock
-                {
-                    Text = name,
-                    FontSize = 12,
-                    Foreground = BlueBrush,
-                    Cursor = Cursors.Hand,
-                    Margin = new Thickness(0, 2, 0, 2),
-                    Tag = file,
-                };
-                link.MouseLeftButtonDown += (_, _) =>
-                {
-                    var path = (string)link.Tag;
-                    var content = File.ReadAllText(path);
-                    DocViewer.ShowDoc(
-                        Window.GetWindow(this)!,
-                        Path.GetFileNameWithoutExtension(path),
-                        content);
-                };
-
-                DocLinksPanel.Children.Add(link);
-            }
         }
 
         private void StartupButton_Click(object sender, RoutedEventArgs e)

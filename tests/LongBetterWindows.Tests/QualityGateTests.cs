@@ -469,7 +469,8 @@ public class QualityGateTests
         Assert.Contains("$maximum -lt $WorkingSetLimitMB", probe);
         Assert.Contains("distinct_builtin_plugin_memory_probe", probe);
         Assert.Contains("plugin-memory-report.json", probe);
-        var toolCenter = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
+        var toolCenter = Read(
+            "src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
         Assert.Contains("MarketHost.Content == null", toolCenter);
         Assert.Contains("MarketHost.Content = new MarketplaceControl()", toolCenter);
     }
@@ -804,12 +805,13 @@ public class QualityGateTests
     {
         var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
         var webDispatcher = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs");
-        var toolCenter = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
+        var developerPage = Read(
+            "src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml.cs");
 
         Assert.Contains("AssemblyInformationalVersionAttribute", app);
         Assert.Contains("App.ProductVersion", webDispatcher);
-        Assert.Contains("App.ProductVersion", toolCenter);
-        Assert.Contains("developer.about.version", toolCenter);
+        Assert.Contains("App.ProductVersion", developerPage);
+        Assert.Contains("developer.about.version", developerPage);
     }
 
     [Fact]
@@ -910,10 +912,14 @@ public class QualityGateTests
     public void ToolCenterOverview_UsesLightweightCards()
     {
         var xaml = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
+        var developerXaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml");
+        var developerCode = Read(
+            "src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml.cs");
 
         Assert.Contains("x:Key=\"ManagementCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource LongCard}\"", xaml);
-        Assert.Equal(16, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
+        Assert.Equal(12, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
         Assert.Contains("x:Key=\"OverviewCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource ManagementCard}\"", xaml);
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
@@ -922,6 +928,14 @@ public class QualityGateTests
         var code = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
         Assert.Contains("App.ShowManagementCardShadowsForQuality", code);
         Assert.Contains("ApplyManagementCardShadowsForQuality", code);
+        Assert.Contains("x:Name=\"DeveloperHost\"", xaml);
+        Assert.DoesNotContain("<local:DeveloperPageControl", xaml);
+        Assert.Contains("DeveloperHost.Content ??= new DeveloperPageControl()", code);
+        Assert.Equal(4, developerXaml.Split("Style=\"{StaticResource DeveloperCard}\"").Length - 1);
+        Assert.Contains("VerticalAlignment=\"Top\"", developerXaml);
+        Assert.Contains("MaxHeight=\"240\"", developerXaml);
+        Assert.Contains("IDisposable", developerCode);
+        Assert.Contains("PluginsChanged -= OnPluginsChanged", developerCode);
     }
 
     [Fact]

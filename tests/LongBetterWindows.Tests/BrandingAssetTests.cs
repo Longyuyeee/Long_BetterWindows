@@ -107,11 +107,18 @@ public sealed class BrandingAssetTests
             "LongBetterWindows.Host",
             "Views",
             "ToolCenterControl.xaml"));
+        var developerPage = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "DeveloperPageControl.xaml"));
         const string resource =
             "/LongBetterWindows.Host;component/Assets/app-icon.png";
         Assert.Contains(resource, mainWindow);
         Assert.True(
-            toolCenter.Split(resource, StringSplitOptions.None).Length - 1 >= 2);
+            (toolCenter + developerPage)
+                .Split(resource, StringSplitOptions.None).Length - 1 >= 2);
     }
 
     private static Dictionary<string, JsonElement> ReadJson(string path)

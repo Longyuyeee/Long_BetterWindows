@@ -94,6 +94,8 @@ namespace LongBetterWindows.Host
                 ToolCenter.OpenSystemForQuality();
             if ((Application.Current as App)?.ShowSettingsForQualityRequested == true)
                 ToolCenter.OpenSettingsForQuality();
+            if ((Application.Current as App)?.ShowDeveloperForQualityRequested == true)
+                ToolCenter.OpenDeveloperForQuality();
             if ((Application.Current as App)?.ShowWelcomeForQualityRequested == true)
                 ToolCenter.ShowWelcomeForQuality();
 
