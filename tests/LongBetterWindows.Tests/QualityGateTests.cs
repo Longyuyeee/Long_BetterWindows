@@ -989,6 +989,27 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void PluginBuild_ExcludesRuntimeSettingsFromBuildAndPublishArtifacts()
+    {
+        var project = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "LongBetterWindows.Host.csproj");
+
+        Assert.Contains(
+            "<RemoveDir Directories=\"$(OutputPath)Plugins\\ClipboardTool;",
+            project);
+        Assert.Equal(
+            18,
+            project.Split(
+                "/XD bin obj /XF config.json",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains(
+            "$(PublishDir)Plugins&quot; /S /XF config.json",
+            project);
+    }
+
+    [Fact]
     public void ReleasePipeline_ValidatesPublishedCommandsAndWebViewCleanup()
     {
         var release = Read("release.ps1");

@@ -858,6 +858,92 @@ public class CommandContractTests
     }
 
     [Fact]
+    public void PluginEntry_AutoStartPreferenceDistinguishesDefaultsAndLegacySettings()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(root, "config.json"),
+                """{"auto_start":"true"}""");
+            var manifest = new PluginManifest
+            {
+                Id = "com.test.preference",
+                Name = "Preference",
+                Version = "1.0.0",
+                EntryPoint = "preference.dll",
+                DefaultSettings = new Dictionary<string, object>
+                {
+                    ["auto_start"] = false,
+                },
+            };
+            var entry = new PluginEntry(
+                manifest,
+                new BackgroundLifecyclePlugin(),
+                root,
+                registrationRevision: 1);
+
+            var legacy = entry.GetAutoStartPreference();
+            Assert.True(legacy.Enabled);
+            Assert.Equal(AutoStartSettingSource.LegacyUnknown, legacy.Source);
+
+            entry.SetAutoStart(false);
+
+            var user = entry.GetAutoStartPreference();
+            Assert.False(user.Enabled);
+            Assert.Equal(AutoStartSettingSource.User, user.Source);
+            Assert.Contains(
+                "\"auto_start_source\": \"user\"",
+                File.ReadAllText(Path.Combine(root, "config.json")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void PluginEntry_AutoStartPreferenceUsesManifestAndLifecycleDefaults()
+    {
+        var plugin = new BackgroundLifecyclePlugin();
+        var manifestDefault = new PluginEntry(
+            new PluginManifest
+            {
+                Id = "com.test.manifest-default",
+                Name = "Manifest default",
+                Version = "1.0.0",
+                EntryPoint = "manifest.dll",
+                DefaultSettings = new Dictionary<string, object>
+                {
+                    ["auto_start"] = false,
+                },
+            },
+            plugin,
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+            registrationRevision: 1);
+        var lifecycleDefault = new PluginEntry(
+            new PluginManifest
+            {
+                Id = "com.test.lifecycle-default",
+                Name = "Lifecycle default",
+                Version = "1.0.0",
+                EntryPoint = "lifecycle.dll",
+                Lifecycle = new PluginLifecyclePreference { StartWithHost = true },
+            },
+            plugin,
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+            registrationRevision: 2);
+
+        Assert.Equal(
+            new AutoStartPreference(false, AutoStartSettingSource.ManifestDefault),
+            manifestDefault.GetAutoStartPreference());
+        Assert.Equal(
+            new AutoStartPreference(true, AutoStartSettingSource.LifecycleDefault),
+            lifecycleDefault.GetAutoStartPreference());
+    }
+
+    [Fact]
     public async Task PluginRegistry_FailedStopDoesNotPublishStoppedState()
     {
         var registry = new PluginRegistry();

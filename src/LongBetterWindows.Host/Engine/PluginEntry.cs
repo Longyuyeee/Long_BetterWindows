@@ -4,9 +4,23 @@ using LongBetterWindows.Host.Core;
 
 namespace LongBetterWindows.Host.Engine
 {
+    internal enum AutoStartSettingSource
+    {
+        LifecycleDefault,
+        ManifestDefault,
+        LegacyUnknown,
+        User,
+    }
+
+    internal sealed record AutoStartPreference(
+        bool Enabled,
+        AutoStartSettingSource Source);
+
     public sealed class PluginEntry
     {
         private Dictionary<string, object> _settings;
+        private readonly HashSet<string> _persistedSettings =
+            new(StringComparer.OrdinalIgnoreCase);
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = true,
@@ -75,6 +89,39 @@ namespace LongBetterWindows.Host.Engine
         public void SetSetting(string key, string value)
         {
             _settings[key] = value;
+            _persistedSettings.Add(key);
+            SaveSettings();
+        }
+
+        internal AutoStartPreference GetAutoStartPreference()
+        {
+            var configured = GetSetting("auto_start");
+            var enabled = bool.TryParse(configured, out var parsed)
+                ? parsed
+                : Lifecycle.StartWithHost;
+            if (_persistedSettings.Contains("auto_start"))
+            {
+                var source = GetSetting("auto_start_source");
+                return new AutoStartPreference(
+                    enabled,
+                    string.Equals(source, "user", StringComparison.OrdinalIgnoreCase)
+                        ? AutoStartSettingSource.User
+                        : AutoStartSettingSource.LegacyUnknown);
+            }
+
+            return new AutoStartPreference(
+                enabled,
+                Manifest.DefaultSettings?.ContainsKey("auto_start") == true
+                    ? AutoStartSettingSource.ManifestDefault
+                    : AutoStartSettingSource.LifecycleDefault);
+        }
+
+        internal void SetAutoStart(bool enabled)
+        {
+            _settings["auto_start"] = enabled ? "true" : "false";
+            _settings["auto_start_source"] = "user";
+            _persistedSettings.Add("auto_start");
+            _persistedSettings.Add("auto_start_source");
             SaveSettings();
         }
 
@@ -101,7 +148,10 @@ namespace LongBetterWindows.Host.Engine
                     if (saved != null)
                     {
                         foreach (var kv in saved)
+                        {
                             settings[kv.Key] = kv.Value;
+                            _persistedSettings.Add(kv.Key);
+                        }
                     }
                 }
                 catch { }

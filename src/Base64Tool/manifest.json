@@ -48,7 +48,7 @@
     "min_height": 560
   },
   "lifecycle": {
-    "start_with_host": true,
+    "start_with_host": false,
     "close_behavior": "stop",
     "default_presentation": "embedded",
     "search_in_background": false
@@ -60,5 +60,5 @@
       "en-US": "i18n/en-US.json"
     }
   },
-  "default_settings": {"auto_start": true}
+  "default_settings": {"auto_start": false}
 }

@@ -11,6 +11,30 @@ public sealed class BuiltInPluginLocalizationTests
 {
     [Theory]
     [InlineData("Base64Tool")]
+    [InlineData("ClipboardTool")]
+    [InlineData("FileRenamerPlugin")]
+    [InlineData("JsonFormatterPlugin")]
+    [InlineData("MarkdownPreview")]
+    [InlineData("PasswordGenerator")]
+    [InlineData("QuickNotePlugin")]
+    [InlineData("SamplePlugin")]
+    [InlineData("TextDiffPlugin")]
+    [InlineData("TranslatePlugin")]
+    public async Task UtilityPlugin_DefaultsToOnDemandStartup(string plugin)
+    {
+        var root = FindRepositoryRoot();
+        var result = await ManifestReader.ReadAsync(
+            Path.Combine(root, "src", plugin));
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(
+            "false",
+            ReadSetting(result.Manifest!.DefaultSettings, "auto_start"));
+        Assert.False(result.Manifest.Lifecycle?.StartWithHost ?? false);
+    }
+
+    [Theory]
+    [InlineData("Base64Tool")]
     [InlineData("ClipboardHistory")]
     [InlineData("ClipboardTool")]
     [InlineData("ColorPickerPlugin")]
@@ -613,6 +637,17 @@ public sealed class BuiltInPluginLocalizationTests
         => JsonDocument.Parse(File.ReadAllText(Path.Combine(
             directory,
             localization.Resources[language])));
+
+    private static string? ReadSetting(
+        IReadOnlyDictionary<string, object>? settings,
+        string key)
+    {
+        if (settings?.TryGetValue(key, out var value) != true)
+            return null;
+        return value is JsonElement element
+            ? element.GetRawText()
+            : value?.ToString()?.ToLowerInvariant();
+    }
 
     private static string FindRepositoryRoot()
     {

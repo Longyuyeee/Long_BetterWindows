@@ -100,24 +100,25 @@
     <Exec Command="if exist &quot;$(RepoRoot)src\WindowManagerPlugin\bin\$(Configuration)\net8.0-windows\WindowManagerPlugin.dll&quot; copy /Y &quot;$(RepoRoot)src\WindowManagerPlugin\bin\$(Configuration)\net8.0-windows\WindowManagerPlugin.dll&quot; &quot;$(OutputPath)Plugins\WindowManagerPlugin\&quot; &gt; nul" />
 
     <!-- Web 插件：robocopy 整个目录（排除 bin/obj） -->
-    <Exec Command="robocopy &quot;$(RepoRoot)src\ClipboardTool&quot; &quot;$(OutputPath)Plugins\ClipboardTool&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\QuickNotePlugin&quot; &quot;$(OutputPath)Plugins\QuickNotePlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\TranslatePlugin&quot; &quot;$(OutputPath)Plugins\TranslatePlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\FileRenamerPlugin&quot; &quot;$(OutputPath)Plugins\FileRenamerPlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\JsonFormatterPlugin&quot; &quot;$(OutputPath)Plugins\JsonFormatterPlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\Base64Tool&quot; &quot;$(OutputPath)Plugins\Base64Tool&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\TextDiffPlugin&quot; &quot;$(OutputPath)Plugins\TextDiffPlugin&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\MarkdownPreview&quot; &quot;$(OutputPath)Plugins\MarkdownPreview&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\PasswordGenerator&quot; &quot;$(OutputPath)Plugins\PasswordGenerator&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\UrlToolkit&quot; &quot;$(OutputPath)Plugins\UrlToolkit&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\TimestampConverter&quot; &quot;$(OutputPath)Plugins\TimestampConverter&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\RegexTester&quot; &quot;$(OutputPath)Plugins\RegexTester&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\UuidGenerator&quot; &quot;$(OutputPath)Plugins\UuidGenerator&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\ClipboardHistory&quot; &quot;$(OutputPath)Plugins\ClipboardHistory&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\DevToolkit&quot; &quot;$(OutputPath)Plugins\DevToolkit&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\FileOrganizer&quot; &quot;$(OutputPath)Plugins\FileOrganizer&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\HardwareMonitor&quot; &quot;$(OutputPath)Plugins\HardwareMonitor&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
-    <Exec Command="robocopy &quot;$(RepoRoot)src\PortManager&quot; &quot;$(OutputPath)Plugins\PortManager&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <RemoveDir Directories="$(OutputPath)Plugins\ClipboardTool;$(OutputPath)Plugins\QuickNotePlugin;$(OutputPath)Plugins\TranslatePlugin;$(OutputPath)Plugins\FileRenamerPlugin;$(OutputPath)Plugins\JsonFormatterPlugin;$(OutputPath)Plugins\Base64Tool;$(OutputPath)Plugins\TextDiffPlugin;$(OutputPath)Plugins\MarkdownPreview;$(OutputPath)Plugins\PasswordGenerator;$(OutputPath)Plugins\UrlToolkit;$(OutputPath)Plugins\TimestampConverter;$(OutputPath)Plugins\RegexTester;$(OutputPath)Plugins\UuidGenerator;$(OutputPath)Plugins\ClipboardHistory;$(OutputPath)Plugins\DevToolkit;$(OutputPath)Plugins\FileOrganizer;$(OutputPath)Plugins\HardwareMonitor;$(OutputPath)Plugins\PortManager" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\ClipboardTool&quot; &quot;$(OutputPath)Plugins\ClipboardTool&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\QuickNotePlugin&quot; &quot;$(OutputPath)Plugins\QuickNotePlugin&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\TranslatePlugin&quot; &quot;$(OutputPath)Plugins\TranslatePlugin&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\FileRenamerPlugin&quot; &quot;$(OutputPath)Plugins\FileRenamerPlugin&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\JsonFormatterPlugin&quot; &quot;$(OutputPath)Plugins\JsonFormatterPlugin&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\Base64Tool&quot; &quot;$(OutputPath)Plugins\Base64Tool&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\TextDiffPlugin&quot; &quot;$(OutputPath)Plugins\TextDiffPlugin&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\MarkdownPreview&quot; &quot;$(OutputPath)Plugins\MarkdownPreview&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\PasswordGenerator&quot; &quot;$(OutputPath)Plugins\PasswordGenerator&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\UrlToolkit&quot; &quot;$(OutputPath)Plugins\UrlToolkit&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\TimestampConverter&quot; &quot;$(OutputPath)Plugins\TimestampConverter&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\RegexTester&quot; &quot;$(OutputPath)Plugins\RegexTester&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\UuidGenerator&quot; &quot;$(OutputPath)Plugins\UuidGenerator&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\ClipboardHistory&quot; &quot;$(OutputPath)Plugins\ClipboardHistory&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\DevToolkit&quot; &quot;$(OutputPath)Plugins\DevToolkit&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\FileOrganizer&quot; &quot;$(OutputPath)Plugins\FileOrganizer&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\HardwareMonitor&quot; &quot;$(OutputPath)Plugins\HardwareMonitor&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(RepoRoot)src\PortManager&quot; &quot;$(OutputPath)Plugins\PortManager&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
   </Target>
 
   <!-- 发布宿主时补齐原生插件，并将完整插件集写入最终 PublishDir。 -->
@@ -131,7 +132,7 @@
 
   <Target Name="CopyPluginsToPublish" AfterTargets="Publish">
     <MakeDir Directories="$(PublishDir)Plugins" />
-    <Exec Command="robocopy &quot;$(OutputPath)Plugins&quot; &quot;$(PublishDir)Plugins&quot; /S /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Exec Command="robocopy &quot;$(OutputPath)Plugins&quot; &quot;$(PublishDir)Plugins&quot; /S /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
   </Target>
 
 </Project>

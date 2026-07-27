@@ -212,7 +212,7 @@ namespace LongBetterWindows.Host.Engine
                         {
                             SetState(pluginId, PluginState.Running);
                             if (persistAutoStart)
-                                entry.SetSetting("auto_start", "true");
+                                entry.SetAutoStart(true);
                             Log.Information("插件 {PluginId} 已启用", pluginId);
                         }
                         return ok;
@@ -222,7 +222,7 @@ namespace LongBetterWindows.Host.Engine
                         // WebPluginRuntime 等非 ILongPlugin 类型，默认已运行
                         SetState(pluginId, PluginState.Running);
                         if (persistAutoStart)
-                            entry.SetSetting("auto_start", "true");
+                            entry.SetAutoStart(true);
                         Log.Information("插件 {PluginId} 已启用", pluginId);
                         return true;
                     }
@@ -268,7 +268,7 @@ namespace LongBetterWindows.Host.Engine
                     await _hostResourceReleaser(pluginId);
                 SetState(pluginId, PluginState.Stopped);
                 if (persistAutoStart)
-                    entry.SetSetting("auto_start", "false");
+                    entry.SetAutoStart(false);
                 Log.Information("插件 {PluginId} 已停止", pluginId);
                 return true;
             }

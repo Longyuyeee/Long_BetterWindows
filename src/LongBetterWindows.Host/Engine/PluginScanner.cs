@@ -294,10 +294,14 @@ namespace LongBetterWindows.Host.Engine
                 await NotifyPluginLanguageAsync(entry, _currentLanguage());
             _directoryPlugins[pluginDir] = new LoadedDirectoryPlugin(
                 manifest.Id, runtime);
-            var autoStart = entry.GetSetting("auto_start")
-                ?? (entry.Lifecycle.StartWithHost ? "true" : "false");
+            var autoStart = entry.GetAutoStartPreference();
+            Log.Information(
+                "插件 {PluginId} 自动启动决策: Enabled={Enabled}, Source={Source}",
+                manifest.Id,
+                autoStart.Enabled,
+                autoStart.Source);
 
-            if (autoStart == "true")
+            if (autoStart.Enabled)
             {
                 using (PluginAccessContext.Enter(manifest.Id))
                 {
