@@ -30,6 +30,7 @@ public class AppStartupOptionsTests
             "--quality-terminal-export-dir", "quality-exports",
             "--quality-plugin-page-release-report", "plugin-release.json",
             "--quality-startup-report", "startup.json",
+            "--quality-management-card-shadows",
             "--quality-show-welcome",
             "--quality-market-list",
         ]);
@@ -58,6 +59,7 @@ public class AppStartupOptionsTests
             "plugin-release.json",
             options.QualityPluginPageReleaseReportPath);
         Assert.Equal("startup.json", options.QualityStartupReportPath);
+        Assert.True(options.QualityManagementCardShadows);
         Assert.True(options.ShowWelcomeForQuality);
         Assert.True(options.ShowMarketListForQuality);
     }

@@ -30,6 +30,13 @@ namespace LongBetterWindows.Host
         {
             App.MarkStartupStage("main_window_constructor_begin");
             InitializeComponent();
+            EventHandler? firstLayout = null;
+            firstLayout = (_, _) =>
+            {
+                LayoutUpdated -= firstLayout;
+                App.MarkStartupStage("main_window_first_layout");
+            };
+            LayoutUpdated += firstLayout;
             _tray = new TrayService(this);
             ToolCenter.WorkflowReviewClosed += (_, _) =>
             {
@@ -66,6 +73,12 @@ namespace LongBetterWindows.Host
                 WorkflowTerminalClearButton.Visibility = Visibility.Collapsed;
             };
             App.MarkStartupStage("main_window_constructor_end");
+        }
+
+        protected override void OnContentRendered(EventArgs e)
+        {
+            base.OnContentRendered(e);
+            App.MarkStartupStage("main_window_first_render");
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)

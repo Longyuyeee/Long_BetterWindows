@@ -18,6 +18,7 @@ namespace LongBetterWindows.Host.Services
         public bool OpenPluginsForQuality { get; private init; }
         public string? QualityPluginPageReleaseReportPath { get; private init; }
         public string? QualityStartupReportPath { get; private init; }
+        public bool QualityManagementCardShadows { get; private init; }
         public bool OpenSystemForQuality { get; private init; }
         public bool OpenSettingsForQuality { get; private init; }
         public bool ShowWelcomeForQuality { get; private init; }
@@ -80,6 +81,9 @@ namespace LongBetterWindows.Host.Services
                 QualityStartupReportPath = ReadArgument(
                     arguments,
                     "--quality-startup-report"),
+                QualityManagementCardShadows = HasSwitch(
+                    arguments,
+                    "--quality-management-card-shadows"),
                 OpenSystemForQuality = HasSwitch(arguments, "--quality-open-system") || captureView == "system",
                 OpenSettingsForQuality = HasSwitch(arguments, "--quality-open-settings") || captureView == "settings",
                 ShowWelcomeForQuality = HasSwitch(arguments, "--quality-show-welcome"),

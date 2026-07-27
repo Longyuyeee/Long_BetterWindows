@@ -38,7 +38,10 @@ namespace LongBetterWindows.Host.Services
                 _samples.Add(sample);
         }
 
-        public async Task WriteAsync(PluginRuntimeStartResult result)
+        public async Task WriteAsync(
+            PluginRuntimeStartResult result,
+            bool managementCardShadows,
+            int managementCardShadowCount)
         {
             StartupPerformanceSample[] samples;
             lock (_sync)
@@ -50,6 +53,8 @@ namespace LongBetterWindows.Host.Services
                 captured_at = DateTimeOffset.UtcNow,
                 configuration = BuildConfiguration,
                 process_architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+                management_card_shadows = managementCardShadows,
+                management_card_shadow_count = managementCardShadowCount,
                 loaded_plugin_count = result.LoadedPluginCount,
                 recovered_transaction_count = result.RecoveredTransactionCount,
                 installed_package_count = result.InstalledPackageCount,

@@ -918,6 +918,10 @@ public class QualityGateTests
         Assert.Contains("BasedOn=\"{StaticResource ManagementCard}\"", xaml);
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
         Assert.Equal(5, xaml.Split("Style=\"{StaticResource OverviewCard}\"").Length - 1);
+
+        var code = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
+        Assert.Contains("App.ShowManagementCardShadowsForQuality", code);
+        Assert.Contains("ApplyManagementCardShadowsForQuality", code);
     }
 
     [Fact]

@@ -20,12 +20,19 @@ public class StartupPerformanceTraceTests
             var trace = new StartupPerformanceTrace(reportPath);
             trace.Mark("first");
             trace.Mark("second");
-            await trace.WriteAsync(new PluginRuntimeStartResult(25, 0, 0, null));
+            await trace.WriteAsync(
+                new PluginRuntimeStartResult(25, 0, 0, null),
+                managementCardShadows: true,
+                managementCardShadowCount: 21);
 
             using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath));
             var root = report.RootElement;
             Assert.Equal(1, root.GetProperty("schema_version").GetInt32());
             Assert.Equal(25, root.GetProperty("loaded_plugin_count").GetInt32());
+            Assert.True(root.GetProperty("management_card_shadows").GetBoolean());
+            Assert.Equal(
+                21,
+                root.GetProperty("management_card_shadow_count").GetInt32());
             var samples = root.GetProperty("samples");
             Assert.Equal(2, samples.GetArrayLength());
             Assert.Equal("first", samples[0].GetProperty("stage").GetString());

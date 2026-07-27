@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using LongBetterWindows.Host.Interaction;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
@@ -36,6 +37,14 @@ namespace LongBetterWindows.Host.Views
         public ToolCenterControl()
         {
             InitializeComponent();
+            if (App.ShowManagementCardShadowsForQuality)
+            {
+                var count = ApplyManagementCardShadowsForQuality();
+                App.RecordManagementCardShadowCount(count);
+                if (count == 0)
+                    throw new InvalidOperationException(
+                        "Quality management-card shadow baseline did not find any cards.");
+            }
             InitializeLanguageSelector();
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             Unloaded += (_, _) =>
@@ -314,6 +323,49 @@ namespace LongBetterWindows.Host.Views
             var reference = new WeakReference(PluginManagementHost.Content);
             ShowPage("overview");
             return reference;
+        }
+
+        private int ApplyManagementCardShadowsForQuality()
+        {
+            if (FindResource("Long.Shadow.Level1") is not Effect shadow
+                || Resources["ManagementCard"] is not Style managementStyle)
+            {
+                return 0;
+            }
+
+            var count = 0;
+            foreach (var border in EnumerateLogicalDescendants(this).OfType<Border>())
+            {
+                if (IsBasedOn(border.Style, managementStyle))
+                {
+                    border.Effect = shadow.CloneCurrentValue();
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static bool IsBasedOn(Style? style, Style expected)
+        {
+            for (var current = style; current is not null; current = current.BasedOn)
+            {
+                if (ReferenceEquals(current, expected))
+                    return true;
+            }
+            return false;
+        }
+
+        private static IEnumerable<DependencyObject> EnumerateLogicalDescendants(
+            DependencyObject parent)
+        {
+            foreach (var item in LogicalTreeHelper.GetChildren(parent))
+            {
+                if (item is not DependencyObject child)
+                    continue;
+                yield return child;
+                foreach (var descendant in EnumerateLogicalDescendants(child))
+                    yield return descendant;
+            }
         }
         internal void OpenSystemForQuality() => ShowPage("system");
         internal void OpenSettingsForQuality() => ShowPage("settings");

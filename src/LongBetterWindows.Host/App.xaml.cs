@@ -31,6 +31,7 @@ namespace LongBetterWindows.Host
         private AppStartupOptions _startupOptions = new();
         private QualityRuntimeService? _qualityRuntime;
         private StartupPerformanceTrace? _startupTrace;
+        private int _qualityManagementCardShadowCount;
         private int _pluginRuntimeStarted;
         private PluginRuntimeCoordinator? _pluginRuntime;
         private static bool _currentIsLight;
@@ -43,6 +44,8 @@ namespace LongBetterWindows.Host
         internal bool ShowSystemForQualityRequested => _startupOptions.OpenSystemForQuality;
         internal bool ShowSettingsForQualityRequested => _startupOptions.OpenSettingsForQuality;
         internal bool ShowWelcomeForQualityRequested => _startupOptions.ShowWelcomeForQuality;
+        internal static bool ShowManagementCardShadowsForQuality
+            => Current is App { _startupOptions.QualityManagementCardShadows: true };
         internal bool QualityWorkflowAutomationEnabled
             => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId)
                 || !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowsDirectory);
@@ -133,6 +136,12 @@ namespace LongBetterWindows.Host
 
         internal static void MarkStartupStage(string stage)
             => (Current as App)?._startupTrace?.Mark(stage);
+
+        internal static void RecordManagementCardShadowCount(int count)
+        {
+            if (Current is App app)
+                app._qualityManagementCardShadowCount = count;
+        }
 
         internal void StartPluginRuntime()
         {
@@ -227,7 +236,10 @@ namespace LongBetterWindows.Host
 
                 if (_startupTrace is not null)
                 {
-                    await _startupTrace.WriteAsync(runtimeResult);
+                    await _startupTrace.WriteAsync(
+                        runtimeResult,
+                        _startupOptions.QualityManagementCardShadows,
+                        _qualityManagementCardShadowCount);
                     Shutdown(0);
                     return;
                 }

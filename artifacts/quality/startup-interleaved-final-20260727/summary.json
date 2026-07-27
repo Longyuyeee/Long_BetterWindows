@@ -1,0 +1,82 @@
+{
+  "captured_at": "2026-07-27",
+  "configuration": "Release",
+  "binary_strategy": "same_binary_interleaved",
+  "sequence": [
+    "optimized",
+    "shadow",
+    "shadow",
+    "optimized",
+    "shadow",
+    "optimized",
+    "optimized",
+    "shadow",
+    "optimized",
+    "shadow",
+    "shadow",
+    "optimized"
+  ],
+  "runs_per_variant": 6,
+  "quality_baseline": {
+    "switch": "--quality-management-card-shadows",
+    "expected_card_count": 21,
+    "observed_card_count": 21
+  },
+  "optimized": {
+    "runtime_ready_elapsed_average_ms": 3965.3,
+    "runtime_ready_elapsed_median_ms": 3630.6,
+    "runtime_ready_cpu_average_ms": 3763.0,
+    "runtime_ready_cpu_median_ms": 3726.6,
+    "runtime_ready_working_set_average_mb": 193.7,
+    "runtime_ready_working_set_median_mb": 198.0,
+    "runtime_ready_working_set_max_mb": 200.3,
+    "runtime_ready_private_memory_average_mb": 148.5,
+    "runtime_ready_private_memory_median_mb": 151.2,
+    "runtime_ready_private_memory_max_mb": 154.9,
+    "constructor_to_first_layout_average_ms": 1008.2,
+    "first_layout_to_loaded_average_ms": 821.8,
+    "loaded_to_first_render_average_ms": 86.3,
+    "plugin_source_discovery_average_ms": 15.4,
+    "plugin_manifest_read_average_ms": 463.0,
+    "plugin_registration_average_ms": 728.6
+  },
+  "shadow_baseline": {
+    "runtime_ready_elapsed_average_ms": 4366.6,
+    "runtime_ready_elapsed_median_ms": 4275.6,
+    "runtime_ready_cpu_average_ms": 4375.0,
+    "runtime_ready_cpu_median_ms": 4461.0,
+    "runtime_ready_working_set_average_mb": 190.0,
+    "runtime_ready_working_set_median_mb": 188.7,
+    "runtime_ready_working_set_max_mb": 202.2,
+    "runtime_ready_private_memory_average_mb": 171.4,
+    "runtime_ready_private_memory_median_mb": 169.4,
+    "runtime_ready_private_memory_max_mb": 180.5,
+    "constructor_to_first_layout_average_ms": 1273.3,
+    "first_layout_to_loaded_average_ms": 1181.4,
+    "loaded_to_first_render_average_ms": 75.1,
+    "plugin_source_discovery_average_ms": 15.9,
+    "plugin_manifest_read_average_ms": 300.4,
+    "plugin_registration_average_ms": 359.4
+  },
+  "decision": {
+    "runtime_ready_elapsed_average_change_percent": -9.2,
+    "runtime_ready_elapsed_median_change_percent": -15.1,
+    "runtime_ready_cpu_average_change_percent": -14.0,
+    "runtime_ready_cpu_median_change_percent": -16.5,
+    "private_memory_average_change_mb": -22.9,
+    "private_memory_average_change_percent": -13.4,
+    "private_memory_median_change_mb": -18.2,
+    "private_memory_max_change_mb": -25.6,
+    "constructor_to_first_layout_change_percent": -20.8,
+    "first_layout_to_loaded_change_percent": -30.4,
+    "working_set_improved": false,
+    "private_memory_improved": true,
+    "startup_elapsed_improved": true,
+    "strict_idle_memory_gate_passed": false
+  },
+  "visual_evidence": {
+    "optimized_sha256": "2478C84BC0527B0892B6F2AA6295FA295F94945DE1AD71C07D53D7612EFDB9D7",
+    "shadow_sha256": "55CB09C4EDFB66D2EA231BFA13369EE52030C22DC9152005A065BAF781D376CA",
+    "pixel_outputs_differ": true
+  }
+}

@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27T05:26:45.2774327+00:00",
+  "configuration": "Release",
+  "process_architecture": "X64",
+  "management_card_shadows": false,
+  "management_card_shadow_count": 0,
+  "loaded_plugin_count": 25,
+  "recovered_transaction_count": 0,
+  "installed_package_count": 0,
+  "samples": [
+    {
+      "stage": "options_parsed",
+      "elapsed_ms": 0.9,
+      "cpu_ms": 421.9,
+      "working_set_mb": 52.3,
+      "private_memory_mb": 13.8,
+      "managed_heap_mb": 1.5,
+      "thread_count": 8
+    },
+    {
+      "stage": "services_initialize_begin",
+      "elapsed_ms": 24.7,
+      "cpu_ms": 437.5,
+      "working_set_mb": 52.4,
+      "private_memory_mb": 13.8,
+      "managed_heap_mb": 1.6,
+      "thread_count": 8
+    },
+    {
+      "stage": "services_initialize_end",
+      "elapsed_ms": 109.9,
+      "cpu_ms": 515.6,
+      "working_set_mb": 59.2,
+      "private_memory_mb": 15,
+      "managed_heap_mb": 1.7,
+      "thread_count": 14
+    },
+    {
+      "stage": "localization_applied",
+      "elapsed_ms": 124.9,
+      "cpu_ms": 531.2,
+      "working_set_mb": 60.1,
+      "private_memory_mb": 16.1,
+      "managed_heap_mb": 2.8,
+      "thread_count": 14
+    },
+    {
+      "stage": "theme_applied",
+      "elapsed_ms": 344.2,
+      "cpu_ms": 750,
+      "working_set_mb": 68.8,
+      "private_memory_mb": 22.4,
+      "managed_heap_mb": 7.7,
+      "thread_count": 14
+    },
+    {
+      "stage": "app_startup_end",
+      "elapsed_ms": 353.2,
+      "cpu_ms": 765.6,
+      "working_set_mb": 68.8,
+      "private_memory_mb": 22.4,
+      "managed_heap_mb": 7.7,
+      "thread_count": 14
+    },
+    {
+      "stage": "main_window_constructor_begin",
+      "elapsed_ms": 368.2,
+      "cpu_ms": 781.2,
+      "working_set_mb": 69.3,
+      "private_memory_mb": 22.6,
+      "managed_heap_mb": 7.8,
+      "thread_count": 14
+    },
+    {
+      "stage": "main_window_source_initialized",
+      "elapsed_ms": 892.7,
+      "cpu_ms": 1343.8,
+      "working_set_mb": 101.8,
+      "private_memory_mb": 52,
+      "managed_heap_mb": 5.9,
+      "thread_count": 16
+    },
+    {
+      "stage": "plugin_runtime_scheduled",
+      "elapsed_ms": 913.5,
+      "cpu_ms": 1375,
+      "working_set_mb": 104.1,
+      "private_memory_mb": 53.6,
+      "managed_heap_mb": 5.9,
+      "thread_count": 16
+    },
+    {
+      "stage": "main_window_constructor_end",
+      "elapsed_ms": 936.1,
+      "cpu_ms": 1390.6,
+      "working_set_mb": 105.5,
+      "private_memory_mb": 54.9,
+      "managed_heap_mb": 5.9,
+      "thread_count": 17
+    },
+    {
+      "stage": "main_window_first_layout",
+      "elapsed_ms": 1051.1,
+      "cpu_ms": 1609.4,
+      "working_set_mb": 118,
+      "private_memory_mb": 65.5,
+      "managed_heap_mb": 7.2,
+      "thread_count": 17
+    },
+    {
+      "stage": "main_window_loaded",
+      "elapsed_ms": 1749.6,
+      "cpu_ms": 2312.5,
+      "working_set_mb": 166.8,
+      "private_memory_mb": 130.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 26
+    },
+    {
+      "stage": "main_window_first_render",
+      "elapsed_ms": 1825.8,
+      "cpu_ms": 2421.9,
+      "working_set_mb": 175.8,
+      "private_memory_mb": 139.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 26
+    },
+    {
+      "stage": "plugin_runtime_begin",
+      "elapsed_ms": 1843,
+      "cpu_ms": 2437.5,
+      "working_set_mb": 177.2,
+      "private_memory_mb": 140.6,
+      "managed_heap_mb": 7.3,
+      "thread_count": 26
+    },
+    {
+      "stage": "plugin_runtime_constructed",
+      "elapsed_ms": 1865.2,
+      "cpu_ms": 2484.4,
+      "working_set_mb": 177.7,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 27
+    },
+    {
+      "stage": "transaction_recovery_begin",
+      "elapsed_ms": 1879.3,
+      "cpu_ms": 2500,
+      "working_set_mb": 177.8,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 27
+    },
+    {
+      "stage": "transaction_recovery_end",
+      "elapsed_ms": 1895.8,
+      "cpu_ms": 2515.6,
+      "working_set_mb": 177.8,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 27
+    },
+    {
+      "stage": "package_install_begin",
+      "elapsed_ms": 1907.7,
+      "cpu_ms": 2531.2,
+      "working_set_mb": 177.8,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 27
+    },
+    {
+      "stage": "package_install_end",
+      "elapsed_ms": 1920.7,
+      "cpu_ms": 2531.2,
+      "working_set_mb": 177.8,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 27
+    },
+    {
+      "stage": "plugin_scan_begin",
+      "elapsed_ms": 1933.6,
+      "cpu_ms": 2546.9,
+      "working_set_mb": 177.8,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 27
+    },
+    {
+      "stage": "plugin_source_discovery_begin",
+      "elapsed_ms": 1948.1,
+      "cpu_ms": 2562.5,
+      "working_set_mb": 177.9,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.3,
+      "thread_count": 27
+    },
+    {
+      "stage": "plugin_source_discovery_end",
+      "elapsed_ms": 1962,
+      "cpu_ms": 2578.1,
+      "working_set_mb": 177.9,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.4,
+      "thread_count": 27
+    },
+    {
+      "stage": "standalone_plugin_load_begin",
+      "elapsed_ms": 1973.6,
+      "cpu_ms": 2593.8,
+      "working_set_mb": 177.9,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.4,
+      "thread_count": 27
+    },
+    {
+      "stage": "standalone_plugin_load_end",
+      "elapsed_ms": 1985.2,
+      "cpu_ms": 2593.8,
+      "working_set_mb": 177.9,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.4,
+      "thread_count": 27
+    },
+    {
+      "stage": "plugin_manifest_read_begin",
+      "elapsed_ms": 1997.8,
+      "cpu_ms": 2609.4,
+      "working_set_mb": 177.9,
+      "private_memory_mb": 140.7,
+      "managed_heap_mb": 7.4,
+      "thread_count": 27
+    },
+    {
+      "stage": "plugin_manifest_read_end",
+      "elapsed_ms": 2491.2,
+      "cpu_ms": 2843.8,
+      "working_set_mb": 180.9,
+      "private_memory_mb": 141.1,
+      "managed_heap_mb": 6.7,
+      "thread_count": 33
+    },
+    {
+      "stage": "plugin_registration_begin",
+      "elapsed_ms": 2502.8,
+      "cpu_ms": 2859.4,
+      "working_set_mb": 180.9,
+      "private_memory_mb": 141.1,
+      "managed_heap_mb": 6.7,
+      "thread_count": 33
+    },
+    {
+      "stage": "plugin_registration_end",
+      "elapsed_ms": 2953.7,
+      "cpu_ms": 3078.1,
+      "working_set_mb": 182.5,
+      "private_memory_mb": 141.1,
+      "managed_heap_mb": 8.2,
+      "thread_count": 33
+    },
+    {
+      "stage": "plugin_scan_end",
+      "elapsed_ms": 2969.9,
+      "cpu_ms": 3093.8,
+      "working_set_mb": 182.5,
+      "private_memory_mb": 141.1,
+      "managed_heap_mb": 8.2,
+      "thread_count": 33
+    },
+    {
+      "stage": "plugin_runtime_ready",
+      "elapsed_ms": 3001.8,
+      "cpu_ms": 3125,
+      "working_set_mb": 182.6,
+      "private_memory_mb": 141.1,
+      "managed_heap_mb": 8.2,
+      "thread_count": 33
+    }
+  ]
+}

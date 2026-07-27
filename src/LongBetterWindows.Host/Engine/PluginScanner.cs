@@ -31,10 +31,12 @@ namespace LongBetterWindows.Host.Engine
             new(StringComparer.OrdinalIgnoreCase);
         private readonly SemaphoreSlim _reloadGate = new(1, 1);
         private readonly Func<string>? _currentLanguage;
+        private readonly Action<string>? _startupMark;
 
         public PluginScanner(
             string? pluginsDir = null,
-            Func<string>? currentLanguage = null)
+            Func<string>? currentLanguage = null,
+            Action<string>? startupMark = null)
         {
             _sourceDiscovery = new PluginSourceDiscovery(pluginsDir);
             _standaloneLoader = new StandalonePluginLoader(
@@ -43,6 +45,7 @@ namespace LongBetterWindows.Host.Engine
                 _sourceDiscovery.ScanDirectories,
                 HandlePluginFileChangeAsync);
             _currentLanguage = currentLanguage;
+            _startupMark = startupMark;
         }
 
         public List<PluginManifest> DiscoveredManifests { get; } = new();
@@ -53,16 +56,27 @@ namespace LongBetterWindows.Host.Engine
             foreach (var scanDir in _sourceDiscovery.ScanDirectories)
                 Log.Information("扫描插件目录: {Dir}", scanDir);
 
+            _startupMark?.Invoke("plugin_source_discovery_begin");
             var sources = _sourceDiscovery.Discover();
+            _startupMark?.Invoke("plugin_source_discovery_end");
+
+            _startupMark?.Invoke("standalone_plugin_load_begin");
             foreach (var scriptFile in sources.StandaloneScripts)
                 await TryLoadStandaloneAsync(scriptFile);
+            _startupMark?.Invoke("standalone_plugin_load_end");
 
             Log.Information("发现 {Count} 个插件目录", sources.PluginDirectories.Count);
 
+            _startupMark?.Invoke("plugin_manifest_read_begin");
+            var manifests = new List<(string Directory, ManifestResult Result)>();
             foreach (var dir in sources.PluginDirectories)
-            {
-                await TryLoadPluginAsync(dir);
-            }
+                manifests.Add((dir, await ManifestReader.ReadAsync(dir)));
+            _startupMark?.Invoke("plugin_manifest_read_end");
+
+            _startupMark?.Invoke("plugin_registration_begin");
+            foreach (var (directory, result) in manifests)
+                await TryRegisterPluginAsync(directory, result);
+            _startupMark?.Invoke("plugin_registration_end");
 
             Log.Information("插件扫描完成: {Loaded}/{Total} 加载成功",
                 LoadedPlugins.Count, DiscoveredManifests.Count);
@@ -264,7 +278,13 @@ namespace LongBetterWindows.Host.Engine
         private async Task TryLoadPluginAsync(string pluginDir)
         {
             var manifestResult = await ManifestReader.ReadAsync(pluginDir);
+            await TryRegisterPluginAsync(pluginDir, manifestResult);
+        }
 
+        private async Task TryRegisterPluginAsync(
+            string pluginDir,
+            ManifestResult manifestResult)
+        {
             if (!manifestResult.IsSuccess)
             {
                 Log.Warning("插件清单无效: {Dir} - {ErrorCode} - {Error}",

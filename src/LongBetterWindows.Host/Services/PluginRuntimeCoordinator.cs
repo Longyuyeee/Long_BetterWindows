@@ -23,7 +23,10 @@ namespace LongBetterWindows.Host.Services
             _startupTrace = startupTrace;
             _scanner = new PluginScanner(
                 pluginsDirectory,
-                () => _i18n.CurrentLanguage);
+                () => _i18n.CurrentLanguage,
+                _startupTrace is null
+                    ? null
+                    : stage => _startupTrace.Mark(stage));
             _registry = registry ?? HostProvider.Instance.PluginStore;
             PackageInstaller = new LpakInstaller(_scanner, pluginsDirectory);
             _i18n.LanguageChanged += OnLanguageChanged;
