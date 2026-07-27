@@ -243,6 +243,7 @@ public class QualityGateTests
         Assert.Contains("no_clipping_or_overflow", capture);
         Assert.Contains("webview_preview", capture);
         Assert.Contains("wpf_render_target", capture);
+        Assert.Contains("'--command-text', $PluginCommandText", capture);
         Assert.Contains("ConfirmVisualReview", approve);
         Assert.Contains("ExpectedSourceCommit", approve);
         Assert.Contains("Physical DPI evidence source commit does not match ExpectedSourceCommit", approve);

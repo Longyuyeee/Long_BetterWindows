@@ -15,6 +15,7 @@ param(
     [ValidateSet('main','market','palette','plugin')]
     [string[]] $Views = @('main','market','palette','plugin'),
     [string] $PluginCommandKey = 'com.long.url-toolkit:url.encode',
+    [string] $PluginCommandText = 'Long助手 DPI 验收',
     [ValidateRange(100,10000)] [int] $CaptureDelayMilliseconds = 1500,
     [ValidateRange(30,180)] [int] $ProcessTimeoutSeconds = 90,
     [switch] $ApproveAfterVisualReview,
@@ -78,7 +79,10 @@ foreach ($theme in $Themes) {
         if ($view -eq 'market') { $arguments += '--quality-open-market' }
         if ($view -eq 'palette') { $arguments += '--quality-open-palette' }
         if ($view -eq 'plugin') {
-            $arguments += @('--run-command', $PluginCommandKey)
+            $arguments += @(
+                '--run-command', $PluginCommandKey,
+                '--command-text', $PluginCommandText
+            )
         }
 
         $process = Start-Process -FilePath $executable -ArgumentList $arguments `
