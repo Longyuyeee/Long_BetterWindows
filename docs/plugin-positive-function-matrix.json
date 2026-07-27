@@ -1,0 +1,637 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-07-27",
+  "policy": {
+    "required_plugin_count": 25,
+    "required_command_count": 42,
+    "release_rule": "Every required manual check must be passed with an existing evidence file and matching SHA-256 before a new release candidate is eligible."
+  },
+  "plugins": [
+    {
+      "id": "com.long.base64",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["base64.encode", "base64.decode"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
+          "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "encode-decode-roundtrip",
+          "commands": ["base64.encode", "base64.decode"],
+          "description": "Encode mixed Chinese/ASCII text, decode it, and confirm an exact round trip in the real plugin view.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.clipboardhistory",
+      "runtime": "web",
+      "risk": "medium",
+      "commands": ["clipboard-history.open"],
+      "automated_evidence": [
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ClipboardMonitoringLeaseManagerTests.cs",
+          "symbol": "MultipleConsumers_StartOnceAndStopAfterLastRelease"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "capture-search-reuse",
+          "commands": ["clipboard-history.open"],
+          "description": "Copy two distinct values, open history, search and reuse one value, then confirm monitoring survives a host restart.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.clipboard-tool",
+      "runtime": "web",
+      "risk": "medium",
+      "commands": ["clipboard.open"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "open-and-transform",
+          "commands": ["clipboard.open"],
+          "description": "Open from the command center with text on the clipboard and confirm the displayed content and one transform/copy action.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.color-picker",
+      "runtime": "native",
+      "risk": "high",
+      "commands": ["color.pick"],
+      "automated_evidence": [
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ScreenCaptureServiceTests.cs",
+          "symbol": "ScreenColorSampler_SamplesPhysicalScreenPixel"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "pick-visible-color",
+          "commands": ["color.pick"],
+          "description": "Pick a known visible color through the real overlay and verify the clipboard value and cancel path.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.devtoolkit",
+      "runtime": "web",
+      "risk": "medium",
+      "commands": ["dev-toolkit.open"],
+      "automated_evidence": [
+        {
+          "level": "integration",
+          "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
+          "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "open-edit-preview",
+          "commands": ["dev-toolkit.open"],
+          "description": "Open the workbench, edit a temporary plugin file, preview without losing the edit, and discard the temporary change.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.fileorganizer",
+      "runtime": "web",
+      "risk": "high",
+      "commands": ["file-organizer.open"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
+          "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "isolated-preview-and-apply",
+          "commands": ["file-organizer.open"],
+          "description": "Use an isolated temporary directory, preview an organization plan, apply it, and verify every resulting path.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.file-renamer",
+      "runtime": "web",
+      "risk": "high",
+      "commands": ["file.rename-batch"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "isolated-batch-rename",
+          "commands": ["file.rename-batch"],
+          "description": "Rename multiple files in an isolated directory, verify preview/collision handling, and confirm final names.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.folder-note",
+      "runtime": "native",
+      "risk": "high",
+      "commands": ["folder-note.edit"],
+      "automated_evidence": [
+        {
+          "level": "integration",
+          "path": "tests/LongBetterWindows.Tests/AdsServiceTransactionTests.cs",
+          "symbol": "WriteAsync_OverwritesAndReadsBackLargeUnicodeContent"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "explorer-edit-reopen",
+          "commands": ["folder-note.edit"],
+          "description": "Edit a note for an isolated Explorer folder, reopen it, verify persistence and confirm failure text on an inaccessible target.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.hardwaremonitor",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["hardware-monitor.open"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
+          "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "live-metrics-refresh",
+          "commands": ["hardware-monitor.open"],
+          "description": "Open the monitor, confirm CPU/memory values are plausible and refresh without freezing or leaking an extra view.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.json-formatter",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["json.format", "json.minify"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "format-minify-invalid",
+          "commands": ["json.format", "json.minify"],
+          "description": "Format and minify valid Unicode JSON, then verify invalid JSON shows a stable error without replacing the source.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.macro",
+      "runtime": "native",
+      "risk": "critical",
+      "commands": ["macro.record-toggle", "macro.play-once", "macro.loop-toggle"],
+      "automated_evidence": [
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+          "symbol": "StopPlayAsync_ReleasesPressedMouseButtonAndWaits"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "record-play-cancel",
+          "commands": ["macro.record-toggle", "macro.play-once", "macro.loop-toggle"],
+          "description": "Record a harmless sequence in a disposable target, play once, start/stop loop playback and confirm no key/button remains pressed.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.markdown-preview",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["markdown.preview"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "render-safe-markdown",
+          "commands": ["markdown.preview"],
+          "description": "Render headings, tables, links and code from mixed-language Markdown and confirm unsafe HTML is not executed.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.password-gen",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["password.generate"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "generate-copy-constraints",
+          "commands": ["password.generate"],
+          "description": "Generate with multiple length/character settings, verify constraints, regeneration and clipboard copy.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.portmanager",
+      "runtime": "web",
+      "risk": "high",
+      "commands": ["port-manager.open"],
+      "automated_evidence": [
+        {
+          "level": "integration",
+          "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
+          "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "inspect-owned-port",
+          "commands": ["port-manager.open"],
+          "description": "Start a disposable local listener, locate it, inspect the owning process and stop only that disposable listener.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.quicklaunch",
+      "runtime": "native",
+      "risk": "high",
+      "commands": ["launcher.open"],
+      "automated_evidence": [
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/LocalFileSearchProviderTests.cs",
+          "symbol": "SearchAsync_FindsNestedFilesAndProvidesSecondaryActions"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "large-directory-cancel-launch",
+          "commands": ["launcher.open"],
+          "description": "Search a large directory, supersede the query, verify responsive cancellation and launch one harmless result.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.quick-note",
+      "runtime": "web",
+      "risk": "medium",
+      "commands": ["note.new"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "create-persist-delete-note",
+          "commands": ["note.new"],
+          "description": "Create a Unicode note, restart the host, confirm persistence, then delete the test note.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.regex-tester",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["regex.test"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "match-groups-invalid-pattern",
+          "commands": ["regex.test"],
+          "description": "Verify multiple matches and capture groups, then confirm an invalid expression reports an error without freezing.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.sample",
+      "runtime": "native",
+      "risk": "low",
+      "commands": ["sample.hello"],
+      "automated_evidence": [
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/BuiltInPluginLocalizationTests.cs",
+          "symbol": "SamplePlugin_IsLocalizedReferenceImplementation"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "hello-settings-language",
+          "commands": ["sample.hello"],
+          "description": "Run hello, open settings and switch language while confirming state remains intact.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.screenshot",
+      "runtime": "native",
+      "risk": "high",
+      "commands": ["screenshot.full", "screenshot.region"],
+      "automated_evidence": [
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ScreenCaptureServiceTests.cs",
+          "symbol": "CaptureToBitmapAsync_CapturesPhysicalVirtualScreen"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "full-region-clipboard",
+          "commands": ["screenshot.full", "screenshot.region"],
+          "description": "Capture full screen and a dragged region, paste both clipboard images and verify cancel leaves the previous clipboard unchanged.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.text-diff",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["text.diff"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "unicode-line-diff",
+          "commands": ["text.diff"],
+          "description": "Compare multiline Unicode text and verify additions, deletions and unchanged lines are visually distinct.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.timestamp-converter",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["timestamp.convert"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "seconds-milliseconds-timezone",
+          "commands": ["timestamp.convert"],
+          "description": "Convert seconds and milliseconds in both directions and verify the displayed local/UTC timezone labels.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.translate",
+      "runtime": "web",
+      "risk": "medium",
+      "commands": ["translate.text"],
+      "automated_evidence": [
+        {
+          "level": "integration",
+          "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
+          "symbol": "SideEffectingPluginCommands_ReportActualCompletion"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "online-and-offline-recovery",
+          "commands": ["translate.text"],
+          "description": "Translate a known phrase online, then disable networking, verify the offline failure and confirm recovery after reconnecting.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.url-toolkit",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["url.encode", "url.decode"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
+          "symbol": "BuiltInManifest_CommandContract_IsValid"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "encode-decode-unicode-url",
+          "commands": ["url.encode", "url.decode"],
+          "description": "Encode and decode a URL containing Chinese text, spaces and query parameters and verify exact round trip.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.uuid-generator",
+      "runtime": "web",
+      "risk": "low",
+      "commands": ["uuid.generate"],
+      "automated_evidence": [
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/QualityGateTests.cs",
+          "symbol": "UuidGenerator"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "generate-version-format-copy",
+          "commands": ["uuid.generate"],
+          "description": "Generate supported UUID versions/formats, verify uniqueness and copy the selected value.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    },
+    {
+      "id": "com.long.window-manager",
+      "runtime": "native",
+      "risk": "critical",
+      "commands": [
+        "window.guide",
+        "window.topmost",
+        "window.left",
+        "window.right",
+        "window.maximize",
+        "window.bottom",
+        "window.top-left",
+        "window.top-right",
+        "window.bottom-left",
+        "window.bottom-right",
+        "window.third-left",
+        "window.third-right"
+      ],
+      "automated_evidence": [
+        {
+          "level": "integration",
+          "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+          "symbol": "ApplyLayout_WorksAgainstIsolatedNativeWindow"
+        }
+      ],
+      "manual_checks": [
+        {
+          "id": "layouts-topmost-multimonitor",
+          "commands": [
+            "window.guide",
+            "window.topmost",
+            "window.left",
+            "window.right",
+            "window.maximize",
+            "window.bottom",
+            "window.top-left",
+            "window.top-right",
+            "window.bottom-left",
+            "window.bottom-right",
+            "window.third-left",
+            "window.third-right"
+          ],
+          "description": "Verify guide, topmost and every layout on normal/minimized/maximized windows across available monitors, including a denied high-integrity target.",
+          "status": "pending",
+          "required_for_release": true,
+          "evidence_path": null,
+          "evidence_sha256": null
+        }
+      ]
+    }
+  ]
+}
