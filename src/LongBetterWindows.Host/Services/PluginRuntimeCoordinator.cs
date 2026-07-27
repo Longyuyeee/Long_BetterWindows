@@ -107,10 +107,24 @@ namespace LongBetterWindows.Host.Services
                 return request.ExitAfterCommand ? 2 : null;
             }
 
-            var inputType = !string.IsNullOrEmpty(request.CommandText)
-                            && descriptor.Command.AcceptedInputs.Contains(AcceptedInputType.Text)
-                ? AcceptedInputType.Text
-                : AcceptedInputType.None;
+            var commandPaths = request.CommandPaths ?? Array.Empty<string>();
+            var inputType = ResolveInputType(
+                descriptor.Command.AcceptedInputs,
+                request.CommandText,
+                commandPaths);
+            if (inputType is null)
+            {
+                var failure = PluginCommandResult.Failure(
+                    "Requested command does not accept the supplied input.");
+                await WriteCommandReportAsync(
+                    request,
+                    descriptor,
+                    AcceptedInputType.None,
+                    failure,
+                    0,
+                    3);
+                return request.ExitAfterCommand ? 3 : null;
+            }
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             if (!string.IsNullOrWhiteSpace(request.QualityCommandReportPath))
                 CapabilityUsageTracker.Instance.ClearStats(descriptor.PluginId);
@@ -122,8 +136,11 @@ namespace LongBetterWindows.Host.Services
                 new PluginCommandInvocation
                 {
                     CommandId = descriptor.Command.Id,
-                    InputType = inputType,
+                    InputType = inputType.Value,
                     Text = inputType == AcceptedInputType.Text ? request.CommandText : null,
+                    Paths = IsPathInput(inputType.Value)
+                        ? commandPaths
+                        : Array.Empty<string>(),
                 });
             stopwatch.Stop();
             var exitCode = result.IsSuccess ? 0 : 3;
@@ -136,12 +153,51 @@ namespace LongBetterWindows.Host.Services
             await WriteCommandReportAsync(
                 request,
                 descriptor,
-                inputType,
+                inputType.Value,
                 result,
                 stopwatch.Elapsed.TotalMilliseconds,
                 exitCode);
             return request.ExitAfterCommand ? exitCode : null;
         }
+
+        private static AcceptedInputType? ResolveInputType(
+            IReadOnlyList<AcceptedInputType> acceptedInputs,
+            string? commandText,
+            IReadOnlyList<string> commandPaths)
+        {
+            if (commandPaths.Count > 0)
+            {
+                if (commandPaths.Count == 1)
+                {
+                    if (acceptedInputs.Contains(AcceptedInputType.Folder))
+                        return AcceptedInputType.Folder;
+                    if (acceptedInputs.Contains(AcceptedInputType.File))
+                        return AcceptedInputType.File;
+                }
+                if (acceptedInputs.Contains(AcceptedInputType.Files))
+                    return AcceptedInputType.Files;
+                if (acceptedInputs.Contains(AcceptedInputType.ExplorerSelection))
+                    return AcceptedInputType.ExplorerSelection;
+                return null;
+            }
+
+            if (!string.IsNullOrEmpty(commandText))
+            {
+                return acceptedInputs.Contains(AcceptedInputType.Text)
+                    ? AcceptedInputType.Text
+                    : null;
+            }
+
+            return acceptedInputs.Contains(AcceptedInputType.None)
+                ? AcceptedInputType.None
+                : null;
+        }
+
+        private static bool IsPathInput(AcceptedInputType inputType)
+            => inputType is AcceptedInputType.File
+                or AcceptedInputType.Files
+                or AcceptedInputType.Folder
+                or AcceptedInputType.ExplorerSelection;
 
         private static async Task WriteCommandReportAsync(
             PluginRuntimeStartRequest request,
@@ -163,6 +219,9 @@ namespace LongBetterWindows.Host.Services
             var inputText = inputType == AcceptedInputType.Text
                 ? request.CommandText ?? string.Empty
                 : string.Empty;
+            var inputPaths = IsPathInput(inputType)
+                ? request.CommandPaths ?? Array.Empty<string>()
+                : Array.Empty<string>();
             var outputs = result.Outputs.ToDictionary(
                 item => item.Key,
                 item => new QualityCommandOutput(
@@ -185,6 +244,12 @@ namespace LongBetterWindows.Host.Services
                     : Convert.ToHexString(
                         SHA256.HashData(Encoding.UTF8.GetBytes(inputText)))
                         .ToLowerInvariant(),
+                inputPaths.Count,
+                inputPaths.Select(path =>
+                        Convert.ToHexString(
+                            SHA256.HashData(Encoding.UTF8.GetBytes(path)))
+                            .ToLowerInvariant())
+                    .ToArray(),
                 result.IsSuccess,
                 result.Message,
                 result.KeepPaletteOpen,
@@ -251,7 +316,8 @@ namespace LongBetterWindows.Host.Services
         string? CommandText,
         bool ExitAfterCommand,
         string? QualityCommandReportPath = null,
-        string? QualityCommandFixturePath = null);
+        string? QualityCommandFixturePath = null,
+        IReadOnlyList<string>? CommandPaths = null);
 
     internal sealed record PluginRuntimeStartResult(
         int LoadedPluginCount,
@@ -268,6 +334,9 @@ namespace LongBetterWindows.Host.Services
         [property: JsonPropertyName("input_type")] string InputType,
         [property: JsonPropertyName("input_text_length")] int InputTextLength,
         [property: JsonPropertyName("input_text_sha256")] string? InputTextSha256,
+        [property: JsonPropertyName("input_path_count")] int InputPathCount,
+        [property: JsonPropertyName("input_path_sha256")]
+            IReadOnlyList<string> InputPathSha256,
         [property: JsonPropertyName("success")] bool Success,
         [property: JsonPropertyName("message")] string? Message,
         [property: JsonPropertyName("keep_palette_open")] bool KeepPaletteOpen,

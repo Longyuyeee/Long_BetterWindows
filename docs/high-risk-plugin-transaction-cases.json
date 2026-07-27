@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-07-27",
+  "policy": {
+    "required_plugin_count": 4,
+    "required_command_count": 4,
+    "isolation": "Every case uses a fresh host process and a random workspace under the system temporary directory. Port queries use only a listener owned by the matrix process.",
+    "side_effect_rule": "Startup commands may only preview or read. File moves, renames, ADS writes and process termination remain behind explicit user confirmation and are verified separately at the transactional service boundary."
+  },
+  "cases": [
+    {
+      "id": "file-organizer-temporary-preview",
+      "plugin_id": "com.long.fileorganizer",
+      "plugin_folder": "FileOrganizer",
+      "command_id": "file-organizer.open",
+      "setup": {
+        "directories": ["organize"],
+        "files": [
+          { "path": "organize/notes.txt", "content": "notes" },
+          { "path": "organize/image.png", "content": "image" }
+        ]
+      },
+      "input_paths": ["${CASE_WORKSPACE}\\organize"],
+      "expected_success": true,
+      "expected_output": { "key": "planned-count", "exact": "2" },
+      "allowed_api_methods": ["fileSystem.planOrganization"],
+      "expected_workspace_unchanged": true
+    },
+    {
+      "id": "file-organizer-missing-folder",
+      "plugin_id": "com.long.fileorganizer",
+      "plugin_folder": "FileOrganizer",
+      "command_id": "file-organizer.open",
+      "setup": { "directories": [] },
+      "input_paths": ["${CASE_WORKSPACE}\\missing"],
+      "expected_success": false,
+      "allowed_api_methods": ["fileSystem.planOrganization"],
+      "expected_workspace_unchanged": true
+    },
+    {
+      "id": "file-renamer-temporary-preview",
+      "plugin_id": "com.long.file-renamer",
+      "plugin_folder": "FileRenamerPlugin",
+      "command_id": "file.rename-batch",
+      "setup": {
+        "files": [
+          { "path": "rename/first.txt", "content": "first" },
+          { "path": "rename/second.txt", "content": "second" }
+        ]
+      },
+      "input_paths": [
+        "${CASE_WORKSPACE}\\rename\\first.txt",
+        "${CASE_WORKSPACE}\\rename\\second.txt"
+      ],
+      "expected_success": true,
+      "expected_output": { "key": "selected-count", "exact": "2" },
+      "allowed_api_methods": [],
+      "expected_workspace_unchanged": true
+    },
+    {
+      "id": "folder-note-temporary-folder",
+      "plugin_id": "com.long.folder-note",
+      "plugin_folder": "FolderNotePlugin",
+      "command_id": "folder-note.edit",
+      "setup": { "directories": ["noted"] },
+      "input_paths": ["${CASE_WORKSPACE}\\noted"],
+      "expected_success": true,
+      "expected_output": {
+        "key": "selected-folder",
+        "exact": "${CASE_WORKSPACE}\\noted"
+      },
+      "allowed_api_methods": [],
+      "expected_workspace_unchanged": true
+    },
+    {
+      "id": "folder-note-missing-folder",
+      "plugin_id": "com.long.folder-note",
+      "plugin_folder": "FolderNotePlugin",
+      "command_id": "folder-note.edit",
+      "setup": { "directories": [] },
+      "input_paths": ["${CASE_WORKSPACE}\\missing"],
+      "expected_success": false,
+      "allowed_api_methods": [],
+      "expected_workspace_unchanged": true
+    },
+    {
+      "id": "port-manager-owned-listener",
+      "plugin_id": "com.long.portmanager",
+      "plugin_folder": "PortManager",
+      "command_id": "port-manager.open",
+      "setup": { "tcp_listener": true },
+      "input": "${TCP_PORT}",
+      "expected_success": true,
+      "expected_output": { "key": "query", "exact": "tcp:${TCP_PORT}" },
+      "allowed_api_methods": [
+        "networkPort.getTcpListeners",
+        "networkPort.getTcpConnections",
+        "networkPort.getUdpEndpoints",
+        "networkPort.findOwner"
+      ],
+      "expected_workspace_unchanged": true
+    },
+    {
+      "id": "port-manager-invalid-port",
+      "plugin_id": "com.long.portmanager",
+      "plugin_folder": "PortManager",
+      "command_id": "port-manager.open",
+      "input": "70000",
+      "expected_success": false,
+      "allowed_api_methods": [
+        "networkPort.getTcpListeners",
+        "networkPort.getTcpConnections",
+        "networkPort.getUdpEndpoints"
+      ],
+      "expected_workspace_unchanged": true
+    }
+  ]
+}

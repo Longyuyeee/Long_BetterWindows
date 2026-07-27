@@ -3,6 +3,7 @@
   "plugin.description": "Scan ports, identify owning processes, analyze usage, and safely release ports after reviewing whether a process can be stopped",
   "commands.port-manager.open.title": "Open Port Manager",
   "commands.port-manager.open.description": "Inspect port usage and owning processes, and perform controlled release operations",
+  "commands.port-manager.open.outputs.query.description": "Protocol and port used by the completed query",
   "page.title": "Port Manager",
   "page.description": "Inspect local port usage and owning processes. Stopping a process always requires confirmation.",
   "filter.ariaLabel": "Port filters",

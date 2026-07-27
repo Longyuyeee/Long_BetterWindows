@@ -78,7 +78,7 @@
     </div>
     <div class="long-dialog__body">
       <p id="executeDialogMessage"></p>
-      <p class="long-status long-status--warning" data-i18n="dialog.warning">文件将被移动到当前目录下的 Long Organized 子目录。已完成的移动不会因后续失败而自动撤销。</p>
+      <p class="long-status long-status--warning" data-i18n="dialog.warning">文件将被移动到当前目录下的 Long Organized 子目录。整批操作会先预检，异常时自动回滚。</p>
     </div>
     <div class="long-dialog__actions">
       <button class="long-button long-button--secondary btn-secondary" id="cancelButton" type="button"
@@ -307,15 +307,23 @@
         folderPath.value = path;
         renderActionState();
         setStatus('status.folderLoaded', 'success', '已读取 Explorer 当前文件夹');
+        return { success: true };
       } catch (error) {
+        const detail = error && error.message ? error.message : String(error);
         setStatus('status.folderFailed', 'danger', '读取 Explorer 文件夹失败：{detail}', {
-          detail: error && error.message ? error.message : String(error)
+          detail: detail
         });
+        return { success: false, error: detail };
       }
     }
 
     async function analyzeFolder() {
-      if (isAnalyzing || isExecuting || !folderPath.value.trim()) return;
+      if (isAnalyzing || isExecuting) {
+        return { success: false, error: t('error.busy', '文件整理器正忙') };
+      }
+      if (!folderPath.value.trim()) {
+        return { success: false, error: t('error.folderRequired', '请先选择文件夹') };
+      }
       isAnalyzing = true;
       plan = [];
       planState = 'loading';
@@ -329,11 +337,13 @@
         planState = plan.length ? 'ready' : 'noFiles';
         renderPlanState(true);
         if (!plan.length) setStatus('status.noFiles', '', '所选目录顶层没有可整理的文件');
+        return { success: true, count: plan.length };
       } catch (error) {
         planErrorDetail = error && error.message ? error.message : String(error);
         planState = 'error';
         renderPlanState(false);
         setStatus('status.analyzeFailed', 'danger', '分析失败：{detail}', { detail: planErrorDetail });
+        return { success: false, error: planErrorDetail };
       } finally {
         isAnalyzing = false;
         renderActionState();
@@ -354,19 +364,17 @@
           t('error.execute', '文件整理失败'));
         const failures = property(result, 'failures', 'Failures') || [];
         const moved = Number(property(result, 'movedCount', 'MovedCount') || 0);
-        const failedSources = new Set(failures.map(function (failure) {
-          return String(property(failure, 'sourcePath', 'SourcePath') || '').toLocaleLowerCase();
-        }));
-        plan = submitted.filter(function (item) {
-          return failedSources.has(item.sourcePath.toLocaleLowerCase());
-        });
-        if (plan.length) {
+        if (failures.length) {
+          plan = submitted;
           planState = 'ready';
-          plan.forEach(function (item) { item.hasConflict = true; });
           const detail = property(failures[0], 'detail', 'Detail') || t('error.execute', '文件整理失败');
-          setStatus('status.partial', 'warning', '已移动 {moved} 个，失败 {failed} 个：{detail}', {
+          setStatus(
+            moved > 0 ? 'status.rollbackIncomplete' : 'status.transactionFailed',
+            moved > 0 ? 'danger' : 'warning',
+            moved > 0
+              ? '整理失败且有 {moved} 个文件未能回滚：{detail}'
+              : '整理未执行，文件已保持原状：{detail}', {
             moved: moved,
-            failed: plan.length,
             detail: detail
           });
         } else {
@@ -420,15 +428,32 @@
         analyzeFolder();
       }
     });
-    window.LongUI?.onCommand(function (command) {
+    window.LongUI?.onCommand(async function (command) {
       const paths = window.LongUI.commandPaths(command);
       if (paths.length) {
         folderPath.value = paths[0];
         renderActionState();
         setStatus('status.contextLoaded', 'success', '已从命令上下文读取文件夹');
       } else {
-        loadActiveFolder();
+        const loaded = await loadActiveFolder();
+        if (!loaded.success) {
+          return { success: false, message: loaded.error, outputs: {} };
+        }
       }
+      const analyzed = await analyzeFolder();
+      if (!analyzed.success) {
+        return { success: false, message: analyzed.error, outputs: {} };
+      }
+      return {
+        success: true,
+        message: t('command.previewReady', '文件整理预览已生成'),
+        outputs: {
+          'planned-count': {
+            type: 'text',
+            value: String(analyzed.count)
+          }
+        }
+      };
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);

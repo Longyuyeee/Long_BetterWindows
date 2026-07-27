@@ -1,6 +1,6 @@
 {
   "id": "com.long.fileorganizer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "文件整理器",
   "author": "Long",
   "description": "自动整理指定文件夹，支持按类型/日期分类、查找大文件、删除重复文件、批量重命名",
@@ -18,6 +18,13 @@
       "description": "分析并整理指定文件夹或 Explorer 当前选区",
       "aliases": ["文件整理", "整理文件夹", "file organizer", "wenjianzhengli"],
       "accepted_inputs": ["folder", "explorer_selection", "none"],
+      "outputs": [
+        {
+          "key": "planned-count",
+          "type": "text",
+          "description": "本次安全预览生成的文件数量"
+        }
+      ],
       "view_mode": "form",
       "priority": 28
     }

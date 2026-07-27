@@ -13,6 +13,8 @@ public class AppStartupOptionsTests
             "--language", "EN-us",
             "--run-command", "SAMPLE.HELLO",
             "--command-text", "hello",
+            "--command-path", @"C:\quality\one.txt",
+            "--command-path", @"C:\quality\two.txt",
             "--plugins-dir", "test-plugins",
             "--exit-after-command",
             "--quality-command-report", "command-report.json",
@@ -50,6 +52,9 @@ public class AppStartupOptionsTests
         Assert.Equal("en-US", options.LanguageOverride);
         Assert.Equal("sample.hello", options.RequestedCommandKey);
         Assert.Equal("hello", options.RequestedCommandText);
+        Assert.Equal(
+            [@"C:\quality\one.txt", @"C:\quality\two.txt"],
+            options.RequestedCommandPaths);
         Assert.Equal("test-plugins", options.RequestedPluginsDirectory);
         Assert.True(options.ExitAfterCommand);
         Assert.Equal("command-report.json", options.QualityCommandReportPath);

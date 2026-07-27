@@ -216,6 +216,7 @@ namespace LongBetterWindows.Host.Engine
                 // === long.shell file ops ===
                 "shell.listFiles" => Task.FromResult<object?>(ShellListFiles(WebPluginArguments.GetString(args, 0))),
                 "shell.renameFile" => ShellRenameFileAsync(WebPluginArguments.GetString(args, 0), WebPluginArguments.GetString(args, 1)),
+                "shell.renameBatch" => ShellRenameBatchAsync(args),
 
                 // === long.window ===
                 "window.getForeground" => WindowGetForeground(),
@@ -425,6 +426,20 @@ namespace LongBetterWindows.Host.Engine
             var newPath = Path.Combine(directory, newName);
             var result = await _host.FileOps.MoveAsync(oldPath, newPath);
             return new { success = result.IsSuccess, error = result.ErrorMessage };
+        }
+
+        private async Task<object?> ShellRenameBatchAsync(object?[] args)
+        {
+            var operations =
+                WebPluginArguments.GetJson<List<RenameOperation>>(args, 0)
+                ?? new List<RenameOperation>();
+            var result = await _host.FileSystem.BatchRenameAsync(operations);
+            return new
+            {
+                success = result.IsSuccess,
+                data = result.Data,
+                error = result.ErrorMessage,
+            };
         }
 
         private async Task<object?> WindowGetForeground()

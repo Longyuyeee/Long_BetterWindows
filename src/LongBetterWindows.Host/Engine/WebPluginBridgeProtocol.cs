@@ -176,7 +176,7 @@ namespace LongBetterWindows.Host.Engine
                 => "shell.execute",
 
             // 文件操作
-            "shell.listFiles" or "shell.renameFile"
+            "shell.listFiles" or "shell.renameFile" or "shell.renameBatch"
                 => "file.ops",
 
             // 窗口信息
@@ -273,6 +273,7 @@ window.long = {
     getItemScreenRect: function(){return call('shell.getItemScreenRect',[]);},
     listFiles: function(dir){return call('shell.listFiles',[dir]);},
     renameFile: function(oldPath,newName){return call('shell.renameFile',[oldPath,newName]);},
+    renameBatch: function(operations){return call('shell.renameBatch',[operations||[]]);},
     openUrl: function(url){return call('shell.openUrl',[url]);},
     openFolder: function(path){return call('shell.openFolder',[path]);},
     openWithDefault: function(path){return call('shell.openWithDefault',[path]);}

@@ -3,6 +3,7 @@
   "plugin.description": "端口扫描、进程识别、占用分析与安全释放，快速找到谁占用了端口，判断能否安全关闭",
   "commands.port-manager.open.title": "打开端口管理器",
   "commands.port-manager.open.description": "查询端口占用、关联进程并执行受控释放",
+  "commands.port-manager.open.outputs.query.description": "已完成查询的协议与端口",
   "page.title": "端口管理器",
   "page.description": "查看本机端口占用与关联进程，终止进程前需要再次确认。",
   "filter.ariaLabel": "端口筛选",

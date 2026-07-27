@@ -315,6 +315,74 @@ public sealed class PluginPositiveFunctionMatrixTests
                     .GetInt32()));
     }
 
+    [Fact]
+    public void HighRiskTransactionCases_CoverDeclaredTemporaryTargets()
+    {
+        var root = FindRepositoryRoot();
+        using var matrix = LoadMatrix(root);
+        var policy = matrix.RootElement.GetProperty("policy");
+        var casesPath = Path.GetFullPath(Path.Combine(
+            root,
+            policy.GetProperty("high_transaction_cases_path").GetString()!));
+        using var cases = JsonDocument.Parse(File.ReadAllText(casesPath));
+        var declaredPluginIds = policy
+            .GetProperty("high_transaction_plugin_ids")
+            .EnumerateArray()
+            .Select(item => item.GetString()!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var highRiskPlugins = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Where(plugin =>
+                plugin.GetProperty("risk").GetString() == "high"
+                && declaredPluginIds.Contains(
+                    plugin.GetProperty("id").GetString()!))
+            .ToDictionary(
+                plugin => plugin.GetProperty("id").GetString()!,
+                plugin => plugin.GetProperty("commands")
+                    .EnumerateArray()
+                    .Select(command => command.GetString()!)
+                    .ToHashSet(StringComparer.Ordinal),
+                StringComparer.OrdinalIgnoreCase);
+        var caseItems = cases.RootElement
+            .GetProperty("cases")
+            .EnumerateArray()
+            .ToArray();
+        var covered = caseItems
+            .GroupBy(
+                item => item.GetProperty("plugin_id").GetString()!,
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(item => item.GetProperty("command_id").GetString()!)
+                    .ToHashSet(StringComparer.Ordinal),
+                StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal(
+            policy.GetProperty("high_transaction_required_plugin_count")
+                .GetInt32(),
+            declaredPluginIds.Count);
+        Assert.Equal(
+            declaredPluginIds.Order(StringComparer.OrdinalIgnoreCase),
+            highRiskPlugins.Keys.Order(StringComparer.OrdinalIgnoreCase));
+        Assert.Equal(
+            highRiskPlugins.Keys.Order(StringComparer.OrdinalIgnoreCase),
+            covered.Keys.Order(StringComparer.OrdinalIgnoreCase));
+        foreach (var (pluginId, commands) in highRiskPlugins)
+            Assert.Equal(
+                commands.Order(StringComparer.Ordinal),
+                covered[pluginId].Order(StringComparer.Ordinal));
+        Assert.Equal(
+            policy.GetProperty("high_transaction_required_command_count")
+                .GetInt32(),
+            highRiskPlugins.Values.Sum(commands => commands.Count));
+        Assert.All(
+            caseItems,
+            item => Assert.True(
+                item.GetProperty("expected_workspace_unchanged").GetBoolean()));
+    }
+
     private static JsonDocument LoadMatrix(string root)
         => JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,

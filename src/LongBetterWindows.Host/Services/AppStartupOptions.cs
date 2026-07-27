@@ -9,6 +9,8 @@ namespace LongBetterWindows.Host.Services
         public string? LanguageOverride { get; private init; }
         public string? RequestedCommandKey { get; private init; }
         public string? RequestedCommandText { get; private init; }
+        public IReadOnlyList<string> RequestedCommandPaths { get; private init; } =
+            Array.Empty<string>();
         public string? RequestedPluginsDirectory { get; private init; }
         public bool ExitAfterCommand { get; private init; }
         public string? QualityCommandReportPath { get; private init; }
@@ -83,6 +85,9 @@ namespace LongBetterWindows.Host.Services
                     : null,
                 RequestedCommandKey = ReadArgument(arguments, "--run-command")?.ToLowerInvariant(),
                 RequestedCommandText = ReadArgument(arguments, "--command-text"),
+                RequestedCommandPaths = ReadArgumentList(
+                    arguments,
+                    "--command-path"),
                 RequestedPluginsDirectory = ReadArgument(arguments, "--plugins-dir"),
                 ExitAfterCommand = HasSwitch(arguments, "--exit-after-command"),
                 QualityCommandReportPath = ReadArgument(
@@ -180,6 +185,25 @@ namespace LongBetterWindows.Host.Services
             string name)
         {
             var values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < arguments.Count - 1; index++)
+            {
+                if (string.Equals(
+                        arguments[index],
+                        name,
+                        StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(arguments[index + 1]))
+                {
+                    values.Add(arguments[index + 1].Trim());
+                }
+            }
+            return values;
+        }
+
+        private static IReadOnlyList<string> ReadArgumentList(
+            IReadOnlyList<string> arguments,
+            string name)
+        {
+            var values = new List<string>();
             for (var index = 0; index < arguments.Count - 1; index++)
             {
                 if (string.Equals(

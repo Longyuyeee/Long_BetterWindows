@@ -48,9 +48,9 @@
       "Category": "文件管理",
       "Tags": ["文件", "重命名", "Explorer"],
       "Versions": [{
-        "Version": "1.1.0",
-        "PublishedAt": "2026-07-18T00:00:00+08:00",
-        "ReleaseNotes": "统一宽屏布局与 Explorer 多选上下文。",
+        "Version": "1.1.1",
+        "PublishedAt": "2026-07-27T00:00:00+08:00",
+        "ReleaseNotes": "整批预检重命名目标，执行异常时自动逆序回滚。",
         "Capabilities": ["shell.selection", "file.ops"],
         "MinHostVersion": "0.5.0",
         "MinApiVersion": "1.0.0",

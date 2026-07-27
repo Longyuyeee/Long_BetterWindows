@@ -132,26 +132,83 @@ namespace LongBetterWindows.Host.Services
         {
             return Task.Run(() =>
             {
+                var completed = new List<(string Source, string Destination)>();
                 try
                 {
-                    int count = 0;
-                    foreach (var op in operations)
+                    if (operations is null)
+                        throw new ArgumentNullException(nameof(operations));
+
+                    var planned = new List<(string Source, string Destination)>();
+                    var sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var operation in operations)
                     {
-                        try
-                        {
-                            var dir = Path.GetDirectoryName(op.OldPath);
-                            var newPath = Path.Combine(dir!, op.NewName);
-                            File.Move(op.OldPath, newPath);
-                            count++;
-                        }
-                        catch { }
+                        if (operation is null)
+                            throw new InvalidDataException("Rename operation is required.");
+                        var source = Path.GetFullPath(operation.OldPath);
+                        if (!File.Exists(source))
+                            throw new FileNotFoundException(
+                                "Rename source does not exist.",
+                                source);
+                        if (!sources.Add(source))
+                            throw new IOException("Duplicate rename source.");
+                        ValidateFileName(operation.NewName);
+                        var directory = Path.GetDirectoryName(source)
+                            ?? throw new InvalidDataException(
+                                "Rename source has no parent directory.");
+                        var destination = Path.GetFullPath(
+                            Path.Combine(directory, operation.NewName));
+                        if (!string.Equals(
+                                Path.GetDirectoryName(destination),
+                                directory,
+                                StringComparison.OrdinalIgnoreCase))
+                            throw new UnauthorizedAccessException(
+                                "Rename destination must remain in the source directory.");
+                        if (!destinations.Add(destination))
+                            throw new IOException("Duplicate rename destination.");
+                        if (!source.Equals(
+                                destination,
+                                StringComparison.OrdinalIgnoreCase)
+                            && File.Exists(destination))
+                            throw new IOException(
+                                "Rename destination already exists.");
+                        planned.Add((source, destination));
                     }
 
-                    return HostApiResponse<int>.Success(count);
+                    foreach (var item in planned.Where(item =>
+                                 !item.Source.Equals(
+                                     item.Destination,
+                                     StringComparison.Ordinal)))
+                    {
+                        File.Move(item.Source, item.Destination);
+                        completed.Add(item);
+                    }
+
+                    return HostApiResponse<int>.Success(completed.Count);
                 }
                 catch (Exception ex)
                 {
-                    return HostApiResponse<int>.Failure(ApiErrorCode.Unknown, ex.Message);
+                    var rollbackFailures = new List<string>();
+                    for (var index = completed.Count - 1; index >= 0; index--)
+                    {
+                        var item = completed[index];
+                        try
+                        {
+                            if (File.Exists(item.Destination)
+                                && !File.Exists(item.Source))
+                                File.Move(item.Destination, item.Source);
+                        }
+                        catch (Exception rollbackException)
+                        {
+                            rollbackFailures.Add(rollbackException.Message);
+                        }
+                    }
+                    var detail = rollbackFailures.Count == 0
+                        ? ex.Message
+                        : $"{ex.Message} Rollback failed: {string.Join(" | ", rollbackFailures)}";
+                    return HostApiResponse<int>.Failure(
+                        ApiErrorCode.Unknown,
+                        detail);
                 }
             });
         }
@@ -310,6 +367,7 @@ namespace LongBetterWindows.Host.Services
                     };
                     var seenSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     var seenDestinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var planned = new List<(string Source, string Destination)>();
 
                     foreach (var requested in items)
                     {
@@ -319,7 +377,7 @@ namespace LongBetterWindows.Host.Services
                             {
                                 Detail = "Organization item is required.",
                             });
-                            continue;
+                            break;
                         }
 
                         try
@@ -355,10 +413,7 @@ namespace LongBetterWindows.Host.Services
                             if (File.Exists(destination))
                                 throw new IOException("Destination file already exists.");
 
-                            Directory.CreateDirectory(destinationDirectory);
-                            EnsureDirectoryIsNotReparsePoint(destinationDirectory);
-                            File.Move(source, destination);
-                            result.MovedCount++;
+                            planned.Add((source, destination));
                         }
                         catch (Exception ex)
                         {
@@ -368,7 +423,85 @@ namespace LongBetterWindows.Host.Services
                                 DestinationPath = requested.DestinationPath,
                                 Detail = ex.Message,
                             });
+                            break;
                         }
+                    }
+
+                    if (result.Failures.Count > 0)
+                        return HostApiResponse<FileOrganizationResult>.Success(result);
+
+                    var completed = new List<(string Source, string Destination)>();
+                    var createdDirectories = new HashSet<string>(
+                        StringComparer.OrdinalIgnoreCase);
+                    try
+                    {
+                        foreach (var item in planned)
+                        {
+                            var destinationDirectory =
+                                Path.GetDirectoryName(item.Destination)!;
+                            if (!Directory.Exists(destinationDirectory))
+                            {
+                                var missingDirectories = new Stack<string>();
+                                var candidate = destinationDirectory;
+                                while (!Directory.Exists(candidate)
+                                    && candidate.StartsWith(
+                                        root + Path.DirectorySeparatorChar,
+                                        StringComparison.OrdinalIgnoreCase))
+                                {
+                                    missingDirectories.Push(candidate);
+                                    candidate = Path.GetDirectoryName(candidate)
+                                        ?? root;
+                                }
+                                Directory.CreateDirectory(destinationDirectory);
+                                foreach (var createdDirectory in missingDirectories)
+                                    createdDirectories.Add(createdDirectory);
+                            }
+                            EnsureDirectoryIsNotReparsePoint(destinationDirectory);
+                            File.Move(item.Source, item.Destination);
+                            completed.Add(item);
+                        }
+                        result.MovedCount = completed.Count;
+                    }
+                    catch (Exception executionException)
+                    {
+                        var rollbackFailures = new List<string>();
+                        for (var index = completed.Count - 1; index >= 0; index--)
+                        {
+                            var item = completed[index];
+                            try
+                            {
+                                if (File.Exists(item.Destination)
+                                    && !File.Exists(item.Source))
+                                    File.Move(item.Destination, item.Source);
+                            }
+                            catch (Exception rollbackException)
+                            {
+                                rollbackFailures.Add(rollbackException.Message);
+                            }
+                        }
+                        foreach (var directory in createdDirectories
+                                     .OrderByDescending(item => item.Length))
+                        {
+                            try
+                            {
+                                if (Directory.Exists(directory)
+                                    && !Directory.EnumerateFileSystemEntries(
+                                        directory).Any())
+                                    Directory.Delete(directory);
+                            }
+                            catch (Exception rollbackException)
+                            {
+                                rollbackFailures.Add(rollbackException.Message);
+                            }
+                        }
+                        result.MovedCount = completed.Count(item =>
+                            File.Exists(item.Destination));
+                        result.Failures.Add(new FileOrganizationFailure
+                        {
+                            Detail = rollbackFailures.Count == 0
+                                ? executionException.Message
+                                : $"{executionException.Message} Rollback failed: {string.Join(" | ", rollbackFailures)}",
+                        });
                     }
 
                     return HostApiResponse<FileOrganizationResult>.Success(result);
@@ -433,6 +566,17 @@ namespace LongBetterWindows.Host.Services
             foreach (var character in Path.GetInvalidFileNameChars())
                 category = category.Replace(character, '_');
             return category;
+        }
+
+        private static void ValidateFileName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)
+                || !string.Equals(name, Path.GetFileName(name), StringComparison.Ordinal)
+                || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                || name.EndsWith(' ')
+                || name.EndsWith('.'))
+                throw new InvalidDataException(
+                    "Rename destination name is invalid.");
         }
 
         private static void EnsureDirectoryIsNotReparsePoint(string path)

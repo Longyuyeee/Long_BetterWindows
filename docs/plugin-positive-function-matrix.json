@@ -10,6 +10,15 @@
     "medium_command_cases_path": "docs/medium-risk-plugin-command-cases.json",
     "medium_command_required_plugin_count": 5,
     "medium_command_required_command_count": 5,
+    "high_transaction_cases_path": "docs/high-risk-plugin-transaction-cases.json",
+    "high_transaction_plugin_ids": [
+      "com.long.fileorganizer",
+      "com.long.file-renamer",
+      "com.long.folder-note",
+      "com.long.portmanager"
+    ],
+    "high_transaction_required_plugin_count": 4,
+    "high_transaction_required_command_count": 4,
     "release_rule": "Every required manual check must be passed with an existing evidence file and matching SHA-256 before a new release candidate is eligible."
   },
   "plugins": [

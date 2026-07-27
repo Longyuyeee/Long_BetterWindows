@@ -255,6 +255,7 @@
       await refreshPorts(false);
       startPolling();
     }
+    const initializationPromise = initialize();
 
     function refreshPorts(manual) {
       if (refreshPromise) return refreshPromise;
@@ -704,16 +705,28 @@
       }
     });
     window.LongUI?.onCommand(async function (command) {
+      await initializationPromise;
       const text = window.LongUI.commandText(command).trim();
-      const match = /(?:^|\D)(\d{1,5})(?:\D|$)/.exec(text);
-      if (match && Number(match[1]) <= 65535) {
-        document.getElementById('portNumber').value = match[1];
+      const numericMatch = /^(\d+)$/.exec(text);
+      if (numericMatch) {
+        const port = Number(numericMatch[1]);
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+          return {
+            success: false,
+            message: t('find.invalidPort', '请输入 1 到 65535 之间的有效端口号'),
+            outputs: {}
+          };
+        }
+        document.getElementById('portNumber').value = String(port);
         const success = await findPort();
         return {
           success: success,
           message: success
             ? t('command.findCompleted', '端口查询完成')
-            : t('command.findFailed', '端口查询失败')
+            : t('command.findFailed', '端口查询失败'),
+          outputs: success ? {
+            query: { type: 'text', value: 'tcp:' + String(port) }
+          } : {}
         };
       }
       if (text) {
@@ -723,13 +736,13 @@
       }
       return {
         success: true,
-        message: t('command.opened', '端口管理器已打开')
+        message: t('command.opened', '端口管理器已打开'),
+        outputs: {}
       };
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });
-    initialize();
   </script>
 </body>
 </html>

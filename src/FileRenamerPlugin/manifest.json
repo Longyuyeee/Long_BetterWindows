@@ -1,6 +1,6 @@
 {
   "id": "com.long.file-renamer",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": "批量重命名",
   "author": "Long",
   "entry_point": "index.html",
@@ -13,6 +13,13 @@
       "description": "为文件或 Explorer 当前选区批量生成并预览新名称",
       "aliases": ["重命名", "rename", "piliangchongmingming", "plcmm"],
       "accepted_inputs": ["file", "files", "explorer_selection"],
+      "outputs": [
+        {
+          "key": "selected-count",
+          "type": "text",
+          "description": "载入批量重命名预览的文件数量"
+        }
+      ],
       "view_mode": "form",
       "keep_alive": true,
       "priority": 35

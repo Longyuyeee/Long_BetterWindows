@@ -44,6 +44,34 @@ function Get-PropertyNames($ObjectValue) {
         ForEach-Object { [string]$_.Name })
 }
 
+function Resolve-CaseToken(
+    [string]$Value,
+    [string]$Workspace,
+    [int]$TcpPort) {
+    return $Value.
+        Replace('${CASE_WORKSPACE}', $Workspace).
+        Replace('${TCP_PORT}', [string]$TcpPort)
+}
+
+function Get-WorkspaceFingerprint([string]$Workspace) {
+    if (-not (Test-Path -LiteralPath $Workspace -PathType Container)) {
+        return ""
+    }
+    $entries = Get-ChildItem -LiteralPath $Workspace -Recurse -Force |
+        Sort-Object FullName |
+        ForEach-Object {
+            $relative = $_.FullName.Substring($Workspace.Length).
+                TrimStart([System.IO.Path]::DirectorySeparatorChar).
+                Replace([System.IO.Path]::DirectorySeparatorChar, [char]"/")
+            if ($_.PSIsContainer) {
+                "D:$relative"
+            } else {
+                "F:${relative}:$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash)"
+            }
+        }
+    return Get-Sha256Text ($entries -join "`n")
+}
+
 $casesFile = Resolve-RepositoryPath $CasesPath
 $hostRoot = Resolve-RepositoryPath $HostDirectory
 $hostExe = Join-Path $hostRoot "LongBetterWindows.Host.exe"
@@ -89,12 +117,63 @@ try {
         $targetPlugin = Join-Path $isolatedPlugins ([string]$case.plugin_folder)
         $commandReport = Join-Path $caseRoot "command-report.json"
         $fixturePath = Join-Path $caseRoot "command-fixture.json"
+        $caseWorkspace = Join-Path $caseRoot "Workspace"
         New-Item -ItemType Directory -Path $isolatedPlugins -Force | Out-Null
         if (-not (Test-Path -LiteralPath $sourcePlugin -PathType Container)) {
             $failures.Add("$($case.id): release plugin folder is missing")
             continue
         }
         Copy-Item -LiteralPath $sourcePlugin -Destination $targetPlugin -Recurse
+        New-Item -ItemType Directory -Path $caseWorkspace -Force | Out-Null
+
+        if ($case.PSObject.Properties.Name -contains "setup") {
+            $setupDirectories = if (
+                $case.setup.PSObject.Properties.Name -contains "directories") {
+                @($case.setup.directories)
+            } else { @() }
+            foreach ($relativeDirectory in $setupDirectories) {
+                $directoryPath = [System.IO.Path]::GetFullPath(
+                    (Join-Path $caseWorkspace ([string]$relativeDirectory)))
+                if (-not $directoryPath.StartsWith(
+                        $caseWorkspace + [System.IO.Path]::DirectorySeparatorChar,
+                        [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw "$($case.id): setup directory escaped the case workspace"
+                }
+                New-Item -ItemType Directory -Path $directoryPath -Force | Out-Null
+            }
+            $setupFiles = if (
+                $case.setup.PSObject.Properties.Name -contains "files") {
+                @($case.setup.files)
+            } else { @() }
+            foreach ($file in $setupFiles) {
+                $filePath = [System.IO.Path]::GetFullPath(
+                    (Join-Path $caseWorkspace ([string]$file.path)))
+                if (-not $filePath.StartsWith(
+                        $caseWorkspace + [System.IO.Path]::DirectorySeparatorChar,
+                        [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw "$($case.id): setup file escaped the case workspace"
+                }
+                New-Item -ItemType Directory -Path (
+                    [System.IO.Path]::GetDirectoryName($filePath)) -Force |
+                    Out-Null
+                Set-Content -LiteralPath $filePath -Value ([string]$file.content) `
+                    -Encoding UTF8 -NoNewline
+            }
+        }
+
+        $listener = $null
+        $tcpPort = 0
+        if ($case.PSObject.Properties.Name -contains "setup" -and
+            $case.setup.PSObject.Properties.Name -contains "tcp_listener" -and
+            [bool]$case.setup.tcp_listener) {
+            $listener = [System.Net.Sockets.TcpListener]::new(
+                [System.Net.IPAddress]::Loopback,
+                0)
+            $listener.Start()
+            $tcpPort = [int](
+                [System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+        }
+        $workspaceFingerprintBefore = Get-WorkspaceFingerprint $caseWorkspace
 
         $arguments = @(
             "--plugins-dir", $isolatedPlugins,
@@ -108,7 +187,17 @@ try {
             ""
         }
         if ($case.PSObject.Properties.Name -contains "input") {
+            $inputText = Resolve-CaseToken $inputText $caseWorkspace $tcpPort
             $arguments += @("--command-text", $inputText)
+        }
+        $inputPaths = @()
+        if ($case.PSObject.Properties.Name -contains "input_paths") {
+            $inputPaths = @($case.input_paths | ForEach-Object {
+                Resolve-CaseToken ([string]$_) $caseWorkspace $tcpPort
+            })
+            foreach ($inputPath in $inputPaths) {
+                $arguments += @("--command-path", $inputPath)
+            }
         }
         if ($case.PSObject.Properties.Name -contains "fixture") {
             $case.fixture | ConvertTo-Json -Depth 12 |
@@ -123,9 +212,11 @@ try {
             -WorkingDirectory $hostRoot -PassThru
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             try { $process.Kill() } catch {}
+            if ($null -ne $listener) { $listener.Stop() }
             $failures.Add("$($case.id): timed out after $TimeoutSeconds seconds")
             continue
         }
+        if ($null -ne $listener) { $listener.Stop() }
         if (-not (Test-Path -LiteralPath $commandReport -PathType Leaf)) {
             $failures.Add("$($case.id): host produced no command report (exit $($process.ExitCode))")
             continue
@@ -151,6 +242,17 @@ try {
             [string]$report.input_text_sha256 -ne (Get-Sha256Text $inputText)) {
             $caseErrors.Add("input SHA-256 does not match")
         }
+        if ([int]$report.input_path_count -ne $inputPaths.Count) {
+            $caseErrors.Add("input path count does not match")
+        }
+        $reportedPathHashes = @($report.input_path_sha256 |
+            ForEach-Object { [string]$_ })
+        $expectedPathHashes = @($inputPaths |
+            ForEach-Object { Get-Sha256Text ([string]$_) })
+        if (($reportedPathHashes -join ",") -cne
+            ($expectedPathHashes -join ",")) {
+            $caseErrors.Add("input path SHA-256 list does not match")
+        }
 
         $outputLength = 0
         $outputSha256 = $null
@@ -164,7 +266,8 @@ try {
                 $outputLength = $outputValue.Length
                 $outputSha256 = Get-Sha256Text $outputValue
                 if ($case.expected_output.PSObject.Properties.Name -contains "exact" -and
-                    $outputValue -cne [string]$case.expected_output.exact) {
+                    $outputValue -cne (Resolve-CaseToken (
+                        [string]$case.expected_output.exact) $caseWorkspace $tcpPort)) {
                     $caseErrors.Add("output '$outputKey' does not equal expected value")
                 }
                 if ($case.expected_output.PSObject.Properties.Name -contains "contains" -and
@@ -176,6 +279,15 @@ try {
                     $caseErrors.Add("output '$outputKey' does not match expected pattern")
                 }
             }
+        }
+
+        $workspaceFingerprintAfter = Get-WorkspaceFingerprint $caseWorkspace
+        $workspaceUnchanged =
+            $workspaceFingerprintAfter -ceq $workspaceFingerprintBefore
+        if ($case.PSObject.Properties.Name -contains "expected_workspace_unchanged" -and
+            [bool]$case.expected_workspace_unchanged -ne $workspaceUnchanged) {
+            $caseErrors.Add(
+                "workspace unchanged was $workspaceUnchanged, expected $($case.expected_workspace_unchanged)")
         }
 
         $allowedMethods = @($case.allowed_api_methods | ForEach-Object { [string]$_ })
@@ -275,6 +387,11 @@ try {
             input_text_sha256 = if ($inputText.Length -gt 0) {
                 Get-Sha256Text $inputText
             } else { $null }
+            input_path_count = $inputPaths.Count
+            input_path_sha256 = $expectedPathHashes
+            workspace_unchanged = $workspaceUnchanged
+            workspace_fingerprint_before = $workspaceFingerprintBefore
+            workspace_fingerprint_after = $workspaceFingerprintAfter
             output_length = $outputLength
             output_sha256 = $outputSha256
             api_method_calls = $report.api_method_calls

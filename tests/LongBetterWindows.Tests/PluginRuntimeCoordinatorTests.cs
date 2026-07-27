@@ -108,12 +108,73 @@ public class PluginRuntimeCoordinatorTests
             Assert.Equal("text", root.GetProperty("input_type").GetString());
             Assert.Equal(13, root.GetProperty("input_text_length").GetInt32());
             Assert.Equal(64, root.GetProperty("input_text_sha256").GetString()!.Length);
+            Assert.Equal(0, root.GetProperty("input_path_count").GetInt32());
+            Assert.Empty(root.GetProperty("input_path_sha256").EnumerateArray());
             Assert.DoesNotContain("private input", await File.ReadAllTextAsync(reportPath));
             Assert.True(root.GetProperty("success").GetBoolean());
             Assert.Equal(
                 "echoed",
                 root.GetProperty("outputs").GetProperty("result")
                     .GetProperty("value").GetString());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteRequestedCommandAsync_UsesPathInputWithoutPersistingRawPaths()
+    {
+        var directory = CreateTemporaryDirectory();
+        var reportPath = Path.Combine(directory, "command.json");
+        var privatePath = Path.Combine(directory, "private.txt");
+        try
+        {
+            var registry = new PluginRegistry();
+            var plugin = new PathCommandPlugin();
+            registry.Register(
+                new PluginManifest
+                {
+                    Id = "quality.path",
+                    Name = "Quality path",
+                    Version = "1.0.0",
+                    EntryPoint = "quality.path.dll",
+                    Commands =
+                    [
+                        new PluginCommand
+                        {
+                            Id = "inspect",
+                            Title = "Inspect",
+                            AcceptedInputs = [AcceptedInputType.File],
+                        },
+                    ],
+                },
+                plugin,
+                null,
+                directory);
+
+            var exitCode = await PluginRuntimeCoordinator.ExecuteRequestedCommandAsync(
+                registry,
+                new PluginRuntimeStartRequest(
+                    "quality.path:inspect",
+                    null,
+                    true,
+                    reportPath,
+                    CommandPaths: [privatePath]));
+
+            Assert.Equal(0, exitCode);
+            Assert.Equal(AcceptedInputType.File, plugin.LastInputType);
+            Assert.Equal([privatePath], plugin.LastPaths);
+            using var document = JsonDocument.Parse(
+                await File.ReadAllTextAsync(reportPath));
+            var root = document.RootElement;
+            Assert.Equal("file", root.GetProperty("input_type").GetString());
+            Assert.Equal(1, root.GetProperty("input_path_count").GetInt32());
+            Assert.Equal(
+                64,
+                root.GetProperty("input_path_sha256")[0].GetString()!.Length);
+            Assert.DoesNotContain(privatePath, await File.ReadAllTextAsync(reportPath));
         }
         finally
         {
@@ -242,5 +303,36 @@ public class PluginRuntimeCoordinatorTests
                 {
                     ["result"] = new(PluginCommandOutputType.Text, "echoed"),
                 }));
+    }
+
+    private sealed class PathCommandPlugin : ILongPlugin, IPluginCommandHandler
+    {
+        public string Id => "quality.path";
+        public string Name => "Quality path";
+        public string Version => "1.0.0";
+        public PluginState State { get; private set; } = PluginState.Loaded;
+        public AcceptedInputType LastInputType { get; private set; }
+        public IReadOnlyList<string> LastPaths { get; private set; } =
+            Array.Empty<string>();
+
+        public Task<bool> InitializeAsync(IHostApi host) => Task.FromResult(true);
+        public Task<bool> StartAsync()
+        {
+            State = PluginState.Running;
+            return Task.FromResult(true);
+        }
+        public Task<bool> StopAsync()
+        {
+            State = PluginState.Stopped;
+            return Task.FromResult(true);
+        }
+        public Task<PluginCommandResult> ExecuteCommandAsync(
+            PluginCommandInvocation invocation,
+            CancellationToken cancellationToken = default)
+        {
+            LastInputType = invocation.InputType;
+            LastPaths = invocation.Paths;
+            return Task.FromResult(PluginCommandResult.Success("inspected"));
+        }
     }
 }

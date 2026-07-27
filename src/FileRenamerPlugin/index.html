@@ -137,7 +137,7 @@
         if (!response.data || !response.data.length) {
           setFiles([]);
           setStatus('status.selectionEmpty', 'warning', 'Explorer 当前没有明确选中的文件');
-          return;
+          return { success: false, error: t('status.selectionEmpty', 'Explorer 当前没有明确选中的文件') };
         }
         setFiles(response.data);
         setStatus(
@@ -145,6 +145,7 @@
           'success',
           '已读取 {count} 个选中项',
           { count: files.length });
+        return { success: true, count: files.length };
       } catch (error) {
         loadErrorDetail = error && error.message ? error.message : String(error);
         if (!files.length) {
@@ -156,6 +157,7 @@
           'danger',
           '读取 Explorer 选区失败：{detail}',
           { detail: loadErrorDetail });
+        return { success: false, error: loadErrorDetail };
       }
     }
 
@@ -234,30 +236,31 @@
       isRenaming = true;
       window.LongUI?.setBusy(renameButton, true);
       const failures = [];
-      const failedIndexes = [];
       let completed = 0;
       try {
-        for (let index = 0; index < files.length; index++) {
-          const original = fileName(files[index]);
-          if (previewNames[index] === original) continue;
-          try {
-            const response = await long.shell.renameFile(files[index], previewNames[index]);
-            if (response.success) completed++; else { failures.push(original + ': ' + (response.error || t('error.rename', '失败'))); failedIndexes.push(index); }
-          } catch (error) { failures.push(original + ': ' + error.message); failedIndexes.push(index); }
+        const operations = files.map(function (path, index) {
+          return { oldPath: path, newName: previewNames[index] };
+        }).filter(function (operation, index) {
+          return operation.newName !== fileName(files[index]);
+        });
+        const response = await long.shell.renameBatch(operations);
+        if (response.success) {
+          completed = Number(response.data || 0);
+        } else {
+          failures.push(response.error || t('error.rename', '失败'));
         }
+      } catch (error) {
+        failures.push(error && error.message ? error.message : String(error));
       } finally {
         isRenaming = false;
         window.LongUI?.setBusy(renameButton, false);
       }
       if (failures.length) {
-        const failedFiles = failedIndexes.map(function (index) { return files[index]; });
-        const failedNames = failedIndexes.map(function (index) { return previewNames[index]; });
-        files = failedFiles; previewNames = failedNames; renderFiles();
         setStatus(
-          'status.partialFailure',
+          'status.transactionFailed',
           'danger',
-          '完成 {completed} 项，失败 {failed} 项 · {detail}',
-          { completed: completed, failed: failures.length, detail: failures[0] });
+          '未执行批量重命名，文件已保持原状 · {detail}',
+          { detail: failures[0] });
       } else {
         setFiles([]);
         setStatus(
@@ -284,10 +287,27 @@
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter' && !renameButton.disabled) { event.preventDefault(); executeRename(); }
     });
-    window.LongUI?.onCommand(function (command) {
+    window.LongUI?.onCommand(async function (command) {
       const paths = window.LongUI.commandPaths(command);
-      if (paths.length) { setFiles(paths); setStatus('status.contextLoaded', 'success', '已从命令上下文读取 {count} 个文件', { count: paths.length }); }
-      else loadSelection();
+      if (paths.length) {
+        setFiles(paths);
+        setStatus('status.contextLoaded', 'success', '已从命令上下文读取 {count} 个文件', { count: paths.length });
+      } else {
+        const loaded = await loadSelection();
+        if (!loaded.success) {
+          return { success: false, message: loaded.error, outputs: {} };
+        }
+      }
+      return {
+        success: true,
+        message: t('command.previewReady', '批量重命名预览已就绪'),
+        outputs: {
+          'selected-count': {
+            type: 'text',
+            value: String(files.length)
+          }
+        }
+      };
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);

@@ -693,10 +693,15 @@ public class DesignSystemTests
         var root = FindRepositoryRoot();
         var manifest = File.ReadAllText(Path.Combine(
             root, "src", "FileRenamerPlugin", "manifest.json"));
+        var html = File.ReadAllText(Path.Combine(
+            root, "src", "FileRenamerPlugin", "index.html"));
         var dispatcher = File.ReadAllText(Path.Combine(
             root, "src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs"));
 
         Assert.Contains("\"file.ops\"", manifest);
+        Assert.Contains("long.shell.renameBatch(operations)", html);
+        Assert.Contains("\"shell.renameBatch\"", dispatcher);
+        Assert.Contains("FileSystem.BatchRenameAsync", dispatcher);
         Assert.Contains("FileOps.MoveAsync", dispatcher);
         Assert.DoesNotContain("File.Move(oldPath", dispatcher);
     }
