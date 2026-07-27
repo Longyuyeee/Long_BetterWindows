@@ -931,6 +931,7 @@ public class CommandContractTests
         Assert.True(result.IsSuccess, result.Message);
         Assert.Equal("hello", plugin.LastInvocation!.Text);
         Assert.Equal(PluginState.Running, registry.Get("handler")!.State);
+        Assert.Null(registry.Get("handler")!.GetSetting("auto_start"));
     }
 
     [Fact]

@@ -33,12 +33,21 @@ public partial class LaunchWindow : Window
     private LaunchWindowLocalization _localization;
     private Action<SmartEntry?>? _onSelect;
     private CancellationTokenSource? _searchCancellation;
+    private const int MaxFileCandidates = 5_000;
+    private const int MaxContentCandidates = 500;
+    private const long MaxContentFileBytes = 1_048_576;
 
     public LaunchWindow(LaunchWindowLocalization localization)
     {
         _localization = localization;
         InitializeComponent();
-        LoadApps();
+        Loaded += LaunchWindow_Loaded;
+        Closed += (_, _) =>
+        {
+            _searchCancellation?.Cancel();
+            _searchCancellation?.Dispose();
+            _searchCancellation = null;
+        };
         ApplyLocalization(localization);
     }
 
@@ -65,9 +74,19 @@ public partial class LaunchWindow : Window
     private static List<SmartEntry>? _cachedApps;
     private static readonly object AppCacheLock = new();
 
-    private void LoadApps()
+    private async void LaunchWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        _apps.AddRange(GetApplications());
+        try
+        {
+            var applications = await Task.Run(GetApplications);
+            _apps.AddRange(applications);
+            if (!string.IsNullOrWhiteSpace(SearchBox.Text))
+                await UpdateSearchAsync(SearchBox.Text.Trim());
+        }
+        catch (Exception)
+        {
+            // URL, calculation, and file search remain available if app discovery fails.
+        }
     }
 
     internal static IReadOnlyList<SmartEntry> GetApplications()
@@ -120,8 +139,10 @@ public partial class LaunchWindow : Window
     private async void SearchBox_TextChanged(
         object sender,
         System.Windows.Controls.TextChangedEventArgs e)
+        => await UpdateSearchAsync(SearchBox.Text.Trim());
+
+    private async Task UpdateSearchAsync(string query)
     {
-        var query = SearchBox.Text.Trim();
         _searchCancellation?.Cancel();
         _searchCancellation?.Dispose();
         _searchCancellation = new CancellationTokenSource();
@@ -258,15 +279,21 @@ public partial class LaunchWindow : Window
             IEnumerable<string> files;
             try
             {
-                files = Directory.EnumerateFiles(dir, "*", enumeration)
-                    .Where(path => Path.GetFileName(path).Contains(
-                        query, StringComparison.OrdinalIgnoreCase));
+                files = Directory.EnumerateFiles(dir, "*", enumeration);
             }
             catch { continue; }
 
-            foreach (var f in files.Take(remaining))
+            var inspected = 0;
+            foreach (var f in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (++inspected > MaxFileCandidates)
+                    break;
+                if (!Path.GetFileName(f).Contains(
+                        query,
+                        StringComparison.OrdinalIgnoreCase))
+                    continue;
+
                 remaining--;
                 var name = Path.GetFileName(f);
                 var ext = Path.GetExtension(f).ToLower();
@@ -285,6 +312,8 @@ public partial class LaunchWindow : Window
                     Category = "file",
                     Subtitle = dir,
                 };
+                if (remaining <= 0)
+                    yield break;
             }
         }
     }
@@ -313,13 +342,18 @@ public partial class LaunchWindow : Window
             }
             catch { continue; }
 
-            foreach (var f in files.Take(200))
+            var inspected = 0;
+            foreach (var f in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (++inspected > MaxContentCandidates)
+                    break;
                 if (results.Count >= 4) return results;
                 if (!exts.Contains(Path.GetExtension(f))) continue;
                 try
                 {
+                    if (new FileInfo(f).Length > MaxContentFileBytes)
+                        continue;
                     var content = File.ReadAllText(f);
                     var idx = content.IndexOf(query, StringComparison.OrdinalIgnoreCase);
                     if (idx >= 0)

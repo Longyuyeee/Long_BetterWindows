@@ -70,7 +70,9 @@ namespace LongBetterWindows.Host.Interaction
             {
                 if (entry.State != PluginState.Running)
                 {
-                    var started = await _plugins.StartPluginAsync(entry.Id);
+                    var started = await _plugins.StartPluginAsync(
+                        entry.Id,
+                        persistAutoStart: false);
                     if (!started && entry.State != PluginState.Running)
                         return PluginCommandResult.Failure($"插件启动失败: {entry.DisplayName}");
                 }

@@ -185,7 +185,9 @@ namespace LongBetterWindows.Host.Engine
                 ?? (IReadOnlyList<string>)Array.Empty<string>();
         }
 
-        public async Task<bool> StartPluginAsync(string pluginId)
+        public async Task<bool> StartPluginAsync(
+            string pluginId,
+            bool persistAutoStart = true)
         {
             PluginEntry? entry;
             lock (_lock)
@@ -209,7 +211,8 @@ namespace LongBetterWindows.Host.Engine
                         if (ok)
                         {
                             SetState(pluginId, PluginState.Running);
-                            entry.SetSetting("auto_start", "true");
+                            if (persistAutoStart)
+                                entry.SetSetting("auto_start", "true");
                             Log.Information("插件 {PluginId} 已启用", pluginId);
                         }
                         return ok;
@@ -218,7 +221,8 @@ namespace LongBetterWindows.Host.Engine
                     {
                         // WebPluginRuntime 等非 ILongPlugin 类型，默认已运行
                         SetState(pluginId, PluginState.Running);
-                        entry.SetSetting("auto_start", "true");
+                        if (persistAutoStart)
+                            entry.SetSetting("auto_start", "true");
                         Log.Information("插件 {PluginId} 已启用", pluginId);
                         return true;
                     }
