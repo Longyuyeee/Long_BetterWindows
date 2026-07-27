@@ -31,8 +31,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Long.Brush.Surface.Hover}" />
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Long.Brush.Stroke.Strong}" />
+                            <Setter TargetName="Chrome" Property="Opacity" Value="0.92" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Long.Brush.Surface.Pressed}" />
@@ -56,6 +56,14 @@
         <Setter Property="Background" Value="{DynamicResource Long.Brush.Accent.Primary}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Long.Brush.Accent.Primary}" />
         <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Text.OnAccent}" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource Long.Brush.Accent.Hover}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter Property="Background" Value="{DynamicResource Long.Brush.Accent.Pressed}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="LongButton.Danger" TargetType="Button" BasedOn="{StaticResource LongButton}">

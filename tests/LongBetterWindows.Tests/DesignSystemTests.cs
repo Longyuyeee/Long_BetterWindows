@@ -514,7 +514,7 @@ public class DesignSystemTests
         Assert.Contains("long.networkPort.getTcpListeners()", page);
         Assert.Contains("long.networkPort.getTcpConnections()", page);
         Assert.Contains("long.networkPort.getUdpEndpoints()", page);
-        Assert.Contains("long.networkPort.findOwner(port, protocol)", page);
+        Assert.Contains("long.networkPort.findPortOwner(port, protocol)", page);
         Assert.Contains("long.clipboard.setText(text)", page);
         Assert.Contains("long.process.kill(target.id)", page);
         Assert.Contains("killDialog.showModal()", page);

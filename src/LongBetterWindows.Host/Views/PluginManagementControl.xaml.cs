@@ -138,6 +138,7 @@ namespace LongBetterWindows.Host.Views
                 if (content is null) return;
 
                 new PluginWindowHost(
+                    entry.Id,
                     string.Format(I18n("plugins.settingsTitle"), entry.DisplayName),
                     content,
                     entry.Manifest.Window)
@@ -162,6 +163,7 @@ namespace LongBetterWindows.Host.Views
             var panel = new CapabilityDetailPanel();
             panel.LoadCapabilities(entry.Id, entry.DisplayName, entry.Manifest.Capabilities);
             new PluginWindowHost(
+                entry.Id,
                 string.Format(I18n("plugins.capabilitiesTitle"), entry.DisplayName),
                 panel,
                 new PluginWindowPreference

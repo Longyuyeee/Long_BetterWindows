@@ -6,7 +6,8 @@ namespace LongBetterWindows.Host.Interaction
 {
     public sealed class LocalFileSearchProvider : ISearchProvider
     {
-        private const int MaximumIndexedEntries = 75000;
+        private const int MaximumIndexedEntries = 30000;
+        private const int SnapshotBatchSize = 2048;
         private readonly IReadOnlyList<string> _roots;
         private readonly object _indexLock = new();
         private readonly Func<string, string>? _localize;
@@ -43,12 +44,13 @@ namespace LongBetterWindows.Host.Interaction
             var index = completed == indexTask
                 ? await indexTask
                 : Volatile.Read(ref _snapshot);
-            return index
-                .Select(item => (item, score: Score(item, query)))
-                .Where(match => match.score > 0)
+            return FindBestMatches(
+                    index,
+                    query,
+                    Math.Min(8, request.MaxResults),
+                    cancellationToken)
                 .OrderByDescending(match => match.score)
                 .ThenBy(match => match.item.Name, StringComparer.OrdinalIgnoreCase)
-                .Take(Math.Min(8, request.MaxResults))
                 .Select(match => CreateResult(match.item, match.score))
                 .ToList();
         }
@@ -56,7 +58,15 @@ namespace LongBetterWindows.Host.Interaction
         private Task<IReadOnlyList<IndexedPath>> GetIndexAsync()
         {
             lock (_indexLock)
-                return _indexTask ??= Task.Run(BuildIndex);
+                return _indexTask ??= Task.Factory.StartNew(
+                    () =>
+                    {
+                        Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
+                        return BuildIndex();
+                    },
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default);
         }
 
         private IReadOnlyList<IndexedPath> BuildIndex()
@@ -81,7 +91,8 @@ namespace LongBetterWindows.Host.Interaction
                             path,
                             Path.GetFileName(path),
                             Directory.Exists(path)));
-                        if (results.Count % 256 == 0) PublishSnapshot(results);
+                        if (results.Count % SnapshotBatchSize == 0)
+                            PublishSnapshot(results);
                         if (results.Count >= MaximumIndexedEntries)
                         {
                             PublishSnapshot(results);
@@ -97,6 +108,49 @@ namespace LongBetterWindows.Host.Interaction
 
             PublishSnapshot(results);
             return results;
+        }
+
+        private static IReadOnlyList<(IndexedPath item, int score)> FindBestMatches(
+            IReadOnlyList<IndexedPath> index,
+            string query,
+            int maximumResults,
+            CancellationToken cancellationToken)
+        {
+            if (maximumResults <= 0)
+                return Array.Empty<(IndexedPath item, int score)>();
+
+            var matches = new List<(IndexedPath item, int score)>(maximumResults + 1);
+            for (var indexPosition = 0; indexPosition < index.Count; indexPosition++)
+            {
+                if ((indexPosition & 255) == 0)
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                var item = index[indexPosition];
+                var score = Score(item, query);
+                if (score <= 0)
+                    continue;
+
+                matches.Add((item, score));
+                if (matches.Count <= maximumResults)
+                    continue;
+
+                var worst = 0;
+                for (var candidate = 1; candidate < matches.Count; candidate++)
+                {
+                    if (matches[candidate].score < matches[worst].score
+                        || matches[candidate].score == matches[worst].score
+                        && string.Compare(
+                            matches[candidate].item.Name,
+                            matches[worst].item.Name,
+                            StringComparison.OrdinalIgnoreCase) > 0)
+                    {
+                        worst = candidate;
+                    }
+                }
+                matches.RemoveAt(worst);
+            }
+
+            return matches;
         }
 
         private void PublishSnapshot(List<IndexedPath> results)

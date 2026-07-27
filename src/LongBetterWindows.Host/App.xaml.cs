@@ -408,6 +408,7 @@ namespace LongBetterWindows.Host
                 : isLight ? LightPalette : DarkPalette;
             foreach (var (key, value) in palette)
                 r[key] = (Color)ColorConverter.ConvertFromString(value);
+            UpdateThemeBrushResources(r, palette);
             if (SystemParameters.HighContrast || _forceHighContrast)
             {
                 r["Long.Brush.Accent.Gradient"] = new SolidColorBrush(SystemColors.HighlightColor);
@@ -425,6 +426,64 @@ namespace LongBetterWindows.Host
             }
 
             ThemeChanged?.Invoke(isLight);
+        }
+
+        private static void UpdateThemeBrushResources(
+            ResourceDictionary resources,
+            IReadOnlyDictionary<string, string> palette)
+        {
+            var brushColors = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Long.Brush.Background.Base"] = "Long.Color.Background.Base",
+                ["Long.Brush.Background.Raised"] = "Long.Color.Background.Raised",
+                ["Long.Brush.Surface.Card"] = "Long.Color.Surface.Card",
+                ["Long.Brush.Surface.Hover"] = "Long.Color.Surface.Hover",
+                ["Long.Brush.Surface.Pressed"] = "Long.Color.Surface.Pressed",
+                ["Long.Brush.Surface.Overlay"] = "Long.Color.Surface.Overlay",
+                ["Long.Brush.Stroke.Default"] = "Long.Color.Stroke.Default",
+                ["Long.Brush.Stroke.Strong"] = "Long.Color.Stroke.Strong",
+                ["Long.Brush.Text.Primary"] = "Long.Color.Text.Primary",
+                ["Long.Brush.Text.Secondary"] = "Long.Color.Text.Secondary",
+                ["Long.Brush.Text.Muted"] = "Long.Color.Text.Muted",
+                ["Long.Brush.Accent.Primary"] = "Long.Color.Accent.Primary",
+                ["Long.Brush.Accent.Hover"] = "Long.Color.Accent.Hover",
+                ["Long.Brush.Accent.Pressed"] = "Long.Color.Accent.Pressed",
+                ["Long.Brush.Accent.Soft"] = "Long.Color.Accent.Soft",
+                ["Long.Brush.Focus"] = "Long.Color.Focus",
+                ["Long.Brush.State.Success"] = "Long.Color.State.Success",
+                ["Long.Brush.State.Warning"] = "Long.Color.State.Warning",
+                ["Long.Brush.State.Danger"] = "Long.Color.State.Danger",
+                ["Long.Brush.ScrollThumb"] = "Long.Color.ScrollThumb",
+                ["Long.Brush.ScrollThumbHover"] = "Long.Color.ScrollThumbHover",
+                ["AccentBlueBrush"] = "Long.Color.Accent.Primary",
+                ["AccentBlueHoverBrush"] = "Long.Color.Accent.Hover",
+                ["AccentBluePressedBrush"] = "Long.Color.Accent.Pressed",
+                ["SuccessGreenBrush"] = "Long.Color.State.Success",
+                ["SuccessGreenHoverBrush"] = "Long.Color.State.Success",
+                ["DangerRedBrush"] = "Long.Color.State.Danger",
+                ["DangerRedHoverBrush"] = "Long.Color.State.Danger",
+                ["SurfaceBackgroundBrush"] = "Long.Color.Background.Base",
+                ["CardBackgroundBrush"] = "Long.Color.Surface.Card",
+                ["CardHoverBrush"] = "Long.Color.Surface.Hover",
+                ["TitleBarBrush"] = "Long.Color.Background.Raised",
+                ["SecondaryButtonBrush"] = "Long.Color.Surface.Card",
+                ["SecondaryButtonHoverBrush"] = "Long.Color.Surface.Hover",
+                ["TextPrimaryBrush"] = "Long.Color.Text.Primary",
+                ["TextSecondaryBrush"] = "Long.Color.Text.Secondary",
+                ["TextMutedBrush"] = "Long.Color.Text.Muted",
+                ["TextDimBrush"] = "Long.Color.Text.Muted",
+                ["DividerBrush"] = "Long.Color.Stroke.Default",
+                ["ScrollThumbBrush"] = "Long.Color.ScrollThumb",
+                ["ScrollThumbHoverBrush"] = "Long.Color.ScrollThumbHover",
+            };
+
+            foreach (var (brushKey, colorKey) in brushColors)
+            {
+                var brush = new SolidColorBrush(
+                    (Color)ColorConverter.ConvertFromString(palette[colorKey]));
+                brush.Freeze();
+                resources[brushKey] = brush;
+            }
         }
 
         private static void SystemParameters_StaticPropertyChanged(

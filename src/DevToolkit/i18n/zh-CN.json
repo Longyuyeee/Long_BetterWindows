@@ -3,6 +3,7 @@
   "plugin.description": "面向开发者的编码、解码、转换与识别工具，支持 Base64、时间戳、UUID、Hash、URL、进制、Unicode 等一站式转换",
   "commands.dev-toolkit.open.title": "打开开发者工具箱",
   "commands.dev-toolkit.open.description": "使用编码、哈希、时间戳、UUID 和进制转换工具",
+  "command.opened": "开发者工具箱已打开",
   "page.title": "开发者工具箱",
   "page.subtitle": "编码、解码、转换与识别 · 输入即识别",
   "tabs.encode": "编码/解码",

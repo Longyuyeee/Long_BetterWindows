@@ -14,6 +14,7 @@ namespace LongBetterWindows.Host.Engine
         private readonly WebPluginLanguageMessageState _languageMessages = new();
         private WebView2? _webView;
         private bool _themeSubscribed;
+        private TaskCompletionSource<bool>? _navigationCompletion;
 
         internal WebPluginViewLifecycle(
             PluginManifest manifest,
@@ -62,16 +63,10 @@ namespace LongBetterWindows.Host.Engine
                     await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(uiKitScript);
 
                 // 注入 long.* JS API 桥接
-                // 在页面加载前注入初始化脚本（与导航并行执行）
-                _ = webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
-                    WebPluginBridgeProtocol.BuildInjectionScript(_manifest.Id))
-                    .ContinueWith(t =>
-                    {
-                        if (t.IsFaulted)
-                            Log.Error(t.Exception, "[Web:{Id}] JS Bridge 注入失败", _manifest.Id);
-                        else
-                            Log.Debug("[Web:{Id}] JS Bridge 注入完成", _manifest.Id);
-                    }, TaskScheduler.Default);
+                // 注入必须在导航前完成，否则首条命令可能早于页面处理器到达。
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                    WebPluginBridgeProtocol.BuildInjectionScript(_manifest.Id));
+                Log.Debug("[Web:{Id}] JS Bridge 注入完成", _manifest.Id);
 
                 if (!_themeSubscribed)
                 {
@@ -84,11 +79,25 @@ namespace LongBetterWindows.Host.Engine
                     throw new InvalidDataException(
                         $"Web 插件入口不存在或越出插件目录：{_manifest.EntryPoint}");
 
+                _navigationCompletion = new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
                 webView.CoreWebView2.Navigate(entryUri!.AbsoluteUri);
             });
             try
             {
                 await await initialization;
+                var navigationCompletion = _navigationCompletion
+                    ?? throw new InvalidOperationException(
+                        $"Web plugin navigation did not start: {_manifest.Id}");
+                var navigationSucceeded = await navigationCompletion.Task.WaitAsync(
+                    TimeSpan.FromSeconds(15));
+                if (!navigationSucceeded)
+                {
+                    Log.Error(
+                        "WebPlugin {PluginId} 初始页面导航失败",
+                        _manifest.Id);
+                    return false;
+                }
             }
             catch (Exception ex)
             {
@@ -185,6 +194,7 @@ namespace LongBetterWindows.Host.Engine
             CoreWebView2NavigationCompletedEventArgs args)
         {
             var message = _languageMessages.CompleteNavigation(args.IsSuccess);
+            _navigationCompletion?.TrySetResult(args.IsSuccess);
             if (message is not null)
                 PostMessageCore(message);
         }

@@ -1,8 +1,18 @@
 <Window x:Class="WindowManagerPlugin.WindowManagerGuide"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="窗口管理" Width="560" Height="590" SizeToContent="Manual"
-        Style="{StaticResource LongDialog}" WindowStartupLocation="CenterScreen">
+        Background="Transparent"
+        Foreground="{DynamicResource Long.Brush.Text.Primary}"
+        FontFamily="{DynamicResource Long.Font.Ui}"
+        WindowStyle="None" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="42" CornerRadius="14"
+                            GlassFrameThickness="0" ResizeBorderThickness="6"
+                            UseAeroCaptionButtons="True" />
+    </shell:WindowChrome.WindowChrome>
     <Border Style="{StaticResource LongCard}" Padding="24">
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>

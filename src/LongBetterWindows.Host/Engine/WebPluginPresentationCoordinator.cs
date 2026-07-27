@@ -117,10 +117,12 @@ namespace LongBetterWindows.Host.Engine
 
         private void ShowDetachedWindow(System.Windows.FrameworkElement webView)
         {
-            _window = new PluginWindowHost(_pluginName, webView, _runtime.Manifest.Window)
-            {
-                Owner = System.Windows.Application.Current.MainWindow,
-            };
+            _window = new PluginWindowHost(
+                _pluginId,
+                _pluginName,
+                webView,
+                _runtime.Manifest.Window);
+            _window.SetReturnTarget(System.Windows.Application.Current.MainWindow);
             var window = _window;
             window.Closed += async (_, _) =>
             {

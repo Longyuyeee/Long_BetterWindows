@@ -3,6 +3,7 @@
   "plugin.description": "Developer-focused encoding, decoding, conversion, and identification tools for Base64, timestamps, UUIDs, hashes, URLs, number bases, and Unicode",
   "commands.dev-toolkit.open.title": "Open Developer Toolkit",
   "commands.dev-toolkit.open.description": "Use encoding, hashing, timestamp, UUID, and number-base conversion tools",
+  "command.opened": "Developer Toolkit opened",
   "page.title": "Developer Toolkit",
   "page.subtitle": "Encode, decode, convert, and identify · recognize as you type",
   "tabs.encode": "Encode/Decode",

@@ -9,8 +9,8 @@
 
     body {
       font-family: 'Segoe UI', -apple-system, sans-serif;
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: var(--long-bg-base);
+      color: var(--long-text-primary);
       padding: 20px;
       line-height: 1.6;
     }
@@ -24,11 +24,11 @@
       font-size: 24px;
       font-weight: 600;
       margin-bottom: 8px;
-      color: #fff;
+      color: var(--long-text-primary);
     }
 
     .subtitle {
-      color: #888;
+      color: var(--long-text-muted);
       font-size: 13px;
       margin-bottom: 24px;
     }
@@ -37,7 +37,7 @@
       display: flex;
       gap: 8px;
       margin-bottom: 20px;
-      border-bottom: 1px solid #333;
+      border-bottom: 1px solid var(--long-stroke);
       padding-bottom: 2px;
     }
 
@@ -45,7 +45,7 @@
       padding: 8px 16px;
       background: transparent;
       border: none;
-      color: #888;
+      color: var(--long-text-muted);
       cursor: pointer;
       font-size: 14px;
       transition: all 0.2s;
@@ -53,12 +53,12 @@
     }
 
     .tab:hover {
-      color: #d4d4d4;
+      color: var(--long-text-primary);
     }
 
     .tab.active {
-      color: #fff;
-      border-bottom-color: #C4612F;
+      color: var(--long-text-primary);
+      border-bottom-color: var(--long-accent);
     }
 
     .tab-content {
@@ -70,7 +70,8 @@
     }
 
     .tool-section {
-      background: #252526;
+      background: var(--long-surface-card);
+      border: 1px solid var(--long-stroke);
       border-radius: 8px;
       padding: 20px;
       margin-bottom: 16px;
@@ -80,7 +81,7 @@
       font-size: 16px;
       font-weight: 500;
       margin-bottom: 12px;
-      color: #fff;
+      color: var(--long-text-primary);
     }
 
     .input-group {
@@ -90,16 +91,16 @@
     label {
       display: block;
       font-size: 13px;
-      color: #888;
+      color: var(--long-text-muted);
       margin-bottom: 6px;
     }
 
     textarea, input[type="text"], select {
       width: 100%;
-      background: #1e1e1e;
-      border: 1px solid #3c3c3c;
+      background: var(--long-bg-raised);
+      border: 1px solid var(--long-stroke);
       border-radius: 4px;
-      color: #d4d4d4;
+      color: var(--long-text-primary);
       padding: 10px;
       font-family: 'Consolas', monospace;
       font-size: 13px;
@@ -109,7 +110,7 @@
 
     textarea:focus, input:focus, select:focus {
       outline: none;
-      border-color: #C4612F;
+      border-color: var(--long-accent);
     }
 
     textarea {
@@ -124,49 +125,49 @@
 
     button {
       padding: 8px 16px;
-      background: #C4612F;
+      background: var(--long-accent);
       border: none;
       border-radius: 4px;
-      color: #fff;
+      color: var(--long-text-primary);
       font-size: 13px;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     button:hover {
-      background: #A94E22;
+      background: var(--long-accent-hover);
       transform: translateY(-1px);
     }
 
     button.secondary {
-      background: #3c3c3c;
+      background: var(--long-surface-card);
     }
 
     button.secondary:hover {
-      background: #4c4c4c;
+      background: var(--long-surface-hover);
     }
 
     .result {
-      background: #1e1e1e;
-      border: 1px solid #3c3c3c;
+      background: var(--long-bg-raised);
+      border: 1px solid var(--long-stroke);
       border-radius: 4px;
       padding: 12px;
       font-family: 'Consolas', monospace;
       font-size: 13px;
-      color: #4ec9b0;
+      color: var(--long-success);
       word-break: break-all;
       min-height: 60px;
       margin-top: 12px;
     }
 
     .info {
-      background: #264f78;
-      border-left: 3px solid #007acc;
+      background: var(--long-accent-soft);
+      border-left: 3px solid var(--long-accent);
       padding: 10px 12px;
       border-radius: 4px;
       font-size: 12px;
       margin-top: 12px;
-      color: #d4d4d4;
+      color: var(--long-text-secondary);
     }
 
     .quick-buttons {
@@ -178,10 +179,10 @@
 
     .quick-btn {
       padding: 12px;
-      background: #2d2d30;
-      border: 1px solid #3c3c3c;
+      background: var(--long-surface-card);
+      border: 1px solid var(--long-stroke);
       border-radius: 6px;
-      color: #d4d4d4;
+      color: var(--long-text-primary);
       font-size: 13px;
       cursor: pointer;
       transition: all 0.2s;
@@ -189,8 +190,8 @@
     }
 
     .quick-btn:hover {
-      background: #3c3c3c;
-      border-color: #C4612F;
+      background: var(--long-surface-hover);
+      border-color: var(--long-accent);
       transform: translateY(-2px);
     }
 
@@ -201,7 +202,7 @@
 
     .quick-btn-desc {
       font-size: 11px;
-      color: #888;
+      color: var(--long-text-muted);
     }
   </style>
 </head>
@@ -704,6 +705,19 @@
         console.log(t('log.autoCopyFailed', '自动复制失败：'), e);
       }
     }
+    window.LongUI?.onCommand(async function (command) {
+      const text = window.LongUI.commandText(command).trim();
+      if (text) {
+        currentTab = 'encode';
+        document.getElementById('base64Input').value = text;
+        renderTabs();
+        document.getElementById('base64Input').focus();
+      }
+      return {
+        success: true,
+        message: t('command.opened', '开发者工具箱已打开')
+      };
+    });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });

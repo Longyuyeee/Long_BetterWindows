@@ -561,7 +561,7 @@
       renderFindResult();
       try {
         const owner = unwrap(
-          await long.networkPort.findOwner(port, protocol),
+          await long.networkPort.findPortOwner(port, protocol),
           t('error.find', '端口占用查询失败'));
         if (!owner) {
           showFindMessage(

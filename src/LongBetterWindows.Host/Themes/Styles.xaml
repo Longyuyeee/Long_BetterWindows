@@ -116,7 +116,7 @@
         <Setter Property="Template" Value="{StaticResource AnimatedButtonTemplate}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{StaticResource AccentBlueHoverBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AccentBlueHoverBrush}" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -134,7 +134,7 @@
         <Setter Property="Template" Value="{StaticResource AnimatedButtonTemplate}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{StaticResource SecondaryButtonHoverBrush}" />
+                <Setter Property="Background" Value="{DynamicResource SecondaryButtonHoverBrush}" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -152,7 +152,7 @@
         <Setter Property="Template" Value="{StaticResource AnimatedButtonTemplate}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{StaticResource SuccessGreenHoverBrush}" />
+                <Setter Property="Background" Value="{DynamicResource SuccessGreenHoverBrush}" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -170,7 +170,7 @@
         <Setter Property="Template" Value="{StaticResource AnimatedButtonTemplate}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{StaticResource DangerRedHoverBrush}" />
+                <Setter Property="Background" Value="{DynamicResource DangerRedHoverBrush}" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -180,8 +180,8 @@
     <!-- ═══════════════════════════════════════════ -->
 
     <Style x:Key="CardBorderStyle" TargetType="Border">
-        <Setter Property="Background" Value="#CC20283A" />
-        <Setter Property="BorderBrush" Value="#20FFFFFF" />
+        <Setter Property="Background" Value="{DynamicResource Long.Brush.Surface.Card}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Long.Brush.Stroke.Default}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="14" />
         <Setter Property="Padding" Value="18,16" />
@@ -295,7 +295,7 @@
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
                                             <Border x:Name="thumbBorder"
-                                                    Background="{StaticResource ScrollThumbBrush}"
+                                                    Background="{DynamicResource ScrollThumbBrush}"
                                                     CornerRadius="3"
                                                     Width="4"
                                                     HorizontalAlignment="Center" />
@@ -303,7 +303,7 @@
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter TargetName="thumbBorder"
                                                             Property="Background"
-                                                            Value="{StaticResource ScrollThumbHoverBrush}" />
+                                                            Value="{DynamicResource ScrollThumbHoverBrush}" />
                                                     <Setter TargetName="thumbBorder"
                                                             Property="Width"
                                                             Value="6" />
@@ -349,7 +349,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="border" Property="Background"
-                                    Value="#1FFFFFFF" />
+                                    Value="{DynamicResource Long.Brush.Surface.Hover}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

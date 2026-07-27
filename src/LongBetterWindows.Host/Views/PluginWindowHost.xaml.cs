@@ -6,7 +6,10 @@ namespace LongBetterWindows.Host.Views
 {
     public partial class PluginWindowHost : Window
     {
+        private Window? _returnTarget;
+
         public PluginWindowHost(
+            string pluginId,
             string title,
             FrameworkElement content,
             PluginWindowPreference? preference = null)
@@ -15,8 +18,13 @@ namespace LongBetterWindows.Host.Views
             Title = title;
             PluginTitle.Text = title;
             PluginContent.Content = content;
+            Icon = PluginTaskbarIdentity.CreateIcon(pluginId, title);
+            SourceInitialized += (_, _) =>
+                PluginTaskbarIdentity.Apply(this, pluginId);
             ApplyWindowPreference(preference);
         }
+
+        internal void SetReturnTarget(Window? target) => _returnTarget = target;
 
         private void ApplyWindowPreference(PluginWindowPreference? preference)
         {
@@ -72,7 +80,7 @@ namespace LongBetterWindows.Host.Views
 
         private void ReturnToOwner()
         {
-            var owner = Owner;
+            var owner = _returnTarget ?? Owner;
             Close();
             if (owner is null) return;
             if (!owner.IsVisible) owner.Show();

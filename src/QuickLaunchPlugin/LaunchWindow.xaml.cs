@@ -32,6 +32,7 @@ public partial class LaunchWindow : Window
     private List<SmartEntry> _currentResults = [];
     private LaunchWindowLocalization _localization;
     private Action<SmartEntry?>? _onSelect;
+    private CancellationTokenSource? _searchCancellation;
 
     public LaunchWindow(LaunchWindowLocalization localization)
     {
@@ -116,9 +117,15 @@ public partial class LaunchWindow : Window
         }
     }
 
-    private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    private async void SearchBox_TextChanged(
+        object sender,
+        System.Windows.Controls.TextChangedEventArgs e)
     {
         var query = SearchBox.Text.Trim();
+        _searchCancellation?.Cancel();
+        _searchCancellation?.Dispose();
+        _searchCancellation = new CancellationTokenSource();
+        var cancellationToken = _searchCancellation.Token;
 
         if (string.IsNullOrEmpty(query))
         {
@@ -129,12 +136,12 @@ public partial class LaunchWindow : Window
             return;
         }
 
-        var results = new List<SmartEntry>();
+        var immediateResults = new List<SmartEntry>();
 
         // 1. 数学表达式
         if (TryEvaluateMath(query, out var mathResult))
         {
-            results.Add(new SmartEntry
+            immediateResults.Add(new SmartEntry
             {
                 Name = $"{query} = {mathResult}",
                 Path = mathResult,
@@ -147,7 +154,7 @@ public partial class LaunchWindow : Window
         if (IsUrl(query))
         {
             var url = query.StartsWith("http") ? query : "https://" + query;
-            results.Add(new SmartEntry
+            immediateResults.Add(new SmartEntry
             {
                 Name = query,
                 Path = url,
@@ -161,25 +168,35 @@ public partial class LaunchWindow : Window
             .Where(a => a.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
             .Take(5)
             .ToList();
-        results.AddRange(appResults);
+        immediateResults.AddRange(appResults);
 
-        // 4. 内容搜索 (grep: 以 > 开头)
-        if (query.StartsWith(">") && query.Length > 2)
-        {
-            var grepQuery = query.Substring(1).Trim();
-            if (grepQuery.Length >= 2)
-            {
-                var grepResults = SearchContent(grepQuery).Take(4).ToList();
-                results.AddRange(grepResults);
-            }
-        }
-        // 5. 文件搜索（桌面/文档/下载）
-        else if (query.Length >= 2)
-        {
-            var fileResults = SearchFiles(query).Take(3).ToList();
-            results.AddRange(fileResults);
-        }
+        ApplySearchResults(immediateResults);
 
+        try
+        {
+            await Task.Delay(180, cancellationToken);
+            var fileResults = await Task.Run(
+                () => query.StartsWith(">") && query.Length > 2
+                    ? SearchContent(query[1..].Trim(), cancellationToken).Take(4).ToList()
+                    : query.Length >= 2
+                        ? SearchFiles(query, cancellationToken).Take(3).ToList()
+                        : [],
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!string.Equals(SearchBox.Text.Trim(), query, StringComparison.Ordinal))
+                return;
+
+            var results = immediateResults.Concat(fileResults).ToList();
+            ApplySearchResults(results);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer query superseded this disk search.
+        }
+    }
+
+    private void ApplySearchResults(List<SmartEntry> results)
+    {
         _currentResults = results;
         ApplyResultsProjection();
         ResultsList.ItemsSource = _currentResults;
@@ -215,7 +232,9 @@ public partial class LaunchWindow : Window
         }
     }
 
-    private static IEnumerable<SmartEntry> SearchFiles(string query)
+    private static IEnumerable<SmartEntry> SearchFiles(
+        string query,
+        CancellationToken cancellationToken)
     {
         var dirs = new[]
         {
@@ -233,6 +252,7 @@ public partial class LaunchWindow : Window
         };
         foreach (var dir in dirs)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (remaining <= 0) yield break;
             if (!Directory.Exists(dir)) continue;
             IEnumerable<string> files;
@@ -246,6 +266,7 @@ public partial class LaunchWindow : Window
 
             foreach (var f in files.Take(remaining))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 remaining--;
                 var name = Path.GetFileName(f);
                 var ext = Path.GetExtension(f).ToLower();
@@ -268,7 +289,9 @@ public partial class LaunchWindow : Window
         }
     }
 
-    private static List<SmartEntry> SearchContent(string query)
+    private static List<SmartEntry> SearchContent(
+        string query,
+        CancellationToken cancellationToken)
     {
         var results = new List<SmartEntry>();
         var dirs = new[] { Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) };
@@ -276,6 +299,7 @@ public partial class LaunchWindow : Window
 
         foreach (var dir in dirs)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!Directory.Exists(dir)) continue;
             IEnumerable<string> files;
             try
@@ -291,6 +315,7 @@ public partial class LaunchWindow : Window
 
             foreach (var f in files.Take(200))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (results.Count >= 4) return results;
                 if (!exts.Contains(Path.GetExtension(f))) continue;
                 try
@@ -402,6 +427,7 @@ public partial class LaunchWindow : Window
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
+        _searchCancellation?.Cancel();
         _onSelect?.Invoke(null);
         Close();
     }
