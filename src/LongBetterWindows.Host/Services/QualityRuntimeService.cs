@@ -2,6 +2,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -276,6 +277,76 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
+        public async Task RunUiServiceThemeProbeAsync(string reportPath)
+        {
+            var originalTheme = App.IsLightTheme;
+            var dialog = UIService.CreatePromptDialogForQuality();
+            var fullPath = Path.GetFullPath(reportPath);
+            var reportDirectory = Path.GetDirectoryName(fullPath)!;
+            Directory.CreateDirectory(reportDirectory);
+            var darkScreenshotPath = Path.Combine(
+                reportDirectory,
+                "ui-service-dark.png");
+            var lightScreenshotPath = Path.Combine(
+                reportDirectory,
+                "ui-service-light.png");
+            try
+            {
+                dialog.Show();
+                App.UpdateThemeResources(isLight: false);
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.Render);
+                dialog.UpdateLayout();
+                var dark = CaptureDialogTheme(dialog, "dark");
+                await CaptureWindowAsync(dialog, darkScreenshotPath);
+
+                App.UpdateThemeResources(isLight: true);
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.Render);
+                dialog.UpdateLayout();
+                var light = CaptureDialogTheme(dialog, "light");
+                await CaptureWindowAsync(dialog, lightScreenshotPath);
+
+                var changed =
+                    dark.WindowBackground != light.WindowBackground
+                    && dark.InputBackground != light.InputBackground
+                    && dark.SecondaryButtonBackground
+                        != light.SecondaryButtonBackground;
+                var passed = changed && dark.Passed && light.Passed;
+                await File.WriteAllTextAsync(
+                    fullPath,
+                    JsonSerializer.Serialize(
+                        new
+                        {
+                            schema_version = 1,
+                            captured_at = DateTimeOffset.UtcNow,
+                            passed,
+                            runtime_theme_changed = changed,
+                            screenshots = new
+                            {
+                                dark = Path.GetFileName(darkScreenshotPath),
+                                dark_sha256 = GetFileSha256(darkScreenshotPath),
+                                light = Path.GetFileName(lightScreenshotPath),
+                                light_sha256 = GetFileSha256(lightScreenshotPath),
+                            },
+                            themes = new[] { dark, light },
+                        },
+                        new JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+                        }));
+                _application.Shutdown(passed ? 0 : 6);
+            }
+            finally
+            {
+                dialog.Close();
+                App.UpdateThemeResources(originalTheme);
+            }
+        }
+
         public async Task RunPluginPagePerformanceProbeAsync(
             MainWindow window,
             PluginPagePerformanceTrace trace,
@@ -388,6 +459,127 @@ namespace LongBetterWindows.Host.Services
                 .ToLowerInvariant();
         }
 
+        private static async Task CaptureWindowAsync(
+            Window window,
+            string path)
+        {
+            var width = Math.Max(1, (int)Math.Ceiling(window.ActualWidth));
+            var height = Math.Max(1, (int)Math.Ceiling(window.ActualHeight));
+            var bitmap = new RenderTargetBitmap(
+                width,
+                height,
+                96,
+                96,
+                PixelFormats.Pbgra32);
+            bitmap.Render(window);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            await using var stream = new FileStream(
+                path,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                81920,
+                true);
+            encoder.Save(stream);
+            await stream.FlushAsync();
+        }
+
+        private static string GetFileSha256(string path)
+            => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))
+                .ToLowerInvariant();
+
+        private static DialogThemeSnapshot CaptureDialogTheme(
+            Window dialog,
+            string theme)
+        {
+            var label = FindVisualChildren<TextBlock>(dialog).First();
+            var input = FindVisualChildren<System.Windows.Controls.TextBox>(
+                dialog).Single();
+            var buttons = FindVisualChildren<System.Windows.Controls.Button>(
+                dialog).ToArray();
+            var primary = buttons.Single(button =>
+                System.Windows.Automation.AutomationProperties
+                    .GetAutomationId(button)
+                    .EndsWith(".Confirm", StringComparison.Ordinal));
+            var secondary = buttons.Single(button =>
+                System.Windows.Automation.AutomationProperties
+                    .GetAutomationId(button)
+                    .EndsWith(".Cancel", StringComparison.Ordinal));
+
+            var windowBackground = GetColor(dialog.Background);
+            var labelForeground = GetColor(label.Foreground);
+            var inputBackground = GetColor(input.Background);
+            var inputForeground = GetColor(input.Foreground);
+            var primaryBackground = GetColor(primary.Background);
+            var primaryForeground = GetColor(primary.Foreground);
+            var secondaryBackground = GetColor(secondary.Background);
+            var secondaryForeground = GetColor(secondary.Foreground);
+            var labelContrast = ContrastRatio(
+                labelForeground,
+                windowBackground);
+            var inputContrast = ContrastRatio(
+                inputForeground,
+                inputBackground);
+            var primaryContrast = ContrastRatio(
+                primaryForeground,
+                primaryBackground);
+            var secondaryContrast = ContrastRatio(
+                secondaryForeground,
+                secondaryBackground);
+
+            return new DialogThemeSnapshot(
+                theme,
+                ToHex(windowBackground),
+                ToHex(labelForeground),
+                ToHex(inputBackground),
+                ToHex(inputForeground),
+                ToHex(primaryBackground),
+                ToHex(primaryForeground),
+                ToHex(secondaryBackground),
+                ToHex(secondaryForeground),
+                Math.Round(labelContrast, 2),
+                Math.Round(inputContrast, 2),
+                Math.Round(primaryContrast, 2),
+                Math.Round(secondaryContrast, 2),
+                labelContrast >= 4.5
+                    && inputContrast >= 4.5
+                    && primaryContrast >= 4.5
+                    && secondaryContrast >= 4.5);
+        }
+
+        private static Color GetColor(Brush brush)
+            => brush is SolidColorBrush solid
+                ? solid.Color
+                : throw new InvalidDataException(
+                    "UI service theme probe requires solid semantic brushes.");
+
+        private static double ContrastRatio(Color first, Color second)
+        {
+            var firstLuminance = RelativeLuminance(first);
+            var secondLuminance = RelativeLuminance(second);
+            return (Math.Max(firstLuminance, secondLuminance) + 0.05)
+                / (Math.Min(firstLuminance, secondLuminance) + 0.05);
+        }
+
+        private static double RelativeLuminance(Color color)
+        {
+            static double Linearize(byte component)
+            {
+                var value = component / 255d;
+                return value <= 0.04045
+                    ? value / 12.92
+                    : Math.Pow((value + 0.055) / 1.055, 2.4);
+            }
+
+            return 0.2126 * Linearize(color.R)
+                + 0.7152 * Linearize(color.G)
+                + 0.0722 * Linearize(color.B);
+        }
+
+        private static string ToHex(Color color)
+            => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+
         private static async Task WriteCaptureMetadataAsync(
             string path,
             AppStartupOptions options,
@@ -437,5 +629,37 @@ namespace LongBetterWindows.Host.Services
 
             return null;
         }
+
+        private static IEnumerable<T> FindVisualChildren<T>(
+            DependencyObject parent)
+            where T : DependencyObject
+        {
+            for (var index = 0;
+                 index < VisualTreeHelper.GetChildrenCount(parent);
+                 index++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, index);
+                if (child is T match)
+                    yield return match;
+                foreach (var nested in FindVisualChildren<T>(child))
+                    yield return nested;
+            }
+        }
+
+        private sealed record DialogThemeSnapshot(
+            string Theme,
+            string WindowBackground,
+            string LabelForeground,
+            string InputBackground,
+            string InputForeground,
+            string PrimaryButtonBackground,
+            string PrimaryButtonForeground,
+            string SecondaryButtonBackground,
+            string SecondaryButtonForeground,
+            double LabelContrast,
+            double InputContrast,
+            double PrimaryButtonContrast,
+            double SecondaryButtonContrast,
+            bool Passed);
     }
 }

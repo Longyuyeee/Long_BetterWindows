@@ -131,6 +131,39 @@ public sealed class ReleaseBlockingRegressionTests
     }
 
     [Fact]
+    public void PluginUiCapability_UsesRuntimeSemanticThemeResources()
+    {
+        var root = FindRepositoryRoot();
+        var service = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "UIService.cs"));
+
+        Assert.Contains("Long.Brush.Background.Base", service);
+        Assert.Contains("LongButton.Primary", service);
+        Assert.Contains("LongTextBox", service);
+        Assert.Contains("App.ThemeChanged += themeChanged", service);
+        Assert.Contains("NavigationCompleted", service);
+        Assert.Contains("data-long-theme", service);
+        Assert.DoesNotContain("Color.FromRgb", service);
+        Assert.DoesNotContain("MessageBox.Show", service);
+        Assert.False(File.Exists(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Controls",
+            "SkeletonCard.cs")));
+        Assert.False(File.Exists(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Controls",
+            "ToastNotification.cs")));
+    }
+
+    [Fact]
     public void WebPluginCommands_ProvideReliableOpenHandlers()
     {
         var root = FindRepositoryRoot();

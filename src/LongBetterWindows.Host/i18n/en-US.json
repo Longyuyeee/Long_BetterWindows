@@ -284,6 +284,7 @@
   "action.darkMode": "Dark",
   "action.refresh": "Refresh",
   "action.open": "Open",
+  "action.confirm": "Confirm",
   "action.cancel": "Cancel",
   "action.create": "Create",
   "settings.language.title": "Display Language",

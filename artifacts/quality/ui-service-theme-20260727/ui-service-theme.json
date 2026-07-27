@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27T08:31:10.8494713+00:00",
+  "passed": true,
+  "runtime_theme_changed": true,
+  "screenshots": {
+    "dark": "ui-service-dark.png",
+    "dark_sha256": "ed1197b168be7682222ede5af8c0ce1e0547f3a36cb9794aaff0424a4a8b3f3e",
+    "light": "ui-service-light.png",
+    "light_sha256": "85a131ce8332ca0651b20932f8ba6d0a6a91f2b8e09bea5baf0d5af03c497d5c"
+  },
+  "themes": [
+    {
+      "theme": "dark",
+      "window_background": "#0B0D12",
+      "label_foreground": "#F4F6FB",
+      "input_background": "#11151D",
+      "input_foreground": "#F4F6FB",
+      "primary_button_background": "#7059F5",
+      "primary_button_foreground": "#FFFFFF",
+      "secondary_button_background": "#171C27",
+      "secondary_button_foreground": "#F4F6FB",
+      "label_contrast": 17.97,
+      "input_contrast": 16.91,
+      "primary_button_contrast": 4.73,
+      "secondary_button_contrast": 15.77,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "window_background": "#F4F6FA",
+      "label_foreground": "#171A22",
+      "input_background": "#FAFBFD",
+      "input_foreground": "#171A22",
+      "primary_button_background": "#6847F5",
+      "primary_button_foreground": "#FFFFFF",
+      "secondary_button_background": "#FFFFFF",
+      "secondary_button_foreground": "#171A22",
+      "label_contrast": 16.08,
+      "input_contrast": 16.8,
+      "primary_button_contrast": 5.51,
+      "secondary_button_contrast": 17.39,
+      "passed": true
+    }
+  ]
+}

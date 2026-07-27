@@ -50,6 +50,7 @@ namespace LongBetterWindows.Host
             => Current is App { _startupOptions.QualityManagementCardShadows: true };
         internal static bool IsPluginPagePerformanceTracing
             => Current is App { _pluginPageTrace: not null };
+        internal static bool IsLightTheme => _currentIsLight;
         internal bool QualityWorkflowAutomationEnabled
             => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId)
                 || !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowsDirectory);
@@ -285,6 +286,14 @@ namespace LongBetterWindows.Host
                     return;
                 }
 
+                if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityUiServiceThemeReportPath))
+                {
+                    await _qualityRuntime!.RunUiServiceThemeProbeAsync(
+                        _startupOptions.QualityUiServiceThemeReportPath);
+                    return;
+                }
+
                 if (_startupTrace is not null)
                 {
                     await _startupTrace.WriteAsync(
@@ -320,6 +329,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityPluginPagePerformanceReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityTaskbarIdentityReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityUiServiceThemeReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityStartupReportPath))
                 {

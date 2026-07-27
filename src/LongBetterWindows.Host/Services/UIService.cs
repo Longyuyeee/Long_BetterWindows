@@ -1,6 +1,8 @@
+using System.Net;
+using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Media;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using Microsoft.Web.WebView2.Wpf;
@@ -40,13 +42,20 @@ namespace LongBetterWindows.Host.Services
                         Title = title,
                         Width = width,
                         Height = height,
-                        WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                        Background = new SolidColorBrush(Color.FromRgb(30, 31, 34)),
+                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
                         ResizeMode = resizable ? ResizeMode.CanResize : ResizeMode.NoResize
                     };
+                    ApplyWindowTheme(window);
 
                     var webView = new WebView2();
                     window.Content = webView;
+                    Action<bool> themeChanged = isLight =>
+                        _ = ApplyWebThemeAsync(webView, isLight);
+                    webView.NavigationCompleted += async (_, args) =>
+                    {
+                        if (args.IsSuccess)
+                            await ApplyWebThemeAsync(webView, App.IsLightTheme);
+                    };
 
                     window.Loaded += async (_, _) =>
                     {
@@ -63,12 +72,14 @@ namespace LongBetterWindows.Host.Services
 
                     window.Closed += (_, _) =>
                     {
+                        App.ThemeChanged -= themeChanged;
                         lock (_lock)
                         {
                             _windows.Remove(windowId);
                         }
                         webView.Dispose();
                     };
+                    App.ThemeChanged += themeChanged;
 
                     lock (_lock)
                     {
@@ -96,13 +107,8 @@ namespace LongBetterWindows.Host.Services
             {
                 var result = await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    var msgResult = MessageBox.Show(
-                        message,
-                        title,
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Question);
-
-                    return msgResult == MessageBoxResult.Yes;
+                    var dialog = new ConfirmDialog(message, title);
+                    return dialog.ShowDialog() == true;
                 });
 
                 return HostApiResponse<bool>.Success(result);
@@ -227,7 +233,7 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
-        private string WrapHtmlContent(string content, string title)
+        private static string WrapHtmlContent(string content, string title)
         {
             // 如果已经是完整 HTML，直接返回
             if (content.TrimStart().StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase) ||
@@ -237,18 +243,29 @@ namespace LongBetterWindows.Host.Services
             }
 
             // 否则包装为完整页面
+            var initialTheme = App.IsLightTheme ? "light" : "dark";
             return $@"<!DOCTYPE html>
-<html lang=""zh-CN"">
+<html lang=""zh-CN"" data-long-theme=""{initialTheme}"">
 <head>
     <meta charset=""UTF-8"">
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-    <title>{title}</title>
+    <title>{WebUtility.HtmlEncode(title)}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        :root {{
+            color-scheme: dark;
+            --long-bg: #0B0D12;
+            --long-text: #F4F6FB;
+        }}
+        :root[data-long-theme=""light""] {{
+            color-scheme: light;
+            --long-bg: #F5F7FB;
+            --long-text: #171A22;
+        }}
         body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #1E1F22;
-            color: #E8E8E8;
+            background: var(--long-bg);
+            color: var(--long-text);
             padding: 20px;
         }}
     </style>
@@ -259,9 +276,136 @@ namespace LongBetterWindows.Host.Services
 </html>";
         }
 
-        /// <summary>
-        /// 简单输入对话框
-        /// </summary>
+        internal static Window CreatePromptDialogForQuality()
+            => new InputDialog("Theme probe", "Prompt", "Value");
+
+        private static void ApplyWindowTheme(Window window)
+        {
+            window.SetResourceReference(
+                Control.BackgroundProperty,
+                "Long.Brush.Background.Base");
+            if (Application.Current.MainWindow is { IsVisible: true } owner
+                && !ReferenceEquals(owner, window))
+            {
+                window.Owner = owner;
+            }
+            else
+            {
+                window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
+        }
+
+        private static void ApplyControlStyle(
+            FrameworkElement control,
+            string resourceKey)
+            => control.SetResourceReference(
+                FrameworkElement.StyleProperty,
+                resourceKey);
+
+        private static Button CreateDialogButton(
+            string content,
+            string automationId,
+            bool primary)
+        {
+            var button = new Button
+            {
+                Content = content,
+                Width = 80,
+                Height = 32,
+            };
+            ApplyControlStyle(
+                button,
+                primary ? "LongButton.Primary" : "LongButton");
+            AutomationProperties.SetAutomationId(button, automationId);
+            return button;
+        }
+
+        private static async Task ApplyWebThemeAsync(
+            WebView2 webView,
+            bool isLight)
+        {
+            if (webView.CoreWebView2 == null)
+                return;
+
+            try
+            {
+                var themeJson = JsonSerializer.Serialize(
+                    isLight ? "light" : "dark");
+                await webView.CoreWebView2.ExecuteScriptAsync($$"""
+                    (() => {
+                      const theme = {{themeJson}};
+                      document.documentElement.dataset.longTheme = theme;
+                      document.documentElement.style.colorScheme = theme;
+                      window.dispatchEvent(new CustomEvent(
+                        'longthemechanged',
+                        { detail: { theme } }));
+                    })();
+                    """);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "同步自定义窗口主题失败");
+            }
+        }
+
+        private sealed class ConfirmDialog : Window
+        {
+            internal ConfirmDialog(string message, string title)
+            {
+                Title = title;
+                Width = 420;
+                SizeToContent = SizeToContent.Height;
+                WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                ResizeMode = ResizeMode.NoResize;
+                ApplyWindowTheme(this);
+
+                var panel = new StackPanel
+                {
+                    Margin = new Thickness(20),
+                };
+                var label = new TextBlock
+                {
+                    Text = message,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 16),
+                };
+                label.SetResourceReference(
+                    TextBlock.ForegroundProperty,
+                    "Long.Brush.Text.Primary");
+                panel.Children.Add(label);
+
+                var buttons = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                };
+                var confirm = CreateDialogButton(
+                    ServicesInitializer.I18n.T("action.confirm"),
+                    "Long.UI.Confirm.Accept",
+                    primary: true);
+                confirm.Click += (_, _) =>
+                {
+                    DialogResult = true;
+                    Close();
+                };
+                buttons.Children.Add(confirm);
+
+                var cancel = CreateDialogButton(
+                    ServicesInitializer.I18n.T("action.cancel"),
+                    "Long.UI.Confirm.Cancel",
+                    primary: false);
+                cancel.Margin = new Thickness(8, 0, 0, 0);
+                cancel.Click += (_, _) =>
+                {
+                    DialogResult = false;
+                    Close();
+                };
+                buttons.Children.Add(cancel);
+                panel.Children.Add(buttons);
+                Content = panel;
+            }
+        }
+
         private class InputDialog : Window
         {
             private readonly TextBox _textBox;
@@ -273,9 +417,9 @@ namespace LongBetterWindows.Host.Services
                 Title = title;
                 Width = 400;
                 Height = 180;
-                WindowStartupLocation = WindowStartupLocation.CenterScreen;
-                Background = new SolidColorBrush(Color.FromRgb(30, 31, 34));
+                WindowStartupLocation = WindowStartupLocation.CenterOwner;
                 ResizeMode = ResizeMode.NoResize;
+                ApplyWindowTheme(this);
 
                 var grid = new Grid { Margin = new Thickness(20) };
                 grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -285,24 +429,24 @@ namespace LongBetterWindows.Host.Services
                 var label = new TextBlock
                 {
                     Text = message,
-                    Foreground = new SolidColorBrush(Colors.White),
                     Margin = new Thickness(0, 0, 0, 12),
                     TextWrapping = TextWrapping.Wrap
                 };
+                label.SetResourceReference(
+                    TextBlock.ForegroundProperty,
+                    "Long.Brush.Text.Primary");
                 Grid.SetRow(label, 0);
                 grid.Children.Add(label);
 
                 _textBox = new TextBox
                 {
                     Text = defaultValue,
-                    Padding = new Thickness(8),
-                    Background = new SolidColorBrush(Color.FromRgb(51, 51, 56)),
-                    Foreground = new SolidColorBrush(Colors.White),
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(58, 58, 61)),
-                    BorderThickness = new Thickness(1),
-                    VerticalAlignment = VerticalAlignment.Top,
-                    Height = 32
+                    VerticalAlignment = VerticalAlignment.Top
                 };
+                ApplyControlStyle(_textBox, "LongTextBox");
+                AutomationProperties.SetAutomationId(
+                    _textBox,
+                    "Long.UI.Prompt.Input");
                 Grid.SetRow(_textBox, 1);
                 grid.Children.Add(_textBox);
 
@@ -314,30 +458,18 @@ namespace LongBetterWindows.Host.Services
                 };
                 Grid.SetRow(buttonPanel, 2);
 
-                var okButton = new Button
-                {
-                    Content = "确定",
-                    Width = 80,
-                    Height = 28,
-                    Background = new SolidColorBrush(Color.FromRgb(0, 122, 255)),
-                    Foreground = new SolidColorBrush(Colors.White),
-                    BorderThickness = new Thickness(0),
-                    Cursor = System.Windows.Input.Cursors.Hand
-                };
+                var okButton = CreateDialogButton(
+                    ServicesInitializer.I18n.T("action.confirm"),
+                    "Long.UI.Prompt.Confirm",
+                    primary: true);
                 okButton.Click += (_, _) => { DialogResult = true; Close(); };
                 buttonPanel.Children.Add(okButton);
 
-                var cancelButton = new Button
-                {
-                    Content = "取消",
-                    Width = 80,
-                    Height = 28,
-                    Margin = new Thickness(8, 0, 0, 0),
-                    Background = new SolidColorBrush(Color.FromRgb(58, 58, 61)),
-                    Foreground = new SolidColorBrush(Colors.White),
-                    BorderThickness = new Thickness(0),
-                    Cursor = System.Windows.Input.Cursors.Hand
-                };
+                var cancelButton = CreateDialogButton(
+                    ServicesInitializer.I18n.T("action.cancel"),
+                    "Long.UI.Prompt.Cancel",
+                    primary: false);
+                cancelButton.Margin = new Thickness(8, 0, 0, 0);
                 cancelButton.Click += (_, _) => { DialogResult = false; Close(); };
                 buttonPanel.Children.Add(cancelButton);
 
@@ -349,9 +481,6 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
-        /// <summary>
-        /// 简单选择对话框
-        /// </summary>
         private class SelectDialog : Window
         {
             private readonly ListBox _listBox;
@@ -363,9 +492,9 @@ namespace LongBetterWindows.Host.Services
                 Title = title;
                 Width = 400;
                 Height = 300;
-                WindowStartupLocation = WindowStartupLocation.CenterScreen;
-                Background = new SolidColorBrush(Color.FromRgb(30, 31, 34));
+                WindowStartupLocation = WindowStartupLocation.CenterOwner;
                 ResizeMode = ResizeMode.NoResize;
+                ApplyWindowTheme(this);
 
                 var grid = new Grid { Margin = new Thickness(20) };
                 grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -375,20 +504,28 @@ namespace LongBetterWindows.Host.Services
                 var label = new TextBlock
                 {
                     Text = message,
-                    Foreground = new SolidColorBrush(Colors.White),
                     Margin = new Thickness(0, 0, 0, 12),
                     TextWrapping = TextWrapping.Wrap
                 };
+                label.SetResourceReference(
+                    TextBlock.ForegroundProperty,
+                    "Long.Brush.Text.Primary");
                 Grid.SetRow(label, 0);
                 grid.Children.Add(label);
 
-                _listBox = new ListBox
-                {
-                    Background = new SolidColorBrush(Color.FromRgb(51, 51, 56)),
-                    Foreground = new SolidColorBrush(Colors.White),
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(58, 58, 61)),
-                    BorderThickness = new Thickness(1)
-                };
+                _listBox = new ListBox();
+                _listBox.SetResourceReference(
+                    Control.BackgroundProperty,
+                    "Long.Brush.Background.Raised");
+                _listBox.SetResourceReference(
+                    Control.ForegroundProperty,
+                    "Long.Brush.Text.Primary");
+                _listBox.SetResourceReference(
+                    Control.BorderBrushProperty,
+                    "Long.Brush.Stroke.Default");
+                AutomationProperties.SetAutomationId(
+                    _listBox,
+                    "Long.UI.Select.Options");
                 foreach (var option in options)
                 {
                     _listBox.Items.Add(option);
@@ -407,30 +544,18 @@ namespace LongBetterWindows.Host.Services
                 };
                 Grid.SetRow(buttonPanel, 2);
 
-                var okButton = new Button
-                {
-                    Content = "确定",
-                    Width = 80,
-                    Height = 28,
-                    Background = new SolidColorBrush(Color.FromRgb(0, 122, 255)),
-                    Foreground = new SolidColorBrush(Colors.White),
-                    BorderThickness = new Thickness(0),
-                    Cursor = System.Windows.Input.Cursors.Hand
-                };
+                var okButton = CreateDialogButton(
+                    ServicesInitializer.I18n.T("action.confirm"),
+                    "Long.UI.Select.Confirm",
+                    primary: true);
                 okButton.Click += (_, _) => { DialogResult = true; Close(); };
                 buttonPanel.Children.Add(okButton);
 
-                var cancelButton = new Button
-                {
-                    Content = "取消",
-                    Width = 80,
-                    Height = 28,
-                    Margin = new Thickness(8, 0, 0, 0),
-                    Background = new SolidColorBrush(Color.FromRgb(58, 58, 61)),
-                    Foreground = new SolidColorBrush(Colors.White),
-                    BorderThickness = new Thickness(0),
-                    Cursor = System.Windows.Input.Cursors.Hand
-                };
+                var cancelButton = CreateDialogButton(
+                    ServicesInitializer.I18n.T("action.cancel"),
+                    "Long.UI.Select.Cancel",
+                    primary: false);
+                cancelButton.Margin = new Thickness(8, 0, 0, 0);
                 cancelButton.Click += (_, _) => { DialogResult = false; Close(); };
                 buttonPanel.Children.Add(cancelButton);
 

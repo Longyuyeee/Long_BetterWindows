@@ -284,6 +284,7 @@
   "action.darkMode": "暗色",
   "action.refresh": "刷新",
   "action.open": "打开",
+  "action.confirm": "确定",
   "action.cancel": "取消",
   "action.create": "创建",
   "settings.language.title": "界面语言",
