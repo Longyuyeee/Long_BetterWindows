@@ -115,6 +115,9 @@ namespace LongBetterWindows.Host
             }
         }
 
+        internal PluginPageVisualMetrics GetPluginPageVisualMetricsForQuality()
+            => ToolCenter.GetPluginPageVisualMetricsForQuality();
+
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ClickCount == 2)

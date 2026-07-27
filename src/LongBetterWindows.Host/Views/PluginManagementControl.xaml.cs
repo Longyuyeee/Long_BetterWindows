@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
@@ -12,16 +13,18 @@ namespace LongBetterWindows.Host.Views
     public partial class PluginManagementControl : UserControl, IDisposable
     {
         private readonly PluginRegistry _pluginStore;
-        private DispatcherOperation? _refreshOperation;
-        private int _refreshPending;
+        private CancellationTokenSource? _refreshDebounce;
         private int _disposed;
 
         public PluginManagementControl()
         {
+            App.MarkPluginPageStage("plugin_page_constructor_begin");
             InitializeComponent();
             _pluginStore = HostProvider.Instance.PluginStore;
             _pluginStore.PluginsChanged += OnPluginsChanged;
             SizeChanged += PluginManagementControl_SizeChanged;
+            Loaded += PluginManagementControl_Loaded;
+            App.MarkPluginPageStage("plugin_page_constructor_end");
         }
 
         public void Refresh()
@@ -29,6 +32,7 @@ namespace LongBetterWindows.Host.Views
             if (Volatile.Read(ref _disposed) != 0)
                 return;
 
+            App.MarkPluginPageStage("plugin_projection_begin");
             var plugins = _pluginStore.GetAll();
             PluginsHeader.Text = string.Format(
                 I18n("plugins.installedCount"),
@@ -49,28 +53,110 @@ namespace LongBetterWindows.Host.Views
                 ? I18n("plugins.empty")
                 : string.Format(I18n("plugins.noMatch"), filter);
             EmptyStateText.Visibility = items.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (App.IsPluginPagePerformanceTracing)
+                App.MarkPluginPageStage(
+                    "plugin_projection_end",
+                    GetPerformanceMetricsForQuality());
+        }
+
+        private void PluginManagementControl_Loaded(
+            object sender,
+            RoutedEventArgs e)
+        {
+            Loaded -= PluginManagementControl_Loaded;
+            if (!App.IsPluginPagePerformanceTracing)
+                return;
+
+            App.MarkPluginPageStage(
+                "plugin_page_loaded",
+                GetPerformanceMetricsForQuality());
+            _ = Dispatcher.BeginInvoke(
+                new Action(() =>
+                {
+                    if (Volatile.Read(ref _disposed) == 0)
+                    {
+                        App.MarkPluginPageStage(
+                            "plugin_page_first_idle",
+                            GetPerformanceMetricsForQuality());
+                    }
+                }),
+                DispatcherPriority.ContextIdle);
+        }
+
+        internal PluginPageVisualMetrics GetPerformanceMetricsForQuality()
+        {
+            var realized = 0;
+            for (var index = 0; index < PluginsPanel.Items.Count; index++)
+            {
+                if (PluginsPanel.ItemContainerGenerator.ContainerFromIndex(index)
+                    is not null)
+                {
+                    realized++;
+                }
+            }
+
+            return new PluginPageVisualMetrics(
+                PluginsPanel.Items.Count,
+                realized,
+                CountVisualDescendants(this));
+        }
+
+        private static int CountVisualDescendants(DependencyObject parent)
+        {
+            var count = 0;
+            var childCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (var index = 0; index < childCount; index++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, index);
+                count += 1 + CountVisualDescendants(child);
+            }
+            return count;
         }
 
         private void OnPluginsChanged()
         {
             if (Volatile.Read(ref _disposed) != 0)
                 return;
-            if (Interlocked.Exchange(ref _refreshPending, 1) != 0)
-                return;
 
-            var operation = Dispatcher.BeginInvoke(
-                new Action(() =>
-                {
-                    _refreshOperation = null;
-                    Interlocked.Exchange(ref _refreshPending, 0);
-                    Refresh();
-                }),
-                DispatcherPriority.ContextIdle);
-            _refreshOperation = operation;
-            if (Volatile.Read(ref _disposed) != 0
-                && operation.Status == DispatcherOperationStatus.Pending)
+            var next = new CancellationTokenSource();
+            var previous = Interlocked.Exchange(ref _refreshDebounce, next);
+            if (previous is not null)
             {
-                operation.Abort();
+                previous.Cancel();
+                previous.Dispose();
+            }
+            _ = RefreshAfterPluginChangeAsync(next);
+        }
+
+        private async Task RefreshAfterPluginChangeAsync(
+            CancellationTokenSource source)
+        {
+            try
+            {
+                await Task.Delay(150, source.Token);
+                await Dispatcher.InvokeAsync(
+                    Refresh,
+                    DispatcherPriority.ContextIdle,
+                    source.Token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (InvalidOperationException)
+                when (Volatile.Read(ref _disposed) != 0)
+            {
+            }
+            finally
+            {
+                if (ReferenceEquals(
+                        Interlocked.CompareExchange(
+                            ref _refreshDebounce,
+                            null,
+                            source),
+                        source))
+                {
+                    source.Dispose();
+                }
             }
         }
 
@@ -352,10 +438,13 @@ namespace LongBetterWindows.Host.Views
 
             _pluginStore.PluginsChanged -= OnPluginsChanged;
             SizeChanged -= PluginManagementControl_SizeChanged;
-            if (_refreshOperation?.Status == DispatcherOperationStatus.Pending)
-                _refreshOperation.Abort();
-            _refreshOperation = null;
-            Interlocked.Exchange(ref _refreshPending, 0);
+            Loaded -= PluginManagementControl_Loaded;
+            var debounce = Interlocked.Exchange(ref _refreshDebounce, null);
+            if (debounce is not null)
+            {
+                debounce.Cancel();
+                debounce.Dispose();
+            }
             PluginsPanel.ItemsSource = null;
         }
 

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27",
+  "configuration": "Release",
+  "probe": {
+    "switch": "--quality-plugin-page-performance-report",
+    "idle_ms": 9000,
+    "width": 1120,
+    "height": 760,
+    "records_process_resources": true,
+    "records_visual_metrics": true
+  },
+  "before_debounce": {
+    "runs": 1,
+    "projection_count": 22,
+    "runtime_ready_elapsed_ms": 6086.6,
+    "runtime_ready_cpu_ms": 6468.8,
+    "runtime_ready_private_memory_mb": 178.2,
+    "idle_working_set_mb": 211.1,
+    "idle_private_memory_mb": 179.2
+  },
+  "after_debounce": {
+    "runs": 5,
+    "projection_counts": [3, 2, 2, 2, 2],
+    "runtime_ready_elapsed_average_ms": 3644.98,
+    "runtime_ready_elapsed_median_ms": 3071.5,
+    "runtime_ready_cpu_average_ms": 3440.62,
+    "runtime_ready_private_memory_average_mb": 143.94,
+    "idle_working_set_samples_mb": [212.0, 209.8, 214.1, 213.8, 209.8],
+    "idle_working_set_average_mb": 211.9,
+    "idle_working_set_max_mb": 214.1,
+    "idle_private_memory_average_mb": 174.6,
+    "realized_container_count": 10,
+    "visual_descendant_count": 254
+  },
+  "comparison_to_previous_compact_list_gate": {
+    "previous_idle_working_set_average_mb": 215.3,
+    "current_idle_working_set_average_mb": 211.9,
+    "working_set_average_change_mb": -3.4,
+    "previous_idle_working_set_max_mb": 217.9,
+    "current_idle_working_set_max_mb": 214.1,
+    "working_set_max_change_mb": -3.8,
+    "previous_idle_private_memory_average_mb": 182.26,
+    "current_idle_private_memory_average_mb": 174.6,
+    "private_memory_average_change_mb": -7.66
+  },
+  "decision": {
+    "registration_projection_debounce_effective": true,
+    "plugin_page_collected_after_navigation_away": true,
+    "strict_idle_working_set_gate_passed": false,
+    "performance_p0_closed": false,
+    "release_candidate_unblocked": false,
+    "next_step": "Attribute post-runtime-ready CPU and private-memory growth to individual auto-start plugins and host background activity."
+  }
+}

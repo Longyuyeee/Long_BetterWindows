@@ -31,6 +31,7 @@ namespace LongBetterWindows.Host
         private AppStartupOptions _startupOptions = new();
         private QualityRuntimeService? _qualityRuntime;
         private StartupPerformanceTrace? _startupTrace;
+        private PluginPagePerformanceTrace? _pluginPageTrace;
         private int _qualityManagementCardShadowCount;
         private int _pluginRuntimeStarted;
         private PluginRuntimeCoordinator? _pluginRuntime;
@@ -47,6 +48,8 @@ namespace LongBetterWindows.Host
         internal bool ShowWelcomeForQualityRequested => _startupOptions.ShowWelcomeForQuality;
         internal static bool ShowManagementCardShadowsForQuality
             => Current is App { _startupOptions.QualityManagementCardShadows: true };
+        internal static bool IsPluginPagePerformanceTracing
+            => Current is App { _pluginPageTrace: not null };
         internal bool QualityWorkflowAutomationEnabled
             => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId)
                 || !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowsDirectory);
@@ -71,6 +74,13 @@ namespace LongBetterWindows.Host
             Log.Information("Long助手 正在启动...");
 
             _startupOptions = AppStartupOptions.Parse(e.Args);
+            if (!string.IsNullOrWhiteSpace(
+                    _startupOptions.QualityPluginPagePerformanceReportPath))
+            {
+                _pluginPageTrace = new PluginPagePerformanceTrace(
+                    _startupOptions.QualityPluginPagePerformanceReportPath);
+                _pluginPageTrace.Mark("quality_options_parsed");
+            }
             if (!string.IsNullOrWhiteSpace(_startupOptions.QualityStartupReportPath))
             {
                 _startupTrace = new StartupPerformanceTrace(
@@ -137,6 +147,11 @@ namespace LongBetterWindows.Host
 
         internal static void MarkStartupStage(string stage)
             => (Current as App)?._startupTrace?.Mark(stage);
+
+        internal static void MarkPluginPageStage(
+            string stage,
+            PluginPageVisualMetrics? visualMetrics = null)
+            => (Current as App)?._pluginPageTrace?.Mark(stage, visualMetrics);
 
         internal static void RecordManagementCardShadowCount(int count)
         {
@@ -224,6 +239,27 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginPagePerformanceReportPath))
+                {
+                    if (MainWindow is not MainWindow performanceProbeWindow
+                        || _pluginPageTrace is null)
+                    {
+                        throw new InvalidOperationException(
+                            "Plugin page performance probe requires the main window.");
+                    }
+                    var idleMilliseconds =
+                        _startupOptions.QualityIdleMilliseconds > 0
+                            ? _startupOptions.QualityIdleMilliseconds
+                            : 9_000;
+                    await _qualityRuntime!.RunPluginPagePerformanceProbeAsync(
+                        performanceProbeWindow,
+                        _pluginPageTrace,
+                        runtimeResult,
+                        idleMilliseconds);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginPageReleaseReportPath))
                 {
                     if (MainWindow is not MainWindow releaseProbeWindow)
@@ -266,6 +302,8 @@ namespace LongBetterWindows.Host
                 if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginPageReleaseReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginPagePerformanceReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityStartupReportPath))
                 {

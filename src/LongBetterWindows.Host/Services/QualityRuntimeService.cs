@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Views;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
@@ -186,6 +187,29 @@ namespace LongBetterWindows.Host.Services
                 collected,
                 fullPath);
             _application.Shutdown(collected ? 0 : 4);
+        }
+
+        public async Task RunPluginPagePerformanceProbeAsync(
+            MainWindow window,
+            PluginPagePerformanceTrace trace,
+            PluginRuntimeStartResult result,
+            int idleMilliseconds)
+        {
+            trace.Mark(
+                "plugin_runtime_ready",
+                window.GetPluginPageVisualMetricsForQuality());
+            await Task.Delay(idleMilliseconds);
+            await _application.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.ContextIdle);
+            trace.Mark(
+                "plugin_page_idle",
+                window.GetPluginPageVisualMetricsForQuality());
+            await trace.WriteAsync(
+                result,
+                HostProvider.Instance.PluginStore.Commands.Count,
+                idleMilliseconds);
+            _application.Shutdown(0);
         }
 
         private static async Task CaptureWebViewAsync(

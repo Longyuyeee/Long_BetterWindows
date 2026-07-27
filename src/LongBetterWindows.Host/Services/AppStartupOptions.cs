@@ -17,6 +17,7 @@ namespace LongBetterWindows.Host.Services
         public bool OpenDiagnosticsForQuality { get; private init; }
         public bool OpenPluginsForQuality { get; private init; }
         public string? QualityPluginPageReleaseReportPath { get; private init; }
+        public string? QualityPluginPagePerformanceReportPath { get; private init; }
         public string? QualityStartupReportPath { get; private init; }
         public bool QualityManagementCardShadows { get; private init; }
         public bool OpenSystemForQuality { get; private init; }
@@ -52,6 +53,9 @@ namespace LongBetterWindows.Host.Services
             var pluginPageReleaseReport = ReadArgument(
                 arguments,
                 "--quality-plugin-page-release-report");
+            var pluginPagePerformanceReport = ReadArgument(
+                arguments,
+                "--quality-plugin-page-performance-report");
 
             return new AppStartupOptions
             {
@@ -77,8 +81,11 @@ namespace LongBetterWindows.Host.Services
                 OpenDiagnosticsForQuality = HasSwitch(arguments, "--quality-open-diagnostics") || captureView == "diagnostics",
                 OpenPluginsForQuality = HasSwitch(arguments, "--quality-open-plugins")
                     || captureView == "plugins"
-                    || !string.IsNullOrWhiteSpace(pluginPageReleaseReport),
+                    || !string.IsNullOrWhiteSpace(pluginPageReleaseReport)
+                    || !string.IsNullOrWhiteSpace(pluginPagePerformanceReport),
                 QualityPluginPageReleaseReportPath = pluginPageReleaseReport,
+                QualityPluginPagePerformanceReportPath =
+                    pluginPagePerformanceReport,
                 QualityStartupReportPath = ReadArgument(
                     arguments,
                     "--quality-startup-report"),

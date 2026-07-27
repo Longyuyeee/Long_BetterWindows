@@ -895,7 +895,9 @@ public class QualityGateTests
         Assert.DoesNotContain("Click=\"PluginToggle_Click\"", xaml);
         Assert.DoesNotContain("Click=\"PluginSettings_Click\"", xaml);
         Assert.DoesNotContain("Click=\"CapabilityDetails_Click\"", xaml);
-        Assert.Contains("Interlocked.Exchange(ref _refreshPending, 1)", code);
+        Assert.Contains("Interlocked.Exchange(ref _refreshDebounce, next)", code);
+        Assert.Contains("Task.Delay(150, source.Token)", code);
+        Assert.Contains("previous.Cancel()", code);
         Assert.Contains("DispatcherPriority.ContextIdle", code);
         Assert.Contains("IDisposable", code);
         Assert.Contains("_pluginStore.PluginsChanged -= OnPluginsChanged", code);
@@ -1058,6 +1060,44 @@ public class QualityGateTests
         Assert.Contains("Current.Name", desktopSmoke);
         Assert.Contains("ControlType.ProgrammaticName", desktopSmoke);
         Assert.Contains("automation_semantics", desktopSmoke);
+    }
+
+    [Fact]
+    public void PluginPagePerformanceProbe_IsOptInAndCapturesPageStages()
+    {
+        var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
+        var options = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "AppStartupOptions.cs");
+        var trace = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "PluginPagePerformanceTrace.cs");
+        var quality = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "QualityRuntimeService.cs");
+        var plugins = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "PluginManagementControl.xaml.cs");
+
+        Assert.Contains("--quality-plugin-page-performance-report", options);
+        Assert.Contains("new PluginPagePerformanceTrace", app);
+        Assert.Contains("RunPluginPagePerformanceProbeAsync", quality);
+        Assert.Contains("plugin_page_constructor_begin", plugins);
+        Assert.Contains("plugin_projection_begin", plugins);
+        Assert.Contains("plugin_projection_end", plugins);
+        Assert.Contains("plugin_page_first_idle", plugins);
+        Assert.Contains("realized_container_count", trace);
+        Assert.Contains("visual_descendant_count", trace);
+        Assert.Contains("gc_committed_mb", trace);
+        Assert.DoesNotContain("DispatcherTimer", trace);
     }
 
     [Fact]

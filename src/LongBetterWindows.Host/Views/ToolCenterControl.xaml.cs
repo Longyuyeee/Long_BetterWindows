@@ -139,7 +139,15 @@ namespace LongBetterWindows.Host.Views
 
         internal void OpenMarketForQuality() => ShowPage("market");
         internal void OpenDiagnosticsForQuality() => ShowPage("diagnostics");
-        internal void OpenPluginsForQuality() => ShowPage("plugins");
+        internal void OpenPluginsForQuality()
+        {
+            App.MarkPluginPageStage("plugin_page_navigation_begin");
+            ShowPage("plugins");
+        }
+        internal PluginPageVisualMetrics GetPluginPageVisualMetricsForQuality()
+            => PluginManagementHost.Content is PluginManagementControl plugins
+                ? plugins.GetPerformanceMetricsForQuality()
+                : default;
         internal void OpenDeveloperForQuality() => ShowPage("developer");
         internal WeakReference ReleasePluginsForQuality()
         {
