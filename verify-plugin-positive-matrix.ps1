@@ -1,6 +1,7 @@
 param(
     [string]$MatrixPath = "docs/plugin-positive-function-matrix.json",
     [string]$SourceRoot = "src",
+    [string]$ApprovalDirectory = "docs/plugin-manual-approvals",
     [string]$OutputPath,
     [switch]$RequireReleaseEligible
 )
@@ -21,8 +22,92 @@ function Add-MatrixError(
     $Errors.Add($Message)
 }
 
+function Test-ApprovalReceipt(
+    [System.IO.FileInfo]$ReceiptFile,
+    [string]$PluginId,
+    [string]$ManualCheckId,
+    [string]$ManifestPath,
+    [string[]]$ExpectedCommands,
+    [System.Collections.Generic.List[string]]$Errors) {
+    try {
+        $receipt = Get-Content -LiteralPath $ReceiptFile.FullName `
+            -Raw -Encoding UTF8 | ConvertFrom-Json
+        $label = "$PluginId/$ManualCheckId"
+        if ([int]$receipt.schema_version -ne 1 `
+            -or [string]$receipt.plugin_id -ne $PluginId `
+            -or [string]$receipt.manual_check_id -ne $ManualCheckId `
+            -or [string]$receipt.status -ne "passed") {
+            Add-MatrixError $Errors "Manual approval receipt identity/status is invalid: $label"
+            return $false
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$receipt.reviewer) `
+            -or [string]::IsNullOrWhiteSpace([string]$receipt.notes)) {
+            Add-MatrixError $Errors "Manual approval receipt lacks reviewer/notes: $label"
+            return $false
+        }
+        $sourceCommit = [string]$receipt.source_commit
+        if ($sourceCommit -notmatch "^[a-fA-F0-9]{40}$") {
+            Add-MatrixError $Errors "Manual approval source commit is invalid: $label"
+            return $false
+        }
+        & git -C $PSScriptRoot merge-base --is-ancestor `
+            $sourceCommit HEAD 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Add-MatrixError $Errors "Manual approval source commit is not an ancestor: $label"
+            return $false
+        }
+        $sourceChanges = @(& git -C $PSScriptRoot diff `
+            --name-only $sourceCommit HEAD -- src 2>$null)
+        if ($LASTEXITCODE -ne 0 -or $sourceChanges.Count -gt 0) {
+            Add-MatrixError $Errors "Product source changed after manual approval: $label"
+            return $false
+        }
+        $manifestHash = (Get-FileHash -LiteralPath $ManifestPath `
+            -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ([string]$receipt.manifest_sha256 -ne $manifestHash) {
+            Add-MatrixError $Errors "Manual approval manifest hash mismatch: $label"
+            return $false
+        }
+        $receiptCommands = @($receipt.commands |
+            ForEach-Object { [string]$_ } | Sort-Object)
+        if (($receiptCommands -join "`n") -ne `
+            (($ExpectedCommands | Sort-Object) -join "`n")) {
+            Add-MatrixError $Errors "Manual approval command set mismatch: $label"
+            return $false
+        }
+        if ([string]$receipt.subject_executable_sha256 `
+                -notmatch "^[a-fA-F0-9]{64}$") {
+            Add-MatrixError $Errors "Manual approval subject hash is invalid: $label"
+            return $false
+        }
+        $evidenceFiles = @($receipt.evidence_files)
+        if ($evidenceFiles.Count -eq 0) {
+            Add-MatrixError $Errors "Manual approval has no evidence file hashes: $label"
+            return $false
+        }
+        foreach ($evidence in $evidenceFiles) {
+            if ([string]$evidence.relative_path `
+                    -notlike "artifacts/quality/*" `
+                -or [string]$evidence.sha256 `
+                    -notmatch "^[a-fA-F0-9]{64}$" `
+                -or [long]$evidence.size_bytes -le 0) {
+                Add-MatrixError $Errors "Manual approval evidence metadata is invalid: $label"
+                return $false
+            }
+        }
+        return $true
+    }
+    catch {
+        Add-MatrixError $Errors (
+            "Manual approval receipt could not be read: " +
+            "$PluginId/$ManualCheckId ($($_.Exception.Message))")
+        return $false
+    }
+}
+
 $matrixFile = Resolve-RepositoryPath $MatrixPath
 $sourceDirectory = Resolve-RepositoryPath $SourceRoot
+$approvalRoot = Resolve-RepositoryPath $ApprovalDirectory
 if (-not (Test-Path -LiteralPath $matrixFile -PathType Leaf)) {
     throw "Plugin positive matrix was not found: $matrixFile"
 }
@@ -33,6 +118,27 @@ if (-not (Test-Path -LiteralPath $sourceDirectory -PathType Container)) {
 $matrix = Get-Content -LiteralPath $matrixFile -Raw -Encoding UTF8 |
     ConvertFrom-Json
 $errors = [System.Collections.Generic.List[string]]::new()
+$approvalByKey = @{}
+if (Test-Path -LiteralPath $approvalRoot -PathType Container) {
+    foreach ($receiptFile in Get-ChildItem -LiteralPath $approvalRoot `
+            -Filter "*.json" -File) {
+        try {
+            $receipt = Get-Content -LiteralPath $receiptFile.FullName `
+                -Raw -Encoding UTF8 | ConvertFrom-Json
+            $key = "$([string]$receipt.plugin_id)/$([string]$receipt.manual_check_id)"
+            if ($approvalByKey.ContainsKey($key)) {
+                Add-MatrixError $errors "Duplicate manual approval receipt: $key"
+            } else {
+                $approvalByKey[$key] = $receiptFile
+            }
+        }
+        catch {
+            Add-MatrixError $errors (
+                "Manual approval receipt could not be indexed: " +
+                "$($receiptFile.Name) ($($_.Exception.Message))")
+        }
+    }
+}
 $manifestById = @{}
 $manifestFiles = Get-ChildItem -LiteralPath $sourceDirectory -Directory |
     ForEach-Object {
@@ -65,6 +171,8 @@ $automatedEvidenceCount = 0
 $manualPendingCount = 0
 $manualFailedCount = 0
 $manualRequiredCount = 0
+$manualApprovalReceiptCount = 0
+$consumedApprovalKeys = @{}
 $matrixCommandCount = 0
 foreach ($plugin in @($matrix.plugins)) {
     $pluginId = [string]$plugin.id
@@ -153,6 +261,23 @@ foreach ($plugin in @($matrix.plugins)) {
             $manualCommandCoverage[$commandText] = $true
         }
         $status = [string]$manualCheck.status
+        $approvalKey = "$pluginId/$manualId"
+        $approvedByReceipt = $false
+        if ($approvalByKey.ContainsKey($approvalKey)) {
+            $consumedApprovalKeys[$approvalKey] = $true
+            $receiptValid = Test-ApprovalReceipt `
+                $approvalByKey[$approvalKey] `
+                $pluginId `
+                $manualId `
+                $manifestById[$pluginId].Path `
+                @($manualCheck.commands | ForEach-Object { [string]$_ }) `
+                $errors
+            if ($receiptValid) {
+                $status = "passed"
+                $approvedByReceipt = $true
+                $manualApprovalReceiptCount++
+            }
+        }
         if ($status -notin @("pending", "passed", "failed", "blocked")) {
             Add-MatrixError $errors `
                 "Invalid manual status for ${pluginId}/${manualId}: $status"
@@ -165,7 +290,7 @@ foreach ($plugin in @($matrix.plugins)) {
                 $manualFailedCount++
             }
         }
-        if ($status -eq "passed") {
+        if ($status -eq "passed" -and -not $approvedByReceipt) {
             $evidencePath = [string]$manualCheck.evidence_path
             $evidenceSha256 = [string]$manualCheck.evidence_sha256
             if ([string]::IsNullOrWhiteSpace($evidencePath) -or
@@ -194,6 +319,13 @@ foreach ($plugin in @($matrix.plugins)) {
             Add-MatrixError $errors `
                 "Command has no positive manual check: ${pluginId}/$commandId"
         }
+    }
+}
+
+foreach ($approvalKey in $approvalByKey.Keys) {
+    if (-not $consumedApprovalKeys.ContainsKey($approvalKey)) {
+        Add-MatrixError $errors `
+            "Manual approval receipt has no matching matrix check: $approvalKey"
     }
 }
 
@@ -246,6 +378,7 @@ $report = [ordered]@{
     command_count = $matrixCommandCount
     automated_evidence_count = $automatedEvidenceCount
     required_manual_check_count = $manualRequiredCount
+    approval_receipt_count = $manualApprovalReceiptCount
     pending_or_blocked_manual_count = $manualPendingCount
     failed_manual_count = $manualFailedCount
     contract_valid = $errors.Count -eq 0
