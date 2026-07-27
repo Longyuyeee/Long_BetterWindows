@@ -8,13 +8,21 @@ param(
     [ValidateRange(3,20)] [int] $Samples = 5,
     [ValidateRange(1000,15000)] [int] $IdleMilliseconds = 2500,
     [ValidateRange(100,1024)] [double] $WorkingSetLimitMB = 200,
-    [switch] $NoBuild
+    [switch] $NoBuild,
+    [switch] $AllowDirty
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $outputRoot) { throw "Memory evidence directory already exists: $outputRoot" }
+[string]$trackedStatus = ((& git -C $repoRoot status `
+    --porcelain --untracked-files=no) -join "`n")
+$sourceDirty = -not [string]::IsNullOrWhiteSpace($trackedStatus)
+if ($sourceDirty -and -not $AllowDirty) {
+    throw "Formal memory evidence requires a clean tracked worktree. Use -AllowDirty only for development diagnostics."
+}
+$sourceCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 [IO.Directory]::CreateDirectory($outputRoot) | Out-Null
 
 $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
@@ -87,9 +95,17 @@ $report = [ordered]@{
     schema_version = 1
     measured_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'distinct_builtin_plugin_memory_probe'
+    source_commit = $sourceCommit
+    source_dirty = $sourceDirty
+    configuration = 'Release'
+    host_executable_sha256 = (
+        Get-FileHash -LiteralPath $executable -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
     plugin_count = 25
     unique_plugin_ids = $uniqueIds
     command_count_minimum = 37
+    sample_count = $Samples
+    idle_milliseconds = $IdleMilliseconds
     samples = $results
     median_working_set_mb = $median
     maximum_working_set_mb = $maximum
