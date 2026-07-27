@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27",
+  "scope": "managed stack, window message, and animated-property attribution",
+  "managed_trace": {
+    "tool": "dotnet-trace",
+    "version": "9.0.661903",
+    "profile": "dotnet-sampled-thread-time",
+    "high_cpu_report": "visible-01-report.json",
+    "process_cpu_growth_3000_to_9000_ms": 1812.5,
+    "ui_dispatcher_get_message_wall_time_ms": 5987.6,
+    "dispatcher_callback_inclusive_ms": 81.3,
+    "quality_visual_tree_walk_inclusive_ms": 33.2,
+    "conclusion": "No continuously executing managed application hotspot was observed."
+  },
+  "native_trace": {
+    "tool": "Windows Performance Recorder",
+    "profile": "CPU.Verbose.File",
+    "completed": false,
+    "error_code": "0xc5585011",
+    "reason": "The current session cannot enable the system performance profiling policy."
+  },
+  "window_message_control": {
+    "reports": [
+      "messages-visible-01.json",
+      "messages-visible-02.json"
+    ],
+    "window_messages_3000_to_9000": [
+      0,
+      0
+    ]
+  },
+  "animation_control": {
+    "report": "final-animation-message.json",
+    "item_count": 25,
+    "realized_container_count": 10,
+    "visual_descendant_count": 254,
+    "animated_property_count": 0,
+    "process_cpu_growth_3000_to_9000_ms": 375.0,
+    "final_working_set_mb": 213.2,
+    "final_private_memory_mb": 175.2
+  },
+  "conclusions": [
+    "The intermittent long tail is not explained by managed plugin or host application methods.",
+    "The main window receives no message storm during the stable idle interval.",
+    "The plugin page has no active UIElement or RenderTransform animations during the stable idle interval.",
+    "Native WPF composition, D3D/DWM, or the display-driver path requires privileged ETW attribution."
+  ],
+  "next_step": "Capture CPU and DesktopComposition WPR profiles in an authorized diagnostic session before changing rendering behavior.",
+  "release_gate": {
+    "performance_p0_closed": false,
+    "new_release_candidate_allowed": false
+  }
+}

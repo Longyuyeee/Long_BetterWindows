@@ -23,6 +23,13 @@ public class PluginPagePerformanceTraceTests
             trace.Mark(
                 "projection",
                 new PluginPageVisualMetrics(25, 8, 240));
+            trace.SetWindowMessageCheckpoints(
+            [
+                new WindowMessageCheckpoint(
+                    "projection",
+                    3,
+                    [new WindowMessageCount(0x000F, "WM_PAINT", 3)]),
+            ]);
             trace.SetWindowVisibleDuringIdle(false);
             await trace.WriteAsync(
                 new PluginRuntimeStartResult(25, 0, 0, null),
@@ -47,6 +54,13 @@ public class PluginPagePerformanceTraceTests
                 root.GetProperty("running_plugin_ids")[0].GetString());
             Assert.False(
                 root.GetProperty("window_visible_during_idle").GetBoolean());
+            var messageCheckpoint =
+                root.GetProperty("window_message_checkpoints")[0];
+            Assert.Equal(
+                "WM_PAINT",
+                messageCheckpoint.GetProperty("top_messages")[0]
+                    .GetProperty("name")
+                    .GetString());
             var sample = root.GetProperty("samples")[0];
             Assert.Equal("projection", sample.GetProperty("stage").GetString());
             Assert.True(sample.GetProperty("top_threads").GetArrayLength() > 0);
@@ -57,6 +71,9 @@ public class PluginPagePerformanceTraceTests
             Assert.Equal(
                 240,
                 sample.GetProperty("visual_descendant_count").GetInt32());
+            Assert.Equal(
+                0,
+                sample.GetProperty("animated_property_count").GetInt32());
             Assert.True(sample.GetProperty("private_memory_mb").GetDouble() > 0);
             Assert.True(sample.GetProperty("gc_committed_mb").GetDouble() > 0);
         }

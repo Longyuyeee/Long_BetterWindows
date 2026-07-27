@@ -9,7 +9,8 @@ namespace LongBetterWindows.Host.Services
     internal readonly record struct PluginPageVisualMetrics(
         int ItemCount,
         int RealizedContainerCount,
-        int VisualDescendantCount);
+        int VisualDescendantCount,
+        int AnimatedPropertyCount = 0);
 
     internal sealed class PluginPagePerformanceTrace
     {
@@ -24,6 +25,7 @@ namespace LongBetterWindows.Host.Services
         private readonly string _reportPath;
         private readonly string[] _suppressedAutoStartPluginIds;
         private readonly int _uiThreadId = unchecked((int)GetCurrentThreadId());
+        private IReadOnlyList<WindowMessageCheckpoint> _windowMessageCheckpoints = [];
         private bool _windowVisibleDuringIdle = true;
 
         public PluginPagePerformanceTrace(
@@ -58,7 +60,8 @@ namespace LongBetterWindows.Host.Services
                 topThreads,
                 visualMetrics?.ItemCount,
                 visualMetrics?.RealizedContainerCount,
-                visualMetrics?.VisualDescendantCount);
+                visualMetrics?.VisualDescendantCount,
+                visualMetrics?.AnimatedPropertyCount);
 
             lock (_sync)
                 _samples.Add(sample);
@@ -66,6 +69,10 @@ namespace LongBetterWindows.Host.Services
 
         public void SetWindowVisibleDuringIdle(bool isVisible)
             => _windowVisibleDuringIdle = isVisible;
+
+        public void SetWindowMessageCheckpoints(
+            IReadOnlyList<WindowMessageCheckpoint> checkpoints)
+            => _windowMessageCheckpoints = checkpoints.ToArray();
 
         public async Task WriteAsync(
             PluginRuntimeStartResult result,
@@ -93,6 +100,18 @@ namespace LongBetterWindows.Host.Services
                     _suppressedAutoStartPluginIds,
                 window_visible_during_idle = _windowVisibleDuringIdle,
                 running_plugin_ids = runningPluginIds ?? [],
+                window_message_checkpoints =
+                    _windowMessageCheckpoints.Select(checkpoint => new
+                    {
+                        stage = checkpoint.Stage,
+                        total_count = checkpoint.TotalCount,
+                        top_messages = checkpoint.TopMessages.Select(message => new
+                        {
+                            id = message.Id,
+                            name = message.Name,
+                            count = message.Count,
+                        }),
+                    }),
                 samples = samples.Select(sample => new
                 {
                     stage = sample.Stage,
@@ -111,6 +130,7 @@ namespace LongBetterWindows.Host.Services
                     item_count = sample.ItemCount,
                     realized_container_count = sample.RealizedContainerCount,
                     visual_descendant_count = sample.VisualDescendantCount,
+                    animated_property_count = sample.AnimatedPropertyCount,
                 }),
             };
 
@@ -163,7 +183,8 @@ namespace LongBetterWindows.Host.Services
             IReadOnlyList<PluginPageThreadSample> TopThreads,
             int? ItemCount,
             int? RealizedContainerCount,
-            int? VisualDescendantCount);
+            int? VisualDescendantCount,
+            int? AnimatedPropertyCount);
 
         private sealed record PluginPageThreadSample(
             int Id,

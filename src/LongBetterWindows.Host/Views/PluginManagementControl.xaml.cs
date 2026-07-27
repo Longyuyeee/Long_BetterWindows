@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
@@ -95,22 +96,45 @@ namespace LongBetterWindows.Host.Views
                 }
             }
 
+            var visualMetrics = CountVisualMetrics(this);
             return new PluginPageVisualMetrics(
                 PluginsPanel.Items.Count,
                 realized,
-                CountVisualDescendants(this));
+                visualMetrics.DescendantCount,
+                visualMetrics.AnimatedPropertyCount);
         }
 
-        private static int CountVisualDescendants(DependencyObject parent)
+        private static (int DescendantCount, int AnimatedPropertyCount)
+            CountVisualMetrics(DependencyObject parent)
         {
-            var count = 0;
+            var descendants = 0;
+            var animatedProperties = 0;
             var childCount = VisualTreeHelper.GetChildrenCount(parent);
             for (var index = 0; index < childCount; index++)
             {
                 var child = VisualTreeHelper.GetChild(parent, index);
-                count += 1 + CountVisualDescendants(child);
+                descendants++;
+                if (child is UIElement
+                    {
+                        HasAnimatedProperties: true,
+                    })
+                {
+                    animatedProperties++;
+                }
+                if (child is UIElement element
+                    && element.RenderTransform is Animatable
+                    {
+                        HasAnimatedProperties: true,
+                    })
+                {
+                    animatedProperties++;
+                }
+
+                var nested = CountVisualMetrics(child);
+                descendants += nested.DescendantCount;
+                animatedProperties += nested.AnimatedPropertyCount;
             }
-            return count;
+            return (descendants, animatedProperties);
         }
 
         private void OnPluginsChanged()

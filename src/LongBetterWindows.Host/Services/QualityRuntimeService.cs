@@ -200,6 +200,8 @@ namespace LongBetterWindows.Host.Services
             trace.Mark(
                 "plugin_runtime_ready",
                 window.GetPluginPageVisualMetricsForQuality());
+            using var windowMessages = new WindowMessageActivityTrace(window);
+            windowMessages.Mark("plugin_runtime_ready");
             await Task.Delay(200);
             await _application.Dispatcher.InvokeAsync(
                 () => { },
@@ -207,6 +209,7 @@ namespace LongBetterWindows.Host.Services
             trace.Mark(
                 "plugin_page_settled",
                 window.GetPluginPageVisualMetricsForQuality());
+            windowMessages.Mark("plugin_page_settled");
             if (hideWindowDuringIdle)
             {
                 await _application.Dispatcher.InvokeAsync(
@@ -235,7 +238,12 @@ namespace LongBetterWindows.Host.Services
                         ? "plugin_page_idle"
                         : $"plugin_page_idle_{checkpoint}ms",
                     window.GetPluginPageVisualMetricsForQuality());
+                windowMessages.Mark(
+                    checkpoint == idleMilliseconds
+                        ? "plugin_page_idle"
+                        : $"plugin_page_idle_{checkpoint}ms");
             }
+            trace.SetWindowMessageCheckpoints(windowMessages.Checkpoints);
             var registry = HostProvider.Instance.PluginStore;
             await trace.WriteAsync(
                 result,

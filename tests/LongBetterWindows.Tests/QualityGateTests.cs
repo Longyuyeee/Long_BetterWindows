@@ -1081,6 +1081,11 @@ public class QualityGateTests
             "LongBetterWindows.Host",
             "Services",
             "QualityRuntimeService.cs");
+        var windowMessages = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "WindowMessageActivityTrace.cs");
         var plugins = Read(
             "src",
             "LongBetterWindows.Host",
@@ -1098,6 +1103,9 @@ public class QualityGateTests
         Assert.Contains("\"plugin_page_settled\"", quality);
         Assert.Contains("ui_thread_id", trace);
         Assert.Contains("top_threads", trace);
+        Assert.Contains("window_message_checkpoints", trace);
+        Assert.Contains("_source.AddHook", windowMessages);
+        Assert.Contains("_source.RemoveHook", windowMessages);
         Assert.Contains("window.Hide", quality);
         Assert.Contains("plugin_page_constructor_begin", plugins);
         Assert.Contains("plugin_projection_begin", plugins);
@@ -1105,6 +1113,7 @@ public class QualityGateTests
         Assert.Contains("plugin_page_first_idle", plugins);
         Assert.Contains("realized_container_count", trace);
         Assert.Contains("visual_descendant_count", trace);
+        Assert.Contains("animated_property_count", trace);
         Assert.Contains("gc_committed_mb", trace);
         Assert.DoesNotContain("DispatcherTimer", trace);
     }
