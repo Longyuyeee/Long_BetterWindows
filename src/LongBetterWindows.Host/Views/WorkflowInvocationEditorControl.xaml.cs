@@ -119,11 +119,11 @@ namespace LongBetterWindows.Host.Views
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
             {
-                MessageBox.Show(
+                ThemedMessageDialog.ShowAlert(
+                    Window.GetWindow(this),
                     ex.Message,
                     I18n("workflow.invocation.imageDialogTitle"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    ThemedMessageDialogTone.Warning);
             }
         }
 

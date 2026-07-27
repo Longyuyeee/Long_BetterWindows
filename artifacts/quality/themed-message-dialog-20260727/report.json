@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27T08:52:26.3235868+00:00",
+  "passed": true,
+  "runtime_theme_changed": true,
+  "default_action": "cancel",
+  "screenshots": {
+    "dark": "themed-message-dialog-dark.png",
+    "dark_sha256": "683b341e621f6e7d8d02f6cd29cce39fcb027305f5434523e7d39f01672d19fe",
+    "light": "themed-message-dialog-light.png",
+    "light_sha256": "3ce46abc5a32e73e7f7d6a9fd3778cb7e1e82388918222b99d927524cc501e6a"
+  },
+  "themes": [
+    {
+      "theme": "dark",
+      "surface": "#171C27",
+      "title": "#F4F6FB",
+      "message": "#B2BACB",
+      "primary_button_background": "#7059F5",
+      "primary_button_foreground": "#FFFFFF",
+      "secondary_button_background": "#171C27",
+      "secondary_button_foreground": "#F4F6FB",
+      "title_contrast": 15.77,
+      "message_contrast": 8.75,
+      "primary_button_contrast": 4.73,
+      "secondary_button_contrast": 15.77,
+      "passed": true
+    },
+    {
+      "theme": "light",
+      "surface": "#FFFFFF",
+      "title": "#171A22",
+      "message": "#505B70",
+      "primary_button_background": "#6847F5",
+      "primary_button_foreground": "#FFFFFF",
+      "secondary_button_background": "#FFFFFF",
+      "secondary_button_foreground": "#171A22",
+      "title_contrast": 17.39,
+      "message_contrast": 6.84,
+      "primary_button_contrast": 5.51,
+      "secondary_button_contrast": 17.39,
+      "passed": true
+    }
+  ]
+}

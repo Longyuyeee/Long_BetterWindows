@@ -347,6 +347,76 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
+        public async Task RunThemedMessageDialogProbeAsync(string reportPath)
+        {
+            var originalTheme = App.IsLightTheme;
+            var dialog = ThemedMessageDialog.CreateForQuality();
+            var fullPath = Path.GetFullPath(reportPath);
+            var reportDirectory = Path.GetDirectoryName(fullPath)!;
+            Directory.CreateDirectory(reportDirectory);
+            var darkScreenshotPath = Path.Combine(
+                reportDirectory,
+                "themed-message-dialog-dark.png");
+            var lightScreenshotPath = Path.Combine(
+                reportDirectory,
+                "themed-message-dialog-light.png");
+            try
+            {
+                dialog.Show();
+                App.UpdateThemeResources(isLight: false);
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.Render);
+                dialog.UpdateLayout();
+                var dark = CaptureThemedMessageDialogTheme(dialog, "dark");
+                await CaptureWindowAsync(dialog, darkScreenshotPath);
+
+                App.UpdateThemeResources(isLight: true);
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.Render);
+                dialog.UpdateLayout();
+                var light = CaptureThemedMessageDialogTheme(dialog, "light");
+                await CaptureWindowAsync(dialog, lightScreenshotPath);
+
+                var changed =
+                    dark.Surface != light.Surface
+                    && dark.SecondaryButtonBackground
+                        != light.SecondaryButtonBackground;
+                var passed = changed && dark.Passed && light.Passed;
+                await File.WriteAllTextAsync(
+                    fullPath,
+                    JsonSerializer.Serialize(
+                        new
+                        {
+                            schema_version = 1,
+                            captured_at = DateTimeOffset.UtcNow,
+                            passed,
+                            runtime_theme_changed = changed,
+                            default_action = "cancel",
+                            screenshots = new
+                            {
+                                dark = Path.GetFileName(darkScreenshotPath),
+                                dark_sha256 = GetFileSha256(darkScreenshotPath),
+                                light = Path.GetFileName(lightScreenshotPath),
+                                light_sha256 = GetFileSha256(lightScreenshotPath),
+                            },
+                            themes = new[] { dark, light },
+                        },
+                        new JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+                        }));
+                _application.Shutdown(passed ? 0 : 7);
+            }
+            finally
+            {
+                dialog.Close();
+                App.UpdateThemeResources(originalTheme);
+            }
+        }
+
         public async Task RunPluginPagePerformanceProbeAsync(
             MainWindow window,
             PluginPagePerformanceTrace trace,
@@ -548,6 +618,43 @@ namespace LongBetterWindows.Host.Services
                     && secondaryContrast >= 4.5);
         }
 
+        private static ThemedMessageDialogSnapshot CaptureThemedMessageDialogTheme(
+            ThemedMessageDialog dialog,
+            string theme)
+        {
+            var snapshot = dialog.GetThemeSnapshot();
+            var titleContrast = ContrastRatio(
+                snapshot.Title,
+                snapshot.Surface);
+            var messageContrast = ContrastRatio(
+                snapshot.Message,
+                snapshot.Surface);
+            var primaryContrast = ContrastRatio(
+                snapshot.PrimaryForeground,
+                snapshot.PrimaryBackground);
+            var secondaryContrast = ContrastRatio(
+                snapshot.SecondaryForeground,
+                snapshot.SecondaryBackground);
+
+            return new ThemedMessageDialogSnapshot(
+                theme,
+                ToHex(snapshot.Surface),
+                ToHex(snapshot.Title),
+                ToHex(snapshot.Message),
+                ToHex(snapshot.PrimaryBackground),
+                ToHex(snapshot.PrimaryForeground),
+                ToHex(snapshot.SecondaryBackground),
+                ToHex(snapshot.SecondaryForeground),
+                Math.Round(titleContrast, 2),
+                Math.Round(messageContrast, 2),
+                Math.Round(primaryContrast, 2),
+                Math.Round(secondaryContrast, 2),
+                titleContrast >= 4.5
+                    && messageContrast >= 4.5
+                    && primaryContrast >= 4.5
+                    && secondaryContrast >= 4.5);
+        }
+
         private static Color GetColor(Brush brush)
             => brush is SolidColorBrush solid
                 ? solid.Color
@@ -658,6 +765,21 @@ namespace LongBetterWindows.Host.Services
             string SecondaryButtonForeground,
             double LabelContrast,
             double InputContrast,
+            double PrimaryButtonContrast,
+            double SecondaryButtonContrast,
+            bool Passed);
+
+        private sealed record ThemedMessageDialogSnapshot(
+            string Theme,
+            string Surface,
+            string Title,
+            string Message,
+            string PrimaryButtonBackground,
+            string PrimaryButtonForeground,
+            string SecondaryButtonBackground,
+            string SecondaryButtonForeground,
+            double TitleContrast,
+            double MessageContrast,
             double PrimaryButtonContrast,
             double SecondaryButtonContrast,
             bool Passed);

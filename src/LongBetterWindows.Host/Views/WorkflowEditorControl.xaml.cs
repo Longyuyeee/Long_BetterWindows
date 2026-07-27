@@ -236,11 +236,11 @@ namespace LongBetterWindows.Host.Views
                     "External workflow import preview failed ({ErrorCode}): {Error}",
                     review.ErrorCode,
                     review.Error);
-                MessageBox.Show(
+                ThemedMessageDialog.ShowAlert(
+                    Window.GetWindow(this),
                     I18n(WorkflowErrorPresentation.GetResourceKey(review.ErrorCode)),
                     I18n("workflow.import.dialog.errorTitle"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    ThemedMessageDialogTone.Warning);
                 return;
             }
             _reviewingTemplate = false;
@@ -257,20 +257,20 @@ namespace LongBetterWindows.Host.Views
                     "Workflow template catalog could not be listed ({ErrorCode}): {Error}",
                     result.ErrorCode,
                     result.Error);
-                MessageBox.Show(
+                ThemedMessageDialog.ShowAlert(
+                    Window.GetWindow(this),
                     I18n(WorkflowErrorPresentation.GetResourceKey(result.ErrorCode)),
                     I18n("workflow.template.title"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    ThemedMessageDialogTone.Warning);
                 return;
             }
             if (result.Templates.Count == 0)
             {
-                MessageBox.Show(
+                ThemedMessageDialog.ShowAlert(
+                    Window.GetWindow(this),
                     I18n("workflow.template.empty"),
                     I18n("workflow.template.title"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                    ThemedMessageDialogTone.Info);
                 return;
             }
 
@@ -330,11 +330,11 @@ namespace LongBetterWindows.Host.Views
                     template.Key,
                     review.ErrorCode,
                     review.Error);
-                MessageBox.Show(
+                ThemedMessageDialog.ShowAlert(
+                    Window.GetWindow(this),
                     I18n(WorkflowErrorPresentation.GetResourceKey(review.ErrorCode)),
                     I18n("workflow.template.title"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    ThemedMessageDialogTone.Warning);
                 return;
             }
             _reviewingTemplate = true;
@@ -356,13 +356,12 @@ namespace LongBetterWindows.Host.Views
             if (_session.State.IsDirty)
             {
                 var sourceLabel = ImportSourceLabel();
-                var answer = MessageBox.Show(
+                var approved = ThemedMessageDialog.ShowConfirmation(
+                    Window.GetWindow(this),
                     Format("workflow.import.confirm.replaceDraft", sourceLabel),
                     Format("workflow.import.confirm.title", sourceLabel),
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Warning,
-                    MessageBoxResult.No);
-                if (answer != MessageBoxResult.Yes) return;
+                    ThemedMessageDialogTone.Warning);
+                if (!approved) return;
             }
             if (!_session.AdoptImport(review))
             {
@@ -371,11 +370,11 @@ namespace LongBetterWindows.Host.Views
                     "Workflow import review could not be adopted ({ErrorCode}): {Error}",
                     _session.State.ErrorCode,
                     _session.State.Error);
-                MessageBox.Show(
+                ThemedMessageDialog.ShowAlert(
+                    Window.GetWindow(this),
                     I18n(WorkflowErrorPresentation.GetResourceKey(_session.State.ErrorCode)),
                     Format("workflow.import.confirm.title", sourceLabel),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    ThemedMessageDialogTone.Warning);
                 return;
             }
             _importReview = null;
@@ -506,13 +505,15 @@ namespace LongBetterWindows.Host.Views
             ExportWorkflowButton.IsEnabled = false;
             var result = await _session.ExportCurrentAsync(dialog.FileName);
             RenderStatus();
-            MessageBox.Show(
+            ThemedMessageDialog.ShowAlert(
+                Window.GetWindow(this),
                 result.IsSuccess
                     ? Format("workflow.export.success", result.Path ?? string.Empty)
                     : I18n("workflow.export.error"),
                 I18n("workflow.export.dialog.title"),
-                MessageBoxButton.OK,
-                result.IsSuccess ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                result.IsSuccess
+                    ? ThemedMessageDialogTone.Success
+                    : ThemedMessageDialogTone.Warning);
         }
 
         private void DuplicateWorkflow_Click(object sender, RoutedEventArgs e)
@@ -549,13 +550,12 @@ namespace LongBetterWindows.Host.Views
         {
             var draft = _session.State.Draft;
             if (draft is null || _session.State.ExistingDefinitionSha256 is null) return;
-            var answer = MessageBox.Show(
+            var approved = ThemedMessageDialog.ShowConfirmation(
+                Window.GetWindow(this),
                 Format("workflow.delete.confirm", draft.Name),
                 I18n("workflow.delete.title"),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning,
-                MessageBoxResult.No);
-            if (answer != MessageBoxResult.Yes) return;
+                ThemedMessageDialogTone.Danger);
+            if (!approved) return;
             var result = await _session.DeleteCurrentAsync();
             if (!result.IsSuccess)
             {
@@ -738,11 +738,11 @@ namespace LongBetterWindows.Host.Views
                 Log.Warning(
                     exception,
                     "Workflow terminal output could not be copied.");
-                MessageBox.Show(
+                ThemedMessageDialog.ShowAlert(
+                    Window.GetWindow(this),
                     I18n("workflow.terminal.copyError"),
                     I18n("workflow.terminal.copyErrorTitle"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    ThemedMessageDialogTone.Warning);
             }
         }
 
@@ -766,15 +766,16 @@ namespace LongBetterWindows.Host.Views
             var review = _terminalOutputExporter.Prepare(item.Source, dialog.FileName);
             if (!review.IsValid)
             {
-                MessageBox.Show(
+                ThemedMessageDialog.ShowAlert(
+                    Window.GetWindow(this),
                     I18n(WorkflowErrorPresentation.GetResourceKey(review.ErrorCode)),
                     I18n("workflow.terminal.export.prepareFailedTitle"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    ThemedMessageDialogTone.Warning);
                 return;
             }
 
-            var approved = MessageBox.Show(
+            var approved = ThemedMessageDialog.ShowConfirmation(
+                Window.GetWindow(this),
                 Format(
                     "workflow.terminal.export.confirm",
                     item.Source.StepId,
@@ -784,16 +785,15 @@ namespace LongBetterWindows.Host.Views
                     review.ValueSha256,
                     review.DestinationPath ?? string.Empty),
                 I18n("workflow.terminal.export.confirmTitle"),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning,
-                MessageBoxResult.No);
-            if (approved != MessageBoxResult.Yes) return;
+                ThemedMessageDialogTone.Warning);
+            if (!approved) return;
 
             var result = await _terminalOutputExporter.ExportApprovedAsync(
                 item.Source,
                 dialog.FileName,
                 review.Fingerprint);
-            MessageBox.Show(
+            ThemedMessageDialog.ShowAlert(
+                Window.GetWindow(this),
                 result.IsSuccess
                     ? Format(
                         "workflow.terminal.export.success",
@@ -801,8 +801,9 @@ namespace LongBetterWindows.Host.Views
                         result.ValueSha256 ?? string.Empty)
                     : TerminalExportFailureMessage(result.ErrorCode),
                 I18n("workflow.terminal.export.resultTitle"),
-                MessageBoxButton.OK,
-                result.IsSuccess ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                result.IsSuccess
+                    ? ThemedMessageDialogTone.Success
+                    : ThemedMessageDialogTone.Warning);
         }
 
         internal bool ClearTerminalOutputs()

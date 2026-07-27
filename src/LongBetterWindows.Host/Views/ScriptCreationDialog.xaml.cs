@@ -63,13 +63,13 @@ namespace LongBetterWindows.Host.Views
             Close();
         }
 
-        private static void ShowValidationMessage(string messageKey)
+        private void ShowValidationMessage(string messageKey)
         {
-            MessageBox.Show(
+            ThemedMessageDialog.ShowAlert(
+                this,
                 Services.ServicesInitializer.I18n.T(messageKey),
                 Services.ServicesInitializer.I18n.T("developer.script.validation.title"),
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                ThemedMessageDialogTone.Warning);
         }
     }
 }

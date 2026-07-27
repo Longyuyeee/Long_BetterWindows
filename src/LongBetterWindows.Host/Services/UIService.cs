@@ -5,6 +5,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Views;
 using Microsoft.Web.WebView2.Wpf;
 using Serilog;
 
@@ -106,10 +107,10 @@ namespace LongBetterWindows.Host.Services
             try
             {
                 var result = await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    var dialog = new ConfirmDialog(message, title);
-                    return dialog.ShowDialog() == true;
-                });
+                    ThemedMessageDialog.ShowConfirmation(
+                        owner: null,
+                        message,
+                        title));
 
                 return HostApiResponse<bool>.Success(result);
             }
@@ -345,64 +346,6 @@ namespace LongBetterWindows.Host.Services
             catch (Exception ex)
             {
                 Log.Debug(ex, "同步自定义窗口主题失败");
-            }
-        }
-
-        private sealed class ConfirmDialog : Window
-        {
-            internal ConfirmDialog(string message, string title)
-            {
-                Title = title;
-                Width = 420;
-                SizeToContent = SizeToContent.Height;
-                WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                ResizeMode = ResizeMode.NoResize;
-                ApplyWindowTheme(this);
-
-                var panel = new StackPanel
-                {
-                    Margin = new Thickness(20),
-                };
-                var label = new TextBlock
-                {
-                    Text = message,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 16),
-                };
-                label.SetResourceReference(
-                    TextBlock.ForegroundProperty,
-                    "Long.Brush.Text.Primary");
-                panel.Children.Add(label);
-
-                var buttons = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                };
-                var confirm = CreateDialogButton(
-                    ServicesInitializer.I18n.T("action.confirm"),
-                    "Long.UI.Confirm.Accept",
-                    primary: true);
-                confirm.Click += (_, _) =>
-                {
-                    DialogResult = true;
-                    Close();
-                };
-                buttons.Children.Add(confirm);
-
-                var cancel = CreateDialogButton(
-                    ServicesInitializer.I18n.T("action.cancel"),
-                    "Long.UI.Confirm.Cancel",
-                    primary: false);
-                cancel.Margin = new Thickness(8, 0, 0, 0);
-                cancel.Click += (_, _) =>
-                {
-                    DialogResult = false;
-                    Close();
-                };
-                buttons.Children.Add(cancel);
-                panel.Children.Add(buttons);
-                Content = panel;
             }
         }
 

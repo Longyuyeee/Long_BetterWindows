@@ -285,6 +285,7 @@
   "action.refresh": "Refresh",
   "action.open": "Open",
   "action.confirm": "Confirm",
+  "action.ok": "OK",
   "action.cancel": "Cancel",
   "action.create": "Create",
   "settings.language.title": "Display Language",

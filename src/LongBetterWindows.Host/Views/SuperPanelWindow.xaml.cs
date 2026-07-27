@@ -376,14 +376,14 @@ namespace LongBetterWindows.Host.Views
         {
             var group = _groupCoordinator.ActiveCustomGroup;
             if (group is null) return;
-            var answer = MessageBox.Show(
+            var approved = ThemedMessageDialog.ShowConfirmation(
+                this,
                 string.Format(
                     I18n("superPanel.confirm.deleteGroup.message"),
                     group.Title),
                 I18n("superPanel.confirm.deleteGroup.title"),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-            if (answer != MessageBoxResult.Yes) return;
+                ThemedMessageDialogTone.Danger);
+            if (!approved) return;
             var outcome = await _groupCoordinator.DeleteActiveGroupAsync();
             if (outcome.Success)
             {

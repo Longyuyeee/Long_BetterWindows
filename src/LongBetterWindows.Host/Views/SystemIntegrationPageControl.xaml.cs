@@ -226,16 +226,16 @@ namespace LongBetterWindows.Host.Views
             var action = _sparsePackageInstalled
                 ? I18n("system.sparse.action.upgrade")
                 : I18n("system.sparse.action.register");
-            var answer = MessageBox.Show(
+            var approved = ThemedMessageDialog.ShowConfirmation(
+                Window.GetWindow(this),
                 string.Format(
                     I18n("system.sparse.confirm.registerOrUpgrade.message"),
                     action),
                 string.Format(
                     I18n("system.sparse.confirm.registerOrUpgrade.title"),
                     action),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-            if (answer != MessageBoxResult.Yes) return;
+                ThemedMessageDialogTone.Info);
+            if (!approved) return;
 
             await RunSparsePackageOperationAsync(
                 () => ServicesInitializer.SparsePackage.RegisterOrUpgradeAsync(
@@ -247,12 +247,12 @@ namespace LongBetterWindows.Host.Views
             RoutedEventArgs e)
         {
             if (_sparsePackageBusy || !_sparsePackageInstalled) return;
-            var answer = MessageBox.Show(
+            var approved = ThemedMessageDialog.ShowConfirmation(
+                Window.GetWindow(this),
                 I18n("system.sparse.confirm.uninstall.message"),
                 I18n("system.sparse.confirm.uninstall.title"),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-            if (answer != MessageBoxResult.Yes) return;
+                ThemedMessageDialogTone.Danger);
+            if (!approved) return;
 
             await RunSparsePackageOperationAsync(
                 () => ServicesInitializer.SparsePackage.UnregisterAsync());

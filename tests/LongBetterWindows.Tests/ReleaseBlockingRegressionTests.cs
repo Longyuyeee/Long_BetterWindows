@@ -221,6 +221,45 @@ public sealed class ReleaseBlockingRegressionTests
     }
 
     [Fact]
+    public void HostMessages_UseThemedDialogAndDefaultSafeConfirmations()
+    {
+        var root = FindRepositoryRoot();
+        var hostRoot = Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host");
+        var productionSources = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(
+                    hostRoot,
+                    "*.cs",
+                    SearchOption.AllDirectories)
+                .Where(path => !path.Contains(
+                    $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                    StringComparison.OrdinalIgnoreCase)
+                    && !path.Contains(
+                        $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                        StringComparison.OrdinalIgnoreCase))
+                .Select(File.ReadAllText));
+        var dialogXaml = File.ReadAllText(Path.Combine(
+            hostRoot,
+            "Views",
+            "ThemedMessageDialog.xaml"));
+        var dialogCode = File.ReadAllText(Path.Combine(
+            hostRoot,
+            "Views",
+            "ThemedMessageDialog.xaml.cs"));
+
+        Assert.DoesNotContain("MessageBox.Show", productionSources);
+        Assert.Contains("DynamicResource Long.Brush.Surface.Card", dialogXaml);
+        Assert.Contains("DynamicResource Long.Brush.Text.Primary", dialogXaml);
+        Assert.Contains("Style=\"{StaticResource LongButton.Primary}\"", dialogXaml);
+        Assert.Contains("AutomationProperties.AutomationId=\"Long.MessageDialog.Cancel\"", dialogXaml);
+        Assert.Contains("CancelButton.Focus()", dialogCode);
+        Assert.Contains("ThemedMessageDialogTone.Danger", productionSources);
+    }
+
+    [Fact]
     public void SideEffectingPluginCommands_ReportActualCompletion()
     {
         var root = FindRepositoryRoot();

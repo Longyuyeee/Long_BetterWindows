@@ -285,6 +285,7 @@
   "action.refresh": "刷新",
   "action.open": "打开",
   "action.confirm": "确定",
+  "action.ok": "知道了",
   "action.cancel": "取消",
   "action.create": "创建",
   "settings.language.title": "界面语言",

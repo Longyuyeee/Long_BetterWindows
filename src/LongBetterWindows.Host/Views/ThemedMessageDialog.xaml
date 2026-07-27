@@ -1,0 +1,92 @@
+<Window x:Class="LongBetterWindows.Host.Views.ThemedMessageDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="{Binding ElementName=DialogTitle, Path=Text}"
+        Width="480" MinWidth="360" MaxWidth="640"
+        SizeToContent="Height" MaxHeight="620"
+        Style="{StaticResource LongWindowChrome}"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        AutomationProperties.AutomationId="Long.MessageDialog"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Border x:Name="DialogSurface"
+            Background="{DynamicResource Long.Brush.Surface.Card}"
+            BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource Long.Radius.Card}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="48" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    Background="{DynamicResource Long.Brush.Background.Raised}"
+                    BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                    BorderThickness="0,0,0,1"
+                    CornerRadius="14,14,0,0"
+                    MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid Margin="18,0,10,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border x:Name="ToneBadge" Width="28" Height="28" CornerRadius="8"
+                                Background="{DynamicResource Long.Brush.Accent.Soft}">
+                            <Path x:Name="ToneIcon"
+                                  Data="{StaticResource Long.Icon.Plugin}"
+                                  Style="{StaticResource LongIcon}"
+                                  Width="16" Height="16"
+                                  Stroke="{DynamicResource Long.Brush.Accent.Primary}"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock x:Name="DialogTitle" Margin="10,0,42,0"
+                                   Foreground="{DynamicResource Long.Brush.Text.Primary}"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <Button HorizontalAlignment="Right"
+                            Style="{StaticResource LongIconButton}"
+                            Width="32" Height="30"
+                            Click="Close_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            AutomationProperties.AutomationId="Long.MessageDialog.Close"
+                            AutomationProperties.Name="{DynamicResource i18n.action.cancel}">
+                        <Path Data="{StaticResource Long.Icon.Close}"
+                              Style="{StaticResource LongIcon}"
+                              Width="13" Height="13" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" MaxHeight="390"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <TextBlock x:Name="DialogMessage"
+                           Margin="24,22,24,20"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}"
+                           FontSize="13" LineHeight="21"
+                           TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Assertive" />
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="24,0,24,22">
+                <Button x:Name="CancelButton"
+                        Style="{StaticResource LongButton}"
+                        Margin="0,0,8,0"
+                        Click="Cancel_Click"
+                        AutomationProperties.AutomationId="Long.MessageDialog.Cancel"
+                        Content="{DynamicResource i18n.action.cancel}" />
+                <Button x:Name="PrimaryButton"
+                        Style="{StaticResource LongButton.Primary}"
+                        Click="Primary_Click"
+                        AutomationProperties.AutomationId="Long.MessageDialog.Primary" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
