@@ -17,6 +17,7 @@
   "settings.formatHint": "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6",
   "error.selectFolder": "请先打开资源管理器并选中文件夹。",
   "error.folderMissing": "目标文件夹不存在。",
+  "error.loadFailed": "文件夹备注读取失败，请检查权限后重试。",
   "error.saveFailed": "文件夹备注保存失败，请重试。",
   "error.unknownCommand": "未知文件夹备注命令: {0}"
 }

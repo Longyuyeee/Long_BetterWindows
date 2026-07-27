@@ -385,6 +385,10 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains("await _onSave(text)", hud);
         Assert.Contains("catch (Exception exception)", hud);
         Assert.Contains("if (!result.IsSuccess)", folderNote);
+        Assert.Contains(
+            "noteResult.ErrorCode != ApiErrorCode.StreamNotFound",
+            folderNote);
+        Assert.Contains("\"error.loadFailed\"", folderNote);
         Assert.Contains("\"error.saveFailed\"", folderNote);
     }
 

@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
@@ -444,7 +445,20 @@ namespace LongBetterWindows.Host
 
             string? existingNote = null;
             if (noteResult.IsSuccess && noteResult.Data != null)
+            {
                 existingNote = noteResult.Data;
+            }
+            else if (noteResult.ErrorCode != ApiErrorCode.StreamNotFound)
+            {
+                Log.Warning(
+                    "右键备注读取失败: {Path}, {Error}",
+                    folderPath,
+                    noteResult.ErrorMessage);
+                FloatingHudWindow.ShowToast(
+                    ServicesInitializer.I18n.T(
+                        "folderNote.error.loadFailed"));
+                return;
+            }
 
             Dispatcher.Invoke(() =>
             {
@@ -469,6 +483,10 @@ namespace LongBetterWindows.Host
                                 text);
                         if (!result.IsSuccess)
                         {
+                            Log.Warning(
+                                "右键备注保存失败: {Path}, {Error}",
+                                folderPath,
+                                result.ErrorMessage);
                             throw new InvalidOperationException(
                                 ServicesInitializer.I18n.T(
                                     "folderNote.error.saveFailed"));

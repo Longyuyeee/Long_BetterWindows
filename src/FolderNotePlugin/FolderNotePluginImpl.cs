@@ -150,7 +150,21 @@ public class FolderNotePluginImpl :
 
         string? existingNote = null;
         if (noteResult.IsSuccess && noteResult.Data != null)
+        {
             existingNote = noteResult.Data;
+        }
+        else if (noteResult.ErrorCode != ApiErrorCode.StreamNotFound)
+        {
+            Log.Warning(
+                "[FolderNotePlugin] 备注读取失败: {Path}, {Error}",
+                folderPath,
+                noteResult.ErrorMessage);
+            var message = Text(
+                "error.loadFailed",
+                "文件夹备注读取失败，请检查权限后重试。");
+            FloatingHudWindow.ShowToast(message);
+            return PluginCommandResult.Failure(message);
+        }
 
         var rectResult = await shell.GetSelectedItemScreenRectAsync();
         double hudX, hudY;
@@ -181,6 +195,10 @@ public class FolderNotePluginImpl :
                         : await ads.WriteAsync(folderPath, "long_note", text);
                     if (!result.IsSuccess)
                     {
+                        Log.Warning(
+                            "[FolderNotePlugin] 备注保存失败: {Path}, {Error}",
+                            folderPath,
+                            result.ErrorMessage);
                         throw new InvalidOperationException(Text(
                             "error.saveFailed",
                             "文件夹备注保存失败，请重试。"));

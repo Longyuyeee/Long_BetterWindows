@@ -29,15 +29,27 @@ namespace LongBetterWindows.Host.Services
         {
             lock (_lock)
             {
+                var createdLog = false;
                 if (!_logs.TryGetValue(pluginId, out var log))
                 {
                     log = new PluginChangeLog { PluginId = pluginId };
                     _logs[pluginId] = log;
+                    createdLog = true;
                 }
 
                 record.Timestamp = DateTime.UtcNow;
                 log.Records.Add(record);
-                SaveLog(pluginId);
+                try
+                {
+                    SaveLog(pluginId);
+                }
+                catch
+                {
+                    log.Records.Remove(record);
+                    if (createdLog && log.Records.Count == 0)
+                        _logs.Remove(pluginId);
+                    throw;
+                }
 
                 Log.Debug("变更已记录: {PluginId} -> {Action} {Target}",
                     pluginId, record.Action, record.Target);
@@ -91,6 +103,7 @@ namespace LongBetterWindows.Host.Services
 
             int rolledBack = 0;
             int failed = 0;
+            var failedRecords = new List<ChangeRecord>();
 
             foreach (var record in records)
             {
@@ -105,21 +118,48 @@ namespace LongBetterWindows.Host.Services
                         _ => true,
                     };
 
-                    if (ok) rolledBack++;
-                    else failed++;
+                    if (ok)
+                    {
+                        rolledBack++;
+                    }
+                    else
+                    {
+                        failed++;
+                        failedRecords.Add(record);
+                    }
                 }
                 catch (Exception ex)
                 {
                     Log.Error(ex, "回滚操作失败: {Action} {Target}",
                         record.Action, record.Target);
                     failed++;
+                    failedRecords.Add(record);
                 }
             }
 
             lock (_lock)
             {
-                _logs.Remove(pluginId);
-                DeleteLogFile(pluginId);
+                if (failedRecords.Count == 0)
+                {
+                    _logs.Remove(pluginId);
+                    DeleteLogFile(pluginId);
+                }
+                else if (_logs.TryGetValue(pluginId, out var log))
+                {
+                    log.Records.Clear();
+                    log.Records.AddRange(failedRecords);
+                    try
+                    {
+                        SaveLog(pluginId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(
+                            ex,
+                            "失败回滚记录无法持久化，将保留在当前进程内: {PluginId}",
+                            pluginId);
+                    }
+                }
             }
 
             Log.Information("插件 {PluginId} 回滚完成: 成功={RolledBack}, 失败={Failed}",
@@ -173,27 +213,12 @@ namespace LongBetterWindows.Host.Services
         {
             try
             {
-                if (!string.IsNullOrEmpty(record.OldValue))
-                {
-                    // 存在旧内容 → 恢复旧内容
-                    return WriteAdsContent(record.Target, record.OldValue);
-                }
-                else
-                {
-                    // 无旧内容（新建的流）→ 删除该 ADS 流
-                    if (!DeleteFileW(record.Target))
-                    {
-                        int error = Marshal.GetLastWin32Error();
-                        if (error != 2 && error != 3) // 不是"文件不存在"
-                        {
-                            Log.Warning("ADS 回滚删除失败: {Target}, Win32Error={Error}", record.Target, error);
-                        }
-                    }
-
-                    // 同时清理回退文件
-                    DeleteAdsFallback(record.Target);
-                    return true;
-                }
+                var currentTarget = record.StorageTarget ?? record.Target;
+                var oldTarget = record.OldStorageTarget ?? record.Target;
+                DeleteStorageTarget(currentTarget);
+                if (record.OldValueExists ?? record.OldValue is not null)
+                    WriteStorageTarget(oldTarget, record.OldValue ?? string.Empty);
+                return true;
             }
             catch (Exception ex)
             {
@@ -206,12 +231,14 @@ namespace LongBetterWindows.Host.Services
         {
             try
             {
-                if (!string.IsNullOrEmpty(record.OldValue))
+                if (record.OldValueExists ?? record.OldValue is not null)
                 {
-                    // 恢复了被删除的内容
-                    return WriteAdsContent(record.Target, record.OldValue);
+                    WriteStorageTarget(
+                        record.OldStorageTarget
+                            ?? record.StorageTarget
+                            ?? record.Target,
+                        record.OldValue ?? string.Empty);
                 }
-                // 无旧内容（流原本就不存在），无需恢复
                 return true;
             }
             catch (Exception ex)
@@ -221,85 +248,28 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
-        /// <summary>向 ADS 流写入内容，失败时回退到 fallback 文件</summary>
-        private static bool WriteAdsContent(string adsPath, string content)
+        private static void DeleteStorageTarget(string path)
         {
-            // 判断是否为目录（ADS 路径格式: path:stream）
-            var basePath = GetBasePathFromAds(adsPath);
-            bool isDir = !string.IsNullOrEmpty(basePath) && Directory.Exists(basePath);
-
-            var handle = CreateFileW(
-                adsPath,
-                GENERIC_WRITE,
-                FILE_SHARE_READ,
-                IntPtr.Zero,
-                CREATE_ALWAYS,
-                isDir ? FILE_FLAG_BACKUP_SEMANTICS : FILE_ATTRIBUTE_NORMAL,
-                IntPtr.Zero);
-
-            if (handle == (IntPtr)INVALID_HANDLE_VALUE || handle == IntPtr.Zero)
+            if (File.Exists(path))
             {
-                // ADS 写入失败，写入 fallback 文件
-                WriteAdsFallback(adsPath, content);
-                return true;
+                File.Delete(path);
+                return;
             }
 
-            try
+            if (!DeleteFileW(path))
             {
-                var bytes = Encoding.UTF8.GetBytes(content);
-                if (!WriteFile(handle, bytes, (uint)bytes.Length, out _, IntPtr.Zero))
-                {
-                    WriteAdsFallback(adsPath, content);
-                }
+                var error = Marshal.GetLastWin32Error();
+                if (error is not 2 and not 3)
+                    throw new IOException($"删除回滚目标失败 (Win32: {error})。");
             }
-            finally
-            {
-                CloseHandle(handle);
-            }
-
-            return true;
         }
 
-        /// <summary>从 ADS 路径提取基础文件路径（去掉 :stream 后缀）</summary>
-        private static string GetBasePathFromAds(string adsPath)
+        private static void WriteStorageTarget(string path, string content)
         {
-            var colonIdx = adsPath.LastIndexOf(':');
-            return colonIdx > 0 ? adsPath.Substring(0, colonIdx) : adsPath;
-        }
-
-        /// <summary>获取 ADS 对应的 fallback 文件路径</summary>
-        private static string GetAdsFallbackPath(string adsPath)
-        {
-            var basePath = GetBasePathFromAds(adsPath);
-            var dir = Directory.Exists(basePath) ? basePath : Path.GetDirectoryName(basePath);
-            return Path.Combine(dir ?? ".", "long_note.json");
-        }
-
-        private static void DeleteAdsFallback(string adsPath)
-        {
-            var fallbackPath = GetAdsFallbackPath(adsPath);
-            try
-            {
-                if (File.Exists(fallbackPath))
-                    File.Delete(fallbackPath);
-            }
-            catch { }
-        }
-
-        private static void WriteAdsFallback(string adsPath, string content)
-        {
-            var fallbackPath = GetAdsFallbackPath(adsPath);
-            try
-            {
-                var dir = Path.GetDirectoryName(fallbackPath);
-                if (dir != null && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                File.WriteAllText(fallbackPath, content, Encoding.UTF8);
-            }
-            catch (Exception ex)
-            {
-                Log.Warning(ex, "ADS fallback 写入失败: {Path}", fallbackPath);
-            }
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+            File.WriteAllText(path, content, new UTF8Encoding(false));
         }
 
         private string GetLogPath(string pluginId)
@@ -314,7 +284,23 @@ namespace LongBetterWindows.Host.Services
             {
                 var json = JsonSerializer.Serialize(log,
                     new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(GetLogPath(pluginId), json);
+                var logPath = GetLogPath(pluginId);
+                var temporaryPath = Path.Combine(
+                    _logDir,
+                    $".{Path.GetFileName(logPath)}.{Guid.NewGuid():N}.tmp");
+                try
+                {
+                    File.WriteAllText(
+                        temporaryPath,
+                        json,
+                        new UTF8Encoding(false));
+                    File.Move(temporaryPath, logPath, true);
+                }
+                finally
+                {
+                    if (File.Exists(temporaryPath))
+                        File.Delete(temporaryPath);
+                }
             }
         }
 
@@ -372,6 +358,9 @@ namespace LongBetterWindows.Host.Services
         public string? ValueName { get; init; }
         public string? OldValue { get; init; }
         public string? NewValue { get; init; }
+        public string? StorageTarget { get; init; }
+        public string? OldStorageTarget { get; init; }
+        public bool? OldValueExists { get; init; }
     }
 
     public enum ChangeAction

@@ -43,6 +43,9 @@ namespace LongBetterWindows.Host.Services
             IntPtr lpOverlapped);
 
         [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool FlushFileBuffers(IntPtr hFile);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool CloseHandle(IntPtr hObject);
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -63,7 +66,7 @@ namespace LongBetterWindows.Host.Services
         public const uint CREATE_ALWAYS = 2;
         public const uint FILE_ATTRIBUTE_NORMAL = 0x80;
         public const uint FILE_FLAG_BACKUP_SEMANTICS = 0x02000000;
-        public static readonly IntPtr INVALID_HANDLE_VALUE = unchecked((IntPtr)(long)0xFFFFFFFF);
+        public static readonly IntPtr INVALID_HANDLE_VALUE = new(-1);
 
         // === 多显示器支持 ===
 

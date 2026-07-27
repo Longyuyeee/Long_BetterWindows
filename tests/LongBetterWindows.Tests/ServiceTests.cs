@@ -161,6 +161,40 @@ public class ServiceTests
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
 
+    [Fact]
+    public async Task RollbackEngine_FailedRecordRemainsAvailableForRetry()
+    {
+        var dir = Path.Combine(
+            Path.GetTempPath(),
+            $"test_rb_retry_{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var blockedParent = Path.Combine(dir, "blocked");
+            File.WriteAllText(blockedParent, "file blocks directory creation");
+            var rollback = new RollbackEngine(Path.Combine(dir, "logs"));
+            rollback.RecordChange("plugin-retry", new ChangeRecord
+            {
+                Action = ChangeAction.AdsWrite,
+                Target = Path.Combine(blockedParent, "note:stream"),
+                StorageTarget = Path.Combine(blockedParent, "note:stream"),
+                OldStorageTarget = Path.Combine(blockedParent, "note:stream"),
+                OldValueExists = true,
+                OldValue = "restore me",
+            });
+
+            var result = await rollback.RollbackAsync("plugin-retry");
+
+            Assert.False(result.IsSuccess);
+            Assert.Single(rollback.GetPluginChanges("plugin-retry"));
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, true);
+        }
+    }
+
     // ===== HotKeyService 测试 =====
 
     [Fact]
@@ -299,7 +333,7 @@ public class ServiceTests
             Directory.CreateDirectory(dir);
             File.WriteAllText(file, "base");
 
-            var rb = new RollbackEngine();
+            var rb = new RollbackEngine(Path.Combine(dir, "rollback"));
             var svc = new ADSService(rb);
 
             // 写入 ADS
@@ -325,7 +359,7 @@ public class ServiceTests
         try
         {
             Directory.CreateDirectory(dir);
-            var rb = new RollbackEngine();
+            var rb = new RollbackEngine(Path.Combine(dir, "rollback"));
             var svc = new ADSService(rb);
 
             var w = await svc.WriteAsync(dir, "note", "dir note");
