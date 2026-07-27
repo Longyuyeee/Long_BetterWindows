@@ -14,18 +14,11 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-        <Style x:Key="PluginToggleButton" TargetType="Button" BasedOn="{StaticResource LongButton}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Long.Brush.State.Danger}" />
-                    <Setter Property="BorderBrush" Value="{DynamicResource Long.Brush.State.Danger}" />
-                    <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Text.OnAccent}" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
         <Style x:Key="PluginListCard" TargetType="Border"
                BasedOn="{StaticResource LongPluginCard}">
             <Setter Property="Effect" Value="{x:Null}" />
+            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
     </UserControl.Resources>
 
@@ -100,18 +93,15 @@
                 <DataTemplate>
                     <Border Style="{StaticResource PluginListCard}" Margin="0,0,0,12">
                         <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-
-                            <StackPanel>
+                            <Ellipse Width="8" Height="8" Style="{StaticResource PluginStateDot}"
+                                     Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal">
-                                    <Ellipse Width="8" Height="8" Style="{StaticResource PluginStateDot}"
-                                             Margin="0,0,8,0" VerticalAlignment="Center" />
                                     <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
                                                Foreground="{DynamicResource Long.Brush.Text.Primary}"
                                                VerticalAlignment="Center" />
@@ -119,52 +109,34 @@
                                         <TextBlock Text="{Binding RuntimeLabel}" FontSize="9"
                                                    Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     </Border>
-                                </StackPanel>
-
-                                <StackPanel Orientation="Horizontal" Margin="16,5,0,0">
-                                    <Border Style="{StaticResource LongHotkeyBadge}" Margin="0,0,8,0"
+                                    <Border Style="{StaticResource LongHotkeyBadge}" Margin="7,0,0,0"
                                             Visibility="{Binding HasHotkey, Converter={StaticResource BooleanToVisibility}}">
                                         <TextBlock Text="{Binding Hotkey}" FontSize="10"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}"
                                                    FontFamily="{DynamicResource Long.Font.Mono}" />
                                     </Border>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                     <TextBlock Text="{Binding StatusText}" FontSize="11"
                                                Foreground="{DynamicResource Long.Brush.Text.Muted}"
                                                VerticalAlignment="Center" />
-                                </StackPanel>
-
-                                <Border Style="{StaticResource LongBadge}" Margin="16,6,0,0"
-                                        HorizontalAlignment="Left"
-                                        Visibility="{Binding HasCapabilities, Converter={StaticResource BooleanToVisibility}}">
-                                    <TextBlock Text="{Binding CapabilitySummary}" FontSize="10"
+                                    <TextBlock Text=" · " FontSize="11"
+                                               Visibility="{Binding HasCapabilities, Converter={StaticResource BooleanToVisibility}}"
                                                Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                                </Border>
+                                    <TextBlock Text="{Binding CapabilitySummary}" FontSize="10"
+                                               TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding HasCapabilities, Converter={StaticResource BooleanToVisibility}}"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                </StackPanel>
                             </StackPanel>
-
-                            <WrapPanel Grid.Row="1" Margin="16,14,0,0"
-                                       HorizontalAlignment="Right">
-                                <Button Content="{DynamicResource i18n.action.open}" MinWidth="62" Margin="0,0,6,0"
-                                        Style="{StaticResource LongButton.Primary}" Tag="{Binding}"
-                                        automation:AutomationProperties.Name="{DynamicResource i18n.plugins.open}"
-                                        Click="OpenPlugin_Click"
-                                        Visibility="{Binding CanOpen, Converter={StaticResource BooleanToVisibility}}" />
-                                <Button Width="38" Margin="0,0,6,0" Style="{StaticResource LongIconButton}"
-                                        Tag="{Binding}" Click="PluginSettings_Click"
-                                        ToolTip="{DynamicResource i18n.plugins.settings}"
-                                        automation:AutomationProperties.Name="{DynamicResource i18n.plugins.openSettings}"
-                                        Visibility="{Binding CanOpenSettings, Converter={StaticResource BooleanToVisibility}}">
-                                    <Path Data="{StaticResource Long.Icon.Settings}" Style="{StaticResource LongIcon}"
-                                          Width="17" Height="17" />
-                                </Button>
-                                <Button Width="38" Margin="0,0,6,0" Style="{StaticResource LongIconButton}"
-                                        Tag="{Binding}" Click="CapabilityDetails_Click"
-                                        ToolTip="{DynamicResource i18n.plugins.capabilities}"
-                                        automation:AutomationProperties.Name="{DynamicResource i18n.plugins.openCapabilities}">
-                                    <Path Data="{StaticResource Long.Icon.Shield}" Style="{StaticResource LongIcon}"
-                                          Width="17" Height="17" />
-                                </Button>
-                                <Button Content="{Binding ToggleText}" MinWidth="62" Tag="{Binding}"
-                                        Style="{StaticResource PluginToggleButton}" Click="PluginToggle_Click" />
-                            </WrapPanel>
+                            <Button Grid.Column="2" Width="38" Height="38"
+                                    Style="{StaticResource LongIconButton}" Tag="{Binding}"
+                                    ToolTip="{DynamicResource i18n.plugins.actions}"
+                                    automation:AutomationProperties.Name="{DynamicResource i18n.plugins.actions}"
+                                    Click="PluginActions_Click">
+                                <Path Data="{StaticResource Long.Icon.MoreHorizontal}"
+                                      Style="{StaticResource LongIcon}" Width="18" Height="18" />
+                            </Button>
                         </Grid>
                     </Border>
                 </DataTemplate>

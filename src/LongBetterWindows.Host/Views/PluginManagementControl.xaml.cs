@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
@@ -123,12 +124,73 @@ namespace LongBetterWindows.Host.Views
             Refresh();
         }
 
-        private async void OpenPlugin_Click(object sender, RoutedEventArgs e)
+        private void PluginActions_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button { Tag: PluginCardItem item } button)
                 return;
 
-            button.IsEnabled = false;
+            var menu = new ContextMenu
+            {
+                Placement = PlacementMode.Bottom,
+                PlacementTarget = button,
+            };
+            if (item.CanOpen)
+                AddMenuAction(
+                    menu,
+                    I18n("action.open"),
+                    button,
+                    () => OpenPluginAsync(item));
+            if (item.CanOpenSettings)
+                AddMenuAction(
+                    menu,
+                    I18n("plugins.settings"),
+                    button,
+                    () =>
+                    {
+                        OpenPluginSettings(item);
+                        return Task.CompletedTask;
+                    });
+            AddMenuAction(
+                menu,
+                I18n("plugins.capabilities"),
+                button,
+                () =>
+                {
+                    OpenCapabilityDetails(item);
+                    return Task.CompletedTask;
+                });
+            AddMenuAction(
+                menu,
+                item.ToggleText,
+                button,
+                () => TogglePluginAsync(item));
+            menu.IsOpen = true;
+        }
+
+        private static void AddMenuAction(
+            ItemsControl menu,
+            string header,
+            Button actionButton,
+            Func<Task> action)
+        {
+            var menuItem = new MenuItem { Header = header };
+            menuItem.Click += async (_, _) =>
+            {
+                actionButton.IsEnabled = false;
+                try
+                {
+                    await action();
+                }
+                finally
+                {
+                    actionButton.IsEnabled = true;
+                }
+            };
+            menu.Items.Add(menuItem);
+        }
+
+        private async Task OpenPluginAsync(PluginCardItem item)
+        {
             try
             {
                 var registry = HostProvider.Instance.PluginStore;
@@ -153,15 +215,12 @@ namespace LongBetterWindows.Host.Views
             }
             finally
             {
-                button.IsEnabled = true;
                 Refresh();
             }
         }
 
-        private async void PluginToggle_Click(object sender, RoutedEventArgs e)
+        private async Task TogglePluginAsync(PluginCardItem item)
         {
-            if (sender is not Button { Tag: PluginCardItem item } button) return;
-            button.IsEnabled = false;
             try
             {
                 var registry = HostProvider.Instance.PluginStore;
@@ -179,15 +238,14 @@ namespace LongBetterWindows.Host.Views
             }
             finally
             {
-                button.IsEnabled = true;
                 Refresh();
             }
         }
 
-        private void PluginSettings_Click(object sender, RoutedEventArgs e)
+        private void OpenPluginSettings(PluginCardItem item)
         {
-            if (sender is not Button { Tag: PluginCardItem { Entry: var entry } }
-                || entry.Instance is not IHasSettingsUI settingsUi) return;
+            var entry = item.Entry;
+            if (entry.Instance is not IHasSettingsUI settingsUi) return;
 
             try
             {
@@ -213,9 +271,9 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
-        private void CapabilityDetails_Click(object sender, RoutedEventArgs e)
+        private void OpenCapabilityDetails(PluginCardItem item)
         {
-            if (sender is not Button { Tag: PluginCardItem { Entry: var entry } }) return;
+            var entry = item.Entry;
 
             var panel = new CapabilityDetailPanel();
             panel.LoadCapabilities(entry.Id, entry.DisplayName, entry.Manifest.Capabilities);

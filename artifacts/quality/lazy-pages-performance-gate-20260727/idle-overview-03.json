@@ -1,0 +1,14 @@
+﻿{
+    "schema_version":  1,
+    "captured_at":  "2026-07-27T06:50:12.7259414Z",
+    "view":  "overview",
+    "idle_ms":  9000,
+    "width":  1120,
+    "height":  760,
+    "loaded_plugin_count":  25,
+    "command_count":  42,
+    "working_set_mb":  193.3,
+    "private_memory_mb":  146,
+    "high_contrast":  false,
+    "reduced_motion":  false
+}

@@ -167,7 +167,8 @@ public sealed class I18nServiceTests : IDisposable
 
         Assert.Contains("i18n.plugins.installed", xaml);
         Assert.Contains("i18n.plugins.search", xaml);
-        Assert.Contains("i18n.plugins.openCapabilities", xaml);
+        Assert.Contains("i18n.plugins.actions", xaml);
+        Assert.Contains("I18n(\"plugins.capabilities\")", source);
         Assert.Contains("ApplyResponsiveLayout", source);
         Assert.Contains("plugins.status.runningVersion", source);
         Assert.DoesNotContain("暂无已安装插件", xaml);

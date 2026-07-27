@@ -67,6 +67,7 @@
   "plugins.openSettings": "Open plugin settings",
   "plugins.capabilities": "Permissions and activity",
   "plugins.openCapabilities": "View plugin permissions",
+  "plugins.actions": "Plugin actions",
   "plugins.settingsTitle": "{0} · Settings",
   "plugins.capabilitiesTitle": "{0} · Permission details",
   "plugins.status.runningVersion": "Running · v{0}",

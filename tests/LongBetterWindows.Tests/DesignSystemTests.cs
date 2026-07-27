@@ -291,9 +291,10 @@ public class DesignSystemTests
         Assert.Contains("DiagnosticsHost.Content == null", toolCenter);
         Assert.Contains("DiagnosticsHost.Content = new PerformancePanel()", toolCenter);
         Assert.Contains("OpenDiagnosticsForQuality", toolCenter);
-        Assert.Contains("CapabilityDetails_Click", pluginManagement);
-        Assert.Contains("Long.Icon.Shield", pluginManagementView);
-        Assert.Contains("i18n.plugins.openCapabilities", pluginManagementView);
+        Assert.Contains("OpenCapabilityDetails", pluginManagement);
+        Assert.Contains("I18n(\"plugins.capabilities\")", pluginManagement);
+        Assert.Contains("Long.Icon.MoreHorizontal", pluginManagementView);
+        Assert.Contains("i18n.plugins.actions", pluginManagementView);
         Assert.Contains("查看插件权限", zhResources);
         Assert.DoesNotContain("CapabilityDetails_Click", toolCenter);
         Assert.DoesNotContain("DispatcherTimer", performance);

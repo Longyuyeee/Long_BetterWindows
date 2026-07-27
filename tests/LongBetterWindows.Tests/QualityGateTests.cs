@@ -881,9 +881,20 @@ public class QualityGateTests
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
 
         var code = Read("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs");
-        Assert.Contains("PluginToggle_Click", code);
-        Assert.Contains("PluginSettings_Click", code);
-        Assert.Contains("CapabilityDetails_Click", code);
+        Assert.Contains("PluginActions_Click", code);
+        Assert.Contains("OpenPluginAsync", code);
+        Assert.Contains("OpenPluginSettings", code);
+        Assert.Contains("OpenCapabilityDetails", code);
+        Assert.Contains("TogglePluginAsync", code);
+        Assert.Contains("AddMenuAction", code);
+        Assert.Equal(1, xaml.Split("Click=\"PluginActions_Click\"").Length - 1);
+        Assert.Contains(
+            "Foreground=\"{DynamicResource Long.Brush.Text.Secondary}\"",
+            xaml);
+        Assert.DoesNotContain("Click=\"OpenPlugin_Click\"", xaml);
+        Assert.DoesNotContain("Click=\"PluginToggle_Click\"", xaml);
+        Assert.DoesNotContain("Click=\"PluginSettings_Click\"", xaml);
+        Assert.DoesNotContain("Click=\"CapabilityDetails_Click\"", xaml);
         Assert.Contains("Interlocked.Exchange(ref _refreshPending, 1)", code);
         Assert.Contains("DispatcherPriority.ContextIdle", code);
         Assert.Contains("IDisposable", code);

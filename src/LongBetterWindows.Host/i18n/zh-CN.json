@@ -67,6 +67,7 @@
   "plugins.openSettings": "打开插件设置",
   "plugins.capabilities": "权限与调用记录",
   "plugins.openCapabilities": "查看插件权限",
+  "plugins.actions": "插件操作",
   "plugins.settingsTitle": "{0} · 设置",
   "plugins.capabilitiesTitle": "{0} · 权限详情",
   "plugins.status.runningVersion": "运行中 · v{0}",
