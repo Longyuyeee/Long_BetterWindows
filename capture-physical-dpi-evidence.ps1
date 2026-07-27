@@ -15,7 +15,7 @@ param(
     [ValidateSet('main','market','palette','plugin')]
     [string[]] $Views = @('main','market','palette','plugin'),
     [string] $PluginCommandKey = 'com.long.url-toolkit:url.encode',
-    [string] $PluginCommandText = 'Long Assistant DPI Review',
+    [string] $PluginCommandText = 'LongAssistantDpiReview',
     [ValidateRange(100,10000)] [int] $CaptureDelayMilliseconds = 1500,
     [ValidateRange(30,180)] [int] $ProcessTimeoutSeconds = 90,
     [switch] $ApproveAfterVisualReview,
