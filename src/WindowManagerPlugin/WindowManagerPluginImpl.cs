@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Views;
@@ -15,6 +16,7 @@ public class WindowManagerPluginImpl :
     IPluginLanguageLifecycle
 {
     private IHostApi _host = null!;
+    private IPluginSettingsService _pluginSettings = null!;
     private readonly List<string> _registeredHotkeys = new();
     private readonly List<WeakReference<HotkeySettingsControl>> _settings = [];
     private WindowManagerGuide? _guide;
@@ -28,10 +30,14 @@ public class WindowManagerPluginImpl :
     public string Version => "2.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
-    public Task<bool> InitializeAsync(IHostApi host)
+    public async Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
-        return Task.FromResult(true);
+        _pluginSettings = host.Settings;
+        var configured = await _pluginSettings.GetAsync("topmost_hotkey");
+        if (configured.IsSuccess && !string.IsNullOrWhiteSpace(configured.Data))
+            _configuredTopmostHotkey = configured.Data;
+        return true;
     }
 
     public async Task<bool> StartAsync()
@@ -105,11 +111,17 @@ public class WindowManagerPluginImpl :
             Id,
             _registeredTopmostHotkey
                 ?? Text("settings.commandCenter", "命令中心"),
-            value =>
+            async value =>
             {
+                var result = await _pluginSettings.SetAsync(
+                    "topmost_hotkey",
+                    value);
+                if (!result.IsSuccess)
+                    return result;
                 ReplaceRegisteredHotkey(_registeredTopmostHotkey, value);
                 _configuredTopmostHotkey = value;
                 _registeredTopmostHotkey = value;
+                return HostApiResponse.Success();
             },
             CreateSettingsLocalization(),
             ToggleTopmost);

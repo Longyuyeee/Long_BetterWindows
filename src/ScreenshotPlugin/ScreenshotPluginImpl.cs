@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Views;
@@ -17,6 +18,7 @@ public class ScreenshotPluginImpl :
     IPluginLanguageLifecycle
 {
     private IHostApi _host = null!;
+    private IPluginSettingsService _pluginSettings = null!;
     private readonly List<string> _registeredHotkeys = new();
     private readonly List<WeakReference<HotkeySettingsControl>> _fullSettings = [];
     private readonly List<WeakReference<HotkeySettingsControl>> _regionSettings = [];
@@ -33,10 +35,17 @@ public class ScreenshotPluginImpl :
     public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
-    public Task<bool> InitializeAsync(IHostApi host)
+    public async Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
-        return Task.FromResult(true);
+        _pluginSettings = host.Settings;
+        var full = await _pluginSettings.GetAsync("full_hotkey");
+        if (full.IsSuccess && !string.IsNullOrWhiteSpace(full.Data))
+            _configuredFullHotkey = full.Data;
+        var region = await _pluginSettings.GetAsync("region_hotkey");
+        if (region.IsSuccess && !string.IsNullOrWhiteSpace(region.Data))
+            _configuredRegionHotkey = region.Data;
+        return true;
     }
 
     public async Task<bool> StartAsync()
@@ -69,11 +78,17 @@ public class ScreenshotPluginImpl :
         }
 
         Log.Warning("[Screenshot] 热键 {Preferred} 冲突，尝试 {Fallback}", preferred, fallback);
-        result = await _host.HotKey.RegisterAsync(fallback, Id, callback);
-        if (result.IsSuccess)
+        if (!preferred.Equals(fallback, StringComparison.OrdinalIgnoreCase))
         {
-            _registeredHotkeys.Add(fallback);
-            return fallback;
+            result = await _host.HotKey.RegisterAsync(
+                fallback,
+                Id,
+                callback);
+            if (result.IsSuccess)
+            {
+                _registeredHotkeys.Add(fallback);
+                return fallback;
+            }
         }
 
         Log.Warning("[Screenshot] 热键不可用，命令中心入口仍可执行: {Preferred}", preferred);
@@ -216,11 +231,17 @@ public class ScreenshotPluginImpl :
             Id,
             _registeredFullHotkey
                 ?? Text("settings.commandCenter", "命令中心"),
-            value =>
+            async value =>
             {
+                var result = await _pluginSettings.SetAsync(
+                    "full_hotkey",
+                    value);
+                if (!result.IsSuccess)
+                    return result;
                 ReplaceRegisteredHotkey(_registeredFullHotkey, value);
                 _configuredFullHotkey = value;
                 _registeredFullHotkey = value;
+                return HostApiResponse.Success();
             },
             CreateSettingsLocalization(),
             CaptureFullScreen);
@@ -229,11 +250,17 @@ public class ScreenshotPluginImpl :
             Id,
             _registeredRegionHotkey
                 ?? Text("settings.commandCenter", "命令中心"),
-            value =>
+            async value =>
             {
+                var result = await _pluginSettings.SetAsync(
+                    "region_hotkey",
+                    value);
+                if (!result.IsSuccess)
+                    return result;
                 ReplaceRegisteredHotkey(_registeredRegionHotkey, value);
                 _configuredRegionHotkey = value;
                 _registeredRegionHotkey = value;
+                return HostApiResponse.Success();
             },
             CreateSettingsLocalization(),
             CaptureRegion);

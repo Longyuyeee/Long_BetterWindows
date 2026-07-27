@@ -16,12 +16,16 @@ public class MacroPluginImpl :
     IPluginLanguageLifecycle
 {
     private IHostApi? _host;
+    private IPluginSettingsService _pluginSettings = null!;
     private MacroEngine? _engine;
     private MacroOverlay? _overlay;
     private readonly List<string> _registeredHotkeys = new();
-    private string _recordHotkey = "F6";
-    private string _playHotkey = "F7";
-    private string _loopHotkey = "F8";
+    private string _configuredRecordHotkey = "F6";
+    private string _configuredPlayHotkey = "F7";
+    private string _configuredLoopHotkey = "F8";
+    private string? _registeredRecordHotkey;
+    private string? _registeredPlayHotkey;
+    private string? _registeredLoopHotkey;
     private readonly List<(
         WeakReference<HotkeySettingsControl> Reference,
         string LabelKey)> _settings = [];
@@ -33,39 +37,63 @@ public class MacroPluginImpl :
     public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
-    public Task<bool> InitializeAsync(IHostApi host)
+    public async Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
+        _pluginSettings = host.Settings;
 
         if (!host.HasCapability("system.hotkey"))
         {
             Log.Error("[Macro] 未获得热键能力授权");
             State = PluginState.Error;
-            return Task.FromResult(false);
+            return false;
         }
 
+        _configuredRecordHotkey = await ReadHotkeyAsync(
+            "record_hotkey",
+            _configuredRecordHotkey);
+        _configuredPlayHotkey = await ReadHotkeyAsync(
+            "play_once_hotkey",
+            _configuredPlayHotkey);
+        _configuredLoopHotkey = await ReadHotkeyAsync(
+            "play_loop_hotkey",
+            _configuredLoopHotkey);
         _engine = new MacroEngine();
         _engine.StateChanged += OnStateChanged;
 
         Log.Information("[Macro] 初始化完成");
-        return Task.FromResult(true);
+        return true;
     }
 
     public async Task<bool> StartAsync()
     {
         var hotKey = _host!.HotKey!;
 
-        _recordHotkey = await RegisterWithFallbackAsync(hotKey, "F6", "Ctrl+Alt+F6", ToggleRecording);
-        _playHotkey = await RegisterWithFallbackAsync(hotKey, "F7", "Ctrl+Alt+F7", () => _ = PlayOnce());
-        _loopHotkey = await RegisterWithFallbackAsync(hotKey, "F8", "Ctrl+Alt+F8", ToggleLoopPlay);
+        _registeredRecordHotkey = await RegisterWithFallbackAsync(
+            hotKey,
+            _configuredRecordHotkey,
+            "Ctrl+Alt+F6",
+            ToggleRecording);
+        _registeredPlayHotkey = await RegisterWithFallbackAsync(
+            hotKey,
+            _configuredPlayHotkey,
+            "Ctrl+Alt+F7",
+            () => _ = PlayOnce());
+        _registeredLoopHotkey = await RegisterWithFallbackAsync(
+            hotKey,
+            _configuredLoopHotkey,
+            "Ctrl+Alt+F8",
+            ToggleLoopPlay);
 
         State = PluginState.Running;
         Log.Information("[Macro] 已启动: {Record}录制 {Play}播放 {Loop}循环",
-            _recordHotkey, _playHotkey, _loopHotkey);
+            _registeredRecordHotkey ?? "command-center",
+            _registeredPlayHotkey ?? "command-center",
+            _registeredLoopHotkey ?? "command-center");
         return true;
     }
 
-    private async Task<string> RegisterWithFallbackAsync(
+    private async Task<string?> RegisterWithFallbackAsync(
         IHotKeyService hotKey,
         string preferred,
         string fallback,
@@ -79,16 +107,19 @@ public class MacroPluginImpl :
         }
 
         Log.Warning("[Macro] 热键 {Hotkey} 冲突，尝试 {Fallback}", preferred, fallback);
-        result = await hotKey.RegisterAsync(fallback, callback);
-        if (result.IsSuccess)
+        if (!preferred.Equals(fallback, StringComparison.OrdinalIgnoreCase))
         {
-            _registeredHotkeys.Add(fallback);
-            return fallback;
+            result = await hotKey.RegisterAsync(fallback, callback);
+            if (result.IsSuccess)
+            {
+                _registeredHotkeys.Add(fallback);
+                return fallback;
+            }
         }
 
         Log.Warning("[Macro] 热键 {Preferred}/{Fallback} 均不可用，功能仍可从命令中心执行",
             preferred, fallback);
-        return Text("settings.commandCenter", "命令中心");
+        return null;
     }
 
     public async Task<bool> StopAsync()
@@ -97,6 +128,9 @@ public class MacroPluginImpl :
         foreach (var hotkey in _registeredHotkeys)
             await hotKey.UnregisterAsync(hotkey);
         _registeredHotkeys.Clear();
+        _registeredRecordHotkey = null;
+        _registeredPlayHotkey = null;
+        _registeredLoopHotkey = null;
 
         _engine?.StopPlay();
         _engine?.StopRecording();
@@ -218,9 +252,45 @@ public class MacroPluginImpl :
     public FrameworkElement CreateSettingsUI()
     {
         var panel = new StackPanel();
-        AddSettingsControl(panel, "settings.record", "录制", _recordHotkey);
-        AddSettingsControl(panel, "settings.playOnce", "播放单次", _playHotkey);
-        AddSettingsControl(panel, "settings.loop", "循环播放", _loopHotkey);
+        AddSettingsControl(
+            panel,
+            "settings.record",
+            "录制",
+            "record_hotkey",
+            _registeredRecordHotkey,
+            ToggleRecording,
+            value =>
+            {
+                ReplaceRegisteredHotkey(_registeredRecordHotkey, value);
+                _configuredRecordHotkey = value;
+                _registeredRecordHotkey = value;
+            });
+        AddSettingsControl(
+            panel,
+            "settings.playOnce",
+            "播放单次",
+            "play_once_hotkey",
+            _registeredPlayHotkey,
+            () => _ = PlayOnce(),
+            value =>
+            {
+                ReplaceRegisteredHotkey(_registeredPlayHotkey, value);
+                _configuredPlayHotkey = value;
+                _registeredPlayHotkey = value;
+            });
+        AddSettingsControl(
+            panel,
+            "settings.loop",
+            "循环播放",
+            "play_loop_hotkey",
+            _registeredLoopHotkey,
+            ToggleLoopPlay,
+            value =>
+            {
+                ReplaceRegisteredHotkey(_registeredLoopHotkey, value);
+                _configuredLoopHotkey = value;
+                _registeredLoopHotkey = value;
+            });
         return panel;
     }
 
@@ -228,17 +298,55 @@ public class MacroPluginImpl :
         Panel panel,
         string labelKey,
         string fallback,
-        string hotkey)
+        string settingKey,
+        string? registeredHotkey,
+        Action hotkeyCallback,
+        Action<string> commit)
     {
         var control = new HotkeySettingsControl(
             Text(labelKey, fallback),
             Id,
-            hotkey,
-            _ => { },
-            CreateSettingsLocalization());
+            registeredHotkey
+                ?? Text("settings.commandCenter", "命令中心"),
+            async value =>
+            {
+                var result = await _pluginSettings.SetAsync(
+                    settingKey,
+                    value);
+                if (result.IsSuccess)
+                    commit(value);
+                return result;
+            },
+            CreateSettingsLocalization(),
+            hotkeyCallback);
         _settings.RemoveAll(item => !item.Reference.TryGetTarget(out _));
         _settings.Add((new WeakReference<HotkeySettingsControl>(control), labelKey));
         panel.Children.Add(control);
+    }
+
+    private async Task<string> ReadHotkeyAsync(
+        string key,
+        string fallback)
+    {
+        var result = await _pluginSettings.GetAsync(key);
+        return result.IsSuccess && !string.IsNullOrWhiteSpace(result.Data)
+            ? result.Data
+            : fallback;
+    }
+
+    private void ReplaceRegisteredHotkey(string? previous, string current)
+    {
+        if (previous is not null)
+        {
+            _registeredHotkeys.RemoveAll(existing =>
+                existing.Equals(previous, StringComparison.OrdinalIgnoreCase));
+        }
+        if (!_registeredHotkeys.Contains(
+                current,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            _registeredHotkeys.Add(current);
+        }
     }
 
     public void ShowMainUI()

@@ -11,6 +11,7 @@ namespace LongBetterWindows.Host.Core
         bool HasCapability(string capability);
 
         IHotKeyService HotKey { get; }
+        IPluginSettingsService Settings { get; }
         IShellSelectionService ShellSelection { get; }
         IADSService ADS { get; }
         IRegistryService Registry { get; }

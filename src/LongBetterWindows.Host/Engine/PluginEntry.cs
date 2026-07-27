@@ -1,6 +1,7 @@
 using System.Text.Json;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
+using Serilog;
 
 namespace LongBetterWindows.Host.Engine
 {
@@ -130,11 +131,34 @@ namespace LongBetterWindows.Host.Engine
             return null;
         }
 
-        public void SetSetting(string key, string value)
+        internal HostApiResponse SetSetting(string key, string value)
         {
+            var hadPrevious = _settings.TryGetValue(key, out var previous);
+            var wasPersisted = _persistedSettings.Contains(key);
             _settings[key] = value;
             _persistedSettings.Add(key);
-            SaveSettings();
+            try
+            {
+                SaveSettings();
+                return HostApiResponse.Success();
+            }
+            catch (Exception exception)
+            {
+                if (hadPrevious)
+                    _settings[key] = previous!;
+                else
+                    _settings.Remove(key);
+                if (!wasPersisted)
+                    _persistedSettings.Remove(key);
+                Log.Warning(
+                    exception,
+                    "Plugin {PluginId} setting {SettingKey} could not be persisted",
+                    Id,
+                    key);
+                return HostApiResponse.Failure(
+                    ApiErrorCode.Unknown,
+                    "Plugin setting could not be persisted.");
+            }
         }
 
         internal AutoStartPreference GetAutoStartPreference()
@@ -166,7 +190,17 @@ namespace LongBetterWindows.Host.Engine
             _settings["auto_start_source"] = "user";
             _persistedSettings.Add("auto_start");
             _persistedSettings.Add("auto_start_source");
-            SaveSettings();
+            try
+            {
+                SaveSettings();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Plugin {PluginId} auto-start preference could not be persisted",
+                    Id);
+            }
         }
 
         private Dictionary<string, object> LoadSettings(
@@ -207,12 +241,31 @@ namespace LongBetterWindows.Host.Engine
         private void SaveSettings()
         {
             var configPath = System.IO.Path.Combine(Directory, "config.json");
+            var temporaryPath = System.IO.Path.Combine(
+                Directory,
+                $".config.{Guid.NewGuid():N}.tmp");
             try
             {
-                var json = JsonSerializer.Serialize(_settings, JsonOptions);
-                System.IO.File.WriteAllText(configPath, json);
+                var persistedSettings = _settings
+                    .Where(pair => _persistedSettings.Contains(pair.Key))
+                    .ToDictionary(
+                        pair => pair.Key,
+                        pair => pair.Value,
+                        StringComparer.OrdinalIgnoreCase);
+                var json = JsonSerializer.Serialize(
+                    persistedSettings,
+                    JsonOptions);
+                System.IO.File.WriteAllText(temporaryPath, json);
+                System.IO.File.Move(
+                    temporaryPath,
+                    configPath,
+                    overwrite: true);
             }
-            catch { }
+            finally
+            {
+                if (System.IO.File.Exists(temporaryPath))
+                    System.IO.File.Delete(temporaryPath);
+            }
         }
     }
 }

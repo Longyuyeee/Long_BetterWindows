@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using LongBetterWindows.Host.Capabilities;
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host.Views
@@ -32,7 +33,7 @@ namespace LongBetterWindows.Host.Views
     {
         private readonly IHotKeyService _hotKey;
         private readonly string _pluginId;
-        private readonly Action<string> _onHotkeyChanged;
+        private readonly Func<string, Task<HostApiResponse>> _onHotkeyChanged;
         private readonly Action _hotkeyCallback;
         private readonly TextBlock _title;
         private readonly TextBlock _label;
@@ -48,7 +49,7 @@ namespace LongBetterWindows.Host.Views
             string pluginName,
             string pluginId,
             string currentHotkey,
-            Action<string> onHotkeyChanged,
+            Func<string, Task<HostApiResponse>> onHotkeyChanged,
             HotkeySettingsLocalization? localization = null,
             Action? hotkeyCallback = null)
         {
@@ -147,13 +148,47 @@ namespace LongBetterWindows.Host.Views
                 }
 
                 // 更换热键
+                var previousHotkey = _currentHotkey;
+                var previousWasRegistered = string.Equals(
+                    _hotKey.GetOwner(previousHotkey),
+                    _pluginId,
+                    StringComparison.OrdinalIgnoreCase);
                 var changeResult = await _hotKey.ChangeHotkeyAsync(
-                    _currentHotkey, newHotkey, _pluginId, _hotkeyCallback);
+                    previousHotkey, newHotkey, _pluginId, _hotkeyCallback);
 
                 if (changeResult.IsSuccess)
                 {
+                    HostApiResponse persistenceResult;
+                    try
+                    {
+                        persistenceResult = await _onHotkeyChanged(newHotkey);
+                    }
+                    catch (Exception exception)
+                    {
+                        persistenceResult = HostApiResponse.Failure(
+                            ApiErrorCode.Unknown,
+                            exception.Message);
+                    }
+                    if (!persistenceResult.IsSuccess)
+                    {
+                        var rollbackResult = previousWasRegistered
+                            ? await _hotKey.ChangeHotkeyAsync(
+                                newHotkey,
+                                previousHotkey,
+                                _pluginId,
+                                _hotkeyCallback)
+                            : await _hotKey.UnregisterAsync(newHotkey);
+                        var detail = persistenceResult.ErrorMessage
+                            ?? "Plugin setting could not be persisted.";
+                        if (!rollbackResult.IsSuccess)
+                        {
+                            detail += $" Rollback failed: {rollbackResult.ErrorMessage}";
+                        }
+                        SetStatus(HotkeySettingsStatus.Failed, detail);
+                        return;
+                    }
+
                     _currentHotkey = newHotkey;
-                    _onHotkeyChanged(newHotkey);
                     SetStatus(HotkeySettingsStatus.Updated);
                 }
                 else

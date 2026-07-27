@@ -1,4 +1,5 @@
 using System.Windows;
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Views;
@@ -14,6 +15,7 @@ public class ColorPickerPluginImpl :
     IPluginLanguageLifecycle
 {
     private IHostApi? _host;
+    private IPluginSettingsService _pluginSettings = null!;
     private string _configuredHotkey = "Ctrl+Shift+P";
     private string? _registeredHotkey;
     private ColorPickerWindow? _window;
@@ -26,16 +28,23 @@ public class ColorPickerPluginImpl :
     public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
-    public Task<bool> InitializeAsync(IHostApi host)
+    public async Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
-        return Task.FromResult(true);
+        _pluginSettings = host.Settings;
+        var configured = await _pluginSettings.GetAsync("hotkey");
+        if (configured.IsSuccess && !string.IsNullOrWhiteSpace(configured.Data))
+            _configuredHotkey = configured.Data;
+        return true;
     }
 
     public async Task<bool> StartAsync()
     {
         _registeredHotkey = await TryRegisterAsync(_configuredHotkey);
-        if (_registeredHotkey == null)
+        if (_registeredHotkey == null
+            && !_configuredHotkey.Equals(
+                "Ctrl+Alt+P",
+                StringComparison.OrdinalIgnoreCase))
             _registeredHotkey = await TryRegisterAsync("Ctrl+Alt+P");
 
         if (_registeredHotkey == null)
@@ -110,10 +119,14 @@ public class ColorPickerPluginImpl :
             Id,
             _registeredHotkey
                 ?? Text("settings.commandCenter", "命令中心"),
-            hotkey =>
+            async hotkey =>
             {
+                var result = await _pluginSettings.SetAsync("hotkey", hotkey);
+                if (!result.IsSuccess)
+                    return result;
                 _configuredHotkey = hotkey;
                 _registeredHotkey = hotkey;
+                return HostApiResponse.Success();
             },
             CreateSettingsLocalization(),
             OnPickColor);

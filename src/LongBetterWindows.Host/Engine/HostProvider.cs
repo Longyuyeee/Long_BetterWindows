@@ -1,5 +1,6 @@
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Core;
+using LongBetterWindows.Host.Services;
 using Serilog;
 
 namespace LongBetterWindows.Host.Engine
@@ -140,6 +141,16 @@ namespace LongBetterWindows.Host.Engine
         }
 
         public IHotKeyService HotKey => GetService<IHotKeyService>();
+        public IPluginSettingsService Settings
+        {
+            get
+            {
+                var pluginId = PluginAccessContext.CurrentPluginId
+                    ?? throw new InvalidOperationException(
+                        "Plugin settings require an active plugin context.");
+                return new PluginSettingsService(_registry, pluginId);
+            }
+        }
         public IShellSelectionService ShellSelection => GetService<IShellSelectionService>();
         public IADSService ADS => GetService<IADSService>();
         public IRegistryService Registry => GetService<IRegistryService>();

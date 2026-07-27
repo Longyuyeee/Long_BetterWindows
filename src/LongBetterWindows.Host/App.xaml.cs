@@ -310,6 +310,14 @@ namespace LongBetterWindows.Host
                     return;
                 }
 
+                if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginSettingsPersistenceReportPath))
+                {
+                    await _qualityRuntime!.RunPluginSettingsPersistenceProbeAsync(
+                        _startupOptions.QualityPluginSettingsPersistenceReportPath);
+                    return;
+                }
+
                 if (_startupTrace is not null)
                 {
                     await _startupTrace.WriteAsync(
@@ -351,6 +359,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityThemedMessageDialogReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginSettingsReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginSettingsPersistenceReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityStartupReportPath))
                 {

@@ -260,6 +260,44 @@ public sealed class ReleaseBlockingRegressionTests
     }
 
     [Fact]
+    public void NativePluginHotkeySettings_ArePersistedAndRollbackOnFailure()
+    {
+        var root = FindRepositoryRoot();
+        var pluginSources = new[]
+        {
+            "ColorPickerPlugin",
+            "FolderNotePlugin",
+            "MacroPlugin",
+            "ScreenshotPlugin",
+            "WindowManagerPlugin",
+        }.Select(directory => File.ReadAllText(Directory
+            .EnumerateFiles(
+                Path.Combine(root, "src", directory),
+                "*PluginImpl.cs")
+            .Single()))
+            .ToArray();
+        var hotkeyControl = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "HotkeySettingsControl.xaml.cs"));
+
+        Assert.All(pluginSources, source =>
+        {
+            Assert.Contains("host.Settings", source);
+            Assert.Contains(".GetAsync(", source);
+            Assert.Contains(".SetAsync(", source);
+        });
+        Assert.Contains("\"record_hotkey\"", pluginSources[2]);
+        Assert.Contains("\"play_once_hotkey\"", pluginSources[2]);
+        Assert.Contains("\"play_loop_hotkey\"", pluginSources[2]);
+        Assert.Contains("previousWasRegistered", hotkeyControl);
+        Assert.Contains("_hotKey.UnregisterAsync(newHotkey)", hotkeyControl);
+        Assert.Contains("Rollback failed:", hotkeyControl);
+    }
+
+    [Fact]
     public void SideEffectingPluginCommands_ReportActualCompletion()
     {
         var root = FindRepositoryRoot();

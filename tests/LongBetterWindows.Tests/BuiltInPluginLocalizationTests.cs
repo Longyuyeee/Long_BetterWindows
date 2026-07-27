@@ -533,7 +533,7 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.Contains("ApplyLocalization(", source);
         Assert.Contains("_hotkeyCallback", source);
         Assert.Contains(
-            "_currentHotkey, newHotkey, _pluginId, _hotkeyCallback",
+            "previousHotkey, newHotkey, _pluginId, _hotkeyCallback",
             source);
         Assert.Contains("RenderStatus();", source);
         Assert.Contains("\"LongTextBox\"", source);

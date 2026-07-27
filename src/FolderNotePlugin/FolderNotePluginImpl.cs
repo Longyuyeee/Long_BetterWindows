@@ -20,6 +20,8 @@ public class FolderNotePluginImpl :
 {
     private IHostApi _host = null!;
     private IHotKeyService _hotKey = null!;
+    private IPluginSettingsService _pluginSettings = null!;
+    private string _configuredHotkey = "Alt+M";
     private string? _registeredHotkey;
     private FloatingHudWindow? _activeHud;
     private readonly List<WeakReference<HotkeySettingsControl>> _settings = [];
@@ -31,30 +33,45 @@ public class FolderNotePluginImpl :
     public string Version => "1.1.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
-    public Task<bool> InitializeAsync(IHostApi host)
+    public async Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
         _hotKey = host.HotKey; // 若无 system.hotkey 能力会抛出 UnauthorizedAccessException
+        _pluginSettings = host.Settings;
+        var configured = await _pluginSettings.GetAsync("hotkey");
+        if (configured.IsSuccess && !string.IsNullOrWhiteSpace(configured.Data))
+            _configuredHotkey = configured.Data;
 
         Log.Information("[FolderNotePlugin] 初始化完成");
-        return Task.FromResult(true);
+        return true;
     }
 
     public async Task<bool> StartAsync()
     {
-        var result = await _hotKey.RegisterAsync("Alt+M", OnHotkeyTriggered);
+        var result = await _hotKey.RegisterAsync(
+            _configuredHotkey,
+            OnHotkeyTriggered);
         if (result.IsSuccess)
         {
-            _registeredHotkey = "Alt+M";
+            _registeredHotkey = _configuredHotkey;
         }
         else
         {
-            Log.Warning("[FolderNotePlugin] Alt+M 冲突，尝试 Ctrl+Alt+M");
-            result = await _hotKey.RegisterAsync("Ctrl+Alt+M", OnHotkeyTriggered);
-            if (result.IsSuccess)
-                _registeredHotkey = "Ctrl+Alt+M";
-            else
-                Log.Warning("[FolderNotePlugin] 热键不可用，命令中心入口仍可执行");
+            Log.Warning(
+                "[FolderNotePlugin] {Hotkey} 冲突，尝试 Ctrl+Alt+M",
+                _configuredHotkey);
+            if (!_configuredHotkey.Equals(
+                    "Ctrl+Alt+M",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                result = await _hotKey.RegisterAsync(
+                    "Ctrl+Alt+M",
+                    OnHotkeyTriggered);
+                if (result.IsSuccess)
+                    _registeredHotkey = "Ctrl+Alt+M";
+                else
+                    Log.Warning("[FolderNotePlugin] 热键不可用，命令中心入口仍可执行");
+            }
         }
 
         State = PluginState.Running;
@@ -219,9 +236,16 @@ public class FolderNotePluginImpl :
             Name,
             Id,
             _registeredHotkey ?? Text("settings.commandCenter", "命令中心"),
-            newHotkey =>
+            async newHotkey =>
             {
+                var result = await _pluginSettings.SetAsync(
+                    "hotkey",
+                    newHotkey);
+                if (!result.IsSuccess)
+                    return result;
+                _configuredHotkey = newHotkey;
                 _registeredHotkey = newHotkey;
+                return HostApiResponse.Success();
             },
             CreateSettingsLocalization(),
             OnHotkeyTriggered);

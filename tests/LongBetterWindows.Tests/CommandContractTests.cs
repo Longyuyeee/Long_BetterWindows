@@ -944,6 +944,92 @@ public class CommandContractTests
     }
 
     [Fact]
+    public void PluginEntry_SettingWriteIsAtomicAndReloadable()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var manifest = new PluginManifest
+            {
+                Id = "com.test.settings",
+                Name = "Settings",
+                Version = "1.0.0",
+                EntryPoint = "settings.dll",
+                DefaultSettings = new Dictionary<string, object>
+                {
+                    ["hotkey"] = "Ctrl+K",
+                    ["auto_start"] = false,
+                },
+            };
+            var entry = new PluginEntry(
+                manifest,
+                new BackgroundLifecyclePlugin(),
+                root,
+                registrationRevision: 1);
+
+            var result = entry.SetSetting("hotkey", "Ctrl+Shift+K");
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal("Ctrl+Shift+K", entry.GetSetting("hotkey"));
+            Assert.Empty(Directory.GetFiles(root, ".config.*.tmp"));
+            Assert.DoesNotContain(
+                "auto_start",
+                File.ReadAllText(Path.Combine(root, "config.json")));
+            var reloaded = new PluginEntry(
+                manifest,
+                new BackgroundLifecyclePlugin(),
+                root,
+                registrationRevision: 2);
+            Assert.Equal(
+                "Ctrl+Shift+K",
+                reloaded.GetSetting("hotkey"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void PluginEntry_SettingWriteFailureRestoresInMemoryValue()
+    {
+        var filePath = Path.Combine(
+            Path.GetTempPath(),
+            $"{Guid.NewGuid():N}.blocked");
+        File.WriteAllText(filePath, "not a directory");
+        try
+        {
+            var entry = new PluginEntry(
+                new PluginManifest
+                {
+                    Id = "com.test.settings-failure",
+                    Name = "Settings failure",
+                    Version = "1.0.0",
+                    EntryPoint = "settings.dll",
+                    DefaultSettings = new Dictionary<string, object>
+                    {
+                        ["hotkey"] = "Ctrl+K",
+                    },
+                },
+                new BackgroundLifecyclePlugin(),
+                filePath,
+                registrationRevision: 1);
+
+            var result = entry.SetSetting("hotkey", "Ctrl+Shift+K");
+
+            Assert.False(result.IsSuccess);
+            Assert.Equal("Ctrl+K", entry.GetSetting("hotkey"));
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
     public async Task PluginRegistry_DeferredActivationRunsOnceUnderConcurrentStarts()
     {
         var registry = new PluginRegistry();

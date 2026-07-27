@@ -590,6 +590,281 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
+        public async Task RunPluginSettingsPersistenceProbeAsync(
+            string reportPath)
+        {
+            var settings = new Dictionary<string, SettingProbeDefinition[]>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["com.long.color-picker"] =
+                    [new("hotkey", "Ctrl+Shift+P")],
+                ["com.long.folder-note"] =
+                    [new("hotkey", "Alt+M")],
+                ["com.long.macro"] =
+                [
+                    new("record_hotkey", "F6"),
+                    new("play_once_hotkey", "F7"),
+                    new("play_loop_hotkey", "F8"),
+                ],
+                ["com.long.screenshot"] =
+                [
+                    new("full_hotkey", "Ctrl+Shift+S"),
+                    new("region_hotkey", "Ctrl+Shift+A"),
+                ],
+                ["com.long.window-manager"] =
+                    [new("topmost_hotkey", "Ctrl+Alt+T")],
+            };
+            var candidates = Enumerable.Range(1, 12)
+                .Select(number => $"Ctrl+Alt+Shift+F{number}")
+                .ToArray();
+            var candidateIndex = 0;
+            var entries = HostProvider.Instance.PluginStore.GetAll()
+                .ToDictionary(entry => entry.Id, StringComparer.OrdinalIgnoreCase);
+            var results = new List<SettingPersistenceProbeResult>();
+
+            foreach (var plugin in settings)
+            {
+                if (!entries.TryGetValue(plugin.Key, out var entry)
+                    || entry.Instance is not IHasSettingsUI settingsUi)
+                {
+                    foreach (var definition in plugin.Value)
+                    {
+                        results.Add(new SettingPersistenceProbeResult(
+                            plugin.Key,
+                            definition.Key,
+                            null,
+                            null,
+                            false,
+                            false,
+                            false,
+                            false,
+                            false,
+                            "Plugin settings UI is unavailable."));
+                    }
+                    continue;
+                }
+
+                var window = PluginManagementControl.CreateSettingsWindow(
+                    entry,
+                    settingsUi,
+                    owner: null);
+                try
+                {
+                    window.WindowStartupLocation =
+                        WindowStartupLocation.CenterScreen;
+                    window.Show();
+                    await _application.Dispatcher.InvokeAsync(
+                        () => { },
+                        DispatcherPriority.Render);
+                    window.UpdateLayout();
+                    var inputs = FindVisualChildren<System.Windows.Controls.TextBox>(
+                            window)
+                        .Where(input =>
+                            System.Windows.Automation.AutomationProperties
+                                .GetAutomationId(input)
+                                == "Long.HotkeySettings.Input")
+                        .ToArray();
+                    var buttons = FindVisualChildren<System.Windows.Controls.Button>(
+                            window)
+                        .Where(button =>
+                            System.Windows.Automation.AutomationProperties
+                                .GetAutomationId(button)
+                                == "Long.HotkeySettings.Apply")
+                        .ToArray();
+                    if (inputs.Length != plugin.Value.Length
+                        || buttons.Length != plugin.Value.Length)
+                    {
+                        foreach (var definition in plugin.Value)
+                        {
+                            results.Add(new SettingPersistenceProbeResult(
+                                plugin.Key,
+                                definition.Key,
+                                null,
+                                null,
+                                false,
+                                false,
+                                false,
+                                false,
+                                false,
+                                "Settings control count does not match the contract."));
+                        }
+                        continue;
+                    }
+
+                    for (var index = 0; index < plugin.Value.Length; index++)
+                    {
+                        var definition = plugin.Value[index];
+                        var originalConfigured =
+                            entry.GetSetting(definition.Key)
+                            ?? definition.DefaultValue;
+                        var originalDisplayed = inputs[index].Text;
+                        var originalWasRegistered = string.Equals(
+                            ServicesInitializer.HotKey.GetOwner(originalDisplayed),
+                            plugin.Key,
+                            StringComparison.OrdinalIgnoreCase);
+                        string? appliedCandidate = null;
+                        for (var attempt = 0;
+                             attempt < candidates.Length;
+                             attempt++)
+                        {
+                            var candidate = candidates[
+                                candidateIndex++ % candidates.Length];
+                            var conflict = await ServicesInitializer.HotKey
+                                .IsConflictAsync(candidate);
+                            if (!conflict.IsSuccess || conflict.Data)
+                                continue;
+
+                            inputs[index].Text = candidate;
+                            buttons[index].RaiseEvent(new RoutedEventArgs(
+                                System.Windows.Controls.Button.ClickEvent));
+                            if (await WaitUntilAsync(
+                                    () => string.Equals(
+                                        entry.GetSetting(definition.Key),
+                                        candidate,
+                                        StringComparison.OrdinalIgnoreCase),
+                                    2_000))
+                            {
+                                appliedCandidate = candidate;
+                                break;
+                            }
+                        }
+
+                        var registered = appliedCandidate is not null
+                            && string.Equals(
+                                ServicesInitializer.HotKey.GetOwner(
+                                    appliedCandidate),
+                                plugin.Key,
+                                StringComparison.OrdinalIgnoreCase);
+                        var configPath = Path.Combine(
+                            entry.Directory,
+                            "config.json");
+                        var persisted = appliedCandidate is not null
+                            && ConfigSettingEquals(
+                                configPath,
+                                definition.Key,
+                                appliedCandidate);
+                        var reloaded = appliedCandidate is not null
+                            && string.Equals(
+                                new PluginEntry(
+                                    entry.Manifest,
+                                    new object(),
+                                    entry.Directory,
+                                    registrationRevision: 0)
+                                .GetSetting(definition.Key),
+                                appliedCandidate,
+                                StringComparison.OrdinalIgnoreCase);
+
+                        var restored = false;
+                        if (appliedCandidate is not null)
+                        {
+                            if (originalWasRegistered)
+                            {
+                                inputs[index].Text = originalDisplayed;
+                                buttons[index].RaiseEvent(new RoutedEventArgs(
+                                    System.Windows.Controls.Button.ClickEvent));
+                                var runtimeRestored = await WaitUntilAsync(
+                                    () => string.Equals(
+                                            entry.GetSetting(definition.Key),
+                                            originalDisplayed,
+                                            StringComparison.OrdinalIgnoreCase)
+                                        && string.Equals(
+                                            ServicesInitializer.HotKey.GetOwner(
+                                                originalDisplayed),
+                                            plugin.Key,
+                                            StringComparison.OrdinalIgnoreCase),
+                                    2_000);
+                                var configRestored = entry.SetSetting(
+                                    definition.Key,
+                                    originalConfigured);
+                                restored = runtimeRestored
+                                    && configRestored.IsSuccess;
+                            }
+                            else
+                            {
+                                var unregistered =
+                                    await ServicesInitializer.HotKey
+                                        .UnregisterAsync(appliedCandidate);
+                                var reset = entry.SetSetting(
+                                    definition.Key,
+                                    originalConfigured);
+                                restored = unregistered.IsSuccess
+                                    && reset.IsSuccess;
+                            }
+                        }
+
+                        results.Add(new SettingPersistenceProbeResult(
+                            plugin.Key,
+                            definition.Key,
+                            originalDisplayed,
+                            appliedCandidate,
+                            appliedCandidate is not null,
+                            registered,
+                            persisted,
+                            reloaded,
+                            restored,
+                            appliedCandidate is null
+                                ? "No candidate hotkey could be applied."
+                                : null));
+                    }
+                }
+                finally
+                {
+                    window.DetachContent();
+                    window.Close();
+                }
+            }
+
+            var unexpectedPersistedKeys = settings
+                .SelectMany(plugin =>
+                {
+                    if (!entries.TryGetValue(plugin.Key, out var entry))
+                        return [];
+                    var configPath = Path.Combine(
+                        entry.Directory,
+                        "config.json");
+                    if (!File.Exists(configPath))
+                        return [];
+                    using var document = JsonDocument.Parse(
+                        File.ReadAllText(configPath));
+                    var allowed = plugin.Value
+                        .Select(definition => definition.Key)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    return document.RootElement
+                        .EnumerateObject()
+                        .Where(property => !allowed.Contains(property.Name))
+                        .Select(property =>
+                            $"{plugin.Key}:{property.Name}")
+                        .ToArray();
+                })
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var passed = results.Count
+                    == settings.Values.Sum(definitions => definitions.Length)
+                && results.All(result => result.Passed)
+                && unexpectedPersistedKeys.Length == 0;
+            var fullPath = Path.GetFullPath(reportPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await File.WriteAllTextAsync(
+                fullPath,
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        schema_version = 1,
+                        captured_at = DateTimeOffset.UtcNow,
+                        isolated_plugins_directory_required = true,
+                        passed,
+                        setting_count = results.Count,
+                        unexpected_persisted_keys = unexpectedPersistedKeys,
+                        settings = results,
+                    },
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+                    }));
+            _application.Shutdown(passed ? 0 : 9);
+        }
+
         public async Task RunPluginPagePerformanceProbeAsync(
             MainWindow window,
             PluginPagePerformanceTrace trace,
@@ -1018,6 +1293,37 @@ namespace LongBetterWindows.Host.Services
                     <= window.ActualHeight + tolerance;
         }
 
+        private static async Task<bool> WaitUntilAsync(
+            Func<bool> condition,
+            int timeoutMilliseconds)
+        {
+            var deadline = Environment.TickCount64 + timeoutMilliseconds;
+            while (Environment.TickCount64 < deadline)
+            {
+                if (condition())
+                    return true;
+                await Task.Delay(40);
+            }
+            return condition();
+        }
+
+        private static bool ConfigSettingEquals(
+            string configPath,
+            string key,
+            string expected)
+        {
+            if (!File.Exists(configPath))
+                return false;
+            using var document = JsonDocument.Parse(
+                File.ReadAllText(configPath));
+            return document.RootElement.TryGetProperty(key, out var value)
+                && value.ValueKind == JsonValueKind.String
+                && string.Equals(
+                    value.GetString(),
+                    expected,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
         private static Color GetColor(Brush brush)
             => brush is SolidColorBrush solid
                 ? solid.Color
@@ -1181,5 +1487,28 @@ namespace LongBetterWindows.Host.Services
             double InputContrast,
             double ButtonContrast,
             bool Passed);
+
+        private sealed record SettingProbeDefinition(
+            string Key,
+            string DefaultValue);
+
+        private sealed record SettingPersistenceProbeResult(
+            string PluginId,
+            string SettingKey,
+            string? OriginalDisplayedHotkey,
+            string? AppliedHotkey,
+            bool Applied,
+            bool Registered,
+            bool Persisted,
+            bool Reloaded,
+            bool Restored,
+            string? Error)
+        {
+            public bool Passed => Applied
+                && Registered
+                && Persisted
+                && Reloaded
+                && Restored;
+        }
     }
 }
