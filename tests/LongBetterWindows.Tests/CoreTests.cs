@@ -149,6 +149,65 @@ public class CoreTests
         Assert.Contains("未知能力", result.Error);
     }
 
+    [Fact]
+    public async Task ManifestReader_WebBackgroundEntryPoint_ReturnsSuccess()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.hybrid",
+            version = "1.0.0",
+            name = "Hybrid",
+            runtime = "webview",
+            entry_point = "index.html",
+            background = new { entry_point = "Hybrid.Background.dll" },
+        });
+
+        try
+        {
+            var result = await ManifestReader.ReadAsync(dir);
+
+            Assert.True(result.IsSuccess, result.Error);
+            Assert.Equal(
+                "Hybrid.Background.dll",
+                result.Manifest!.Background!.EntryPoint);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Theory]
+    [InlineData(null, "Hybrid.Background.dll")]
+    [InlineData("webview", "../Hybrid.Background.dll")]
+    [InlineData("webview", "Hybrid.Background.exe")]
+    public async Task ManifestReader_InvalidWebBackground_ReturnsFailure(
+        string? runtime,
+        string backgroundEntryPoint)
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.hybrid",
+            version = "1.0.0",
+            name = "Hybrid",
+            runtime,
+            entry_point = "index.html",
+            background = new { entry_point = backgroundEntryPoint },
+        });
+
+        try
+        {
+            var result = await ManifestReader.ReadAsync(dir);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains(result.Issues, issue => issue.Path == "background");
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
     [Theory]
     [InlineData("network.ports")]
     [InlineData("system.performance")]

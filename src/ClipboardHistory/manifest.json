@@ -6,6 +6,9 @@
   "description": "在后台记录文本剪贴板历史，支持按关键词和时间检索并快速重新复制",
   "entry_point": "index.html",
   "runtime": "webview",
+  "background": {
+    "entry_point": "ClipboardHistory.Background.dll"
+  },
   "capabilities": [
     "system.clipboard",
     "system.clipboard.monitor",

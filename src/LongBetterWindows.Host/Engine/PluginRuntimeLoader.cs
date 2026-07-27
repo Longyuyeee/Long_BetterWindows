@@ -55,15 +55,38 @@ namespace LongBetterWindows.Host.Engine
                     try
                     {
                         var runtime = new WebPluginRuntime(manifest, pluginDirectory);
+                        var webAdapter = new WebPluginAdapter(
+                            runtime,
+                            manifest.Id,
+                            manifest.Name,
+                            manifest.Version,
+                            pluginDirectory,
+                            manifest.EntryPoint);
+                        if (manifest.Background is not { } background)
+                        {
+                            return PluginRuntimeLoadResult.Success(
+                                kind,
+                                webAdapter);
+                        }
+
+                        var backgroundNative = await _nativeLoader.LoadAsync(
+                            pluginDirectory,
+                            background.EntryPoint,
+                            manifest.Id);
+                        if (!backgroundNative.IsSuccess)
+                        {
+                            webAdapter.Dispose();
+                            return PluginRuntimeLoadResult.Failure(
+                                kind,
+                                backgroundNative.Error ?? "Web 插件后台组件加载失败");
+                        }
+
                         return PluginRuntimeLoadResult.Success(
                             kind,
-                            new WebPluginAdapter(
-                                runtime,
-                                manifest.Id,
-                                manifest.Name,
-                                manifest.Version,
-                                pluginDirectory,
-                                manifest.EntryPoint));
+                            new WebPluginWithBackgroundAdapter(
+                                webAdapter,
+                                backgroundNative.Instance!),
+                            backgroundNative.Context);
                     }
                     catch (Exception ex)
                     {
@@ -91,8 +114,11 @@ namespace LongBetterWindows.Host.Engine
                 case PluginRuntimeKind.CSharpScript:
                     _scriptLoader.Unload(pluginId);
                     break;
-                case PluginRuntimeKind.WebView when result.Instance is IDisposable disposable:
-                    disposable.Dispose();
+                case PluginRuntimeKind.WebView:
+                    if (result.Instance is IDisposable disposable)
+                        disposable.Dispose();
+                    if (result.LoadContext is not null)
+                        _nativeLoader.Unload(result.LoadContext);
                     break;
             }
         }

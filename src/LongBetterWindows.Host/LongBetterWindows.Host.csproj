@@ -26,6 +26,7 @@
     <NativePluginProject Include="..\ColorPickerPlugin\ColorPickerPlugin.csproj" />
     <NativePluginProject Include="..\ScreenshotPlugin\ScreenshotPlugin.csproj" />
     <NativePluginProject Include="..\WindowManagerPlugin\WindowManagerPlugin.csproj" />
+    <NativePluginProject Include="..\ClipboardHistoryBackground\ClipboardHistoryBackground.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

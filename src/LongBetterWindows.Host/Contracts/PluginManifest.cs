@@ -55,6 +55,19 @@ namespace LongBetterWindows.Host.Contracts
         /// <summary>可选的插件语言资源声明；未声明时保留 Manifest 原文和旧运行时行为。</summary>
         [JsonPropertyName("localization")]
         public PluginLocalizationPreference? Localization { get; init; }
+
+        /// <summary>
+        /// Web 插件可选的原生后台伴生组件。后台组件实现 ILongPlugin，
+        /// 与按需 Web UI 共用一个插件生命周期。
+        /// </summary>
+        [JsonPropertyName("background")]
+        public PluginBackgroundPreference? Background { get; init; }
+    }
+
+    public sealed class PluginBackgroundPreference
+    {
+        [JsonPropertyName("entry_point")]
+        public string EntryPoint { get; init; } = string.Empty;
     }
 
     public class PluginDependency

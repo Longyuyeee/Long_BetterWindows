@@ -40,4 +40,13 @@ namespace LongBetterWindows.Host.Core
             Contracts.PluginLanguageContext context,
             CancellationToken cancellationToken = default);
     }
+
+    /// <summary>
+    /// 后台伴生组件可通过该事件请求宿主打开同一插件的主界面。
+    /// 典型用途是全局热键；事件不得直接创建独立窗口。
+    /// </summary>
+    public interface IPluginOpenRequestSource
+    {
+        event Action? OpenRequested;
+    }
 }

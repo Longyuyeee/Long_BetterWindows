@@ -139,6 +139,14 @@ namespace LongBetterWindows.Host.Engine
                     ManifestValidationCode.InvalidLocalization,
                     "localization",
                     error)));
+
+            var backgroundErrors = new List<string>();
+            ValidateBackground(manifest, backgroundErrors);
+            issues.AddRange(backgroundErrors.Select(error =>
+                new ManifestValidationIssue(
+                    ManifestValidationCode.InvalidManifestValue,
+                    "background",
+                    error)));
             errors.Clear();
 
             // ApiVersion 兼容性检查
@@ -161,6 +169,39 @@ namespace LongBetterWindows.Host.Engine
                 return ManifestResult.ValidationFailure(issues);
 
             return ManifestResult.Ok(manifest);
+        }
+
+        private static void ValidateBackground(
+            PluginManifest manifest,
+            List<string> errors)
+        {
+            if (manifest.Background is not { } background)
+                return;
+
+            if (!string.Equals(
+                    manifest.Runtime?.Trim(),
+                    "webview",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("background 仅可用于 webview 插件");
+            }
+
+            var entryPoint = background.EntryPoint?.Trim() ?? string.Empty;
+            if (entryPoint.Length == 0)
+            {
+                errors.Add("background.entry_point 不能为空");
+                return;
+            }
+
+            if (Path.IsPathRooted(entryPoint)
+                || entryPoint.Split(
+                    [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                    StringSplitOptions.RemoveEmptyEntries)
+                    .Any(segment => segment == "..")
+                || !entryPoint.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("background.entry_point 必须是插件目录内的相对 DLL 路径");
+            }
         }
 
         private static void ValidateCommands(PluginManifest manifest, List<string> errors)

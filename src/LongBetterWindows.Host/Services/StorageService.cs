@@ -7,7 +7,7 @@ using Serilog;
 
 namespace LongBetterWindows.Host.Services
 {
-    public class StorageService : IStorageService
+    public class StorageService : IStorageService, IDisposable
     {
         private readonly string _filePath;
         private readonly ReaderWriterLockSlim _lock = new();
@@ -54,9 +54,21 @@ namespace LongBetterWindows.Host.Services
                 _lock.EnterWriteLock();
                 try
                 {
+                    var hadPrevious = _data.TryGetValue(key, out var previous);
                     _data[key] = value;
-                    Save();
-                    return HostApiResponse.Success();
+                    try
+                    {
+                        SaveUnsafe();
+                        return HostApiResponse.Success();
+                    }
+                    catch
+                    {
+                        if (hadPrevious)
+                            _data[key] = previous!;
+                        else
+                            _data.Remove(key);
+                        throw;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -77,9 +89,18 @@ namespace LongBetterWindows.Host.Services
                 _lock.EnterWriteLock();
                 try
                 {
-                    _data.Remove(key);
-                    Save();
-                    return HostApiResponse.Success();
+                    if (!_data.Remove(key, out var previous))
+                        return HostApiResponse.Success();
+                    try
+                    {
+                        SaveUnsafe();
+                        return HostApiResponse.Success();
+                    }
+                    catch
+                    {
+                        _data[key] = previous;
+                        throw;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -136,19 +157,12 @@ namespace LongBetterWindows.Host.Services
         /// <summary>
         /// 保存数据到文件，使用原子写入防止数据损坏
         /// </summary>
-        private void Save()
+        private void SaveUnsafe()
         {
-            // ✅ 在锁外进行 JSON 序列化，减少锁持有时间
-            string json;
-            _lock.EnterReadLock();
-            try
-            {
-                json = JsonSerializer.Serialize(_data, new JsonSerializerOptions { WriteIndented = true });
-            }
-            finally
-            {
-                _lock.ExitReadLock();
-            }
+            // 调用方持有写锁，快照与文件提交属于同一个原子状态转换。
+            var json = JsonSerializer.Serialize(
+                _data,
+                new JsonSerializerOptions { WriteIndented = true });
 
             // ✅ 使用原子写入：先写临时文件，再替换
             var tempFile = _filePath + ".tmp";

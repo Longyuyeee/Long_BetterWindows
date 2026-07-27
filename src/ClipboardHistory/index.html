@@ -75,7 +75,6 @@
     let history = [];
     let currentRange = 'all';
     let monitorStarted = false;
-    let hotkeyRegistered = false;
     let fallbackTimer = 0;
     let captureRequest = null;
     let mutationQueue = Promise.resolve();
@@ -506,19 +505,7 @@
           : t('error.monitor', '剪贴板监听启动失败');
       }
 
-      try {
-        const response = await long.hotkey.register(hotkey, function () {
-          searchInput.focus();
-          setStatus('status.ready', 'success', '剪贴板历史已就绪');
-        });
-        responseData(response, t('error.hotkey', '热键注册失败'));
-        hotkeyRegistered = true;
-      } catch (_) {
-        hotkeyRegistered = false;
-      }
-
-      if (monitorStarted && hotkeyRegistered) monitorMode = 'active';
-      else if (monitorStarted) monitorMode = 'no-hotkey';
+      if (monitorStarted) monitorMode = 'active';
       else {
         monitorMode = 'fallback';
         setStatus(
@@ -636,7 +623,6 @@
     });
     window.addEventListener('beforeunload', function () {
       window.clearInterval(fallbackTimer);
-      if (hotkeyRegistered) long.hotkey.unregister(hotkey).catch(function () { });
       if (monitorStarted) long.clipboard.stopMonitoring().catch(function () { });
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {

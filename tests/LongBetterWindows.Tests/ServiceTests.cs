@@ -21,6 +21,27 @@ public class ServiceTests
     }
 
     [Fact]
+    public async Task StorageService_Set_PersistsAcrossInstances()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"test_storage_{Guid.NewGuid():N}");
+        var path = Path.Combine(dir, "test.json");
+        try
+        {
+            using (var writer = new StorageService(path))
+            {
+                var result = await writer.SetAsync("persisted", "value");
+                Assert.True(result.IsSuccess, result.ErrorMessage);
+            }
+
+            using var reader = new StorageService(path);
+            var persisted = await reader.GetAsync("persisted");
+            Assert.True(persisted.IsSuccess, persisted.ErrorMessage);
+            Assert.Equal("value", persisted.Data);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public async Task StorageService_ContainsKey_ReturnsTrue()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"test_storage_{Guid.NewGuid():N}");

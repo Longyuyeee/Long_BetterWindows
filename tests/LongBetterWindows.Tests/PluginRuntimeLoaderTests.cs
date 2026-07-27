@@ -1,5 +1,6 @@
 using System.IO;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 
 namespace LongBetterWindows.Tests;
@@ -71,6 +72,35 @@ public sealed class PluginRuntimeLoaderTests : IDisposable
         Assert.Null(result.Instance);
     }
 
+    [Fact]
+    public async Task WebBackgroundAdapter_ComposesLifecycleWithoutCreatingWebView()
+    {
+        Directory.CreateDirectory(_root);
+        var manifest = Manifest("hybrid", "webview", "index.html");
+        var web = new WebPluginAdapter(
+            new WebPluginRuntime(manifest, _root),
+            manifest.Id,
+            manifest.Name,
+            manifest.Version,
+            _root,
+            manifest.EntryPoint);
+        var background = new TestBackgroundPlugin();
+        using var adapter = new WebPluginWithBackgroundAdapter(web, background);
+
+        Assert.True(await adapter.InitializeAsync(null!));
+        Assert.True(await adapter.StartAsync());
+        Assert.Equal(1, background.InitializeCount);
+        Assert.Equal(1, background.StartCount);
+        Assert.Equal(PluginState.Running, adapter.State);
+
+        Assert.True(await adapter.EnterBackgroundAsync());
+        Assert.Equal(PluginState.Background, adapter.State);
+        Assert.True(await adapter.ResumeAsync());
+        Assert.True(await adapter.StopAsync());
+        Assert.Equal(1, background.StopCount);
+        Assert.Equal(PluginState.Stopped, adapter.State);
+    }
+
     private static PluginManifest Manifest(
         string id,
         string? runtime,
@@ -88,5 +118,36 @@ public sealed class PluginRuntimeLoaderTests : IDisposable
     {
         if (Directory.Exists(_root))
             Directory.Delete(_root, recursive: true);
+    }
+
+    private sealed class TestBackgroundPlugin : ILongPlugin
+    {
+        public string Id => "hybrid";
+        public string Name => "Hybrid background";
+        public string Version => "1.0.0";
+        public PluginState State { get; private set; } = PluginState.Loaded;
+        public int InitializeCount { get; private set; }
+        public int StartCount { get; private set; }
+        public int StopCount { get; private set; }
+
+        public Task<bool> InitializeAsync(IHostApi host)
+        {
+            InitializeCount++;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> StartAsync()
+        {
+            StartCount++;
+            State = PluginState.Running;
+            return Task.FromResult(true);
+        }
+
+        public Task<bool> StopAsync()
+        {
+            StopCount++;
+            State = PluginState.Stopped;
+            return Task.FromResult(true);
+        }
     }
 }

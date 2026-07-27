@@ -130,9 +130,11 @@ public class DesignSystemTests
         Assert.Contains("kind: 'empty'", clipboardHistory);
         Assert.Contains("kind: 'error'", clipboardHistory);
         Assert.Contains("long.clipboard.startMonitoring(handleClipboardChanged)", clipboardHistory);
+        Assert.Contains("long.clipboard.stopMonitoring()", clipboardHistory);
         Assert.Contains("mutationQueue", clipboardHistory);
         Assert.Contains("history = previous", clipboardHistory);
-        Assert.Contains("long.hotkey.unregister(hotkey)", clipboardHistory);
+        Assert.DoesNotContain("long.hotkey.register", clipboardHistory);
+        Assert.DoesNotContain("long.hotkey.unregister", clipboardHistory);
         Assert.DoesNotContain("<style", clipboardHistory);
         Assert.DoesNotContain("innerHTML", clipboardHistory);
         Assert.DoesNotContain("onclick=", clipboardHistory);

@@ -12,12 +12,23 @@ namespace LongBetterWindows.Host.Engine
 
         public Task<PluginLoadResult> LoadAsync(string pluginDir, PluginManifest manifest)
         {
-            return Task.Run(() => LoadInternal(pluginDir, manifest));
+            return LoadAsync(pluginDir, manifest.EntryPoint, manifest.Id);
         }
 
-        private PluginLoadResult LoadInternal(string pluginDir, PluginManifest manifest)
+        internal Task<PluginLoadResult> LoadAsync(
+            string pluginDir,
+            string entryPoint,
+            string pluginId)
         {
-            var assemblyPath = Path.Combine(pluginDir, manifest.EntryPoint);
+            return Task.Run(() => LoadInternal(pluginDir, entryPoint, pluginId));
+        }
+
+        private PluginLoadResult LoadInternal(
+            string pluginDir,
+            string entryPoint,
+            string pluginId)
+        {
+            var assemblyPath = Path.Combine(pluginDir, entryPoint);
 
             if (!File.Exists(assemblyPath))
             {
@@ -47,13 +58,13 @@ namespace LongBetterWindows.Host.Engine
                 }
 
                 Log.Information("插件 {PluginId} 加载成功，类型: {PluginType}",
-                    manifest.Id, pluginType.FullName);
+                    pluginId, pluginType.FullName);
 
                 return PluginLoadResult.Ok(instance, context);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "插件 {PluginId} 加载失败", manifest.Id);
+                Log.Error(ex, "插件 {PluginId} 加载失败", pluginId);
                 return PluginLoadResult.Fail($"插件加载异常: {ex.Message}");
             }
         }

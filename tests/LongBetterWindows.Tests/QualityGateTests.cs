@@ -1091,6 +1091,30 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void ClipboardHistory_UsesNativeBackgroundWithoutAHiddenWebView()
+    {
+        var manifest = Read("src", "ClipboardHistory", "manifest.json");
+        var page = Read("src", "ClipboardHistory", "index.html");
+        var background = Read(
+            "src",
+            "ClipboardHistoryBackground",
+            "ClipboardHistoryBackgroundPlugin.cs");
+        var runtime = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Engine",
+            "PluginRuntimeLoader.cs");
+
+        Assert.Contains("\"background\"", manifest);
+        Assert.Contains("ClipboardHistory.Background.dll", manifest);
+        Assert.Contains("IPluginOpenRequestSource", background);
+        Assert.Contains("StartMonitoringAsync", background);
+        Assert.Contains("StorageKey = \"clipboard_history\"", background);
+        Assert.Contains("new WebPluginWithBackgroundAdapter", runtime);
+        Assert.DoesNotContain("long.hotkey.register", page);
+    }
+
+    [Fact]
     public void PluginScanner_DelegatesStandalonePackagingAndLifecycleToLoader()
     {
         var scanner = Read("src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");
