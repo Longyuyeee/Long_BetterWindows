@@ -37,6 +37,7 @@ public class PluginPagePerformanceTraceTests
             Assert.Equal(9_000, root.GetProperty("idle_ms").GetInt32());
             Assert.Equal(25, root.GetProperty("loaded_plugin_count").GetInt32());
             Assert.Equal(42, root.GetProperty("command_count").GetInt32());
+            Assert.True(root.GetProperty("ui_thread_id").GetInt32() > 0);
             Assert.Equal(
                 "com.long.sample",
                 root.GetProperty("suppressed_auto_start_plugin_ids")[0]
@@ -48,6 +49,7 @@ public class PluginPagePerformanceTraceTests
                 root.GetProperty("window_visible_during_idle").GetBoolean());
             var sample = root.GetProperty("samples")[0];
             Assert.Equal("projection", sample.GetProperty("stage").GetString());
+            Assert.True(sample.GetProperty("top_threads").GetArrayLength() > 0);
             Assert.Equal(25, sample.GetProperty("item_count").GetInt32());
             Assert.Equal(
                 8,

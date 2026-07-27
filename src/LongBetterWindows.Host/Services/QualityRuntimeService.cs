@@ -200,6 +200,13 @@ namespace LongBetterWindows.Host.Services
             trace.Mark(
                 "plugin_runtime_ready",
                 window.GetPluginPageVisualMetricsForQuality());
+            await Task.Delay(200);
+            await _application.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.ContextIdle);
+            trace.Mark(
+                "plugin_page_settled",
+                window.GetPluginPageVisualMetricsForQuality());
             if (hideWindowDuringIdle)
             {
                 await _application.Dispatcher.InvokeAsync(

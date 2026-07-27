@@ -77,8 +77,11 @@ namespace LongBetterWindows.Host.Engine
             _startupMark?.Invoke("plugin_manifest_read_end");
 
             _startupMark?.Invoke("plugin_registration_begin");
-            foreach (var (directory, result) in manifests)
-                await TryRegisterPluginAsync(directory, result);
+            using (HostProvider.Instance.PluginStore.BeginChangeBatch())
+            {
+                foreach (var (directory, result) in manifests)
+                    await TryRegisterPluginAsync(directory, result);
+            }
             _startupMark?.Invoke("plugin_registration_end");
 
             Log.Information("插件扫描完成: {Loaded}/{Total} 加载成功",

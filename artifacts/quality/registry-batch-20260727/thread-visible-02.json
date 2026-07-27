@@ -1,0 +1,547 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27T07:54:45.9765839+00:00",
+  "configuration": "Release",
+  "process_architecture": "X64",
+  "ui_thread_id": 52916,
+  "idle_ms": 9000,
+  "loaded_plugin_count": 25,
+  "command_count": 42,
+  "suppressed_auto_start_plugin_ids": [],
+  "window_visible_during_idle": true,
+  "running_plugin_ids": [
+    "com.long.color-picker",
+    "com.long.folder-note",
+    "com.long.macro",
+    "com.long.quicklaunch",
+    "com.long.screenshot",
+    "com.long.window-manager"
+  ],
+  "samples": [
+    {
+      "stage": "quality_options_parsed",
+      "elapsed_ms": 52.8,
+      "cpu_ms": 578.1,
+      "working_set_mb": 52.6,
+      "private_memory_mb": 14.2,
+      "managed_heap_mb": 1.5,
+      "gc_committed_mb": 0,
+      "thread_count": 8,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 578.1
+        },
+        {
+          "id": 50440,
+          "cpu_ms": 0
+        },
+        {
+          "id": 49780,
+          "cpu_ms": 0
+        },
+        {
+          "id": 51768,
+          "cpu_ms": 0
+        },
+        {
+          "id": 43556,
+          "cpu_ms": 0
+        }
+      ],
+      "item_count": null,
+      "realized_container_count": null,
+      "visual_descendant_count": null
+    },
+    {
+      "stage": "plugin_page_navigation_begin",
+      "elapsed_ms": 2590.4,
+      "cpu_ms": 3437.5,
+      "working_set_mb": 177,
+      "private_memory_mb": 138.2,
+      "managed_heap_mb": 6.6,
+      "gc_committed_mb": 15.7,
+      "thread_count": 26,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2171.9
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 406.2
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        },
+        {
+          "id": 48876,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": null,
+      "realized_container_count": null,
+      "visual_descendant_count": null
+    },
+    {
+      "stage": "plugin_page_constructor_begin",
+      "elapsed_ms": 2607.5,
+      "cpu_ms": 3453.1,
+      "working_set_mb": 177,
+      "private_memory_mb": 138.2,
+      "managed_heap_mb": 6.6,
+      "gc_committed_mb": 15.7,
+      "thread_count": 26,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2187.5
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 406.2
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        },
+        {
+          "id": 48876,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": null,
+      "realized_container_count": null,
+      "visual_descendant_count": null
+    },
+    {
+      "stage": "plugin_page_constructor_end",
+      "elapsed_ms": 2655.7,
+      "cpu_ms": 3515.6,
+      "working_set_mb": 177.9,
+      "private_memory_mb": 138.3,
+      "managed_heap_mb": 7.1,
+      "gc_committed_mb": 15.7,
+      "thread_count": 26,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2234.4
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 406.2
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        },
+        {
+          "id": 48876,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": null,
+      "realized_container_count": null,
+      "visual_descendant_count": null
+    },
+    {
+      "stage": "plugin_projection_begin",
+      "elapsed_ms": 2671.4,
+      "cpu_ms": 3515.6,
+      "working_set_mb": 177.9,
+      "private_memory_mb": 138.3,
+      "managed_heap_mb": 7.1,
+      "gc_committed_mb": 15.7,
+      "thread_count": 26,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2250
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 406.2
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        },
+        {
+          "id": 48876,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": null,
+      "realized_container_count": null,
+      "visual_descendant_count": null
+    },
+    {
+      "stage": "plugin_projection_end",
+      "elapsed_ms": 2692.5,
+      "cpu_ms": 3546.9,
+      "working_set_mb": 178.2,
+      "private_memory_mb": 138.3,
+      "managed_heap_mb": 7.2,
+      "gc_committed_mb": 15.7,
+      "thread_count": 26,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2281.2
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 406.2
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        },
+        {
+          "id": 48876,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": 0,
+      "realized_container_count": 0,
+      "visual_descendant_count": 0
+    },
+    {
+      "stage": "plugin_page_loaded",
+      "elapsed_ms": 2722.5,
+      "cpu_ms": 3578.1,
+      "working_set_mb": 178.4,
+      "private_memory_mb": 138.3,
+      "managed_heap_mb": 7.4,
+      "gc_committed_mb": 15.7,
+      "thread_count": 26,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2312.5
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 406.2
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        },
+        {
+          "id": 48876,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": 0,
+      "realized_container_count": 0,
+      "visual_descendant_count": 24
+    },
+    {
+      "stage": "plugin_page_first_idle",
+      "elapsed_ms": 2908.6,
+      "cpu_ms": 3812.5,
+      "working_set_mb": 189.8,
+      "private_memory_mb": 149,
+      "managed_heap_mb": 7.4,
+      "gc_committed_mb": 15.7,
+      "thread_count": 26,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2484.4
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 453.1
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        },
+        {
+          "id": 50440,
+          "cpu_ms": 0
+        }
+      ],
+      "item_count": 0,
+      "realized_container_count": 0,
+      "visual_descendant_count": 24
+    },
+    {
+      "stage": "plugin_runtime_ready",
+      "elapsed_ms": 3478.7,
+      "cpu_ms": 4296.9,
+      "working_set_mb": 195.3,
+      "private_memory_mb": 150,
+      "managed_heap_mb": 7.8,
+      "gc_committed_mb": 15.8,
+      "thread_count": 32,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2906.2
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 453.1
+        },
+        {
+          "id": 11992,
+          "cpu_ms": 46.9
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": 0,
+      "realized_container_count": 0,
+      "visual_descendant_count": 24
+    },
+    {
+      "stage": "plugin_projection_begin",
+      "elapsed_ms": 3623.6,
+      "cpu_ms": 4343.8,
+      "working_set_mb": 195.3,
+      "private_memory_mb": 150,
+      "managed_heap_mb": 7.8,
+      "gc_committed_mb": 15.8,
+      "thread_count": 32,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2953.1
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 453.1
+        },
+        {
+          "id": 11992,
+          "cpu_ms": 46.9
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": null,
+      "realized_container_count": null,
+      "visual_descendant_count": null
+    },
+    {
+      "stage": "plugin_projection_end",
+      "elapsed_ms": 3640.6,
+      "cpu_ms": 4375,
+      "working_set_mb": 195.4,
+      "private_memory_mb": 150,
+      "managed_heap_mb": 7.8,
+      "gc_committed_mb": 15.8,
+      "thread_count": 32,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 2984.4
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 453.1
+        },
+        {
+          "id": 11992,
+          "cpu_ms": 46.9
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": 25,
+      "realized_container_count": 0,
+      "visual_descendant_count": 24
+    },
+    {
+      "stage": "plugin_page_settled",
+      "elapsed_ms": 3886.4,
+      "cpu_ms": 4546.9,
+      "working_set_mb": 199.9,
+      "private_memory_mb": 169.2,
+      "managed_heap_mb": 10,
+      "gc_committed_mb": 15.8,
+      "thread_count": 32,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 3140.6
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 734.4
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 468.8
+        },
+        {
+          "id": 11992,
+          "cpu_ms": 46.9
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": 25,
+      "realized_container_count": 10,
+      "visual_descendant_count": 254
+    },
+    {
+      "stage": "plugin_page_idle_1000ms",
+      "elapsed_ms": 4918.5,
+      "cpu_ms": 5687.5,
+      "working_set_mb": 208.2,
+      "private_memory_mb": 174.9,
+      "managed_heap_mb": 10,
+      "gc_committed_mb": 15.8,
+      "thread_count": 32,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 3390.6
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 1625
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 468.8
+        },
+        {
+          "id": 11992,
+          "cpu_ms": 46.9
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": 25,
+      "realized_container_count": 10,
+      "visual_descendant_count": 254
+    },
+    {
+      "stage": "plugin_page_idle_3000ms",
+      "elapsed_ms": 6933.5,
+      "cpu_ms": 7765.6,
+      "working_set_mb": 212.5,
+      "private_memory_mb": 175,
+      "managed_heap_mb": 10.1,
+      "gc_committed_mb": 15.8,
+      "thread_count": 32,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 3984.4
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 3093.8
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 468.8
+        },
+        {
+          "id": 11992,
+          "cpu_ms": 62.5
+        },
+        {
+          "id": 52740,
+          "cpu_ms": 15.6
+        }
+      ],
+      "item_count": 25,
+      "realized_container_count": 10,
+      "visual_descendant_count": 254
+    },
+    {
+      "stage": "plugin_page_idle",
+      "elapsed_ms": 12962.2,
+      "cpu_ms": 9468.8,
+      "working_set_mb": 201.7,
+      "private_memory_mb": 162.9,
+      "managed_heap_mb": 7,
+      "gc_committed_mb": 15.8,
+      "thread_count": 31,
+      "top_threads": [
+        {
+          "id": 52916,
+          "cpu_ms": 5031.2
+        },
+        {
+          "id": 3044,
+          "cpu_ms": 3656.2
+        },
+        {
+          "id": 24664,
+          "cpu_ms": 515.6
+        },
+        {
+          "id": 11992,
+          "cpu_ms": 62.5
+        },
+        {
+          "id": 11548,
+          "cpu_ms": 46.9
+        }
+      ],
+      "item_count": 25,
+      "realized_container_count": 10,
+      "visual_descendant_count": 254
+    }
+  ]
+}

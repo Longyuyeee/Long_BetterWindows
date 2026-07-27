@@ -1095,6 +1095,9 @@ public class QualityGateTests
         Assert.Contains("RunPluginPagePerformanceProbeAsync", quality);
         Assert.Contains("checkpoints.Add(1_000)", quality);
         Assert.Contains("checkpoints.Add(3_000)", quality);
+        Assert.Contains("\"plugin_page_settled\"", quality);
+        Assert.Contains("ui_thread_id", trace);
+        Assert.Contains("top_threads", trace);
         Assert.Contains("window.Hide", quality);
         Assert.Contains("plugin_page_constructor_begin", plugins);
         Assert.Contains("plugin_projection_begin", plugins);
@@ -1211,6 +1214,8 @@ public class QualityGateTests
         Assert.Contains("_activationGate.WaitAsync", entry);
         Assert.Contains("LifecycleGate.WaitAsync", registry);
         Assert.Contains("RegisterDeferred", registry);
+        Assert.Contains("BeginChangeBatch", registry);
+        Assert.Contains("BeginChangeBatch", scanner);
         Assert.Contains("ActivatePluginAsync", scanner);
         Assert.Contains("运行时等待按需激活", scanner);
         Assert.Contains("persistAutoStart: false", management);

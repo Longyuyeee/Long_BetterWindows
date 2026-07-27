@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27",
+  "scope": "plugin registry batching, settled-page measurement, and WPF thread attribution",
+  "registry_change_batch": {
+    "nested": true,
+    "empty_batch_publishes": false,
+    "scan_batch_notification_count": 1,
+    "normal_registration_semantics_changed": false
+  },
+  "settled_page_samples": [
+    {
+      "report": "settled-01.json",
+      "projection_count": 2,
+      "settle_elapsed_ms": 345.3,
+      "settle_cpu_ms": 234.3,
+      "final_working_set_mb": 195.6
+    },
+    {
+      "report": "settled-02.json",
+      "projection_count": 2,
+      "settle_elapsed_ms": 389.0,
+      "settle_cpu_ms": 187.5,
+      "final_working_set_mb": 208.2
+    },
+    {
+      "report": "settled-03.json",
+      "projection_count": 2,
+      "settle_elapsed_ms": 340.3,
+      "settle_cpu_ms": 250.0,
+      "final_working_set_mb": 213.5
+    }
+  ],
+  "thread_attribution": {
+    "stable_visible": {
+      "report": "thread-visible-01.json",
+      "process_cpu_growth_3000_to_9000_ms": 46.9,
+      "ui_thread_cpu_growth_ms": 31.3
+    },
+    "high_cpu_visible": {
+      "report": "thread-visible-02.json",
+      "process_cpu_growth_3000_to_9000_ms": 1703.2,
+      "ui_thread_cpu_growth_ms": 1046.8,
+      "second_thread_cpu_growth_ms": 562.4
+    },
+    "hidden": {
+      "report": "thread-hidden-01.json",
+      "process_cpu_growth_3000_to_9000_ms": 78.1,
+      "ui_thread_cpu_growth_ms": 62.4
+    }
+  },
+  "conclusions": [
+    "Directory scan registry notifications can be safely published as one stable batch.",
+    "Plugin runtime readiness and plugin page visual readiness are separate stages.",
+    "Intermittent long-tail CPU is dominated by the visible WPF UI and rendering path.",
+    "No source-level evidence currently supports removing plugin features or static plugin-page styles."
+  ],
+  "next_step": "Capture an anomalous visible run with ETW or Visual Studio Profiler and optimize the identified WPF call stack.",
+  "release_gate": {
+    "performance_p0_closed": false,
+    "new_release_candidate_allowed": false
+  }
+}

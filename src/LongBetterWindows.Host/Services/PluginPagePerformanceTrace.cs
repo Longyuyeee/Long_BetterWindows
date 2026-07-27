@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace LongBetterWindows.Host.Services
@@ -21,6 +23,7 @@ namespace LongBetterWindows.Host.Services
         private readonly List<PluginPagePerformanceSample> _samples = new();
         private readonly string _reportPath;
         private readonly string[] _suppressedAutoStartPluginIds;
+        private readonly int _uiThreadId = unchecked((int)GetCurrentThreadId());
         private bool _windowVisibleDuringIdle = true;
 
         public PluginPagePerformanceTrace(
@@ -42,6 +45,7 @@ namespace LongBetterWindows.Host.Services
             using var process = Process.GetCurrentProcess();
             process.Refresh();
             var gcInfo = GC.GetGCMemoryInfo();
+            var topThreads = GetTopProcessorThreads(process);
             var sample = new PluginPagePerformanceSample(
                 stage,
                 Math.Round(_stopwatch.Elapsed.TotalMilliseconds, 1),
@@ -51,6 +55,7 @@ namespace LongBetterWindows.Host.Services
                 Math.Round(GC.GetTotalMemory(forceFullCollection: false) / 1024d / 1024d, 1),
                 Math.Round(gcInfo.TotalCommittedBytes / 1024d / 1024d, 1),
                 process.Threads.Count,
+                topThreads,
                 visualMetrics?.ItemCount,
                 visualMetrics?.RealizedContainerCount,
                 visualMetrics?.VisualDescendantCount);
@@ -80,6 +85,7 @@ namespace LongBetterWindows.Host.Services
                 process_architecture =
                     System.Runtime.InteropServices.RuntimeInformation
                         .ProcessArchitecture.ToString(),
+                ui_thread_id = _uiThreadId,
                 idle_ms = idleMilliseconds,
                 loaded_plugin_count = result.LoadedPluginCount,
                 command_count = commandCount,
@@ -97,6 +103,11 @@ namespace LongBetterWindows.Host.Services
                     managed_heap_mb = sample.ManagedHeapMegabytes,
                     gc_committed_mb = sample.GcCommittedMegabytes,
                     thread_count = sample.ThreadCount,
+                    top_threads = sample.TopThreads.Select(thread => new
+                    {
+                        id = thread.Id,
+                        cpu_ms = thread.CpuMilliseconds,
+                    }),
                     item_count = sample.ItemCount,
                     realized_container_count = sample.RealizedContainerCount,
                     visual_descendant_count = sample.VisualDescendantCount,
@@ -111,6 +122,35 @@ namespace LongBetterWindows.Host.Services
                     new JsonSerializerOptions { WriteIndented = true }));
         }
 
+        private static IReadOnlyList<PluginPageThreadSample> GetTopProcessorThreads(
+            Process process)
+        {
+            var threads = new List<PluginPageThreadSample>();
+            foreach (ProcessThread thread in process.Threads)
+            {
+                try
+                {
+                    threads.Add(new PluginPageThreadSample(
+                        thread.Id,
+                        Math.Round(
+                            thread.TotalProcessorTime.TotalMilliseconds,
+                            1)));
+                }
+                catch (Exception ex)
+                    when (ex is InvalidOperationException or Win32Exception)
+                {
+                }
+            }
+
+            return threads
+                .OrderByDescending(thread => thread.CpuMilliseconds)
+                .Take(5)
+                .ToArray();
+        }
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
+
         private sealed record PluginPagePerformanceSample(
             string Stage,
             double ElapsedMilliseconds,
@@ -120,8 +160,13 @@ namespace LongBetterWindows.Host.Services
             double ManagedHeapMegabytes,
             double GcCommittedMegabytes,
             int ThreadCount,
+            IReadOnlyList<PluginPageThreadSample> TopThreads,
             int? ItemCount,
             int? RealizedContainerCount,
             int? VisualDescendantCount);
+
+        private sealed record PluginPageThreadSample(
+            int Id,
+            double CpuMilliseconds);
     }
 }

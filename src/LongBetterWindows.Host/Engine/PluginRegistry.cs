@@ -13,12 +13,21 @@ namespace LongBetterWindows.Host.Engine
         private SearchCoordinator? _searchCoordinator;
         private Func<string, Task>? _hostResourceReleaser;
         private long _catalogRevision;
+        private int _changeBatchDepth;
+        private bool _changePending;
 
         /// <summary>随插件注册和注销自动同步的功能指令索引。</summary>
         public CommandRegistry Commands { get; } = new();
 
         /// <summary>插件注册/注销/状态变化时触发（在 UI 线程订阅后需自行 Dispatch）</summary>
         public event Action? PluginsChanged;
+
+        internal IDisposable BeginChangeBatch()
+        {
+            lock (_lock)
+                _changeBatchDepth++;
+            return new ChangeBatch(this);
+        }
 
         public void AttachSearchCoordinator(SearchCoordinator coordinator)
         {
@@ -187,7 +196,37 @@ namespace LongBetterWindows.Host.Engine
 
         private void NotifyChanged()
         {
-            PluginsChanged?.Invoke();
+            Action? changed;
+            lock (_lock)
+            {
+                if (_changeBatchDepth > 0)
+                {
+                    _changePending = true;
+                    return;
+                }
+
+                changed = PluginsChanged;
+            }
+            changed?.Invoke();
+        }
+
+        private void EndChangeBatch()
+        {
+            Action? changed = null;
+            lock (_lock)
+            {
+                if (_changeBatchDepth <= 0)
+                    throw new InvalidOperationException(
+                        "Plugin registry change batch is not active.");
+
+                _changeBatchDepth--;
+                if (_changeBatchDepth == 0 && _changePending)
+                {
+                    _changePending = false;
+                    changed = PluginsChanged;
+                }
+            }
+            changed?.Invoke();
         }
 
         private void SyncSearchProvider(PluginEntry entry)
@@ -432,6 +471,17 @@ namespace LongBetterWindows.Host.Engine
             }
 
             return null;
+        }
+
+        private sealed class ChangeBatch : IDisposable
+        {
+            private PluginRegistry? _owner;
+
+            public ChangeBatch(PluginRegistry owner)
+                => _owner = owner;
+
+            public void Dispose()
+                => Interlocked.Exchange(ref _owner, null)?.EndChangeBatch();
         }
     }
 }
