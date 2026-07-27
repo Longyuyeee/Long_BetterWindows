@@ -5,11 +5,9 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using LongBetterWindows.Host.Interaction;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Media.Effects;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
-using Microsoft.Win32;
 using Serilog;
 
 namespace LongBetterWindows.Host.Views
@@ -20,18 +18,12 @@ namespace LongBetterWindows.Host.Views
         internal event Action<bool>? WorkflowLayoutChanged;
         internal event Action<WorkflowExecutionResultState>? WorkflowExecutionResultChanged;
         internal event EventHandler? WorkflowTerminalOutputsCleared;
-        private bool _columnEnabled;
-        private bool _contextMenuRegistered;
-        private bool _sparsePackageInstalled;
-        private bool _sparsePackageBusy;
-        private bool _startupEnabled;
         private bool? _isNarrowLayout;
         private bool _languageSelectorReady;
         private UpdateService? _updateService;
         private UpdateCheckResult? _availableUpdate;
         private string? _downloadedUpdatePath;
         private bool _automaticUpdateCheckStarted;
-        private bool _systemStatusInitialized;
         private bool _settingsStatusInitialized;
 
         public ToolCenterControl()
@@ -54,6 +46,11 @@ namespace LongBetterWindows.Host.Views
                 {
                     DeveloperHost.Content = null;
                     developerPage.Dispose();
+                }
+                if (SystemHost.Content is SystemIntegrationPageControl systemPage)
+                {
+                    SystemHost.Content = null;
+                    systemPage.Dispose();
                 }
                 _updateService?.Dispose();
                 _updateService = null;
@@ -127,7 +124,6 @@ namespace LongBetterWindows.Host.Views
             ContentBodyFrame.Padding = isNarrow
                 ? new Thickness(18, 0, 18, 18)
                 : new Thickness(32, 0, 32, 32);
-            SystemIntegrationGrid.Columns = isNarrow ? 1 : 2;
 
             if (isNarrow)
             {
@@ -492,7 +488,7 @@ namespace LongBetterWindows.Host.Views
                 else if (key == "diagnostics" && DiagnosticsHost.Content == null)
                     DiagnosticsHost.Content = new PerformancePanel();
                 else if (key == "system")
-                    _ = EnsureSystemStatusInitializedAsync();
+                    SystemHost.Content ??= new SystemIntegrationPageControl();
                 else if (key == "developer")
                 {
                     DeveloperHost.Content ??= new DeveloperPageControl();
@@ -513,16 +509,6 @@ namespace LongBetterWindows.Host.Views
 
             PluginManagementHost.Content = null;
             plugins.Dispose();
-        }
-
-        private async Task EnsureSystemStatusInitializedAsync()
-        {
-            if (_systemStatusInitialized) return;
-            _systemStatusInitialized = true;
-            RefreshColumnStatus();
-            RefreshContextMenuStatus();
-            RefreshStartupStatus();
-            await RefreshSparsePackageStatusAsync();
         }
 
         private async Task EnsureSettingsStatusInitializedAsync()
@@ -553,14 +539,6 @@ namespace LongBetterWindows.Host.Views
 
         #endregion
 
-        #region Shared Brush helpers (from Colors.xaml)
-
-        private Brush GreenBrush => (Brush)FindResource("SuccessGreenBrush");
-        private Brush GrayBrush => (Brush)FindResource("TextSecondaryBrush");
-        private Brush RedBrush => (Brush)FindResource("DangerRedBrush");
-
-        #endregion
-
         private void OpenPalette_Click(object sender, RoutedEventArgs e)
             => CommandPaletteWindow.ShowPalette();
 
@@ -581,278 +559,6 @@ namespace LongBetterWindows.Host.Views
                 btn.Content = _isLightMode
                     ? I18n("action.darkMode")
                     : I18n("action.lightMode");
-        }
-
-        private void StartupButton_Click(object sender, RoutedEventArgs e)
-        {
-            _startupEnabled = !_startupEnabled;
-            ServicesInitializer.Startup.SetAutoStart(_startupEnabled);
-            RefreshStartupStatus();
-        }
-
-        private void RefreshStartupStatus()
-        {
-            _startupEnabled = ServicesInitializer.Startup.IsAutoStartEnabled;
-            StartupButton.Content = _startupEnabled
-                ? I18n("action.disable")
-                : I18n("action.enable");
-
-            if (_startupEnabled)
-            {
-                StartupStatusText.Text = I18n("status.enabled");
-                StartupStatusText.Foreground = GreenBrush;
-            }
-            else
-            {
-                StartupStatusText.Text = I18n("status.disabled");
-                StartupStatusText.Foreground = GrayBrush;
-            }
-        }
-
-        private async void ColumnButton_Click(object sender, RoutedEventArgs e)
-        {
-            ColumnButton.IsEnabled = false;
-            ColumnStatusText.Text = I18n("status.processing");
-
-            try
-            {
-                if (_columnEnabled)
-                {
-                    var result = await ServicesInitializer.ColumnInjection
-                        .DisableCommentColumnAsync();
-                    if (result.IsSuccess)
-                    {
-                        _columnEnabled = false;
-                        ColumnStatusText.Text = I18n("status.disabled");
-                        ColumnStatusText.Foreground = GrayBrush;
-                    }
-                    else
-                    {
-                        Log.Warning(
-                            "Explorer note column disable failed ({ErrorCode}): {Error}",
-                            result.ErrorCode,
-                            result.ErrorMessage);
-                        ColumnStatusText.Text = I18n(
-                            "system.column.error.disable");
-                        ColumnStatusText.Foreground = RedBrush;
-                    }
-                }
-                else
-                {
-                    var result = await ServicesInitializer.ColumnInjection
-                        .EnableCommentColumnAsync();
-                    if (result.IsSuccess)
-                    {
-                        _columnEnabled = true;
-                        ColumnStatusText.Text = I18n("status.enabled");
-                        ColumnStatusText.Foreground = GreenBrush;
-                    }
-                    else
-                    {
-                        Log.Warning(
-                            "Explorer note column enable failed ({ErrorCode}): {Error}",
-                            result.ErrorCode,
-                            result.ErrorMessage);
-                        ColumnStatusText.Text = I18n(
-                            "system.column.error.enable");
-                        ColumnStatusText.Foreground = RedBrush;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Explorer note column operation failed");
-                ColumnStatusText.Text = I18n(
-                    "system.column.error.unexpected");
-                ColumnStatusText.Foreground = RedBrush;
-            }
-
-            ColumnButton.Content = _columnEnabled
-                ? I18n("action.remove")
-                : I18n("action.enable");
-            ColumnButton.IsEnabled = true;
-        }
-
-        private async void ContextMenuButton_Click(object sender, RoutedEventArgs e)
-        {
-            ContextMenuButton.IsEnabled = false;
-            ContextMenuStatusText.Text = I18n("status.processing");
-
-            try
-            {
-                if (_contextMenuRegistered)
-                {
-                    var result = await ServicesInitializer.ContextMenu.UnregisterAsync();
-                    if (result.IsSuccess)
-                    {
-                        _contextMenuRegistered = false;
-                        ContextMenuStatusText.Text = I18n(
-                            "status.notRegistered");
-                        ContextMenuStatusText.Foreground = GrayBrush;
-                    }
-                    else
-                    {
-                        Log.Warning(
-                            "Legacy context menu unregister failed ({ErrorCode}): {Error}",
-                            result.ErrorCode,
-                            result.ErrorMessage);
-                        ContextMenuStatusText.Text = I18n(
-                            "system.legacy.error.unregister");
-                        ContextMenuStatusText.Foreground = RedBrush;
-                    }
-                }
-                else
-                {
-                    var result = await ServicesInitializer.ContextMenu.RegisterAsync();
-                    if (result.IsSuccess)
-                    {
-                        _contextMenuRegistered = true;
-                        ContextMenuStatusText.Text = I18n(
-                            "status.registered");
-                        ContextMenuStatusText.Foreground = GreenBrush;
-                    }
-                    else
-                    {
-                        Log.Warning(
-                            "Legacy context menu register failed ({ErrorCode}): {Error}",
-                            result.ErrorCode,
-                            result.ErrorMessage);
-                        ContextMenuStatusText.Text = I18n(
-                            "system.legacy.error.register");
-                        ContextMenuStatusText.Foreground = RedBrush;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Legacy context menu operation failed");
-                ContextMenuStatusText.Text = I18n(
-                    "system.legacy.error.unexpected");
-                ContextMenuStatusText.Foreground = RedBrush;
-            }
-
-            ContextMenuButton.Content = _contextMenuRegistered
-                ? I18n("action.remove")
-                : I18n("action.register");
-            ContextMenuButton.IsEnabled = true;
-        }
-
-        private async void SparsePackageButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_sparsePackageBusy) return;
-
-            var dialog = new OpenFileDialog
-            {
-                Title = _sparsePackageInstalled
-                    ? I18n("system.sparse.dialog.chooseUpgrade")
-                    : I18n("system.sparse.dialog.chooseRegister"),
-                Filter = I18n("system.sparse.dialog.filter"),
-                CheckFileExists = true,
-                Multiselect = false,
-            };
-            if (dialog.ShowDialog() != true) return;
-
-            var action = _sparsePackageInstalled
-                ? I18n("system.sparse.action.upgrade")
-                : I18n("system.sparse.action.register");
-            var answer = MessageBox.Show(
-                string.Format(
-                    I18n("system.sparse.confirm.registerOrUpgrade.message"),
-                    action),
-                string.Format(
-                    I18n("system.sparse.confirm.registerOrUpgrade.title"),
-                    action),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-            if (answer != MessageBoxResult.Yes) return;
-
-            await RunSparsePackageOperationAsync(
-                () => ServicesInitializer.SparsePackage.RegisterOrUpgradeAsync(
-                    dialog.FileName));
-        }
-
-        private async void SparsePackageRemoveButton_Click(
-            object sender,
-            RoutedEventArgs e)
-        {
-            if (_sparsePackageBusy || !_sparsePackageInstalled) return;
-            var answer = MessageBox.Show(
-                I18n("system.sparse.confirm.uninstall.message"),
-                I18n("system.sparse.confirm.uninstall.title"),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-            if (answer != MessageBoxResult.Yes) return;
-
-            await RunSparsePackageOperationAsync(
-                () => ServicesInitializer.SparsePackage.UnregisterAsync());
-        }
-
-        private async Task RunSparsePackageOperationAsync(
-            Func<Task<SparsePackageOperationResult>> operation)
-        {
-            SetSparsePackageBusy(true, I18n("status.processing"));
-            var result = await operation();
-            if (result.State is { } state)
-                ApplySparsePackageState(state);
-            else
-                await RefreshSparsePackageStatusAsync();
-
-            if (!result.IsSuccess)
-            {
-                Log.Warning(
-                    "Sparse package operation failed ({ErrorCode}): {Error}",
-                    (int)result.ErrorCode,
-                    result.Message);
-                SparsePackageStatusText.Text = I18n(
-                    SparsePackagePresentation.GetErrorResourceKey(
-                        result.ErrorCode));
-                SparsePackageStatusText.Foreground = RedBrush;
-            }
-            SetSparsePackageBusy(false);
-        }
-
-        private async Task RefreshSparsePackageStatusAsync()
-        {
-            if (_sparsePackageBusy) return;
-            SetSparsePackageBusy(true, I18n("status.checking"));
-            var result = await ServicesInitializer.SparsePackage.GetStatusAsync();
-            if (result.IsSuccess && result.State is { } state)
-                ApplySparsePackageState(state);
-            else
-            {
-                _sparsePackageInstalled = result.State?.Installed ?? false;
-                Log.Warning(
-                    "Sparse package status failed ({ErrorCode}): {Error}",
-                    (int)result.ErrorCode,
-                    result.Message);
-                SparsePackageStatusText.Text = I18n(
-                    SparsePackagePresentation.GetErrorResourceKey(
-                        result.ErrorCode));
-                SparsePackageStatusText.Foreground = RedBrush;
-            }
-            SetSparsePackageBusy(false);
-        }
-
-        private void ApplySparsePackageState(SparsePackageState state)
-        {
-            _sparsePackageInstalled = state.Installed;
-            if (state.Installed)
-            {
-                var locationState = string.IsNullOrWhiteSpace(state.ExternalLocation)
-                    ? I18n("status.locationPending")
-                    : I18n("status.locationVerified");
-                SparsePackageStatusText.Text = string.Format(
-                    I18n("status.sparseRegistered"),
-                    state.Version ?? "—",
-                    state.Architecture ?? "—",
-                    locationState);
-                SparsePackageStatusText.Foreground = GreenBrush;
-            }
-            else
-            {
-                SparsePackageStatusText.Text = I18n("status.notRegistered");
-                SparsePackageStatusText.Foreground = GrayBrush;
-            }
         }
 
         private void InitializeLanguageSelector()
@@ -885,71 +591,8 @@ namespace LongBetterWindows.Host.Views
             ServicesInitializer.I18n.SetLanguage(language);
             ServicesInitializer.I18n.ApplyTo(Application.Current.Resources);
             ShowPage(_activePage);
-            if (_systemStatusInitialized)
-            {
-                RefreshColumnStatus();
-                RefreshContextMenuStatus();
-                RefreshStartupStatus();
-                _ = RefreshSparsePackageStatusAsync();
-            }
             if (_settingsStatusInitialized)
                 RefreshMouseGestureControls();
-        }
-
-        private void SetSparsePackageBusy(bool busy, string? status = null)
-        {
-            _sparsePackageBusy = busy;
-            SparsePackageButton.IsEnabled = !busy;
-            SparsePackageRemoveButton.IsEnabled = !busy;
-            SparsePackageButton.Content = _sparsePackageInstalled
-                ? I18n("action.chooseUpgrade")
-                : I18n("action.chooseRegister");
-            SparsePackageRemoveButton.Visibility = _sparsePackageInstalled
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            if (!string.IsNullOrWhiteSpace(status))
-            {
-                SparsePackageStatusText.Text = status;
-                SparsePackageStatusText.Foreground = GrayBrush;
-            }
-        }
-
-        private void RefreshColumnStatus()
-        {
-            _columnEnabled = ServicesInitializer.ColumnInjection.IsCommentColumnEnabled;
-            ColumnButton.Content = _columnEnabled
-                ? I18n("action.remove")
-                : I18n("action.enable");
-
-            if (_columnEnabled)
-            {
-                ColumnStatusText.Text = I18n("status.enabled");
-                ColumnStatusText.Foreground = GreenBrush;
-            }
-            else
-            {
-                ColumnStatusText.Text = I18n("status.disabled");
-                ColumnStatusText.Foreground = GrayBrush;
-            }
-        }
-
-        private void RefreshContextMenuStatus()
-        {
-            _contextMenuRegistered = ServicesInitializer.ContextMenu.IsRegistered;
-            ContextMenuButton.Content = _contextMenuRegistered
-                ? I18n("action.remove")
-                : I18n("action.register");
-
-            if (_contextMenuRegistered)
-            {
-                ContextMenuStatusText.Text = I18n("status.registered");
-                ContextMenuStatusText.Foreground = GreenBrush;
-            }
-            else
-            {
-                ContextMenuStatusText.Text = I18n("status.notRegistered");
-                ContextMenuStatusText.Foreground = GrayBrush;
-            }
         }
 
         private static string I18n(string key)

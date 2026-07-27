@@ -901,7 +901,7 @@ public class QualityGateTests
         Assert.Contains("ReleasePluginManagementPage()", toolCenterCode);
         Assert.Contains("PluginManagementHost.Content = null", toolCenterCode);
         Assert.Contains("plugins.Dispose()", toolCenterCode);
-        Assert.Contains("EnsureSystemStatusInitializedAsync", toolCenterCode);
+        Assert.Contains("SystemHost.Content ??= new SystemIntegrationPageControl()", toolCenterCode);
         Assert.Contains("EnsureSettingsStatusInitializedAsync", toolCenterCode);
         Assert.Contains("OpenPluginsForQuality", toolCenterCode);
         Assert.DoesNotContain("CreatePluginCard", toolCenterCode);
@@ -916,10 +916,14 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml");
         var developerCode = Read(
             "src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml.cs");
+        var systemXaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "SystemIntegrationPageControl.xaml");
+        var systemCode = Read(
+            "src", "LongBetterWindows.Host", "Views", "SystemIntegrationPageControl.xaml.cs");
 
         Assert.Contains("x:Key=\"ManagementCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource LongCard}\"", xaml);
-        Assert.Equal(12, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
+        Assert.Equal(7, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
         Assert.Contains("x:Key=\"OverviewCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource ManagementCard}\"", xaml);
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
@@ -936,6 +940,15 @@ public class QualityGateTests
         Assert.Contains("MaxHeight=\"240\"", developerXaml);
         Assert.Contains("IDisposable", developerCode);
         Assert.Contains("PluginsChanged -= OnPluginsChanged", developerCode);
+        Assert.Contains("x:Name=\"SystemHost\"", xaml);
+        Assert.DoesNotContain("<local:SystemIntegrationPageControl", xaml);
+        Assert.Contains("SystemHost.Content ??= new SystemIntegrationPageControl()", code);
+        Assert.Equal(5, systemXaml.Split("Style=\"{StaticResource SystemCard}\"").Length - 1);
+        Assert.Contains("VerticalAlignment=\"Top\"", systemXaml);
+        Assert.Contains("IDisposable", systemCode);
+        Assert.Contains("LanguageChanged -= OnLanguageChanged", systemCode);
+        Assert.True(
+            systemCode.Split("SetSparsePackageBusy(false)").Length - 1 >= 3);
     }
 
     [Fact]

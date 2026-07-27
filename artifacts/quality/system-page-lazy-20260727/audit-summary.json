@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-07-27",
+  "change": "system_integration_page_first_navigation_loading",
+  "release_build": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "tests": {
+    "passed": 691,
+    "failed": 0,
+    "total": 691
+  },
+  "startup_visual_tree": {
+    "management_cards_before": 17,
+    "management_cards_after": 12,
+    "cards_deferred": 5
+  },
+  "before": {
+    "sample_count": 4,
+    "main_window_loaded_median_ms": 2087.0,
+    "plugin_runtime_ready_median_ms": 2850.6,
+    "private_memory_median_mb": 152.0,
+    "working_set_median_mb": 198.85
+  },
+  "after": {
+    "sample_count": 4,
+    "main_window_loaded_median_ms": 2351.35,
+    "plugin_runtime_ready_median_ms": 3353.05,
+    "private_memory_median_mb": 150.8,
+    "working_set_median_mb": 197.65
+  },
+  "visual_matrix": [
+    {
+      "file": "system-wide-light.png",
+      "theme": "light",
+      "language": "en-US",
+      "logical_size": "1440x900",
+      "layout": "two_columns",
+      "result": "passed"
+    },
+    {
+      "file": "system-narrow-dark.png",
+      "theme": "dark",
+      "language": "zh-CN",
+      "logical_size": "800x700",
+      "layout": "single_column",
+      "result": "passed"
+    }
+  ],
+  "additional_fixes": [
+    "disabled_button_opacity_0.62",
+    "sparse_status_refresh_after_stateless_operation"
+  ],
+  "timing_claim": "No startup timing improvement claimed because sequential samples were affected by system load."
+}

@@ -62,6 +62,9 @@ public class DesignSystemTests
         };
 
         Assert.All(required, key => Assert.Contains(key, keys));
+        Assert.Contains(
+            "<Setter TargetName=\"Chrome\" Property=\"Opacity\" Value=\"0.62\"",
+            document.ToString());
     }
 
     [Fact]
@@ -225,6 +228,7 @@ public class DesignSystemTests
             Path.Combine("src", "LongBetterWindows.Host", "MainWindow.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml"),
+            Path.Combine("src", "LongBetterWindows.Host", "Views", "SystemIntegrationPageControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml"),

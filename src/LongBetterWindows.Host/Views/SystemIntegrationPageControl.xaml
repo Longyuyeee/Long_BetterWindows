@@ -1,0 +1,139 @@
+<UserControl x:Class="LongBetterWindows.Host.Views.SystemIntegrationPageControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore">
+    <UserControl.Resources>
+        <Style x:Key="SystemCard" TargetType="Border" BasedOn="{StaticResource LongCard}">
+            <Setter Property="Effect" Value="{x:Null}" />
+        </Style>
+    </UserControl.Resources>
+    <Grid x:Name="SystemGrid" VerticalAlignment="Top">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition x:Name="SystemGapColumn" Width="12" />
+            <ColumnDefinition x:Name="SystemSecondaryColumn" Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border x:Name="ColumnCard" Style="{StaticResource SystemCard}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,12,0">
+                    <TextBlock Text="{DynamicResource i18n.system.column.title}"
+                               FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="{DynamicResource i18n.system.column.desc}"
+                               Margin="0,5,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    <TextBlock x:Name="ColumnStatusText" Margin="0,8,0,0"
+                               automation:AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+                <Button x:Name="ColumnButton" Grid.Column="1"
+                        Content="{DynamicResource i18n.action.enable}"
+                        Style="{StaticResource LongButton.Primary}"
+                        Click="ColumnButton_Click" />
+            </Grid>
+        </Border>
+
+        <Border x:Name="SparseCard" Grid.Column="2"
+                Style="{StaticResource SystemCard}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,12,0">
+                    <TextBlock Text="{DynamicResource i18n.system.sparse.title}"
+                               FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="{DynamicResource i18n.system.sparse.desc}"
+                               Margin="0,5,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    <TextBlock x:Name="SparsePackageStatusText" Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               automation:AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <Button x:Name="SparsePackageButton"
+                            Content="{DynamicResource i18n.action.chooseRegister}"
+                            Style="{StaticResource LongButton.Primary}"
+                            Click="SparsePackageButton_Click" />
+                    <Button x:Name="SparsePackageRemoveButton"
+                            Content="{DynamicResource i18n.action.uninstall}"
+                            Margin="0,6,0,0" Visibility="Collapsed"
+                            Style="{StaticResource LongButton}"
+                            Click="SparsePackageRemoveButton_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border x:Name="ContextMenuCard" Grid.Row="1"
+                Style="{StaticResource SystemCard}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,12,0">
+                    <TextBlock Text="{DynamicResource i18n.system.legacy.title}"
+                               FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="{DynamicResource i18n.system.legacy.desc}"
+                               Margin="0,5,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    <TextBlock x:Name="ContextMenuStatusText" Margin="0,8,0,0"
+                               automation:AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+                <Button x:Name="ContextMenuButton" Grid.Column="1"
+                        Content="{DynamicResource i18n.action.register}"
+                        Style="{StaticResource LongButton.Primary}"
+                        Click="ContextMenuButton_Click" />
+            </Grid>
+        </Border>
+
+        <Border x:Name="StartupCard" Grid.Row="1" Grid.Column="2"
+                Style="{StaticResource SystemCard}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,12,0">
+                    <TextBlock Text="{DynamicResource i18n.system.startup.title}"
+                               FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="{DynamicResource i18n.system.startup.desc}"
+                               Margin="0,5,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    <TextBlock x:Name="StartupStatusText" Margin="0,8,0,0"
+                               automation:AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+                <Button x:Name="StartupButton" Grid.Column="1"
+                        Content="{DynamicResource i18n.action.enable}"
+                        Style="{StaticResource LongButton.Primary}"
+                        Click="StartupButton_Click" />
+            </Grid>
+        </Border>
+
+        <Border x:Name="HotkeyCard" Grid.Row="2"
+                Style="{StaticResource SystemCard}" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="{DynamicResource i18n.system.hotkey.title}"
+                           FontSize="14" FontWeight="SemiBold" />
+                <TextBlock Text="{DynamicResource i18n.system.hotkey.desc}"
+                           Margin="0,5,0,0" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                <Border Style="{StaticResource LongHotkeyBadge}"
+                        HorizontalAlignment="Left" Margin="0,10,0,0">
+                    <TextBlock Text="Alt + Space"
+                               FontFamily="{DynamicResource Long.Font.Mono}" />
+                </Border>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -168,7 +168,7 @@ public class SparsePackageTests
             "src",
             "LongBetterWindows.Host",
             "Views",
-            "ToolCenterControl.xaml"));
+            "SystemIntegrationPageControl.xaml"));
         var zhResources = File.ReadAllText(Path.Combine(
             root,
             "src",

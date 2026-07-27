@@ -58,7 +58,7 @@ public sealed class ToolCenterErrorContractTests
             "src",
             "LongBetterWindows.Host",
             "Views",
-            "ToolCenterControl.xaml.cs"));
+            "SystemIntegrationPageControl.xaml.cs"));
 
         Assert.DoesNotContain(
             "StatusText.Text = \"操作异常: \" + ex.Message",
