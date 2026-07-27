@@ -8,20 +8,27 @@ using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host.Views
 {
-    public partial class PluginManagementControl : UserControl
+    public partial class PluginManagementControl : UserControl, IDisposable
     {
+        private readonly PluginRegistry _pluginStore;
+        private DispatcherOperation? _refreshOperation;
         private int _refreshPending;
+        private int _disposed;
 
         public PluginManagementControl()
         {
             InitializeComponent();
-            HostProvider.Instance.PluginStore.PluginsChanged += OnPluginsChanged;
-            SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
+            _pluginStore = HostProvider.Instance.PluginStore;
+            _pluginStore.PluginsChanged += OnPluginsChanged;
+            SizeChanged += PluginManagementControl_SizeChanged;
         }
 
         public void Refresh()
         {
-            var plugins = HostProvider.Instance.PluginStore.GetAll();
+            if (Volatile.Read(ref _disposed) != 0)
+                return;
+
+            var plugins = _pluginStore.GetAll();
             PluginsHeader.Text = string.Format(
                 I18n("plugins.installedCount"),
                 plugins.Count);
@@ -45,17 +52,31 @@ namespace LongBetterWindows.Host.Views
 
         private void OnPluginsChanged()
         {
+            if (Volatile.Read(ref _disposed) != 0)
+                return;
             if (Interlocked.Exchange(ref _refreshPending, 1) != 0)
                 return;
 
-            _ = Dispatcher.BeginInvoke(
+            var operation = Dispatcher.BeginInvoke(
                 new Action(() =>
                 {
+                    _refreshOperation = null;
                     Interlocked.Exchange(ref _refreshPending, 0);
                     Refresh();
                 }),
                 DispatcherPriority.ContextIdle);
+            _refreshOperation = operation;
+            if (Volatile.Read(ref _disposed) != 0
+                && operation.Status == DispatcherOperationStatus.Pending)
+            {
+                operation.Abort();
+            }
         }
+
+        private void PluginManagementControl_SizeChanged(
+            object sender,
+            SizeChangedEventArgs e)
+            => ApplyResponsiveLayout(ActualWidth);
 
         private void ApplyResponsiveLayout(double width)
         {
@@ -239,9 +260,12 @@ namespace LongBetterWindows.Host.Views
                     : "action.enable");
                 Hotkey = PluginRegistry.GetPluginHotkey(entry) ?? string.Empty;
                 HasHotkey = !string.IsNullOrEmpty(Hotkey);
-                VisibleCapabilities = entry.Manifest.Capabilities.Take(3).ToArray();
-                HasAdditionalCapabilities = entry.Manifest.Capabilities.Count > VisibleCapabilities.Count;
-                AdditionalCapabilityText = $"+{entry.Manifest.Capabilities.Count - VisibleCapabilities.Count}";
+                var visibleCapabilities = entry.Manifest.Capabilities.Take(3).ToArray();
+                HasCapabilities = visibleCapabilities.Length > 0;
+                var additionalCount =
+                    entry.Manifest.Capabilities.Count - visibleCapabilities.Length;
+                CapabilitySummary = string.Join(" · ", visibleCapabilities)
+                    + (additionalCount > 0 ? $" · +{additionalCount}" : string.Empty);
                 CanOpen = entry.Instance is IHasMainUI
                     || entry.Manifest.Window is not null;
                 CanOpenSettings = entry.Instance is IHasSettingsUI;
@@ -255,13 +279,26 @@ namespace LongBetterWindows.Host.Views
             public string ToggleText { get; }
             public string Hotkey { get; }
             public bool HasHotkey { get; }
-            public IReadOnlyList<string> VisibleCapabilities { get; }
-            public bool HasAdditionalCapabilities { get; }
-            public string AdditionalCapabilityText { get; }
+            public bool HasCapabilities { get; }
+            public string CapabilitySummary { get; }
             public bool CanOpen { get; }
             public bool CanOpenSettings { get; }
 
             public static PluginCardItem Create(PluginEntry entry) => new(entry);
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
+
+            _pluginStore.PluginsChanged -= OnPluginsChanged;
+            SizeChanged -= PluginManagementControl_SizeChanged;
+            if (_refreshOperation?.Status == DispatcherOperationStatus.Pending)
+                _refreshOperation.Abort();
+            _refreshOperation = null;
+            Interlocked.Exchange(ref _refreshPending, 0);
+            PluginsPanel.ItemsSource = null;
         }
 
         private static string I18n(string key)

@@ -875,6 +875,8 @@ public class QualityGateTests
         Assert.Contains("VirtualizingPanel.VirtualizationMode=\"Recycling\"", xaml);
         Assert.Contains("<VirtualizingStackPanel", xaml);
         Assert.Contains("DarkScrollBarStyle", xaml);
+        Assert.Contains("x:Key=\"PluginListCard\"", xaml);
+        Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
 
         var code = Read("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs");
         Assert.Contains("PluginToggle_Click", code);
@@ -882,6 +884,11 @@ public class QualityGateTests
         Assert.Contains("CapabilityDetails_Click", code);
         Assert.Contains("Interlocked.Exchange(ref _refreshPending, 1)", code);
         Assert.Contains("DispatcherPriority.ContextIdle", code);
+        Assert.Contains("IDisposable", code);
+        Assert.Contains("_pluginStore.PluginsChanged -= OnPluginsChanged", code);
+        Assert.Contains("PluginsPanel.ItemsSource = null", code);
+        Assert.Contains("CapabilitySummary", code);
+        Assert.DoesNotContain("<ItemsControl ItemsSource=\"{Binding VisibleCapabilities}\">", xaml);
 
         var toolCenterXaml = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
         var toolCenterCode = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
@@ -889,6 +896,9 @@ public class QualityGateTests
         Assert.DoesNotContain("<local:PluginManagementControl", toolCenterXaml);
         Assert.Contains("PluginManagementHost.Content ??= new PluginManagementControl()", toolCenterCode);
         Assert.Contains("((PluginManagementControl)PluginManagementHost.Content).Refresh()", toolCenterCode);
+        Assert.Contains("ReleasePluginManagementPage()", toolCenterCode);
+        Assert.Contains("PluginManagementHost.Content = null", toolCenterCode);
+        Assert.Contains("plugins.Dispose()", toolCenterCode);
         Assert.Contains("EnsureSystemStatusInitializedAsync", toolCenterCode);
         Assert.Contains("EnsureSettingsStatusInitializedAsync", toolCenterCode);
         Assert.Contains("OpenPluginsForQuality", toolCenterCode);

@@ -23,6 +23,10 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="PluginListCard" TargetType="Border"
+               BasedOn="{StaticResource LongPluginCard}">
+            <Setter Property="Effect" Value="{x:Null}" />
+        </Style>
     </UserControl.Resources>
 
     <StackPanel>
@@ -94,7 +98,7 @@
             </ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Border Style="{StaticResource LongPluginCard}" Margin="0,0,0,12">
+                    <Border Style="{StaticResource PluginListCard}" Margin="0,0,0,12">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -128,25 +132,12 @@
                                                VerticalAlignment="Center" />
                                 </StackPanel>
 
-                                <StackPanel Orientation="Horizontal" Margin="16,6,0,0">
-                                    <ItemsControl ItemsSource="{Binding VisibleCapabilities}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Style="{StaticResource LongBadge}" Margin="0,0,5,0">
-                                                    <TextBlock Text="{Binding}" FontSize="10"
-                                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                    <TextBlock Text="{Binding AdditionalCapabilityText}" FontSize="10"
-                                               Foreground="{DynamicResource Long.Brush.Text.Muted}"
-                                               VerticalAlignment="Center"
-                                               Visibility="{Binding HasAdditionalCapabilities, Converter={StaticResource BooleanToVisibility}}" />
-                                </StackPanel>
+                                <Border Style="{StaticResource LongBadge}" Margin="16,6,0,0"
+                                        HorizontalAlignment="Left"
+                                        Visibility="{Binding HasCapabilities, Converter={StaticResource BooleanToVisibility}}">
+                                    <TextBlock Text="{Binding CapabilitySummary}" FontSize="10"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                </Border>
                             </StackPanel>
 
                             <WrapPanel Grid.Row="1" Margin="16,14,0,0"

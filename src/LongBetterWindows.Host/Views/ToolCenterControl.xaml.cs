@@ -40,6 +40,7 @@ namespace LongBetterWindows.Host.Views
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             Unloaded += (_, _) =>
             {
+                ReleasePluginManagementPage();
                 _updateService?.Dispose();
                 _updateService = null;
             };
@@ -386,6 +387,9 @@ namespace LongBetterWindows.Host.Views
 
         private void ShowPage(string page)
         {
+            if (!string.Equals(page, "plugins", StringComparison.Ordinal))
+                ReleasePluginManagementPage();
+
             (string Key, FrameworkElement Panel, RadioButton Navigation, string Title, string Subtitle)[] pages =
             {
                 ("overview", PanelOverview, NavOverview, I18n("page.overview.title"), I18n("page.overview.subtitle")),
@@ -445,6 +449,15 @@ namespace LongBetterWindows.Host.Views
                     new Action(ContentScrollViewer.ScrollToTop),
                     System.Windows.Threading.DispatcherPriority.ContextIdle);
             }
+        }
+
+        private void ReleasePluginManagementPage()
+        {
+            if (PluginManagementHost.Content is not PluginManagementControl plugins)
+                return;
+
+            PluginManagementHost.Content = null;
+            plugins.Dispose();
         }
 
         private async Task EnsureSystemStatusInitializedAsync()
