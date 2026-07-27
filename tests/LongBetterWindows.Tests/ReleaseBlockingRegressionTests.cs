@@ -324,6 +324,48 @@ public sealed class ReleaseBlockingRegressionTests
     }
 
     [Fact]
+    public void ScreenshotAndColorPicker_UsePhysicalCoordinatesAndDeterministicCleanup()
+    {
+        var root = FindRepositoryRoot();
+        var screenshot = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ScreenshotPlugin",
+            "ScreenshotPluginImpl.cs"));
+        var selector = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ScreenshotPlugin",
+            "RegionSelectorWindow.xaml.cs"));
+        var colorPicker = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ColorPickerPlugin",
+            "ColorPickerWindow.xaml.cs"));
+        var captureService = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "ScreenCaptureService.cs"));
+
+        Assert.Contains("_host.ScreenCapture.CaptureToBitmapAsync()", screenshot);
+        Assert.Contains("_host.ScreenCapture.CaptureRegionAsync(", screenshot);
+        Assert.DoesNotContain("internal static class ScreenCapture", screenshot);
+        Assert.Contains("GetCursorPos(out _screenStart)", selector);
+        Assert.Contains("Close();", selector);
+        Assert.Contains(
+            "await Dispatcher.Yield(DispatcherPriority.ApplicationIdle)",
+            selector);
+        Assert.Contains("MonitorHelper.GetCursorPlacement(this)", colorPicker);
+        Assert.Contains("ScreenColorSampler.Sample(", colorPicker);
+        Assert.Contains("finally", colorPicker);
+        Assert.Contains("GetSystemMetrics(SmXvirtualscreen)", captureService);
+        Assert.Contains("if (!BitBlt(", captureService);
+        Assert.Contains("result.Freeze()", captureService);
+    }
+
+    [Fact]
     public void FolderNoteSave_AwaitsStorageBeforeClosing()
     {
         var root = FindRepositoryRoot();
@@ -379,9 +421,17 @@ public sealed class ReleaseBlockingRegressionTests
             "src",
             "ColorPickerPlugin",
             "ColorPickerWindow.xaml.cs"));
+        var sampler = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "ScreenColorSampler.cs"));
 
         Assert.Contains("if (!GetCursorPos(out var point))", picker);
-        Assert.Contains("if (pixel == uint.MaxValue)", picker);
+        Assert.Contains("if (!UpdateSample(point))", picker);
+        Assert.Contains("if (pixel == uint.MaxValue)", sampler);
+        Assert.Contains("ReleaseDC(IntPtr.Zero, screenDc)", sampler);
     }
 
     private static string FindRepositoryRoot()

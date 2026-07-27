@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media;
+using LongBetterWindows.Host.Services;
+using Serilog;
 
 namespace ColorPickerPlugin;
 
@@ -17,9 +19,6 @@ public partial class ColorPickerWindow : Window
     private bool _capturing;
     private bool _leftWasDown;
 
-    [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr window);
-    [DllImport("user32.dll")] private static extern bool ReleaseDC(IntPtr window, IntPtr dc);
-    [DllImport("gdi32.dll")] private static extern uint GetPixel(IntPtr dc, int x, int y);
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out PointNative point);
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int virtualKey);
 
@@ -63,8 +62,12 @@ public partial class ColorPickerWindow : Window
                     Close();
                     return;
                 }
-                UpdateSample(point);
-                PositionNearCursor(point);
+                if (!UpdateSample(point))
+                {
+                    Close();
+                    return;
+                }
+                PositionNearCursor();
 
                 var leftDown = IsLeftButtonDown();
                 if (leftDown && !_leftWasDown)
@@ -82,43 +85,48 @@ public partial class ColorPickerWindow : Window
         }
     }
 
-    private void UpdateSample(PointNative point)
+    private bool UpdateSample(PointNative point)
     {
-        var dc = GetDC(IntPtr.Zero);
-        if (dc == IntPtr.Zero) return;
         try
         {
-            var pixel = GetPixel(dc, point.X, point.Y);
-            if (pixel == uint.MaxValue)
-                return;
-            var red = (byte)(pixel & 0xFF);
-            var green = (byte)((pixel >> 8) & 0xFF);
-            var blue = (byte)((pixel >> 16) & 0xFF);
-            ColorBox.Background = new SolidColorBrush(Color.FromRgb(red, green, blue));
-            HexText.Text = $"#{red:X2}{green:X2}{blue:X2}";
-            RgbText.Text = $"rgb({red}, {green}, {blue})";
+            var color = ScreenColorSampler.Sample(point.X, point.Y);
+            ColorBox.Background = new SolidColorBrush(color);
+            HexText.Text = $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+            RgbText.Text = $"rgb({color.R}, {color.G}, {color.B})";
+            return true;
         }
-        finally
+        catch (Exception ex)
         {
-            ReleaseDC(IntPtr.Zero, dc);
+            Log.Warning(ex, "[ColorPicker] Screen pixel sampling failed");
+            return false;
         }
     }
 
-    private void PositionNearCursor(PointNative point)
+    private void PositionNearCursor()
     {
-        var dpi = VisualTreeHelper.GetDpi(this);
-        var x = point.X / dpi.DpiScaleX;
-        var y = point.Y / dpi.DpiScaleY;
-        var area = LongBetterWindows.Host.Services.MonitorHelper.GetCursorWorkArea();
-        Left = Math.Clamp(x + 18, area.Left + 8, area.Right - Width - 8);
-        Top = Math.Clamp(y + 18, area.Top + 8, area.Bottom - Height - 8);
+        var placement =
+            MonitorHelper.GetCursorPlacement(this);
+        Left = Math.Clamp(
+            placement.Cursor.X + 18,
+            placement.WorkArea.Left + 8,
+            placement.WorkArea.Right - Width - 8);
+        Top = Math.Clamp(
+            placement.Cursor.Y + 18,
+            placement.WorkArea.Top + 8,
+            placement.WorkArea.Bottom - Height - 8);
     }
 
     private async Task PickAndCloseAsync()
     {
         _capturing = false;
-        await _onPicked(HexText.Text);
-        Close();
+        try
+        {
+            await _onPicked(HexText.Text);
+        }
+        finally
+        {
+            Close();
+        }
     }
 
     private static bool IsLeftButtonDown() => (GetAsyncKeyState(0x01) & 0x8000) != 0;

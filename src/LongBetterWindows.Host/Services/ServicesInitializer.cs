@@ -144,7 +144,7 @@ namespace LongBetterWindows.Host.Services
             WindowInfo = new WindowInfoService();
             provider.RegisterService<IWindowInfoService>(WindowInfo);
 
-            ScreenCapture = new ScreenCaptureService();
+            ScreenCapture = new ScreenCaptureService(Clipboard);
             provider.RegisterService<IScreenCaptureService>(ScreenCapture);
 
             Input = new InputService();

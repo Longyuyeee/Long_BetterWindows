@@ -1,7 +1,5 @@
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media.Imaging;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
@@ -135,12 +133,16 @@ public class ScreenshotPluginImpl :
     {
         try
         {
-            var bitmap = await Application.Current.Dispatcher.InvokeAsync(() =>
-                ScreenCapture.Capture(
-                    (int)SystemParameters.VirtualScreenLeft,
-                    (int)SystemParameters.VirtualScreenTop,
-                    (int)SystemParameters.VirtualScreenWidth,
-                    (int)SystemParameters.VirtualScreenHeight));
+            var capture = await _host.ScreenCapture.CaptureToBitmapAsync();
+            if (!capture.IsSuccess || capture.Data is null)
+            {
+                throw new InvalidOperationException(
+                    capture.ErrorMessage ?? Text(
+                        "toast.captureFailed",
+                        "截图失败，请稍后重试"));
+            }
+
+            var bitmap = capture.Data;
             var result = await _host.Clipboard.SetImageAsync(bitmap);
             if (!result.IsSuccess)
             {
@@ -189,10 +191,24 @@ public class ScreenshotPluginImpl :
                 if (ReferenceEquals(_selector, selector))
                     _selector = null;
             };
-            selector.RegionSelected += async bitmap =>
+            selector.RegionSelected += async bounds =>
             {
                 try
                 {
+                    var capture = await _host.ScreenCapture.CaptureRegionAsync(
+                        bounds.X,
+                        bounds.Y,
+                        bounds.Width,
+                        bounds.Height);
+                    if (!capture.IsSuccess || capture.Data is null)
+                    {
+                        throw new InvalidOperationException(
+                            capture.ErrorMessage ?? Text(
+                                "toast.captureFailed",
+                                "截图失败，请稍后重试"));
+                    }
+
+                    var bitmap = capture.Data;
                     var result = await _host.Clipboard.SetImageAsync(bitmap);
                     FloatingHudWindow.ShowToast(result.IsSuccess
                         ? string.Format(
@@ -340,44 +356,4 @@ public class ScreenshotPluginImpl :
             && !string.IsNullOrWhiteSpace(value)
                 ? value
                 : fallback;
-}
-
-internal static class ScreenCapture
-{
-    private const uint Srccopy = 0x00CC0020;
-
-    public static BitmapSource Capture(int x, int y, int width, int height)
-    {
-        var screenDc = GetDC(IntPtr.Zero);
-        var memoryDc = CreateCompatibleDC(screenDc);
-        var bitmapHandle = CreateCompatibleBitmap(screenDc, width, height);
-        var previous = SelectObject(memoryDc, bitmapHandle);
-
-        try
-        {
-            if (!BitBlt(memoryDc, 0, 0, width, height, screenDc, x, y, Srccopy))
-                throw new InvalidOperationException("BitBlt failed.");
-
-            var bitmap = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
-                bitmapHandle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-            bitmap.Freeze();
-            return bitmap;
-        }
-        finally
-        {
-            SelectObject(memoryDc, previous);
-            DeleteObject(bitmapHandle);
-            DeleteDC(memoryDc);
-            ReleaseDC(IntPtr.Zero, screenDc);
-        }
-    }
-
-    [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
-    [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-    [DllImport("gdi32.dll")] private static extern bool BitBlt(IntPtr destination, int x, int y, int width, int height, IntPtr source, int sourceX, int sourceY, uint operation);
-    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int width, int height);
-    [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hdc, IntPtr value);
-    [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hdc);
-    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr value);
 }
