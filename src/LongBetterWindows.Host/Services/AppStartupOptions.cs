@@ -12,6 +12,7 @@ namespace LongBetterWindows.Host.Services
         public string? RequestedPluginsDirectory { get; private init; }
         public bool ExitAfterCommand { get; private init; }
         public string? QualityCommandReportPath { get; private init; }
+        public string? QualityCommandFixturePath { get; private init; }
         public bool OpenPaletteForQuality { get; private init; }
         public bool OpenSuperPanelForQuality { get; private init; }
         public bool OpenMarketForQuality { get; private init; }
@@ -87,6 +88,9 @@ namespace LongBetterWindows.Host.Services
                 QualityCommandReportPath = ReadArgument(
                     arguments,
                     "--quality-command-report"),
+                QualityCommandFixturePath = ReadArgument(
+                    arguments,
+                    "--quality-command-fixture"),
                 OpenPaletteForQuality = HasSwitch(arguments, "--quality-open-palette"),
                 OpenSuperPanelForQuality = HasSwitch(arguments, "--quality-open-super-panel"),
                 OpenMarketForQuality = HasSwitch(arguments, "--quality-open-market") || captureView == "market",

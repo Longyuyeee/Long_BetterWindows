@@ -16,6 +16,7 @@ public class AppStartupOptionsTests
             "--plugins-dir", "test-plugins",
             "--exit-after-command",
             "--quality-command-report", "command-report.json",
+            "--quality-command-fixture", "command-fixture.json",
             "--quality-capture", "capture.png",
             "--quality-capture-view", "plugins",
             "--quality-render-dpi", "144",
@@ -52,6 +53,7 @@ public class AppStartupOptionsTests
         Assert.Equal("test-plugins", options.RequestedPluginsDirectory);
         Assert.True(options.ExitAfterCommand);
         Assert.Equal("command-report.json", options.QualityCommandReportPath);
+        Assert.Equal("command-fixture.json", options.QualityCommandFixturePath);
         Assert.Equal("capture.png", options.QualityCapturePath);
         Assert.Equal("plugins", options.QualityCaptureView);
         Assert.True(options.OpenPluginsForQuality);

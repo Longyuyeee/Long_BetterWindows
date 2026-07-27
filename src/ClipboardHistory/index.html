@@ -565,6 +565,7 @@
         listErrorDetail = '';
         renderListState();
         await startMonitoring();
+        return true;
       } catch (error) {
         monitorMode = 'stopped';
         listState = 'error';
@@ -575,6 +576,7 @@
           'status.historyUnavailable',
           'danger',
           '无法读取本地历史，监听尚未启动');
+        return false;
       }
     }
 
@@ -639,7 +641,13 @@
         captureClipboard({ announce: true });
       }
     });
-    window.LongUI?.onCommand(function (command) {
+    window.LongUI?.onCommand(async function (command) {
+      if (!await initializationPromise) {
+        return {
+          success: false,
+          message: t('status.historyUnavailable', '无法读取本地历史，监听尚未启动')
+        };
+      }
       const text = window.LongUI.commandText(command);
       if (text) searchInput.value = text;
       renderHistory();
@@ -659,7 +667,7 @@
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });
 
-    initialize();
+    const initializationPromise = initialize();
   </script>
 </body>
 </html>

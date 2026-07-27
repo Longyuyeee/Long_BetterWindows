@@ -2,6 +2,7 @@
   "plugin.name": "Translator",
   "commands.translate.text.title": "Translate Text",
   "commands.translate.text.description": "Translate text, links, or clipboard content",
+  "commands.translate.text.outputs.result.description": "Translated text",
   "page.title": "Translator",
   "page.description": "Detect the source language automatically and translate through the host-controlled network capability.",
   "page.autoDetect": "Auto detect",

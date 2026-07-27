@@ -144,6 +144,65 @@ public class PluginRuntimeCoordinatorTests
         }
     }
 
+    [Fact]
+    public async Task QualityCommandFixture_ProvidesStatefulSafeCapabilities()
+    {
+        var directory = CreateTemporaryDirectory();
+        var fixturePath = Path.Combine(directory, "fixture.json");
+        try
+        {
+            await File.WriteAllTextAsync(
+                fixturePath,
+                """
+                {
+                  "schema_version": 1,
+                  "clipboard": { "text": "fixture clipboard" },
+                  "storage": { "values": { "existing": "before" } },
+                  "http": {
+                    "data": "[[[\"Long Assistant\"]],null,\"zh-CN\"]",
+                    "required_url_contains": "translate"
+                  }
+                }
+                """);
+            using var scope = QualityCommandFixture.Install(fixturePath);
+            var fixture = QualityCommandFixture.Current!;
+
+            Assert.True(fixture.TryDispatch(
+                "clipboard.getText",
+                [],
+                out var clipboardResponse));
+            Assert.Contains(
+                "fixture clipboard",
+                JsonSerializer.Serialize(await clipboardResponse));
+            Assert.True(fixture.TryDispatch(
+                "storage.compareExchange",
+                ["existing", "before", "after"],
+                out var storageResponse));
+            Assert.Contains(
+                "\"data\":true",
+                JsonSerializer.Serialize(await storageResponse));
+            Assert.True(fixture.TryDispatch(
+                "http.get",
+                ["https://example.test/translate"],
+                out var httpResponse));
+            Assert.Contains(
+                "Long Assistant",
+                JsonSerializer.Serialize(await httpResponse));
+
+            var snapshot = fixture.CreateSnapshot();
+            Assert.Equal("fixture clipboard", snapshot.ClipboardText);
+            Assert.Equal("after", snapshot.Storage["existing"]);
+            Assert.Equal(1, snapshot.Calls["clipboard.getText"]);
+            Assert.Equal(1, snapshot.Calls["storage.compareExchange"]);
+            Assert.Equal(1, snapshot.Calls["http.get"]);
+            Assert.Matches("^[a-f0-9]{64}$", snapshot.LastHttpUrlSha256!);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryDirectory()
     {
         var path = Path.Combine(

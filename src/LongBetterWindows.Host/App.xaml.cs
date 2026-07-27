@@ -192,7 +192,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.RequestedCommandKey,
                         _startupOptions.RequestedCommandText,
                         _startupOptions.ExitAfterCommand,
-                        _startupOptions.QualityCommandReportPath));
+                        _startupOptions.QualityCommandReportPath,
+                        _startupOptions.QualityCommandFixturePath));
                 _startupTrace?.Mark("plugin_runtime_ready");
                 if (runtimeResult.ExitCode is int exitCode)
                 {

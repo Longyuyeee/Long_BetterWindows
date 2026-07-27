@@ -257,6 +257,64 @@ public sealed class PluginPositiveFunctionMatrixTests
             lowRiskPlugins.Values.Sum(commands => commands.Count));
     }
 
+    [Fact]
+    public void MediumRiskCommandCases_CoverEveryMediumRiskPluginAndCommand()
+    {
+        var root = FindRepositoryRoot();
+        using var matrix = LoadMatrix(root);
+        var policy = matrix.RootElement.GetProperty("policy");
+        var casesPath = Path.GetFullPath(Path.Combine(
+            root,
+            policy.GetProperty("medium_command_cases_path").GetString()!));
+        using var cases = JsonDocument.Parse(File.ReadAllText(casesPath));
+        var mediumRiskPlugins = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Where(plugin => plugin.GetProperty("risk").GetString() == "medium")
+            .ToDictionary(
+                plugin => plugin.GetProperty("id").GetString()!,
+                plugin => plugin.GetProperty("commands")
+                    .EnumerateArray()
+                    .Select(command => command.GetString()!)
+                    .ToHashSet(StringComparer.Ordinal),
+                StringComparer.OrdinalIgnoreCase);
+        var caseItems = cases.RootElement
+            .GetProperty("cases")
+            .EnumerateArray()
+            .ToArray();
+        var covered = caseItems
+            .GroupBy(
+                item => item.GetProperty("plugin_id").GetString()!,
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(item => item.GetProperty("command_id").GetString()!)
+                    .ToHashSet(StringComparer.Ordinal),
+                StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal(
+            policy.GetProperty("medium_command_required_plugin_count").GetInt32(),
+            mediumRiskPlugins.Count);
+        Assert.Equal(
+            mediumRiskPlugins.Keys.Order(StringComparer.OrdinalIgnoreCase),
+            covered.Keys.Order(StringComparer.OrdinalIgnoreCase));
+        foreach (var (pluginId, commands) in mediumRiskPlugins)
+            Assert.Equal(
+                commands.Order(StringComparer.Ordinal),
+                covered[pluginId].Order(StringComparer.Ordinal));
+        Assert.Equal(
+            policy.GetProperty("medium_command_required_command_count").GetInt32(),
+            mediumRiskPlugins.Values.Sum(commands => commands.Count));
+        Assert.All(
+            caseItems,
+            item => Assert.Equal(
+                1,
+                item.GetProperty("fixture")
+                    .GetProperty("schema_version")
+                    .GetInt32()));
+    }
+
     private static JsonDocument LoadMatrix(string root)
         => JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,

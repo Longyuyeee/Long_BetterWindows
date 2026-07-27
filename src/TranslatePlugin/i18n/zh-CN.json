@@ -2,6 +2,7 @@
   "plugin.name": "翻译工具",
   "commands.translate.text.title": "翻译文本",
   "commands.translate.text.description": "翻译输入文本、链接或剪贴板内容",
+  "commands.translate.text.outputs.result.description": "翻译后的文本",
   "page.title": "翻译工具",
   "page.description": "自动检测源语言，通过宿主受控网络能力完成翻译。",
   "page.autoDetect": "自动检测",

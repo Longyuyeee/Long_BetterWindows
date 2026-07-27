@@ -137,10 +137,11 @@
         loadErrorDetail = error && error.message ? error.message : String(error);
         renderListState();
         setStatus('state.loadFailed', 'danger', '历史便签读取失败');
-        return;
+        return false;
       }
       listState = 'ready';
       renderNotes();
+      return true;
     }
 
     async function persistSnapshot(snapshot) {
@@ -293,15 +294,25 @@
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); saveNote(); }
     });
-    window.LongUI?.onCommand(function (command) {
+    window.LongUI?.onCommand(async function (command) {
+      if (!await initializationPromise) {
+        return {
+          success: false,
+          message: t('state.loadFailed', '历史便签读取失败')
+        };
+      }
       const text = window.LongUI.commandText(command);
       if (text) input.value = text;
       input.focus();
+      return {
+        success: true,
+        message: t('command.ready', '便签编辑器已就绪')
+      };
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });
-    initialize();
+    const initializationPromise = initialize();
   </script>
 </body>
 </html>

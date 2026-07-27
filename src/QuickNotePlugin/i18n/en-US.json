@@ -2,6 +2,7 @@
   "plugin.name": "Quick Notes",
   "commands.note.new.title": "New Quick Note",
   "commands.note.new.description": "Capture text or place clipboard content in the note editor",
+  "command.ready": "Note editor is ready",
   "page.title": "Quick Notes",
   "page.description": "Capture an idea quickly. Notes stay in local plugin storage.",
   "field.newNote": "New note",

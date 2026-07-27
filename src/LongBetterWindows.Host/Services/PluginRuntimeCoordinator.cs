@@ -16,6 +16,7 @@ namespace LongBetterWindows.Host.Services
         private readonly PluginRegistry _registry;
         private readonly I18nService _i18n;
         private readonly StartupPerformanceTrace? _startupTrace;
+        private IDisposable? _qualityCommandFixture;
         private bool _disposed;
 
         public PluginRuntimeCoordinator(
@@ -48,6 +49,11 @@ namespace LongBetterWindows.Host.Services
             PluginRuntimeStartRequest request)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!string.IsNullOrWhiteSpace(request.QualityCommandFixturePath))
+            {
+                _qualityCommandFixture ??=
+                    QualityCommandFixture.Install(request.QualityCommandFixturePath);
+            }
 
             _startupTrace?.Mark("transaction_recovery_begin");
             var recovered = await PackageInstaller.RecoverInterruptedTransactionsAsync();
@@ -187,6 +193,7 @@ namespace LongBetterWindows.Host.Services
                     ?? new Dictionary<string, int>(StringComparer.Ordinal),
                 usage?.ApiMethodCalls
                     ?? new Dictionary<string, int>(StringComparer.Ordinal),
+                QualityCommandFixture.Current?.CreateSnapshot(),
                 Math.Round(elapsedMilliseconds, 3),
                 exitCode);
 
@@ -213,6 +220,7 @@ namespace LongBetterWindows.Host.Services
             _disposed = true;
             _i18n.LanguageChanged -= OnLanguageChanged;
             _scanner.Dispose();
+            _qualityCommandFixture?.Dispose();
         }
 
         private void OnLanguageChanged(string language)
@@ -242,7 +250,8 @@ namespace LongBetterWindows.Host.Services
         string? CommandKey,
         string? CommandText,
         bool ExitAfterCommand,
-        string? QualityCommandReportPath = null);
+        string? QualityCommandReportPath = null,
+        string? QualityCommandFixturePath = null);
 
     internal sealed record PluginRuntimeStartResult(
         int LoadedPluginCount,
@@ -268,6 +277,8 @@ namespace LongBetterWindows.Host.Services
             IReadOnlyDictionary<string, int> CapabilityCalls,
         [property: JsonPropertyName("api_method_calls")]
             IReadOnlyDictionary<string, int> ApiMethodCalls,
+        [property: JsonPropertyName("fixture")]
+            QualityCommandFixtureSnapshot? Fixture,
         [property: JsonPropertyName("elapsed_ms")] double ElapsedMilliseconds,
         [property: JsonPropertyName("exit_code")] int ExitCode);
 

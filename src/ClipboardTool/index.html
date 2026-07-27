@@ -160,11 +160,12 @@
         loadErrorDetail = error && error.message ? error.message : String(error);
         renderListState();
         setStatus('status.historyReadFailed', 'danger', '历史记录读取失败');
-        return;
+        return false;
       }
       listState = 'ready';
       render();
       startMonitor();
+      return true;
     }
 
     function startMonitor() {
@@ -382,11 +383,22 @@
     });
     document.addEventListener('visibilitychange', function () { document.hidden ? stopMonitor() : startMonitor(); });
     window.LongUI?.onCommand(async function (command) {
+      if (!await initializationPromise) {
+        return {
+          success: false,
+          message: t('status.historyReadFailed', '历史记录读取失败')
+        };
+      }
       const text = window.LongUI.commandText(command);
       selectTab('tools');
       if (text) {
         content.value = text;
-        await addHistory(text);
+        if (!await addHistory(text)) {
+          return {
+            success: false,
+            message: t('status.localSaveFailed', '本地记录保存失败')
+          };
+        }
       }
       content.focus();
       return {
@@ -397,7 +409,7 @@
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });
-    initialize();
+    const initializationPromise = initialize();
   </script>
 </body>
 </html>

@@ -2,6 +2,7 @@
   "plugin.name": "快速便签",
   "commands.note.new.title": "新建快速便签",
   "commands.note.new.description": "记录文本或将剪贴板内容放入便签编辑区",
+  "command.ready": "便签编辑器已就绪",
   "page.title": "快速便签",
   "page.description": "随手记录想法，便签仅保存在本机插件存储中。",
   "field.newNote": "新便签",

@@ -88,6 +88,7 @@ try {
         $sourcePlugin = Join-Path $pluginsRoot ([string]$case.plugin_folder)
         $targetPlugin = Join-Path $isolatedPlugins ([string]$case.plugin_folder)
         $commandReport = Join-Path $caseRoot "command-report.json"
+        $fixturePath = Join-Path $caseRoot "command-fixture.json"
         New-Item -ItemType Directory -Path $isolatedPlugins -Force | Out-Null
         if (-not (Test-Path -LiteralPath $sourcePlugin -PathType Container)) {
             $failures.Add("$($case.id): release plugin folder is missing")
@@ -108,6 +109,11 @@ try {
         }
         if ($case.PSObject.Properties.Name -contains "input") {
             $arguments += @("--command-text", $inputText)
+        }
+        if ($case.PSObject.Properties.Name -contains "fixture") {
+            $case.fixture | ConvertTo-Json -Depth 12 |
+                Set-Content -LiteralPath $fixturePath -Encoding UTF8
+            $arguments += @("--quality-command-fixture", $fixturePath)
         }
         $quotedArguments = @($arguments | ForEach-Object {
             ConvertTo-NativeArgument ([string]$_)
@@ -174,6 +180,11 @@ try {
 
         $allowedMethods = @($case.allowed_api_methods | ForEach-Object { [string]$_ })
         $usedMethods = @(Get-PropertyNames $report.api_method_calls)
+        if ($null -ne $report.fixture) {
+            $usedMethods = @($usedMethods +
+                @(Get-PropertyNames $report.fixture.calls) |
+                Sort-Object -Unique)
+        }
         $unexpectedMethods = @($usedMethods | Where-Object { $_ -notin $allowedMethods })
         if ($unexpectedMethods.Count -gt 0) {
             $caseErrors.Add("unexpected host API calls: $($unexpectedMethods -join ', ')")
@@ -181,6 +192,71 @@ try {
         foreach ($requiredMethod in $allowedMethods) {
             if ($requiredMethod -notin $usedMethods) {
                 $caseErrors.Add("expected read-only host API was not called: $requiredMethod")
+            }
+        }
+
+        $fixtureSummary = $null
+        if ($case.PSObject.Properties.Name -contains "fixture") {
+            if ($null -eq $report.fixture) {
+                $caseErrors.Add("quality fixture snapshot is missing")
+            } else {
+                if ($case.PSObject.Properties.Name -contains "expected_fixture_calls") {
+                    foreach ($property in $case.expected_fixture_calls.PSObject.Properties) {
+                        $actualProperty = $report.fixture.calls.PSObject.Properties[
+                            [string]$property.Name]
+                        $actualCount = if ($null -eq $actualProperty) {
+                            0
+                        } else {
+                            [int]$actualProperty.Value
+                        }
+                        if ($actualCount -lt [int]$property.Value) {
+                            $caseErrors.Add(
+                                "fixture call '$($property.Name)' count $actualCount is below $($property.Value)")
+                        }
+                    }
+                }
+                if ($case.PSObject.Properties.Name -contains "expected_storage_contains") {
+                    foreach ($expectation in @($case.expected_storage_contains)) {
+                        $storageProperty = $report.fixture.storage.PSObject.Properties[
+                            [string]$expectation.key]
+                        if ($null -eq $storageProperty) {
+                            $caseErrors.Add(
+                                "fixture storage key '$($expectation.key)' is missing")
+                        } elseif (-not ([string]$storageProperty.Value).Contains(
+                                [string]$expectation.contains)) {
+                            $caseErrors.Add(
+                                "fixture storage key '$($expectation.key)' lacks expected content")
+                        }
+                    }
+                }
+                if ($case.PSObject.Properties.Name -contains "expected_monitoring_lease_count" -and
+                    [int]$report.fixture.monitoring_lease_count -ne
+                        [int]$case.expected_monitoring_lease_count) {
+                    $caseErrors.Add(
+                        "monitoring lease count $($report.fixture.monitoring_lease_count) does not equal $($case.expected_monitoring_lease_count)")
+                }
+
+                $storageHashes = [ordered]@{}
+                foreach ($property in $report.fixture.storage.PSObject.Properties) {
+                    $storageValue = [string]$property.Value
+                    $storageHashes[[string]$property.Name] = [ordered]@{
+                        length = $storageValue.Length
+                        sha256 = Get-Sha256Text $storageValue
+                    }
+                }
+                $clipboardValue = [string]$report.fixture.clipboard_text
+                $fixtureSummary = [ordered]@{
+                    clipboard_text_length = $clipboardValue.Length
+                    clipboard_text_sha256 = if ($clipboardValue.Length -gt 0) {
+                        Get-Sha256Text $clipboardValue
+                    } else { $null }
+                    monitoring_lease_count =
+                        [int]$report.fixture.monitoring_lease_count
+                    storage = $storageHashes
+                    calls = $report.fixture.calls
+                    last_http_url_sha256 =
+                        [string]$report.fixture.last_http_url_sha256
+                }
             }
         }
 
@@ -202,6 +278,7 @@ try {
             output_length = $outputLength
             output_sha256 = $outputSha256
             api_method_calls = $report.api_method_calls
+            fixture = $fixtureSummary
             errors = @($caseErrors)
         })
     }
@@ -256,7 +333,7 @@ New-Item -ItemType Directory -Path ([System.IO.Path]::GetDirectoryName($outputFi
 $evidence | ConvertTo-Json -Depth 12 |
     Set-Content -LiteralPath $outputFile -Encoding UTF8
 
-Write-Host "Low-risk plugin command matrix: $($evidence.passed_case_count)/$($cases.Count) cases passed"
+Write-Host "Plugin command case matrix: $($evidence.passed_case_count)/$($cases.Count) cases passed"
 Write-Host "Evidence: $outputFile"
 if (-not $evidence.passed) {
     $failures | ForEach-Object { Write-Error $_ }

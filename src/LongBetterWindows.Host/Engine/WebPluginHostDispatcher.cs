@@ -29,6 +29,12 @@ namespace LongBetterWindows.Host.Engine
 
         internal async Task<object?> DispatchAsync(string method, object?[] args)
         {
+            if (QualityCommandFixture.Current is { } fixture
+                && fixture.TryDispatch(method, args, out var fixtureResponse))
+            {
+                return await fixtureResponse;
+            }
+
             var h = _host;
             return await (method switch
             {

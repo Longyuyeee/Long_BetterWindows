@@ -199,7 +199,10 @@
       const success = await translate();
       return {
         success: success,
-        message: status.textContent
+        message: status.textContent,
+        outputs: success
+          ? { result: { type: 'text', value: result.textContent } }
+          : {}
       };
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {

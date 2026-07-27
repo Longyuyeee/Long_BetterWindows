@@ -13,6 +13,13 @@
       "description": "翻译输入文本、链接或剪贴板内容",
       "aliases": ["翻译", "translate", "fy", "fanyi"],
       "accepted_inputs": ["text", "url", "clipboard"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "翻译后的文本"
+        }
+      ],
       "view_mode": "form",
       "keep_alive": true,
       "priority": 35

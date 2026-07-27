@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-07-27",
+  "policy": {
+    "required_plugin_count": 5,
+    "required_command_count": 5,
+    "isolation": "Every case uses a fresh host process, a single-plugin temporary root, and in-memory clipboard, storage, and HTTP fixtures.",
+    "side_effect_rule": "User clipboard, persistent plugin storage, global monitoring and public networks must never be reached."
+  },
+  "cases": [
+    {
+      "id": "clipboard-history-capture",
+      "plugin_id": "com.long.clipboardhistory",
+      "plugin_folder": "ClipboardHistory",
+      "command_id": "clipboard-history.open",
+      "input": "fixture filter",
+      "fixture": {
+        "schema_version": 1,
+        "clipboard": { "text": "fixture clipboard value" },
+        "storage": { "values": {} }
+      },
+      "expected_success": true,
+      "allowed_api_methods": [
+        "storage.get",
+        "clipboard.startMonitoring",
+        "clipboard.getText",
+        "storage.compareExchange"
+      ],
+      "expected_fixture_calls": {
+        "storage.get": 1,
+        "clipboard.startMonitoring": 1,
+        "clipboard.getText": 1,
+        "storage.compareExchange": 1
+      },
+      "expected_storage_contains": [
+        { "key": "clipboard_history", "contains": "fixture clipboard value" }
+      ],
+      "expected_monitoring_lease_count": 1
+    },
+    {
+      "id": "clipboard-history-storage-failure",
+      "plugin_id": "com.long.clipboardhistory",
+      "plugin_folder": "ClipboardHistory",
+      "command_id": "clipboard-history.open",
+      "fixture": {
+        "schema_version": 1,
+        "clipboard": { "text": "unused" },
+        "storage": {
+          "values": {},
+          "read_error": "fixture storage unavailable"
+        }
+      },
+      "expected_success": false,
+      "allowed_api_methods": ["storage.get"],
+      "expected_fixture_calls": { "storage.get": 1 },
+      "expected_monitoring_lease_count": 0
+    },
+    {
+      "id": "clipboard-tool-history-write",
+      "plugin_id": "com.long.clipboard-tool",
+      "plugin_folder": "ClipboardTool",
+      "command_id": "clipboard.open",
+      "input": "fixture command text",
+      "fixture": {
+        "schema_version": 1,
+        "clipboard": { "text": "fixture clipboard seed" },
+        "storage": { "values": {} }
+      },
+      "expected_success": true,
+      "allowed_api_methods": ["storage.get", "storage.set"],
+      "expected_fixture_calls": {
+        "storage.get": 2,
+        "storage.set": 1
+      },
+      "expected_storage_contains": [
+        { "key": "clip_history", "contains": "fixture command text" }
+      ],
+      "expected_monitoring_lease_count": 0
+    },
+    {
+      "id": "clipboard-tool-write-failure",
+      "plugin_id": "com.long.clipboard-tool",
+      "plugin_folder": "ClipboardTool",
+      "command_id": "clipboard.open",
+      "input": "must not persist",
+      "fixture": {
+        "schema_version": 1,
+        "clipboard": { "text": "" },
+        "storage": {
+          "values": {},
+          "write_error": "fixture write rejected"
+        }
+      },
+      "expected_success": false,
+      "allowed_api_methods": ["storage.get", "storage.set"],
+      "expected_fixture_calls": {
+        "storage.get": 2,
+        "storage.set": 1
+      },
+      "expected_monitoring_lease_count": 0
+    },
+    {
+      "id": "developer-toolkit-open",
+      "plugin_id": "com.long.devtoolkit",
+      "plugin_folder": "DevToolkit",
+      "command_id": "dev-toolkit.open",
+      "input": "Long助手",
+      "fixture": {
+        "schema_version": 1,
+        "clipboard": { "text": "must remain untouched" }
+      },
+      "expected_success": true,
+      "allowed_api_methods": [],
+      "expected_fixture_calls": {},
+      "expected_monitoring_lease_count": 0
+    },
+    {
+      "id": "quick-note-editor",
+      "plugin_id": "com.long.quick-note",
+      "plugin_folder": "QuickNotePlugin",
+      "command_id": "note.new",
+      "input": "fixture note body",
+      "fixture": {
+        "schema_version": 1,
+        "storage": {
+          "values": {
+            "quick_notes": "[]"
+          }
+        }
+      },
+      "expected_success": true,
+      "allowed_api_methods": ["storage.get"],
+      "expected_fixture_calls": { "storage.get": 1 },
+      "expected_monitoring_lease_count": 0
+    },
+    {
+      "id": "quick-note-storage-failure",
+      "plugin_id": "com.long.quick-note",
+      "plugin_folder": "QuickNotePlugin",
+      "command_id": "note.new",
+      "input": "fixture note body",
+      "fixture": {
+        "schema_version": 1,
+        "storage": {
+          "values": {},
+          "read_error": "fixture notes unavailable"
+        }
+      },
+      "expected_success": false,
+      "allowed_api_methods": ["storage.get"],
+      "expected_fixture_calls": { "storage.get": 1 },
+      "expected_monitoring_lease_count": 0
+    },
+    {
+      "id": "translate-online-fixture",
+      "plugin_id": "com.long.translate",
+      "plugin_folder": "TranslatePlugin",
+      "command_id": "translate.text",
+      "input": "Long助手",
+      "fixture": {
+        "schema_version": 1,
+        "http": {
+          "data": "[[[\"Long Assistant\",\"Long助手\",null,null,10]],null,\"zh-CN\"]",
+          "required_url_contains": "translate.googleapis.com"
+        }
+      },
+      "expected_success": true,
+      "expected_output": {
+        "key": "result",
+        "exact": "Long Assistant"
+      },
+      "allowed_api_methods": ["http.get"],
+      "expected_fixture_calls": { "http.get": 1 },
+      "expected_monitoring_lease_count": 0
+    },
+    {
+      "id": "translate-offline-fixture",
+      "plugin_id": "com.long.translate",
+      "plugin_folder": "TranslatePlugin",
+      "command_id": "translate.text",
+      "input": "Long助手",
+      "fixture": {
+        "schema_version": 1,
+        "http": {
+          "error": "fixture network offline",
+          "required_url_contains": "translate.googleapis.com"
+        }
+      },
+      "expected_success": false,
+      "allowed_api_methods": ["http.get"],
+      "expected_fixture_calls": { "http.get": 1 },
+      "expected_monitoring_lease_count": 0
+    }
+  ]
+}
