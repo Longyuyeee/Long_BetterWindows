@@ -56,6 +56,28 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
+        /// <summary>获取不会被后台调用继续修改的统计快照。</summary>
+        internal PluginUsageStats? GetStatsSnapshot(string pluginId)
+        {
+            lock (_lock)
+            {
+                if (!_usageByPlugin.TryGetValue(pluginId, out var stats))
+                    return null;
+
+                var snapshot = new PluginUsageStats
+                {
+                    PluginId = stats.PluginId,
+                    TotalCalls = stats.TotalCalls,
+                    LastCallTime = stats.LastCallTime,
+                };
+                foreach (var item in stats.CapabilityCalls)
+                    snapshot.CapabilityCalls[item.Key] = item.Value;
+                foreach (var item in stats.ApiMethodCalls)
+                    snapshot.ApiMethodCalls[item.Key] = item.Value;
+                return snapshot;
+            }
+        }
+
         /// <summary>
         /// 清除插件的统计数据
         /// </summary>

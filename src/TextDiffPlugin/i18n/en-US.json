@@ -22,6 +22,7 @@
   "status.completed": "Comparison complete",
   "status.noDifference": "The two texts are identical",
   "status.copied": "Diff copied",
+  "status.commandReady": "Text comparison is ready",
   "error.clipboardEmpty": "The clipboard does not contain text",
   "error.clipboardRead": "The clipboard could not be read",
   "error.copy": "Copy failed"

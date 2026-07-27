@@ -152,7 +152,16 @@
     async function paste() { try { const value = await long.clipboard.getText(); if (value.success) input.value = value.data || ''; else setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } }
     document.getElementById('testButton').addEventListener('click', test); document.getElementById('pasteButton').addEventListener('click', paste);
     document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); test(); } });
-    window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) input.value = text; pattern.focus(); });
+    window.LongUI?.onCommand(function (command) {
+      const text = window.LongUI.commandText(command);
+      if (text) input.value = text;
+      pattern.focus();
+      return {
+        success: true,
+        message: t('status.commandReady', '正则测试器已就绪'),
+        outputs: {}
+      };
+    });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });

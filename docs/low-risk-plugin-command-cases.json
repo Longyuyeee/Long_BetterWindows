@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-07-27",
+  "policy": {
+    "required_plugin_count": 11,
+    "required_command_count": 14,
+    "isolation": "Each case runs in a fresh host process with a temporary plugin root containing only the target plugin.",
+    "side_effect_rule": "Only explicitly listed read-only host API methods may be called. Clipboard, file, process mutation, storage and desktop mutation calls are forbidden."
+  },
+  "cases": [
+    {
+      "id": "base64-encode",
+      "plugin_id": "com.long.base64",
+      "plugin_folder": "Base64Tool",
+      "command_id": "base64.encode",
+      "input": "Long助手",
+      "expected_success": true,
+      "expected_output": { "key": "result", "exact": "TG9uZ+WKqeaJiw==" },
+      "allowed_api_methods": []
+    },
+    {
+      "id": "base64-decode",
+      "plugin_id": "com.long.base64",
+      "plugin_folder": "Base64Tool",
+      "command_id": "base64.decode",
+      "input": "TG9uZ+WKqeaJiw==",
+      "expected_success": true,
+      "expected_output": { "key": "result", "exact": "Long助手" },
+      "allowed_api_methods": []
+    },
+    {
+      "id": "base64-invalid",
+      "plugin_id": "com.long.base64",
+      "plugin_folder": "Base64Tool",
+      "command_id": "base64.decode",
+      "input": "%%%invalid%%%",
+      "expected_success": false,
+      "allowed_api_methods": []
+    },
+    {
+      "id": "hardware-refresh",
+      "plugin_id": "com.long.hardwaremonitor",
+      "plugin_folder": "HardwareMonitor",
+      "command_id": "hardware-monitor.open",
+      "expected_success": true,
+      "allowed_api_methods": [
+        "performance.getSystemInfo",
+        "performance.getCpuUsage",
+        "performance.getMemoryInfo",
+        "performance.getDiskInfo",
+        "performance.getTopByMemory"
+      ]
+    },
+    {
+      "id": "json-format",
+      "plugin_id": "com.long.json-formatter",
+      "plugin_folder": "JsonFormatterPlugin",
+      "command_id": "json.format",
+      "input": "{\"name\":\"Long\",\"enabled\":true}",
+      "expected_success": true,
+      "expected_output": {
+        "key": "result",
+        "exact": "{\n  \"name\": \"Long\",\n  \"enabled\": true\n}"
+      },
+      "allowed_api_methods": []
+    },
+    {
+      "id": "json-minify",
+      "plugin_id": "com.long.json-formatter",
+      "plugin_folder": "JsonFormatterPlugin",
+      "command_id": "json.minify",
+      "input": "{ \"name\": \"Long\", \"enabled\": true }",
+      "expected_success": true,
+      "expected_output": { "key": "result", "exact": "{\"name\":\"Long\",\"enabled\":true}" },
+      "allowed_api_methods": []
+    },
+    {
+      "id": "json-invalid",
+      "plugin_id": "com.long.json-formatter",
+      "plugin_folder": "JsonFormatterPlugin",
+      "command_id": "json.format",
+      "input": "{\"broken\":",
+      "expected_success": false,
+      "allowed_api_methods": []
+    },
+    {
+      "id": "markdown-open",
+      "plugin_id": "com.long.markdown-preview",
+      "plugin_folder": "MarkdownPreview",
+      "command_id": "markdown.preview",
+      "input": "# Long助手\n\n- isolated command",
+      "expected_success": true,
+      "allowed_api_methods": []
+    },
+    {
+      "id": "password-generate",
+      "plugin_id": "com.long.password-gen",
+      "plugin_folder": "PasswordGenerator",
+      "command_id": "password.generate",
+      "expected_success": true,
+      "expected_output": { "key": "result", "regex": "^.{20}$" },
+      "allowed_api_methods": []
+    },
+    {
+      "id": "regex-open",
+      "plugin_id": "com.long.regex-tester",
+      "plugin_folder": "RegexTester",
+      "command_id": "regex.test",
+      "input": "Long助手 2026",
+      "expected_success": true,
+      "allowed_api_methods": []
+    },
+    {
+      "id": "sample-hello",
+      "plugin_id": "com.long.sample",
+      "plugin_folder": "SamplePlugin",
+      "command_id": "sample.hello",
+      "expected_success": true,
+      "allowed_api_methods": []
+    },
+    {
+      "id": "text-diff-open",
+      "plugin_id": "com.long.text-diff",
+      "plugin_folder": "TextDiffPlugin",
+      "command_id": "text.diff",
+      "input": "baseline\nline two",
+      "expected_success": true,
+      "allowed_api_methods": []
+    },
+    {
+      "id": "timestamp-convert",
+      "plugin_id": "com.long.timestamp-converter",
+      "plugin_folder": "TimestampConverter",
+      "command_id": "timestamp.convert",
+      "input": "1704067200",
+      "expected_success": true,
+      "expected_output": { "key": "result", "contains": "2024-01-01T00:00:00.000Z" },
+      "allowed_api_methods": []
+    },
+    {
+      "id": "timestamp-invalid",
+      "plugin_id": "com.long.timestamp-converter",
+      "plugin_folder": "TimestampConverter",
+      "command_id": "timestamp.convert",
+      "input": "not-a-date",
+      "expected_success": false,
+      "allowed_api_methods": []
+    },
+    {
+      "id": "url-encode",
+      "plugin_id": "com.long.url-toolkit",
+      "plugin_folder": "UrlToolkit",
+      "command_id": "url.encode",
+      "input": "Long 助手/alpha?x=1",
+      "expected_success": true,
+      "expected_output": {
+        "key": "result",
+        "exact": "Long%20%E5%8A%A9%E6%89%8B%2Falpha%3Fx%3D1"
+      },
+      "allowed_api_methods": []
+    },
+    {
+      "id": "url-decode",
+      "plugin_id": "com.long.url-toolkit",
+      "plugin_folder": "UrlToolkit",
+      "command_id": "url.decode",
+      "input": "Long%20%E5%8A%A9%E6%89%8B%2Falpha%3Fx%3D1",
+      "expected_success": true,
+      "expected_output": { "key": "result", "exact": "Long 助手/alpha?x=1" },
+      "allowed_api_methods": []
+    },
+    {
+      "id": "url-invalid",
+      "plugin_id": "com.long.url-toolkit",
+      "plugin_folder": "UrlToolkit",
+      "command_id": "url.decode",
+      "input": "%E0%A4%A",
+      "expected_success": false,
+      "allowed_api_methods": []
+    },
+    {
+      "id": "uuid-generate",
+      "plugin_id": "com.long.uuid-generator",
+      "plugin_folder": "UuidGenerator",
+      "command_id": "uuid.generate",
+      "expected_success": true,
+      "expected_output": {
+        "key": "result",
+        "regex": "^(?:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\n){9}[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      },
+      "allowed_api_methods": []
+    }
+  ]
+}

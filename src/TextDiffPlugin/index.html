@@ -185,6 +185,11 @@
       const text = window.LongUI.commandText(command);
       if (text) textA.value = text;
       textB.focus();
+      return {
+        success: true,
+        message: t('status.commandReady', '文本对比已就绪'),
+        outputs: {}
+      };
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);

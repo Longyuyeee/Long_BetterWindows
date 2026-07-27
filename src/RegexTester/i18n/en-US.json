@@ -25,6 +25,7 @@
   "state.invalid": "Invalid regular expression",
   "status.completed": "Matching complete",
   "status.noMatches": "The expression is valid but has no matches",
+  "status.commandReady": "Regex tester is ready",
   "error.expression": "Regular expression error: {detail}",
   "error.clipboardRead": "The clipboard could not be read"
 }

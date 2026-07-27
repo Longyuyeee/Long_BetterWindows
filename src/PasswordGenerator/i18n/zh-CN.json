@@ -2,6 +2,7 @@
   "plugin.name": "密码生成器",
   "commands.password.generate.title": "生成安全密码",
   "commands.password.generate.description": "打开密码生成器并立即生成一组安全密码",
+  "commands.password.generate.outputs.result.description": "生成的安全密码",
   "page.title": "密码生成器",
   "page.description": "使用浏览器安全随机源生成高强度密码，不上传任何数据。",
   "options.ariaLabel": "密码生成选项",
@@ -17,5 +18,6 @@
   "action.copy": "复制密码",
   "status.generated": "新密码已生成",
   "status.copied": "密码已复制到剪贴板",
-  "error.copy": "复制失败"
+  "error.copy": "复制失败",
+  "error.unknownCommand": "未知密码命令"
 }

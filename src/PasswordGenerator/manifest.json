@@ -13,6 +13,13 @@
       "description": "打开密码生成器并立即生成一组安全密码",
       "aliases": ["密码", "password", "随机密码", "mima"],
       "accepted_inputs": ["none"],
+      "outputs": [
+        {
+          "key": "result",
+          "type": "text",
+          "description": "生成的安全密码"
+        }
+      ],
       "view_mode": "form",
       "priority": 14
     }

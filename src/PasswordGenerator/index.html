@@ -109,7 +109,13 @@
       lengthValue.textContent = size;
       renderStrength();
       setStatus('', '', '');
-      window.LongUI?.announce(t('status.generated', '新密码已生成'));
+      const message = t('status.generated', '新密码已生成');
+      window.LongUI?.announce(message);
+      return {
+        success: true,
+        message,
+        outputs: { result: { type: 'text', value } }
+      };
     }
 
     async function copy() {
@@ -134,7 +140,8 @@
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); generate(); }
     });
     window.LongUI?.onCommand(function (command) {
-      if (command.command_id === 'password.generate') generate();
+      if (command.command_id === 'password.generate') return generate();
+      return { success: false, message: t('error.unknownCommand', '未知密码命令'), outputs: {} };
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);

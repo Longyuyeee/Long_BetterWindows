@@ -208,6 +208,55 @@ public sealed class PluginPositiveFunctionMatrixTests
         Assert.Equal(2, release.ExitCode);
     }
 
+    [Fact]
+    public void LowRiskCommandCases_CoverEveryLowRiskPluginAndCommand()
+    {
+        var root = FindRepositoryRoot();
+        using var matrix = LoadMatrix(root);
+        var policy = matrix.RootElement.GetProperty("policy");
+        var casesPath = Path.GetFullPath(Path.Combine(
+            root,
+            policy.GetProperty("isolated_command_cases_path").GetString()!));
+        using var cases = JsonDocument.Parse(File.ReadAllText(casesPath));
+        var lowRiskPlugins = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Where(plugin => plugin.GetProperty("risk").GetString() == "low")
+            .ToDictionary(
+                plugin => plugin.GetProperty("id").GetString()!,
+                plugin => plugin.GetProperty("commands")
+                    .EnumerateArray()
+                    .Select(command => command.GetString()!)
+                    .ToHashSet(StringComparer.Ordinal),
+                StringComparer.OrdinalIgnoreCase);
+        var covered = cases.RootElement
+            .GetProperty("cases")
+            .EnumerateArray()
+            .GroupBy(
+                item => item.GetProperty("plugin_id").GetString()!,
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(item => item.GetProperty("command_id").GetString()!)
+                    .ToHashSet(StringComparer.Ordinal),
+                StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal(
+            policy.GetProperty("isolated_command_required_plugin_count").GetInt32(),
+            lowRiskPlugins.Count);
+        Assert.Equal(
+            lowRiskPlugins.Keys.Order(StringComparer.OrdinalIgnoreCase),
+            covered.Keys.Order(StringComparer.OrdinalIgnoreCase));
+        foreach (var (pluginId, commands) in lowRiskPlugins)
+            Assert.Equal(
+                commands.Order(StringComparer.Ordinal),
+                covered[pluginId].Order(StringComparer.Ordinal));
+        Assert.Equal(
+            policy.GetProperty("isolated_command_required_command_count").GetInt32(),
+            lowRiskPlugins.Values.Sum(commands => commands.Count));
+    }
+
     private static JsonDocument LoadMatrix(string root)
         => JsonDocument.Parse(File.ReadAllText(Path.Combine(
             root,

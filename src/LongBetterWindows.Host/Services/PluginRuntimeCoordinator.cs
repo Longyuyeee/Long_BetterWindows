@@ -1,3 +1,8 @@
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
@@ -86,6 +91,13 @@ namespace LongBetterWindows.Host.Services
                 Log.Error(
                     "Requested startup command does not exist: {CommandKey}",
                     request.CommandKey);
+                await WriteCommandReportAsync(
+                    request,
+                    null,
+                    AcceptedInputType.None,
+                    PluginCommandResult.Failure("Requested command was not found."),
+                    0,
+                    2);
                 return request.ExitAfterCommand ? 2 : null;
             }
 
@@ -94,6 +106,8 @@ namespace LongBetterWindows.Host.Services
                 ? AcceptedInputType.Text
                 : AcceptedInputType.None;
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            if (!string.IsNullOrWhiteSpace(request.QualityCommandReportPath))
+                CapabilityUsageTracker.Instance.ClearStats(descriptor.PluginId);
             Log.Information(
                 "Executing requested startup command: {CommandKey}",
                 request.CommandKey);
@@ -106,13 +120,91 @@ namespace LongBetterWindows.Host.Services
                     Text = inputType == AcceptedInputType.Text ? request.CommandText : null,
                 });
             stopwatch.Stop();
+            var exitCode = result.IsSuccess ? 0 : 3;
 
             Log.Information(
                 "Startup command {CommandKey} completed: Success={Success}, ElapsedMs={ElapsedMs:F1}",
                 request.CommandKey,
                 result.IsSuccess,
                 stopwatch.Elapsed.TotalMilliseconds);
-            return request.ExitAfterCommand ? result.IsSuccess ? 0 : 3 : null;
+            await WriteCommandReportAsync(
+                request,
+                descriptor,
+                inputType,
+                result,
+                stopwatch.Elapsed.TotalMilliseconds,
+                exitCode);
+            return request.ExitAfterCommand ? exitCode : null;
+        }
+
+        private static async Task WriteCommandReportAsync(
+            PluginRuntimeStartRequest request,
+            CommandDescriptor? descriptor,
+            AcceptedInputType inputType,
+            PluginCommandResult result,
+            double elapsedMilliseconds,
+            int exitCode)
+        {
+            if (string.IsNullOrWhiteSpace(request.QualityCommandReportPath))
+                return;
+
+            var fullPath = Path.GetFullPath(request.QualityCommandReportPath);
+            var directory = Path.GetDirectoryName(fullPath)
+                ?? throw new InvalidOperationException(
+                    "Quality command report path has no parent directory.");
+            Directory.CreateDirectory(directory);
+
+            var inputText = inputType == AcceptedInputType.Text
+                ? request.CommandText ?? string.Empty
+                : string.Empty;
+            var outputs = result.Outputs.ToDictionary(
+                item => item.Key,
+                item => new QualityCommandOutput(
+                    item.Value.Type.ToString().ToLowerInvariant(),
+                    item.Value.Value),
+                StringComparer.Ordinal);
+            var usage = descriptor is null
+                ? null
+                : CapabilityUsageTracker.Instance.GetStatsSnapshot(descriptor.PluginId);
+            var report = new QualityCommandExecutionReport(
+                1,
+                DateTimeOffset.UtcNow,
+                request.CommandKey ?? string.Empty,
+                descriptor?.PluginId,
+                descriptor?.Command.Id,
+                inputType.ToString().ToLowerInvariant(),
+                inputText.Length,
+                inputText.Length == 0
+                    ? null
+                    : Convert.ToHexString(
+                        SHA256.HashData(Encoding.UTF8.GetBytes(inputText)))
+                        .ToLowerInvariant(),
+                result.IsSuccess,
+                result.Message,
+                result.KeepPaletteOpen,
+                outputs,
+                usage?.CapabilityCalls
+                    ?? new Dictionary<string, int>(StringComparer.Ordinal),
+                usage?.ApiMethodCalls
+                    ?? new Dictionary<string, int>(StringComparer.Ordinal),
+                Math.Round(elapsedMilliseconds, 3),
+                exitCode);
+
+            var temporaryPath = fullPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await File.WriteAllTextAsync(
+                    temporaryPath,
+                    JsonSerializer.Serialize(
+                        report,
+                        new JsonSerializerOptions { WriteIndented = true }));
+                File.Move(temporaryPath, fullPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                    File.Delete(temporaryPath);
+            }
         }
 
         public void Dispose()
@@ -149,11 +241,37 @@ namespace LongBetterWindows.Host.Services
     internal sealed record PluginRuntimeStartRequest(
         string? CommandKey,
         string? CommandText,
-        bool ExitAfterCommand);
+        bool ExitAfterCommand,
+        string? QualityCommandReportPath = null);
 
     internal sealed record PluginRuntimeStartResult(
         int LoadedPluginCount,
         int RecoveredTransactionCount,
         int InstalledPackageCount,
         int? ExitCode);
+
+    internal sealed record QualityCommandExecutionReport(
+        [property: JsonPropertyName("schema_version")] int SchemaVersion,
+        [property: JsonPropertyName("recorded_at")] DateTimeOffset RecordedAt,
+        [property: JsonPropertyName("command_key")] string CommandKey,
+        [property: JsonPropertyName("plugin_id")] string? PluginId,
+        [property: JsonPropertyName("command_id")] string? CommandId,
+        [property: JsonPropertyName("input_type")] string InputType,
+        [property: JsonPropertyName("input_text_length")] int InputTextLength,
+        [property: JsonPropertyName("input_text_sha256")] string? InputTextSha256,
+        [property: JsonPropertyName("success")] bool Success,
+        [property: JsonPropertyName("message")] string? Message,
+        [property: JsonPropertyName("keep_palette_open")] bool KeepPaletteOpen,
+        [property: JsonPropertyName("outputs")]
+            IReadOnlyDictionary<string, QualityCommandOutput> Outputs,
+        [property: JsonPropertyName("capability_calls")]
+            IReadOnlyDictionary<string, int> CapabilityCalls,
+        [property: JsonPropertyName("api_method_calls")]
+            IReadOnlyDictionary<string, int> ApiMethodCalls,
+        [property: JsonPropertyName("elapsed_ms")] double ElapsedMilliseconds,
+        [property: JsonPropertyName("exit_code")] int ExitCode);
+
+    internal sealed record QualityCommandOutput(
+        [property: JsonPropertyName("type")] string Type,
+        [property: JsonPropertyName("value")] string Value);
 }

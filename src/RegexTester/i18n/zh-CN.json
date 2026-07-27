@@ -25,6 +25,7 @@
   "state.invalid": "正则表达式无效",
   "status.completed": "匹配完成",
   "status.noMatches": "表达式有效，但没有匹配",
+  "status.commandReady": "正则测试器已就绪",
   "error.expression": "正则表达式错误：{detail}",
   "error.clipboardRead": "无法读取剪贴板"
 }

@@ -191,7 +191,8 @@ namespace LongBetterWindows.Host
                     new PluginRuntimeStartRequest(
                         _startupOptions.RequestedCommandKey,
                         _startupOptions.RequestedCommandText,
-                        _startupOptions.ExitAfterCommand));
+                        _startupOptions.ExitAfterCommand,
+                        _startupOptions.QualityCommandReportPath));
                 _startupTrace?.Mark("plugin_runtime_ready");
                 if (runtimeResult.ExitCode is int exitCode)
                 {
@@ -363,7 +364,9 @@ namespace LongBetterWindows.Host
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginSettingsPersistenceReportPath)
                     || !string.IsNullOrWhiteSpace(
-                        _startupOptions.QualityStartupReportPath))
+                        _startupOptions.QualityStartupReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityCommandReportPath))
                 {
                     Shutdown(3);
                     return;

@@ -17,6 +17,7 @@
   "state.emptyDetail": "在左侧输入内容后，这里会显示预览",
   "status.copied": "HTML 已复制",
   "status.refreshed": "预览已刷新",
+  "status.commandReady": "Markdown 预览已就绪",
   "error.clipboardRead": "无法读取剪贴板",
   "error.copy": "复制失败"
 }

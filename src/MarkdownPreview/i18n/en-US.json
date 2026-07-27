@@ -17,6 +17,7 @@
   "state.emptyDetail": "Enter content on the left to preview it here",
   "status.copied": "HTML copied",
   "status.refreshed": "Preview refreshed",
+  "status.commandReady": "Markdown preview is ready",
   "error.clipboardRead": "The clipboard could not be read",
   "error.copy": "Copy failed"
 }

@@ -2,6 +2,7 @@
   "plugin.name": "Password Generator",
   "commands.password.generate.title": "Generate Secure Password",
   "commands.password.generate.description": "Open the password generator and create a secure password",
+  "commands.password.generate.outputs.result.description": "Generated secure password",
   "page.title": "Password Generator",
   "page.description": "Generate strong passwords with a secure browser random source. No data is uploaded.",
   "options.ariaLabel": "Password generation options",
@@ -17,5 +18,6 @@
   "action.copy": "Copy password",
   "status.generated": "New password generated",
   "status.copied": "Password copied to the clipboard",
-  "error.copy": "Copy failed"
+  "error.copy": "Copy failed",
+  "error.unknownCommand": "Unknown password command"
 }
