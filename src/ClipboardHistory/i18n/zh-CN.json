@@ -59,6 +59,7 @@
   "error.historyRead": "历史记录读取失败",
   "error.historyFormat": "本地历史数据格式无效",
   "error.historySave": "历史记录保存失败",
+  "error.historyConflict": "历史记录正在被其他组件更新，请重试",
   "error.clipboardRead": "读取剪贴板失败",
   "error.clipboardWrite": "写入剪贴板失败",
   "error.monitor": "剪贴板监听启动失败",

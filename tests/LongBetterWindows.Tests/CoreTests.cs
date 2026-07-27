@@ -303,8 +303,22 @@ public class CoreTests
         Assert.Contains("confirm: function", script);
         Assert.Contains("_pending[m.id].resolve", script);
         Assert.Contains("startMonitoring: function(callback)", script);
+        Assert.Contains("compareExchange: function(k,e,v)", script);
         Assert.Contains("m.type==='clipboard.changed'", script);
         Assert.Contains("com.test.bridge", script);
+    }
+
+    [Fact]
+    public void WebPluginArguments_NullableString_PreservesJsonNull()
+    {
+        using var document = JsonDocument.Parse("null");
+        object?[] arguments = [document.RootElement.Clone()];
+
+        Assert.Null(WebPluginArguments.GetNullableString(arguments, 0));
+        Assert.Null(WebPluginArguments.GetNullableString([], 0));
+        Assert.Equal(
+            "expected",
+            WebPluginArguments.GetNullableString(["expected"], 0));
     }
 
     [Fact]

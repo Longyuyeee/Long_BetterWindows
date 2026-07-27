@@ -1120,8 +1120,32 @@ public class QualityGateTests
         Assert.Contains("IPluginOpenRequestSource", background);
         Assert.Contains("StartMonitoringAsync", background);
         Assert.Contains("StorageKey = \"clipboard_history\"", background);
+        Assert.Contains("CompareExchangeAsync", background);
+        Assert.Contains("long.storage.compareExchange", page);
+        Assert.DoesNotContain("long.storage.set(storageKey", page);
         Assert.Contains("new WebPluginWithBackgroundAdapter", runtime);
         Assert.DoesNotContain("long.hotkey.register", page);
+    }
+
+    [Fact]
+    public void PluginManagement_ReleaseProbeUsesWeakReferenceAndFullCollection()
+    {
+        var toolCenter = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "ToolCenterControl.xaml.cs");
+        var qualityRuntime = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "QualityRuntimeService.cs");
+
+        Assert.Contains("ReleasePluginsForQuality", toolCenter);
+        Assert.Contains("new WeakReference(PluginManagementHost.Content)", toolCenter);
+        Assert.Contains("plugin_page_collected", qualityRuntime);
+        Assert.Contains("GCCollectionMode.Forced", qualityRuntime);
+        Assert.Contains("reference.IsAlive", qualityRuntime);
     }
 
     [Fact]

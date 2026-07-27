@@ -61,6 +61,7 @@
     const storageKey = 'clipboard_history';
     const hotkey = 'Ctrl+Shift+V';
     const maxItems = 500;
+    const maxStorageAttempts = 8;
     const fallbackIntervalMs = 15000;
     const historyList = document.getElementById('historyList');
     const searchInput = document.getElementById('searchInput');
@@ -233,44 +234,73 @@
         : Date.now().toString(36) + '-' + crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
     }
 
-    async function loadHistory() {
+    async function loadHistorySnapshot() {
       const response = await long.storage.get(storageKey);
       const stored = responseData(
         response,
         t('error.historyRead', '历史记录读取失败'));
-      if (!stored) return [];
+      if (!stored) return { raw: stored, items: [] };
       try {
-        return normalizeHistory(JSON.parse(stored));
+        return {
+          raw: stored,
+          items: normalizeHistory(JSON.parse(stored))
+        };
       } catch (_) {
         throw new Error(t('error.historyFormat', '本地历史数据格式无效'));
       }
     }
 
-    async function persistSnapshot(snapshot) {
-      const response = await long.storage.set(storageKey, JSON.stringify(snapshot));
-      responseData(response, t('error.historySave', '历史记录保存失败'));
+    async function loadHistory() {
+      return (await loadHistorySnapshot()).items;
+    }
+
+    async function persistMutation(transform) {
+      for (let attempt = 0; attempt < maxStorageAttempts; attempt += 1) {
+        const snapshot = await loadHistorySnapshot();
+        const next = transform(snapshot.items.slice());
+        if (!next) {
+          return { changed: false, items: snapshot.items };
+        }
+
+        const response = await long.storage.compareExchange(
+          storageKey,
+          snapshot.raw,
+          JSON.stringify(next));
+        const exchanged = responseData(
+          response,
+          t('error.historySave', '历史记录保存失败'));
+        if (exchanged) {
+          return { changed: true, items: next };
+        }
+      }
+
+      throw new Error(t(
+        'error.historyConflict',
+        '历史记录正在被其他组件更新，请重试'));
     }
 
     function queueMutation(transform, options) {
       const settings = options || {};
       const operation = mutationQueue.then(async function () {
         const previous = history;
-        const next = transform(history.slice());
-        if (!next) return false;
-        history = next;
-        renderHistory();
         try {
-          await persistSnapshot(next);
-          if (settings.successKey) {
+          const result = await persistMutation(transform);
+          history = result.items;
+          renderHistory();
+          if (result.changed && settings.successKey) {
             setStatus(
               settings.successKey,
               'success',
               settings.successFallback || settings.successKey,
               settings.successValues);
           }
-          return true;
+          return result.changed;
         } catch (error) {
-          history = previous;
+          try {
+            history = await loadHistory();
+          } catch (_) {
+            history = previous;
+          }
           renderHistory();
           setStatus(
             'status.persistenceRollback',

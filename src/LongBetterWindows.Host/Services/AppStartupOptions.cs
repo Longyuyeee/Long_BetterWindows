@@ -16,6 +16,7 @@ namespace LongBetterWindows.Host.Services
         public bool OpenMarketForQuality { get; private init; }
         public bool OpenDiagnosticsForQuality { get; private init; }
         public bool OpenPluginsForQuality { get; private init; }
+        public string? QualityPluginPageReleaseReportPath { get; private init; }
         public bool OpenSystemForQuality { get; private init; }
         public bool OpenSettingsForQuality { get; private init; }
         public bool ShowWelcomeForQuality { get; private init; }
@@ -45,6 +46,9 @@ namespace LongBetterWindows.Host.Services
                 .ToLowerInvariant() ?? "main";
             var themeOverride = ReadArgument(arguments, "--theme")?.ToLowerInvariant();
             var languageOverride = ReadArgument(arguments, "--language");
+            var pluginPageReleaseReport = ReadArgument(
+                arguments,
+                "--quality-plugin-page-release-report");
 
             return new AppStartupOptions
             {
@@ -68,7 +72,10 @@ namespace LongBetterWindows.Host.Services
                 OpenSuperPanelForQuality = HasSwitch(arguments, "--quality-open-super-panel"),
                 OpenMarketForQuality = HasSwitch(arguments, "--quality-open-market") || captureView == "market",
                 OpenDiagnosticsForQuality = HasSwitch(arguments, "--quality-open-diagnostics") || captureView == "diagnostics",
-                OpenPluginsForQuality = HasSwitch(arguments, "--quality-open-plugins") || captureView == "plugins",
+                OpenPluginsForQuality = HasSwitch(arguments, "--quality-open-plugins")
+                    || captureView == "plugins"
+                    || !string.IsNullOrWhiteSpace(pluginPageReleaseReport),
+                QualityPluginPageReleaseReportPath = pluginPageReleaseReport,
                 OpenSystemForQuality = HasSwitch(arguments, "--quality-open-system") || captureView == "system",
                 OpenSettingsForQuality = HasSwitch(arguments, "--quality-open-settings") || captureView == "settings",
                 ShowWelcomeForQuality = HasSwitch(arguments, "--quality-show-welcome"),

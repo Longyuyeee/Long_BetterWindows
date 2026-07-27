@@ -82,6 +82,54 @@ namespace LongBetterWindows.Host.Services
             });
         }
 
+        public Task<HostApiResponse<bool>> CompareExchangeAsync(
+            string key,
+            string? expectedValue,
+            string value)
+        {
+            return Task.Run(() =>
+            {
+                _lock.EnterWriteLock();
+                try
+                {
+                    var hadPrevious = _data.TryGetValue(key, out var previous);
+                    var current = hadPrevious ? previous : null;
+                    if (!string.Equals(
+                            current,
+                            expectedValue,
+                            StringComparison.Ordinal))
+                    {
+                        return HostApiResponse<bool>.Success(false);
+                    }
+
+                    _data[key] = value;
+                    try
+                    {
+                        SaveUnsafe();
+                        return HostApiResponse<bool>.Success(true);
+                    }
+                    catch
+                    {
+                        if (hadPrevious)
+                            _data[key] = previous!;
+                        else
+                            _data.Remove(key);
+                        throw;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse<bool>.Failure(
+                        ApiErrorCode.Unknown,
+                        ex.Message);
+                }
+                finally
+                {
+                    _lock.ExitWriteLock();
+                }
+            });
+        }
+
         public Task<HostApiResponse> DeleteAsync(string key)
         {
             return Task.Run(() =>

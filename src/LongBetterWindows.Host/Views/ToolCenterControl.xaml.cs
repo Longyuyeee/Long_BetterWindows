@@ -308,6 +308,13 @@ namespace LongBetterWindows.Host.Views
         internal void OpenMarketForQuality() => ShowPage("market");
         internal void OpenDiagnosticsForQuality() => ShowPage("diagnostics");
         internal void OpenPluginsForQuality() => ShowPage("plugins");
+        internal WeakReference ReleasePluginsForQuality()
+        {
+            ShowPage("plugins");
+            var reference = new WeakReference(PluginManagementHost.Content);
+            ShowPage("overview");
+            return reference;
+        }
         internal void OpenSystemForQuality() => ShowPage("system");
         internal void OpenSettingsForQuality() => ShowPage("settings");
         internal void ShowWelcomeForQuality()

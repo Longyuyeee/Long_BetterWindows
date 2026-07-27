@@ -10,6 +10,21 @@ namespace LongBetterWindows.Host.Engine
         internal static string GetString(object?[] args, int index, string defaultValue = "") =>
             args.Length > index ? args[index]?.ToString() ?? defaultValue : defaultValue;
 
+        internal static string? GetNullableString(object?[] args, int index)
+        {
+            if (args.Length <= index
+                || args[index] is null
+                || args[index] is System.Text.Json.JsonElement
+                {
+                    ValueKind: System.Text.Json.JsonValueKind.Null
+                })
+            {
+                return null;
+            }
+
+            return args[index]!.ToString();
+        }
+
         internal static int GetInt(object?[] args, int index, int defaultValue = 0) =>
             int.TryParse(GetString(args, index), out var value) ? value : defaultValue;
 

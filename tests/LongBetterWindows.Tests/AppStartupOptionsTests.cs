@@ -28,6 +28,7 @@ public class AppStartupOptionsTests
             "--quality-edit-workflow", "workflow.quality.editor",
             "--quality-workflow-upgrade-package", "quality-v2.lpak",
             "--quality-terminal-export-dir", "quality-exports",
+            "--quality-plugin-page-release-report", "plugin-release.json",
             "--quality-show-welcome",
             "--quality-market-list",
         ]);
@@ -52,6 +53,9 @@ public class AppStartupOptionsTests
         Assert.Equal("workflow.quality.editor", options.QualityWorkflowEditorId);
         Assert.Equal("quality-v2.lpak", options.QualityWorkflowUpgradePackagePath);
         Assert.Equal("quality-exports", options.QualityTerminalExportDirectory);
+        Assert.Equal(
+            "plugin-release.json",
+            options.QualityPluginPageReleaseReportPath);
         Assert.True(options.ShowWelcomeForQuality);
         Assert.True(options.ShowMarketListForQuality);
     }

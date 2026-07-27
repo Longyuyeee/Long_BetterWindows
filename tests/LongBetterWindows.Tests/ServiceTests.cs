@@ -42,6 +42,64 @@ public class ServiceTests
     }
 
     [Fact]
+    public async Task StorageService_CompareExchange_RejectsStaleSnapshot()
+    {
+        var dir = Path.Combine(
+            Path.GetTempPath(),
+            $"test_storage_{Guid.NewGuid():N}");
+        try
+        {
+            using var service = new StorageService(
+                Path.Combine(dir, "test.json"));
+            Assert.True((await service.SetAsync("history", "v1")).IsSuccess);
+
+            var exchanged = await service.CompareExchangeAsync(
+                "history",
+                "stale",
+                "v2");
+            var current = await service.GetAsync("history");
+
+            Assert.True(exchanged.IsSuccess, exchanged.ErrorMessage);
+            Assert.False(exchanged.Data);
+            Assert.Equal("v1", current.Data);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public async Task StorageService_CompareExchange_AllowsOneConcurrentWriter()
+    {
+        var dir = Path.Combine(
+            Path.GetTempPath(),
+            $"test_storage_{Guid.NewGuid():N}");
+        try
+        {
+            using var service = new StorageService(
+                Path.Combine(dir, "test.json"));
+            Assert.True((await service.SetAsync("history", "v0")).IsSuccess);
+
+            var attempts = await Task.WhenAll(
+                Enumerable.Range(1, 16).Select(index =>
+                    service.CompareExchangeAsync(
+                        "history",
+                        "v0",
+                        $"v{index}")));
+            var current = await service.GetAsync("history");
+
+            Assert.All(
+                attempts,
+                attempt => Assert.True(
+                    attempt.IsSuccess,
+                    attempt.ErrorMessage));
+            Assert.Single(attempts.Where(attempt => attempt.Data));
+            Assert.Contains(
+                current.Data,
+                Enumerable.Range(1, 16).Select(index => $"v{index}"));
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public async Task StorageService_ContainsKey_ReturnsTrue()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"test_storage_{Guid.NewGuid():N}");

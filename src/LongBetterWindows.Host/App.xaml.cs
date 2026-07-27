@@ -194,6 +194,18 @@ namespace LongBetterWindows.Host
                         DispatcherPriority.ApplicationIdle);
                 }
 
+                if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginPageReleaseReportPath))
+                {
+                    if (MainWindow is not MainWindow releaseProbeWindow)
+                        throw new InvalidOperationException(
+                            "Plugin page release probe requires the main window.");
+                    await _qualityRuntime!.RunPluginPageReleaseProbeAsync(
+                        releaseProbeWindow,
+                        _startupOptions.QualityPluginPageReleaseReportPath);
+                    return;
+                }
+
                 if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath))
                     await _qualityRuntime!.CaptureAsync(
                         _startupOptions,
@@ -212,7 +224,9 @@ namespace LongBetterWindows.Host
             catch (Exception ex)
             {
                 Log.Error(ex, "插件加载失败");
-                if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath))
+                if (!string.IsNullOrWhiteSpace(_startupOptions.QualityCapturePath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginPageReleaseReportPath))
                 {
                     Shutdown(3);
                     return;

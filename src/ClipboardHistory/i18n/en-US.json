@@ -59,6 +59,7 @@
   "error.historyRead": "Failed to read history",
   "error.historyFormat": "Local history data has an invalid format",
   "error.historySave": "Failed to save history",
+  "error.historyConflict": "History is being updated by another component; try again",
   "error.clipboardRead": "Failed to read the clipboard",
   "error.clipboardWrite": "Failed to write to the clipboard",
   "error.monitor": "Failed to start clipboard monitoring",

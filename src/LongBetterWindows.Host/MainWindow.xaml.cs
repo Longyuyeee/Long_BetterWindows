@@ -197,6 +197,9 @@ namespace LongBetterWindows.Host
         internal void ShowMarketplaceListForQuality()
             => ToolCenter.ShowMarketplaceListForQuality();
 
+        internal WeakReference ReleasePluginManagementForQuality()
+            => ToolCenter.ReleasePluginsForQuality();
+
         internal void ShowEmbeddedPlugin(
             string title,
             FrameworkElement content,

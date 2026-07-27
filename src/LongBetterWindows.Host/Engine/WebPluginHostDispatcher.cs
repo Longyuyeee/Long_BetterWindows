@@ -82,6 +82,10 @@ namespace LongBetterWindows.Host.Engine
                 // === long.storage ===
                 "storage.get" => Ok(h.Storage.GetAsync(WebPluginArguments.GetString(args, 0))),
                 "storage.set" => Ok(h.Storage.SetAsync(WebPluginArguments.GetString(args, 0), WebPluginArguments.GetString(args, 1))),
+                "storage.compareExchange" => Ok(h.Storage.CompareExchangeAsync(
+                    WebPluginArguments.GetString(args, 0),
+                    WebPluginArguments.GetNullableString(args, 1),
+                    WebPluginArguments.GetString(args, 2))),
                 "storage.delete" => Ok(h.Storage.DeleteAsync(WebPluginArguments.GetString(args, 0))),
                 "storage.containsKey" => Ok(h.Storage.ContainsKeyAsync(WebPluginArguments.GetString(args, 0))),
 

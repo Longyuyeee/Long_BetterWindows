@@ -14,6 +14,7 @@ public sealed class ClipboardHistoryBackgroundPlugin :
     private const string StorageKey = "clipboard_history";
     private const string Hotkey = "Ctrl+Shift+V";
     private const int MaxItems = 500;
+    private const int MaxStorageAttempts = 8;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -127,30 +128,46 @@ public sealed class ClipboardHistoryBackgroundPlugin :
     {
         try
         {
-            var items = await LoadHistoryAsync();
-            if (items.FirstOrDefault()?.Content == text)
-                return;
-
-            items.RemoveAll(item => item.Content == text);
-            items.Insert(0, new HistoryItem
+            for (var attempt = 0; attempt < MaxStorageAttempts; attempt++)
             {
-                Id = Guid.NewGuid().ToString("N"),
-                Content = text,
-                Type = "text",
-                Timestamp = DateTimeOffset.UtcNow,
-            });
-            if (items.Count > MaxItems)
-                items.RemoveRange(MaxItems, items.Count - MaxItems);
+                var snapshot = await LoadHistoryAsync();
+                if (!snapshot.IsSuccess)
+                    return;
 
-            var result = await _storage.SetAsync(
-                StorageKey,
-                JsonSerializer.Serialize(items, JsonOptions));
-            if (!result.IsSuccess)
-            {
-                Log.Warning(
-                    "[ClipboardHistory.Background] 历史持久化失败: {Error}",
-                    result.ErrorMessage);
+                var items = snapshot.Items;
+                if (items.FirstOrDefault()?.Content == text)
+                    return;
+
+                items.RemoveAll(item => item.Content == text);
+                items.Insert(0, new HistoryItem
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Content = text,
+                    Type = "text",
+                    Timestamp = DateTimeOffset.UtcNow,
+                });
+                if (items.Count > MaxItems)
+                    items.RemoveRange(MaxItems, items.Count - MaxItems);
+
+                var result = await _storage.CompareExchangeAsync(
+                    StorageKey,
+                    snapshot.Raw,
+                    JsonSerializer.Serialize(items, JsonOptions));
+                if (!result.IsSuccess)
+                {
+                    Log.Warning(
+                        "[ClipboardHistory.Background] 历史持久化失败: {Error}",
+                        result.ErrorMessage);
+                    return;
+                }
+
+                if (result.Data)
+                    return;
             }
+
+            Log.Warning(
+                "[ClipboardHistory.Background] 历史持久化冲突超过 {Attempts} 次",
+                MaxStorageAttempts);
         }
         catch (Exception exception)
         {
@@ -160,25 +177,34 @@ public sealed class ClipboardHistoryBackgroundPlugin :
         }
     }
 
-    private async Task<List<HistoryItem>> LoadHistoryAsync()
+    private async Task<HistorySnapshot> LoadHistoryAsync()
     {
         var result = await _storage.GetAsync(StorageKey);
-        if (!result.IsSuccess || string.IsNullOrWhiteSpace(result.Data))
-            return [];
+        if (!result.IsSuccess)
+        {
+            Log.Warning(
+                "[ClipboardHistory.Background] 历史读取失败: {Error}",
+                result.ErrorMessage);
+            return new HistorySnapshot(false, null, []);
+        }
+        if (string.IsNullOrWhiteSpace(result.Data))
+            return new HistorySnapshot(true, result.Data, []);
 
         try
         {
-            return JsonSerializer.Deserialize<List<HistoryItem>>(
-                       result.Data,
-                       JsonOptions)
-                   ?? [];
+            return new HistorySnapshot(
+                true,
+                result.Data,
+                JsonSerializer.Deserialize<List<HistoryItem>>(
+                    result.Data,
+                    JsonOptions) ?? []);
         }
         catch (JsonException exception)
         {
             Log.Warning(
                 exception,
                 "[ClipboardHistory.Background] 现有历史格式无效，将从新记录恢复");
-            return [];
+            return new HistorySnapshot(true, result.Data, []);
         }
     }
 
@@ -202,4 +228,9 @@ public sealed class ClipboardHistoryBackgroundPlugin :
         [JsonPropertyName("timestamp")]
         public DateTimeOffset Timestamp { get; init; }
     }
+
+    private sealed record HistorySnapshot(
+        bool IsSuccess,
+        string? Raw,
+        List<HistoryItem> Items);
 }

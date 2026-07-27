@@ -158,7 +158,8 @@ namespace LongBetterWindows.Host.Engine
                 => "network.http",
 
             // 本地存储（无需声明，所有插件都可用）
-            "storage.get" or "storage.set" or "storage.delete" or "storage.containsKey"
+            "storage.get" or "storage.set" or "storage.compareExchange"
+                or "storage.delete" or "storage.containsKey"
                 => null,
 
             // 通知
@@ -296,6 +297,7 @@ window.long = {
   storage: {
     get: function(k){return call('storage.get',[k]);},
     set: function(k,v){return call('storage.set',[k,v]);},
+    compareExchange: function(k,e,v){return call('storage.compareExchange',[k,e,v]);},
     delete: function(k){return call('storage.delete',[k]);},
     containsKey: function(k){return call('storage.containsKey',[k]);}
   },
