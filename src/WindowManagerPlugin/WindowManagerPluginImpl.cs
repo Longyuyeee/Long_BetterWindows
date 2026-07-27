@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Windows;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
@@ -27,7 +26,7 @@ public class WindowManagerPluginImpl :
 
     public string Id => "com.long.window-manager";
     public string Name => Text("plugin.name", "窗口管理");
-    public string Version => "2.1.0";
+    public string Version => "2.1.1";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -45,16 +44,16 @@ public class WindowManagerPluginImpl :
         var bindings = new (string Key, Action Callback)[]
         {
             (_configuredTopmostHotkey, ToggleTopmost),
-            ("Ctrl+Alt+Left", () => Snap("left")),
-            ("Ctrl+Alt+Right", () => Snap("right")),
-            ("Ctrl+Alt+Up", () => Snap("max")),
-            ("Ctrl+Alt+Down", () => Snap("bottom")),
-            ("Ctrl+Alt+1", () => Snap("top-left")),
-            ("Ctrl+Alt+2", () => Snap("top-right")),
-            ("Ctrl+Alt+3", () => Snap("bottom-left")),
-            ("Ctrl+Alt+4", () => Snap("bottom-right")),
-            ("Ctrl+Alt+Shift+Left", () => Snap("third-left")),
-            ("Ctrl+Alt+Shift+Right", () => Snap("third-right")),
+            ("Ctrl+Alt+Left", () => ApplyLayout(WindowLayout.Left, "left")),
+            ("Ctrl+Alt+Right", () => ApplyLayout(WindowLayout.Right, "right")),
+            ("Ctrl+Alt+Up", () => ApplyLayout(WindowLayout.Maximize, "max")),
+            ("Ctrl+Alt+Down", () => ApplyLayout(WindowLayout.Bottom, "bottom")),
+            ("Ctrl+Alt+1", () => ApplyLayout(WindowLayout.TopLeft, "top-left")),
+            ("Ctrl+Alt+2", () => ApplyLayout(WindowLayout.TopRight, "top-right")),
+            ("Ctrl+Alt+3", () => ApplyLayout(WindowLayout.BottomLeft, "bottom-left")),
+            ("Ctrl+Alt+4", () => ApplyLayout(WindowLayout.BottomRight, "bottom-right")),
+            ("Ctrl+Alt+Shift+Left", () => ApplyLayout(WindowLayout.ThirdLeft, "third-left")),
+            ("Ctrl+Alt+Shift+Right", () => ApplyLayout(WindowLayout.ThirdRight, "third-right")),
         };
 
         foreach (var binding in bindings)
@@ -135,25 +134,38 @@ public class WindowManagerPluginImpl :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        switch (invocation.CommandId)
+        if (invocation.CommandId == "window.guide")
         {
-            case "window.guide": ShowMainUI(); break;
-            case "window.topmost": ToggleTopmost(); break;
-            case "window.left": Snap("left"); break;
-            case "window.right": Snap("right"); break;
-            case "window.maximize": Snap("max"); break;
-            case "window.bottom": Snap("bottom"); break;
-            case "window.top-left": Snap("top-left"); break;
-            case "window.top-right": Snap("top-right"); break;
-            case "window.bottom-left": Snap("bottom-left"); break;
-            case "window.bottom-right": Snap("bottom-right"); break;
-            case "window.third-left": Snap("third-left"); break;
-            case "window.third-right": Snap("third-right"); break;
-            default:
-                return Task.FromResult(PluginCommandResult.Failure(string.Format(
-                    Text("error.unknownCommand", "未知窗口命令: {0}"),
-                    invocation.CommandId)));
+            ShowMainUI();
+            return Task.FromResult(PluginCommandResult.Success(
+                Text("command.completed", "窗口布局已应用")));
         }
+
+        HostApiResponse<WindowOperationOutcome>? operation = invocation.CommandId switch
+        {
+            "window.topmost" => _host.WindowInfo.ToggleForegroundTopmost(),
+            "window.left" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.Left),
+            "window.right" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.Right),
+            "window.maximize" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.Maximize),
+            "window.bottom" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.Bottom),
+            "window.top-left" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.TopLeft),
+            "window.top-right" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.TopRight),
+            "window.bottom-left" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.BottomLeft),
+            "window.bottom-right" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.BottomRight),
+            "window.third-left" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.ThirdLeft),
+            "window.third-right" => _host.WindowInfo.ApplyForegroundLayout(WindowLayout.ThirdRight),
+            _ => null,
+        };
+
+        if (operation is null)
+        {
+            return Task.FromResult(PluginCommandResult.Failure(string.Format(
+                Text("error.unknownCommand", "未知窗口命令: {0}"),
+                invocation.CommandId)));
+        }
+        if (!operation.IsSuccess)
+            return Task.FromResult(PluginCommandResult.Failure(
+                FormatOperationFailure(operation)));
 
         return Task.FromResult(PluginCommandResult.Success(
             Text("command.completed", "窗口布局已应用")));
@@ -161,48 +173,55 @@ public class WindowManagerPluginImpl :
 
     private void ToggleTopmost()
     {
-        var window = GetForegroundWindow();
-        if (window == IntPtr.Zero) return;
-        var isTopmost = (GetWindowLong(window, GwlExstyle) & WsExTopmost) != 0;
-        SetWindowPos(window, isTopmost ? HwndNotopmost : HwndTopmost, 0, 0, 0, 0,
-            SwpNosize | SwpNomove | SwpShowwindow);
-        FloatingHudWindow.ShowToast(isTopmost
-            ? Text("toast.topmostDisabled", "已取消窗口置顶")
-            : Text("toast.topmostEnabled", "窗口已置顶"));
+        var result = _host.WindowInfo.ToggleForegroundTopmost();
+        if (!result.IsSuccess)
+        {
+            FloatingHudWindow.ShowToast(FormatOperationFailure(result));
+            return;
+        }
+
+        FloatingHudWindow.ShowToast(result.Data?.After?.IsTopmost == true
+            ? Text("toast.topmostEnabled", "窗口已置顶")
+            : Text("toast.topmostDisabled", "已取消窗口置顶"));
     }
 
-    private void Snap(string layout)
+    private void ApplyLayout(WindowLayout layout, string localizationKey)
     {
-        Application.Current.Dispatcher.Invoke(() =>
-        {
-            var window = GetForegroundWindow();
-            if (window == IntPtr.Zero) return;
-            var monitor = MonitorFromWindow(window, MonitorDefaulttonearest);
-            var monitorInfo = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
-            if (!GetMonitorInfoW(monitor, ref monitorInfo)) return;
+        var result = _host.WindowInfo.ApplyForegroundLayout(layout);
+        FloatingHudWindow.ShowToast(result.IsSuccess
+            ? LayoutName(localizationKey)
+            : FormatOperationFailure(result));
+    }
 
-            var left = monitorInfo.Work.Left;
-            var top = monitorInfo.Work.Top;
-            var width = monitorInfo.Work.Right - left;
-            var height = monitorInfo.Work.Bottom - top;
-            var target = layout switch
+    private string FormatOperationFailure(
+        HostApiResponse<WindowOperationOutcome> result)
+    {
+        var detail = result.ErrorMessage ?? result.ErrorCode.ToString();
+        var message = string.Format(
+            Text("error.operationFailed", "窗口操作失败：{0}"),
+            detail);
+        if (result.Data is
             {
-                "left" => (left, top, width / 2, height),
-                "right" => (left + width / 2, top, width / 2, height),
-                "max" => (left, top, width, height),
-                "bottom" => (left, top + height / 2, width, height / 2),
-                "top-left" => (left, top, width / 2, height / 2),
-                "top-right" => (left + width / 2, top, width / 2, height / 2),
-                "bottom-left" => (left, top + height / 2, width / 2, height / 2),
-                "bottom-right" => (left + width / 2, top + height / 2, width / 2, height / 2),
-                "third-left" => (left, top, width / 3, height),
-                "third-right" => (left + width / 3, top, width * 2 / 3, height),
-                _ => (left, top, width, height),
-            };
-
-            SetWindowPos(window, IntPtr.Zero, target.Item1, target.Item2, target.Item3, target.Item4, SwpShowwindow);
-            FloatingHudWindow.ShowToast(LayoutName(layout));
-        });
+                RecoveryAttempted: true,
+                RecoverySucceeded: true,
+            })
+        {
+            return message + Text(
+                "error.recovered",
+                "；已恢复原窗口状态");
+        }
+        if (result.Data is
+            {
+                RecoveryAttempted: true,
+                RecoverySucceeded: false,
+            } outcome)
+        {
+            return message + string.Format(
+                Text("error.recoveryFailed", "；恢复原状态失败：{0}"),
+                outcome.RecoveryErrorMessage
+                    ?? outcome.RecoveryErrorCode.ToString());
+        }
+        return message;
     }
 
     public Task OnLanguageChangedAsync(
@@ -286,17 +305,4 @@ public class WindowManagerPluginImpl :
                 ? value
                 : fallback;
 
-    private static readonly IntPtr HwndTopmost = new(-1);
-    private static readonly IntPtr HwndNotopmost = new(-2);
-    private const uint SwpNosize = 0x0001, SwpNomove = 0x0002, SwpShowwindow = 0x0040;
-    private const int GwlExstyle = -20, WsExTopmost = 0x0008;
-    private const uint MonitorDefaulttonearest = 2;
-
-    [StructLayout(LayoutKind.Sequential)] private struct MonitorInfo { public uint Size; public Rect Monitor; public Rect Work; public uint Flags; }
-    [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
-    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr window, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
-    [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr window, int index);
-    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetMonitorInfoW(IntPtr monitor, ref MonitorInfo info);
 }

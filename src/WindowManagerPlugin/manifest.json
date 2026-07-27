@@ -1,10 +1,10 @@
 {
   "id": "com.long.window-manager",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "name": "窗口管理",
   "author": "Long",
   "entry_point": "WindowManagerPlugin.dll",
-  "capabilities": ["system.hotkey"],
+  "capabilities": ["system.hotkey", "window.info"],
   "commands": [
     {"id":"window.guide","title":"窗口管理指南","description":"查看窗口布局指令与快捷键","aliases":["窗口快捷键","window guide"],"accepted_inputs":["none"],"view_mode":"form","priority":10},
     {"id":"window.topmost","title":"切换窗口置顶","description":"置顶或取消置顶当前窗口","aliases":["置顶窗口","topmost"],"accepted_inputs":["none"],"view_mode":"none","priority":32},

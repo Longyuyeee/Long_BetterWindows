@@ -120,10 +120,10 @@
       "Category": "系统增强",
       "Tags": ["窗口", "布局", "热键"],
       "Versions": [{
-        "Version": "2.1.0",
-        "PublishedAt": "2026-07-18T00:00:00+08:00",
-        "ReleaseNotes": "新增完整布局命令集与窗口指南。",
-        "Capabilities": ["system.hotkey"],
+        "Version": "2.1.1",
+        "PublishedAt": "2026-07-27T00:00:00+08:00",
+        "ReleaseNotes": "窗口布局与置顶改为宿主事务执行，失败时恢复原窗口状态。",
+        "Capabilities": ["system.hotkey", "window.info"],
         "MinHostVersion": "0.5.0",
         "MinApiVersion": "1.0.0",
         "MinUiKitVersion": "1.0.0"

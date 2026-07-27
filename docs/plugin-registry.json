@@ -65,12 +65,12 @@
     {
       "id": "com.long.window-manager",
       "name": "窗口管理",
-      "version": "1.0.0",
-      "description": "置顶+分屏+最大化",
+      "version": "2.1.1",
+      "description": "事务化置顶、分屏与状态恢复",
       "author": "Long",
       "download_url": null,
       "min_api_version": "1.0.0",
-      "capabilities": ["system.hotkey"],
+      "capabilities": ["system.hotkey", "window.info"],
       "tags": ["窗口", "置顶", "分屏"]
     },
     {
