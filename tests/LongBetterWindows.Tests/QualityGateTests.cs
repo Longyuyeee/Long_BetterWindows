@@ -1244,6 +1244,10 @@ public class QualityGateTests
             "LongBetterWindows.Host",
             "Engine",
             "PluginRuntimeLoader.cs");
+        var hostProject = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "LongBetterWindows.Host.csproj");
 
         Assert.Contains("\"background\"", manifest);
         Assert.Contains("ClipboardHistory.Background.dll", manifest);
@@ -1254,6 +1258,9 @@ public class QualityGateTests
         Assert.Contains("long.storage.compareExchange", page);
         Assert.DoesNotContain("long.storage.set(storageKey", page);
         Assert.Contains("new WebPluginWithBackgroundAdapter", runtime);
+        Assert.Contains(
+            "ClipboardHistory.Background.dll",
+            hostProject);
         Assert.DoesNotContain("long.hotkey.register", page);
     }
 

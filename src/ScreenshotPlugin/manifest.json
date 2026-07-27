@@ -1,6 +1,6 @@
 {
   "id": "com.long.screenshot",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": "截图工具",
   "author": "Long",
   "entry_point": "ScreenshotPlugin.dll",

@@ -2,6 +2,7 @@ using System.Windows;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
+using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
 using Serilog;
 
@@ -19,13 +20,14 @@ public class ColorPickerPluginImpl :
     private string _configuredHotkey = "Ctrl+Shift+P";
     private string? _registeredHotkey;
     private ColorPickerWindow? _window;
+    private CancellationTokenSource _operationLifetime = new();
     private readonly List<WeakReference<HotkeySettingsControl>> _settings = [];
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.color-picker";
     public string Name => Text("plugin.name", "颜色拾取器");
-    public string Version => "1.1.0";
+    public string Version => "1.1.1";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -40,6 +42,11 @@ public class ColorPickerPluginImpl :
 
     public async Task<bool> StartAsync()
     {
+        if (_operationLifetime.IsCancellationRequested)
+        {
+            _operationLifetime.Dispose();
+            _operationLifetime = new CancellationTokenSource();
+        }
         _registeredHotkey = await TryRegisterAsync(_configuredHotkey);
         if (_registeredHotkey == null
             && !_configuredHotkey.Equals(
@@ -69,6 +76,7 @@ public class ColorPickerPluginImpl :
 
     public async Task<bool> StopAsync()
     {
+        _operationLifetime.Cancel();
         if (_registeredHotkey != null)
             await _host!.HotKey.UnregisterAsync(_registeredHotkey);
         _registeredHotkey = null;
@@ -87,19 +95,39 @@ public class ColorPickerPluginImpl :
                 return;
             }
 
+            var operationToken = _operationLifetime.Token;
             _window = new ColorPickerWindow(
                 async hex =>
                 {
-                    var result = await _host!.Clipboard.SetTextAsync(hex);
-                    if (result.IsSuccess)
+                    try
                     {
+                        await AsyncDeliveryBoundary.RunAsync(
+                            () => Task.FromResult(hex),
+                            async value =>
+                            {
+                                var result =
+                                    await _host!.Clipboard.SetTextAsync(value);
+                                if (!result.IsSuccess)
+                                {
+                                    throw new InvalidOperationException(
+                                        result.ErrorMessage
+                                        ?? "Clipboard write failed.");
+                                }
+                            },
+                            operationToken);
                         FloatingHudWindow.ShowToast(string.Format(
                             Text("toast.copied", "已复制颜色 {0}"),
                             hex));
                     }
-                    else
+                    catch (OperationCanceledException)
+                        when (operationToken.IsCancellationRequested)
                     {
-                        Log.Warning("[ColorPicker] 颜色复制失败: {Error}", result.ErrorMessage);
+                        Log.Information(
+                            "[ColorPicker] Cancelled pending clipboard delivery");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "[ColorPicker] 颜色复制失败");
                         FloatingHudWindow.ShowToast(Text(
                             "toast.copyFailed",
                             "拾取成功，但写入剪贴板失败"));

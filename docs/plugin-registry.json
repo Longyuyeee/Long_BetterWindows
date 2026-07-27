@@ -10,7 +10,7 @@
     {
       "id": "com.long.folder-note",
       "name": "文件夹备注助手",
-      "version": "1.0.0",
+      "version": "1.1.1",
       "description": "为文件夹添加备注，NTFS ADS 存储",
       "author": "Long",
       "download_url": null,
@@ -54,7 +54,7 @@
     {
       "id": "com.long.screenshot",
       "name": "截图工具",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "description": "全屏+区域截图，复制到剪贴板",
       "author": "Long",
       "download_url": null,

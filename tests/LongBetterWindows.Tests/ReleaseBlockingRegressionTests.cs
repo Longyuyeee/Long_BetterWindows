@@ -319,8 +319,12 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains("onCommand(async function", translate);
         Assert.Contains("const success = await translate()", translate);
         Assert.Contains("success: success", translate);
-        Assert.Contains("return await CaptureFullScreenAsync()", screenshot);
-        Assert.Contains("Task<PluginCommandResult> CaptureFullScreenAsync()", screenshot);
+        Assert.Contains(
+            "return await CaptureFullScreenAsync(cancellationToken)",
+            screenshot);
+        Assert.Contains(
+            "Task<PluginCommandResult> CaptureFullScreenAsync(",
+            screenshot);
         Assert.Contains("return await ShowNoteHudAsync(folderPath)", folderNote);
         Assert.Contains("Application.Current.Dispatcher.Invoke(() => _activeHud?.Close())", folderNote);
     }
@@ -353,6 +357,8 @@ public sealed class ReleaseBlockingRegressionTests
 
         Assert.Contains("_host.ScreenCapture.CaptureToBitmapAsync()", screenshot);
         Assert.Contains("_host.ScreenCapture.CaptureRegionAsync(", screenshot);
+        Assert.Contains("AsyncDeliveryBoundary.RunAsync(", screenshot);
+        Assert.Contains("_operationLifetime.Cancel()", screenshot);
         Assert.DoesNotContain("internal static class ScreenCapture", screenshot);
         Assert.Contains("GetCursorPos(out _screenStart)", selector);
         Assert.Contains("Close();", selector);

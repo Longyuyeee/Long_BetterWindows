@@ -116,6 +116,10 @@
     <Exec Command="robocopy &quot;$(RepoRoot)src\RegexTester&quot; &quot;$(OutputPath)Plugins\RegexTester&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="robocopy &quot;$(RepoRoot)src\UuidGenerator&quot; &quot;$(OutputPath)Plugins\UuidGenerator&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="robocopy &quot;$(RepoRoot)src\ClipboardHistory&quot; &quot;$(OutputPath)Plugins\ClipboardHistory&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
+    <Copy
+      SourceFiles="$(RepoRoot)src\ClipboardHistoryBackground\bin\$(Configuration)\net8.0-windows\ClipboardHistory.Background.dll"
+      DestinationFolder="$(OutputPath)Plugins\ClipboardHistory"
+      Condition="Exists('$(RepoRoot)src\ClipboardHistoryBackground\bin\$(Configuration)\net8.0-windows\ClipboardHistory.Background.dll')" />
     <Exec Command="robocopy &quot;$(RepoRoot)src\DevToolkit&quot; &quot;$(OutputPath)Plugins\DevToolkit&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="robocopy &quot;$(RepoRoot)src\FileOrganizer&quot; &quot;$(OutputPath)Plugins\FileOrganizer&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />
     <Exec Command="robocopy &quot;$(RepoRoot)src\HardwareMonitor&quot; &quot;$(OutputPath)Plugins\HardwareMonitor&quot; /S /XD bin obj /XF config.json /NJH /NJS /NDL /NFL &gt; nul || exit 0" />

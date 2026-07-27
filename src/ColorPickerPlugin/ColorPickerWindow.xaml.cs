@@ -16,6 +16,7 @@ public sealed record ColorPickerWindowLocalization(
 public partial class ColorPickerWindow : Window
 {
     private readonly Func<string, Task> _onPicked;
+    private readonly CancellationTokenSource _captureLifetime = new();
     private bool _capturing;
     private bool _leftWasDown;
 
@@ -53,7 +54,8 @@ public partial class ColorPickerWindow : Window
 
     private async Task CaptureLoopAsync()
     {
-        while (_capturing)
+        var cancellationToken = _captureLifetime.Token;
+        while (_capturing && !cancellationToken.IsCancellationRequested)
         {
             try
             {
@@ -76,11 +78,17 @@ public partial class ColorPickerWindow : Window
                     return;
                 }
                 _leftWasDown = leftDown;
-                await Task.Delay(35);
+                await Task.Delay(35, cancellationToken);
             }
-            catch
+            catch (OperationCanceledException)
+                when (cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(80);
+                return;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[ColorPicker] Capture loop iteration failed");
+                await Task.Delay(80, cancellationToken);
             }
         }
     }
@@ -139,5 +147,9 @@ public partial class ColorPickerWindow : Window
         e.Handled = true;
     }
 
-    private void Window_Closed(object? sender, EventArgs e) => _capturing = false;
+    private void Window_Closed(object? sender, EventArgs e)
+    {
+        _capturing = false;
+        _captureLifetime.Cancel();
+    }
 }
