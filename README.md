@@ -89,6 +89,25 @@ Long助手不是 uTools 插件兼容层。我们参考的是成熟的统一入�
 | 宏回放一次 / 循环 | `F7` / `F8` |
 | 全屏截图 | `Ctrl + Shift + S` |
 
+### 一键启动与打包
+
+在仓库根目录可以直接双击：
+
+- `启动.bat`：构建 Release 并启动 Long助手；
+- `开发模式.bat`：以 Debug 模式运行并保留控制台；
+- `打包发布.bat`：自动读取项目版本，执行完整测试和发布流水线，生成 Setup.exe、两种便携 ZIP、Manifest 与 SHA-256，并打开产物目录。
+
+对应的可配置 PowerShell 入口：
+
+```powershell
+.\start-long.ps1
+.\start-long.ps1 -Configuration Debug -Wait
+.\package-long.ps1 -PreflightOnly
+.\package-long.ps1 -PackageKind All -OpenOutput
+```
+
+正式打包默认要求跟踪工作区干净。同版本目录已存在时会先询问是否替换；脚本不会静默删除旧产物。`-AllowDirty` 只适合本地测试包，不能用于发布。
+
 ## 插件开发
 
 | 运行时 | 开发体验 | 适合场景 |
@@ -160,7 +179,7 @@ dotnet run --project src/LongBetterWindows.Host
 构建发布候选：
 
 ```powershell
-.\release.ps1 -Version 1.11.0-rc.2
+.\package-long.ps1 -PackageKind All -OpenOutput
 ```
 
 项目使用自动化单元测试、真实宿主启动与命令冒烟、WebView2 退出清理、插件数量与命令契约、双语键集合、视觉矩阵、DPI 与辅助功能门禁。v1.11 候选继承 [v1.10 开发审计与发布交接](docs/v1.10开发审计与发布交接_2026-07-26.md) 中尚未关闭的外部门禁。

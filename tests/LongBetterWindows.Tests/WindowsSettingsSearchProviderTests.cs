@@ -18,9 +18,9 @@ public sealed class WindowsSettingsSearchProviderTests
         var results = await provider.SearchAsync(new SearchRequest(
             query, ContextSnapshot.Empty, MaxResults: 6));
 
-        var result = Assert.Single(results.Where(item =>
+        var result = Assert.Single(results, item =>
             string.Equals(item.PrimaryAction.Target, expectedUri,
-                StringComparison.OrdinalIgnoreCase)));
+                StringComparison.OrdinalIgnoreCase));
         Assert.Equal(SearchActionKind.OpenUri, result.PrimaryAction.Kind);
         Assert.Equal(SearchActionKind.CopyText, Assert.Single(result.SecondaryActions).Kind);
         Assert.Equal("Windows 设置", result.Source);

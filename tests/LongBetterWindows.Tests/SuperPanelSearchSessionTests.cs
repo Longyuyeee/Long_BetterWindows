@@ -25,7 +25,7 @@ public class SuperPanelSearchSessionTests
         Assert.Single(contexts);
         Assert.False(contexts[0].IsLoading);
         Assert.Contains(results, update => !update.Completed);
-        var completed = Assert.Single(results.Where(update => update.Completed));
+        var completed = Assert.Single(results, update => update.Completed);
         Assert.Equal("result.preset", Assert.Single(completed.Results).Id);
     }
 

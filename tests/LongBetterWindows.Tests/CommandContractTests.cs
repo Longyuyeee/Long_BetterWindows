@@ -1072,7 +1072,7 @@ public class CommandContractTests
 
         Assert.Equal(1, activationCount);
         Assert.Equal(1, plugin.StartCount);
-        Assert.Single(results.Where(result => result));
+        Assert.Single(results, result => result);
         Assert.True(entry.IsActivated);
         Assert.Same(plugin, entry.Instance);
         Assert.Equal(PluginState.Running, entry.State);

@@ -94,7 +94,7 @@ public class ServiceTests
                 attempt => Assert.True(
                     attempt.IsSuccess,
                     attempt.ErrorMessage));
-            Assert.Single(attempts.Where(attempt => attempt.Data));
+            Assert.Single(attempts, attempt => attempt.Data);
             Assert.Contains(
                 current.Data,
                 Enumerable.Range(1, 16).Select(index => $"v{index}"));

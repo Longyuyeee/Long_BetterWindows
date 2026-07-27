@@ -1,17 +1,16 @@
 @echo off
-chcp 65001 >nul
-title Long窗口 - 开发模式
+setlocal
+pushd "%~dp0"
 
-echo ====================================
-echo   Long窗口 v1.8 - 开发模式
-echo ====================================
-echo.
+echo Starting Long Assistant (Debug)...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-long.ps1" -Configuration Debug -Wait
+set "EXIT_CODE=%ERRORLEVEL%"
 
-if not exist "src\LongBetterWindows.Host\LongBetterWindows.Host.csproj" (
-    echo [错误] 请在项目根目录执行
+if not "%EXIT_CODE%"=="0" (
+    echo.
+    echo Development run failed with exit code %EXIT_CODE%.
     pause
-    exit /b 1
 )
 
-echo [1/1] 构建并启动 (Debug)...
-dotnet run --project src\LongBetterWindows.Host\LongBetterWindows.Host.csproj -c Debug
+popd
+exit /b %EXIT_CODE%

@@ -464,7 +464,7 @@ public class DesignSystemTests
         Assert.Contains("event.key === 'F5'", page);
         var capabilities = manifest.RootElement.GetProperty("capabilities")
             .EnumerateArray()
-            .Select(element => element.GetString())
+            .Select(element => element.GetString()!)
             .ToArray();
         Assert.Equal(["system.performance"], capabilities);
 
@@ -494,7 +494,7 @@ public class DesignSystemTests
 
         var capabilities = manifest.RootElement.GetProperty("capabilities")
             .EnumerateArray()
-            .Select(element => element.GetString())
+            .Select(element => element.GetString()!)
             .ToArray();
         Assert.Contains("filesystem.advanced", capabilities);
         Assert.Contains("shell.selection", capabilities);
@@ -532,7 +532,7 @@ public class DesignSystemTests
 
         var capabilities = manifest.RootElement.GetProperty("capabilities")
             .EnumerateArray()
-            .Select(element => element.GetString())
+            .Select(element => element.GetString()!)
             .ToArray();
         Assert.Equal(
             ["network.ports", "system.process", "system.clipboard"],
