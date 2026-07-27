@@ -1,0 +1,39 @@
+{
+  "captured_at": "2026-07-27",
+  "configuration": "Release",
+  "viewport": {
+    "width": 1120,
+    "height": 760
+  },
+  "sample_delay_seconds": 9,
+  "runs_per_variant": 5,
+  "before": {
+    "working_set_mb": [192.2, 206.2, 191.9, 206.3, 206.6],
+    "private_memory_mb": [165.1, 178.6, 166.3, 178.7, 179.6],
+    "cpu_seconds": [4.77, 5.30, 4.83, 6.91, 6.94],
+    "working_set_average_mb": 200.6,
+    "working_set_median_mb": 206.2,
+    "working_set_max_mb": 206.6,
+    "private_memory_average_mb": 173.7,
+    "private_memory_median_mb": 178.6,
+    "cpu_average_seconds": 5.75
+  },
+  "after": {
+    "working_set_mb": [210.5, 209.6, 189.9, 194.5, 211.1],
+    "private_memory_mb": [155.8, 155.2, 142.0, 140.5, 154.6],
+    "cpu_seconds": [5.92, 5.58, 5.41, 4.61, 6.19],
+    "working_set_average_mb": 203.1,
+    "working_set_median_mb": 209.6,
+    "working_set_max_mb": 211.1,
+    "private_memory_average_mb": 149.6,
+    "private_memory_median_mb": 154.6,
+    "cpu_average_seconds": 5.54
+  },
+  "decision": {
+    "private_memory_average_change_percent": -13.9,
+    "cpu_average_change_percent": -3.7,
+    "working_set_average_change_percent": 1.2,
+    "private_memory_improved": true,
+    "strict_working_set_gate_passed": false
+  }
+}

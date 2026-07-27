@@ -907,6 +907,17 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void ToolCenterOverview_UsesLightweightCards()
+    {
+        var xaml = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
+
+        Assert.Contains("x:Key=\"OverviewCard\"", xaml);
+        Assert.Contains("BasedOn=\"{StaticResource LongCard}\"", xaml);
+        Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
+        Assert.Equal(5, xaml.Split("Style=\"{StaticResource OverviewCard}\"").Length - 1);
+    }
+
+    [Fact]
     public void MainWindow_SupportsMinimumQualityViewportAndResponsiveToolCenter()
     {
         var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml");

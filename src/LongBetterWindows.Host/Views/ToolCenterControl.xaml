@@ -4,6 +4,11 @@
              xmlns:local="clr-namespace:LongBetterWindows.Host.Views"
              xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
              Focusable="True" PreviewKeyDown="UserControl_PreviewKeyDown">
+    <UserControl.Resources>
+        <Style x:Key="OverviewCard" TargetType="Border" BasedOn="{StaticResource LongCard}">
+            <Setter Property="Effect" Value="{x:Null}" />
+        </Style>
+    </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="NavigationColumn" Width="220" />
@@ -124,15 +129,15 @@
                         </Border>
 
                         <UniformGrid Columns="3" Margin="0,0,0,20">
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,0">
+                            <Border Style="{StaticResource OverviewCard}" Margin="0,0,12,0">
                                 <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.plugins}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     <TextBlock x:Name="OverviewPluginCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
                             </Border>
-                            <Border Style="{StaticResource LongCard}" Margin="0,0,12,0">
+                            <Border Style="{StaticResource OverviewCard}" Margin="0,0,12,0">
                                 <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.commands}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     <TextBlock x:Name="OverviewCommandCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
                             </Border>
-                            <Border Style="{StaticResource LongCard}">
+                            <Border Style="{StaticResource OverviewCard}">
                                 <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.capabilities}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     <TextBlock x:Name="OverviewCapabilityCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
                             </Border>
@@ -145,7 +150,7 @@
                                 <ColumnDefinition x:Name="OverviewGapColumn" Width="16"/>
                                 <ColumnDefinition x:Name="OverviewStatusColumn" Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Style="{StaticResource LongCard}">
+                            <Border Style="{StaticResource OverviewCard}">
                                 <Grid x:Name="OverviewLaunchGrid">
                                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
@@ -162,7 +167,7 @@
                                             Click="OpenPalette_Click" />
                                 </Grid>
                             </Border>
-                            <Border x:Name="OverviewStatusCard" Grid.Column="2" Style="{StaticResource LongCard}">
+                            <Border x:Name="OverviewStatusCard" Grid.Column="2" Style="{StaticResource OverviewCard}">
                                 <StackPanel><TextBlock Text="{DynamicResource i18n.overview.status.title}" FontSize="16" FontWeight="SemiBold" />
                                     <TextBlock Text="{DynamicResource i18n.overview.status.ready}" Margin="0,7,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.State.Success}" />
                                     <TextBlock Text="{DynamicResource i18n.overview.status.releasePending}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" /></StackPanel>
