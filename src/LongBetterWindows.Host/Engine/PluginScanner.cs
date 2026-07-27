@@ -5,9 +5,19 @@ using Serilog;
 
 namespace LongBetterWindows.Host.Engine
 {
-    internal sealed record LoadedDirectoryPlugin(
-        string Id,
-        PluginRuntimeLoadResult Runtime);
+    internal sealed class LoadedDirectoryPlugin
+    {
+        public LoadedDirectoryPlugin(
+            string id,
+            PluginRuntimeLoadResult? runtime)
+        {
+            Id = id;
+            Runtime = runtime;
+        }
+
+        public string Id { get; }
+        public PluginRuntimeLoadResult? Runtime { get; set; }
+    }
 
     public class PluginScanner : IDisposable
     {
@@ -176,28 +186,42 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task UnloadDirectoryPluginAsync(string pluginDirectory)
         {
-            if (!_directoryPlugins.Remove(pluginDirectory, out var loaded))
+            if (!_directoryPlugins.TryGetValue(pluginDirectory, out var tracked))
                 return;
 
             var registry = HostProvider.Instance.PluginStore;
-            var entry = registry.Get(loaded.Id);
-            if (entry?.Instance is ILongPlugin plugin)
-            {
-                try
-                {
-                    using (PluginAccessContext.Enter(loaded.Id))
-                        await plugin.StopAsync();
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "插件 {PluginId} 停止时出错", loaded.Id);
-                }
-            }
+            var entry = registry.Get(tracked.Id);
+            if (entry is not null)
+                await entry.LifecycleGate.WaitAsync();
 
-            registry.Unregister(loaded.Id);
-            _runtimeLoader.Release(loaded.Runtime, loaded.Id);
-            LoadedPlugins.RemoveAll(plugin => plugin.Id == loaded.Id);
-            DiscoveredManifests.RemoveAll(manifest => manifest.Id == loaded.Id);
+            try
+            {
+                if (!_directoryPlugins.Remove(pluginDirectory, out var loaded))
+                    return;
+
+                if (entry?.Instance is ILongPlugin plugin)
+                {
+                    try
+                    {
+                        using (PluginAccessContext.Enter(loaded.Id))
+                            await plugin.StopAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "插件 {PluginId} 停止时出错", loaded.Id);
+                    }
+                }
+
+                registry.Unregister(loaded.Id);
+                if (loaded.Runtime is not null)
+                    _runtimeLoader.Release(loaded.Runtime, loaded.Id);
+                LoadedPlugins.RemoveAll(plugin => plugin.Id == loaded.Id);
+                DiscoveredManifests.RemoveAll(manifest => manifest.Id == loaded.Id);
+            }
+            finally
+            {
+                entry?.LifecycleGate.Release();
+            }
         }
 
         private bool IsStandaloneScript(string filePath)
@@ -262,38 +286,20 @@ namespace LongBetterWindows.Host.Engine
                 return;
             }
 
-            var runtime = await _runtimeLoader.LoadAsync(pluginDir, manifest);
-            if (!runtime.IsSuccess)
+            if (!registry.RegisterDeferred(
+                    manifest,
+                    pluginDir,
+                    entry => ActivatePluginAsync(pluginDir, entry)))
             {
-                Log.Error("插件 {PluginId} 运行时加载失败: {Error}",
-                    manifest.Id, runtime.Error);
                 return;
             }
-            var plugin = runtime.Instance!;
 
-            // ★ 先注册再初始化，以便 InitializeAsync 中权限检查能生效
-            registry.Register(manifest, plugin, runtime.LoadContext, pluginDir);
-
-            var hostApi = HostProvider.Instance;
-
-            using (PluginAccessContext.Enter(manifest.Id))
-            {
-                var initOk = await plugin.InitializeAsync(hostApi);
-                if (!initOk)
-                {
-                    Log.Error("插件 {PluginId} 初始化失败", manifest.Id);
-                    registry.Unregister(manifest.Id);
-                    _runtimeLoader.Release(runtime, manifest.Id);
-                    return;
-                }
-            }
-
-            // 检查用户配置：仅 auto_start=true 时自动启动
             var entry = registry.Get(manifest.Id)!;
+            _directoryPlugins[pluginDir] = new LoadedDirectoryPlugin(
+                manifest.Id,
+                null);
             if (_currentLanguage is not null)
                 await NotifyPluginLanguageAsync(entry, _currentLanguage());
-            _directoryPlugins[pluginDir] = new LoadedDirectoryPlugin(
-                manifest.Id, runtime);
             var autoStart = entry.GetAutoStartPreference();
             Log.Information(
                 "插件 {PluginId} 自动启动决策: Enabled={Enabled}, Source={Source}",
@@ -303,47 +309,82 @@ namespace LongBetterWindows.Host.Engine
 
             if (autoStart.Enabled)
             {
-                using (PluginAccessContext.Enter(manifest.Id))
+                if (!await registry.StartPluginAsync(
+                        manifest.Id,
+                        persistAutoStart: false))
                 {
-                    var startOk = await plugin.StartAsync();
-                    if (!startOk)
-                    {
-                        Log.Error("插件 {PluginId} 启动失败", manifest.Id);
-                        try
-                        {
-                            await plugin.StopAsync();
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Warning(ex, "插件 {PluginId} 启动失败后的清理未完全完成", manifest.Id);
-                        }
-
-                        // 保留插件实例，用户可解决热键冲突后从管理界面重新启用。
-                        registry.SetState(manifest.Id, PluginState.Error);
-                        LoadedPlugins.Add(entry);
-                        return;
-                    }
-                    else
-                    {
-                        registry.SetState(manifest.Id, PluginState.Running);
-                        Log.Information("插件 {PluginId} 已自动启动", manifest.Id);
-                    }
+                    LoadedPlugins.Add(entry);
+                    return;
                 }
+
+                Log.Information("插件 {PluginId} 已自动激活并启动", manifest.Id);
             }
             else
             {
-                Log.Information("插件 {PluginId} 已加载（auto_start=false，待用户启用）", manifest.Id);
+                Log.Information("插件 {PluginId} 已注册，运行时等待按需激活", manifest.Id);
             }
 
             LoadedPlugins.Add(entry);
         }
 
+        private async Task<object?> ActivatePluginAsync(
+            string pluginDirectory,
+            PluginEntry entry)
+        {
+            var runtime = await _runtimeLoader.LoadAsync(
+                pluginDirectory,
+                entry.Manifest);
+            if (!runtime.IsSuccess)
+            {
+                Log.Error(
+                    "插件 {PluginId} 运行时加载失败: {Error}",
+                    entry.Id,
+                    runtime.Error);
+                return null;
+            }
+
+            var plugin = runtime.Instance!;
+            using (PluginAccessContext.Enter(entry.Id))
+            {
+                if (!await plugin.InitializeAsync(HostProvider.Instance))
+                {
+                    Log.Error("插件 {PluginId} 初始化失败", entry.Id);
+                    _runtimeLoader.Release(runtime, entry.Id);
+                    return null;
+                }
+            }
+
+            if (_currentLanguage is not null)
+                await NotifyPluginLanguageAsync(
+                    entry,
+                    _currentLanguage(),
+                    plugin);
+            if (!_directoryPlugins.TryGetValue(
+                    pluginDirectory,
+                    out var tracked)
+                || !string.Equals(
+                    tracked.Id,
+                    entry.Id,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _runtimeLoader.Release(runtime, entry.Id);
+                Log.Information(
+                    "插件 {PluginId} 激活期间已卸载，运行时已释放",
+                    entry.Id);
+                return null;
+            }
+
+            tracked.Runtime = runtime;
+            Log.Information("插件 {PluginId} 运行时已按需激活", entry.Id);
+            return plugin;
+        }
+
         private static async Task NotifyPluginLanguageAsync(
             PluginEntry entry,
-            string language)
+            string language,
+            object? activatedInstance = null)
         {
-            if (entry.Manifest.Localization is not { } localization
-                || entry.Instance is not IPluginLanguageLifecycle lifecycle)
+            if (entry.Manifest.Localization is not { } localization)
                 return;
 
             if (!PluginLocalizationLoader.TryLoad(
@@ -363,6 +404,12 @@ namespace LongBetterWindows.Host.Engine
             var registry = HostProvider.Instance.PluginStore;
             if (!registry.ApplyLocalization(entry.Id, context!))
                 entry.ApplyLanguageContext(context!);
+
+            if ((activatedInstance ?? entry.Instance)
+                is not IPluginLanguageLifecycle lifecycle)
+            {
+                return;
+            }
 
             try
             {

@@ -944,6 +944,79 @@ public class CommandContractTests
     }
 
     [Fact]
+    public async Task PluginRegistry_DeferredActivationRunsOnceUnderConcurrentStarts()
+    {
+        var registry = new PluginRegistry();
+        var plugin = new BackgroundLifecyclePlugin();
+        var activationCount = 0;
+        var manifest = new PluginManifest
+        {
+            Id = plugin.Id,
+            Name = plugin.Name,
+            Version = plugin.Version,
+            EntryPoint = "lifecycle.dll",
+            Commands =
+            [
+                new PluginCommand
+                {
+                    Id = plugin.Id + ".open",
+                    Title = "Open",
+                },
+            ],
+        };
+        Assert.True(registry.RegisterDeferred(
+            manifest,
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+            async _ =>
+            {
+                Interlocked.Increment(ref activationCount);
+                await Task.Delay(25);
+                return plugin;
+            }));
+        var entry = registry.Get(plugin.Id)!;
+        Assert.False(entry.IsActivated);
+        Assert.Null(entry.Instance);
+        Assert.Same(manifest, entry.Manifest);
+        Assert.Single(registry.Commands.GetAll());
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(
+            _ => registry.StartPluginAsync(
+                plugin.Id,
+                persistAutoStart: false)));
+
+        Assert.Equal(1, activationCount);
+        Assert.Equal(1, plugin.StartCount);
+        Assert.Single(results.Where(result => result));
+        Assert.True(entry.IsActivated);
+        Assert.Same(plugin, entry.Instance);
+        Assert.Equal(PluginState.Running, entry.State);
+    }
+
+    [Fact]
+    public async Task PluginRegistry_DeferredActivationFailurePublishesErrorState()
+    {
+        var registry = new PluginRegistry();
+        Assert.True(registry.RegisterDeferred(
+            new PluginManifest
+            {
+                Id = "deferred-failure",
+                Name = "Deferred failure",
+                Version = "1.0.0",
+                EntryPoint = "missing.dll",
+            },
+            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+            _ => Task.FromResult<object?>(null)));
+
+        Assert.False(await registry.StartPluginAsync(
+            "deferred-failure",
+            persistAutoStart: false));
+
+        var entry = registry.Get("deferred-failure")!;
+        Assert.False(entry.IsActivated);
+        Assert.Equal(PluginState.Error, entry.State);
+    }
+
+    [Fact]
     public async Task PluginRegistry_FailedStopDoesNotPublishStoppedState()
     {
         var registry = new PluginRegistry();

@@ -1064,6 +1064,27 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void PluginRuntime_DefersInstanceCreationUntilLifecycleStart()
+    {
+        var entry = Read(
+            "src", "LongBetterWindows.Host", "Engine", "PluginEntry.cs");
+        var registry = Read(
+            "src", "LongBetterWindows.Host", "Engine", "PluginRegistry.cs");
+        var scanner = Read(
+            "src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");
+        var management = Read(
+            "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs");
+
+        Assert.Contains("EnsureActivatedAsync", entry);
+        Assert.Contains("_activationGate.WaitAsync", entry);
+        Assert.Contains("LifecycleGate.WaitAsync", registry);
+        Assert.Contains("RegisterDeferred", registry);
+        Assert.Contains("ActivatePluginAsync", scanner);
+        Assert.Contains("运行时等待按需激活", scanner);
+        Assert.Contains("persistAutoStart: false", management);
+    }
+
+    [Fact]
     public void PluginScanner_DelegatesStandalonePackagingAndLifecycleToLoader()
     {
         var scanner = Read("src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");

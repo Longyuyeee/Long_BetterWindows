@@ -95,10 +95,39 @@ namespace LongBetterWindows.Host.Views
             Refresh();
         }
 
-        private void OpenPlugin_Click(object sender, RoutedEventArgs e)
+        private async void OpenPlugin_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button { Tag: PluginCardItem { Entry.Instance: IHasMainUI mainUi } })
-                mainUi.ShowMainUI();
+            if (sender is not Button { Tag: PluginCardItem item } button)
+                return;
+
+            button.IsEnabled = false;
+            try
+            {
+                var registry = HostProvider.Instance.PluginStore;
+                var entry = registry.Get(item.Entry.Id);
+                if (entry is null)
+                    return;
+                if (entry.State != PluginState.Running
+                    && !await registry.StartPluginAsync(
+                        entry.Id,
+                        persistAutoStart: false))
+                {
+                    return;
+                }
+
+                if (entry.Instance is IHasMainUI mainUi)
+                    mainUi.ShowMainUI();
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Plugin open error: {exception.Message}");
+            }
+            finally
+            {
+                button.IsEnabled = true;
+                Refresh();
+            }
         }
 
         private async void PluginToggle_Click(object sender, RoutedEventArgs e)
@@ -206,7 +235,8 @@ namespace LongBetterWindows.Host.Views
                 VisibleCapabilities = entry.Manifest.Capabilities.Take(3).ToArray();
                 HasAdditionalCapabilities = entry.Manifest.Capabilities.Count > VisibleCapabilities.Count;
                 AdditionalCapabilityText = $"+{entry.Manifest.Capabilities.Count - VisibleCapabilities.Count}";
-                CanOpen = entry.Instance is IHasMainUI;
+                CanOpen = entry.Instance is IHasMainUI
+                    || entry.Manifest.Window is not null;
                 CanOpenSettings = entry.Instance is IHasSettingsUI;
             }
 

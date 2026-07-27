@@ -132,6 +132,37 @@ namespace LongBetterWindows.Host.Engine
             return true;
         }
 
+        internal bool RegisterDeferred(
+            PluginManifest manifest,
+            string directory,
+            Func<PluginEntry, Task<object?>> activator)
+        {
+            lock (_lock)
+            {
+                if (_entries.ContainsKey(manifest.Id))
+                    return false;
+
+                _catalogRevision++;
+                var entry = new PluginEntry(
+                    manifest,
+                    directory,
+                    _catalogRevision,
+                    activator)
+                {
+                    State = PluginState.Loaded,
+                };
+                _entries[manifest.Id] = entry;
+                Commands.RegisterManifest(manifest);
+                Log.Information(
+                    "插件 {PluginId} (v{Version}) 已延迟注册",
+                    manifest.Id,
+                    manifest.Version);
+            }
+
+            NotifyChanged();
+            return true;
+        }
+
         internal bool ApplyLocalization(
             string pluginId,
             PluginLanguageContext context)
@@ -195,10 +226,20 @@ namespace LongBetterWindows.Host.Engine
                 entry = Get(pluginId);
             }
 
-            if (entry == null || entry.State == PluginState.Running) return false;
+            if (entry == null) return false;
 
+            await entry.LifecycleGate.WaitAsync();
             try
             {
+                if (entry.State == PluginState.Running)
+                    return false;
+                if (!await entry.EnsureActivatedAsync())
+                {
+                    Log.Error("插件 {PluginId} 运行时激活失败", pluginId);
+                    SetState(pluginId, PluginState.Error);
+                    return false;
+                }
+
                 using (PluginAccessContext.Enter(pluginId))
                 {
                     if (entry.Instance is ILongPlugin plugin)
@@ -234,6 +275,10 @@ namespace LongBetterWindows.Host.Engine
                 SetState(pluginId, PluginState.Error);
                 return false;
             }
+            finally
+            {
+                entry.LifecycleGate.Release();
+            }
         }
 
         public async Task<bool> StopPluginAsync(
@@ -246,11 +291,14 @@ namespace LongBetterWindows.Host.Engine
                 entry = Get(pluginId);
             }
 
-            if (entry == null || entry.State is not (PluginState.Running or PluginState.Background))
+            if (entry == null)
                 return false;
 
+            await entry.LifecycleGate.WaitAsync();
             try
             {
+                if (entry.State is not (PluginState.Running or PluginState.Background))
+                    return false;
                 using (PluginAccessContext.Enter(pluginId))
                 {
                     if (entry.Instance is ILongPlugin plugin)
@@ -276,6 +324,10 @@ namespace LongBetterWindows.Host.Engine
             {
                 Log.Error(ex, "插件 {PluginId} 停止失败", pluginId);
                 return false;
+            }
+            finally
+            {
+                entry.LifecycleGate.Release();
             }
         }
 

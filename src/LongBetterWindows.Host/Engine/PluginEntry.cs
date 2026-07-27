@@ -19,6 +19,10 @@ namespace LongBetterWindows.Host.Engine
     public sealed class PluginEntry
     {
         private Dictionary<string, object> _settings;
+        private object? _instance;
+        private readonly Func<PluginEntry, Task<object?>>? _activator;
+        private readonly SemaphoreSlim _activationGate = new(1, 1);
+        internal SemaphoreSlim LifecycleGate { get; } = new(1, 1);
         private readonly HashSet<string> _persistedSettings =
             new(StringComparer.OrdinalIgnoreCase);
         private static readonly JsonSerializerOptions JsonOptions = new()
@@ -32,7 +36,8 @@ namespace LongBetterWindows.Host.Engine
             "plugin.name",
             Manifest.Name);
         public PluginManifest Manifest { get; }
-        public object Instance { get; }
+        public object? Instance => Volatile.Read(ref _instance);
+        public bool IsActivated => Instance is not null;
         public PluginState State { get; set; } = PluginState.Loaded;
         public string Directory { get; }
         public PluginLifecyclePreference Lifecycle { get; }
@@ -45,11 +50,50 @@ namespace LongBetterWindows.Host.Engine
             long registrationRevision)
         {
             Manifest = manifest;
-            Instance = instance;
+            _instance = instance;
             Directory = directory;
             Lifecycle = manifest.Lifecycle ?? new PluginLifecyclePreference();
             RegistrationRevision = registrationRevision;
             _settings = LoadSettings(directory, manifest.DefaultSettings);
+        }
+
+        internal PluginEntry(
+            PluginManifest manifest,
+            string directory,
+            long registrationRevision,
+            Func<PluginEntry, Task<object?>> activator)
+        {
+            Manifest = manifest;
+            Directory = directory;
+            Lifecycle = manifest.Lifecycle ?? new PluginLifecyclePreference();
+            RegistrationRevision = registrationRevision;
+            _activator = activator ?? throw new ArgumentNullException(nameof(activator));
+            _settings = LoadSettings(directory, manifest.DefaultSettings);
+        }
+
+        internal async Task<bool> EnsureActivatedAsync()
+        {
+            if (Instance is not null)
+                return true;
+            if (_activator is null)
+                return false;
+
+            await _activationGate.WaitAsync();
+            try
+            {
+                if (Instance is not null)
+                    return true;
+
+                var instance = await _activator(this);
+                if (instance is null)
+                    return false;
+                Volatile.Write(ref _instance, instance);
+                return true;
+            }
+            finally
+            {
+                _activationGate.Release();
+            }
         }
 
         public bool HasCapability(string capability)
