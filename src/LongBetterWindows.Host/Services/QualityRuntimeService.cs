@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Views;
@@ -369,6 +370,8 @@ namespace LongBetterWindows.Host.Services
                     DispatcherPriority.Render);
                 dialog.UpdateLayout();
                 var dark = CaptureThemedMessageDialogTheme(dialog, "dark");
+                var compactLongTextLayoutPassed =
+                    VerifyThemedMessageDialogLayout(dialog);
                 await CaptureWindowAsync(dialog, darkScreenshotPath);
 
                 App.UpdateThemeResources(isLight: true);
@@ -383,7 +386,10 @@ namespace LongBetterWindows.Host.Services
                     dark.Surface != light.Surface
                     && dark.SecondaryButtonBackground
                         != light.SecondaryButtonBackground;
-                var passed = changed && dark.Passed && light.Passed;
+                var passed = changed
+                    && compactLongTextLayoutPassed
+                    && dark.Passed
+                    && light.Passed;
                 await File.WriteAllTextAsync(
                     fullPath,
                     JsonSerializer.Serialize(
@@ -394,6 +400,13 @@ namespace LongBetterWindows.Host.Services
                             passed,
                             runtime_theme_changed = changed,
                             default_action = "cancel",
+                            compact_long_text_layout_passed =
+                                compactLongTextLayoutPassed,
+                            window = new
+                            {
+                                width = Math.Round(dialog.ActualWidth, 1),
+                                height = Math.Round(dialog.ActualHeight, 1),
+                            },
                             screenshots = new
                             {
                                 dark = Path.GetFileName(darkScreenshotPath),
@@ -413,6 +426,166 @@ namespace LongBetterWindows.Host.Services
             finally
             {
                 dialog.Close();
+                App.UpdateThemeResources(originalTheme);
+            }
+        }
+
+        public async Task RunPluginSettingsProbeAsync(string reportPath)
+        {
+            var expectedControls = new Dictionary<string, int>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                ["com.long.color-picker"] = 1,
+                ["com.long.folder-note"] = 1,
+                ["com.long.macro"] = 3,
+                ["com.long.screenshot"] = 2,
+                ["com.long.window-manager"] = 1,
+            };
+            var originalTheme = App.IsLightTheme;
+            var fullPath = Path.GetFullPath(reportPath);
+            var reportDirectory = Path.GetDirectoryName(fullPath)!;
+            Directory.CreateDirectory(reportDirectory);
+            var entries = HostProvider.Instance.PluginStore.GetAll()
+                .ToDictionary(entry => entry.Id, StringComparer.OrdinalIgnoreCase);
+            var results = new List<PluginSettingsProbeResult>();
+            try
+            {
+                foreach (var expected in expectedControls)
+                {
+                    if (!entries.TryGetValue(expected.Key, out var entry)
+                        || entry.Instance is not IHasSettingsUI settingsUi)
+                    {
+                        results.Add(new PluginSettingsProbeResult(
+                            expected.Key,
+                            expected.Value,
+                            0,
+                            false,
+                            false,
+                            null,
+                            null,
+                            null,
+                            null));
+                        continue;
+                    }
+
+                    var window = PluginManagementControl.CreateSettingsWindow(
+                        entry,
+                        settingsUi,
+                        owner: null);
+                    var fileStem = expected.Key.Replace('.', '-');
+                    var darkScreenshotPath = Path.Combine(
+                        reportDirectory,
+                        $"{fileStem}-dark.png");
+                    var lightScreenshotPath = Path.Combine(
+                        reportDirectory,
+                        $"{fileStem}-light.png");
+                    try
+                    {
+                        window.WindowStartupLocation =
+                            WindowStartupLocation.CenterScreen;
+                        window.Show();
+                        App.UpdateThemeResources(isLight: false);
+                        await _application.Dispatcher.InvokeAsync(
+                            () => { },
+                            DispatcherPriority.Render);
+                        window.UpdateLayout();
+                        var darkAccessible =
+                            await VerifySettingsControlsAccessibleAsync(window);
+                        var dark = CapturePluginSettingsTheme(
+                            window,
+                            "dark",
+                            expected.Value,
+                            darkAccessible);
+                        await CaptureWindowAsync(window, darkScreenshotPath);
+
+                        App.UpdateThemeResources(isLight: true);
+                        await _application.Dispatcher.InvokeAsync(
+                            () => { },
+                            DispatcherPriority.Render);
+                        window.UpdateLayout();
+                        var lightAccessible =
+                            await VerifySettingsControlsAccessibleAsync(window);
+                        var light = CapturePluginSettingsTheme(
+                            window,
+                            "light",
+                            expected.Value,
+                            lightAccessible);
+                        await CaptureWindowAsync(window, lightScreenshotPath);
+
+                        var changed = dark.Surface != light.Surface
+                            && dark.InputBackground != light.InputBackground;
+                        results.Add(new PluginSettingsProbeResult(
+                            expected.Key,
+                            expected.Value,
+                            dark.ControlCount,
+                            changed && dark.Passed && light.Passed,
+                            changed,
+                            Path.GetFileName(darkScreenshotPath),
+                            GetFileSha256(darkScreenshotPath),
+                            Path.GetFileName(lightScreenshotPath),
+                            GetFileSha256(lightScreenshotPath))
+                        {
+                            Themes = [dark, light],
+                        });
+                    }
+                    finally
+                    {
+                        window.DetachContent();
+                        window.Close();
+                    }
+                }
+
+                var registeredHotkeys = ServicesInitializer.HotKey
+                    .GetAllHotkeys();
+                var samePluginPair = registeredHotkeys
+                    .GroupBy(
+                        pair => pair.Value,
+                        StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault(group => group.Count() >= 2)?
+                    .Take(2)
+                    .Select(pair => pair.Key)
+                    .ToArray();
+                var currentHotkey = samePluginPair?.ElementAtOrDefault(0);
+                var requestedHotkey = samePluginPair?.ElementAtOrDefault(1);
+                var samePluginConflict = currentHotkey is not null
+                    && requestedHotkey is not null
+                    ? await ServicesInitializer.HotKey.IsConflictAsync(
+                        requestedHotkey,
+                        currentHotkey)
+                    : HostApiResponse<bool>.Failure(
+                        ApiErrorCode.NotFound,
+                        "No plugin registered two hotkeys for the quality probe.");
+                var conflictPassed = samePluginConflict.IsSuccess
+                    && samePluginConflict.Data;
+                var passed = results.Count == expectedControls.Count
+                    && results.All(result => result.Passed)
+                    && conflictPassed;
+                await File.WriteAllTextAsync(
+                    fullPath,
+                    JsonSerializer.Serialize(
+                        new
+                        {
+                            schema_version = 1,
+                            captured_at = DateTimeOffset.UtcNow,
+                            passed,
+                            same_plugin_conflict = new
+                            {
+                                current_hotkey = currentHotkey,
+                                requested_hotkey = requestedHotkey,
+                                detected = samePluginConflict.Data,
+                                passed = conflictPassed,
+                            },
+                            plugins = results,
+                        },
+                        new JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+                        }));
+                _application.Shutdown(passed ? 0 : 8);
+            }
+            finally
+            {
                 App.UpdateThemeResources(originalTheme);
             }
         }
@@ -655,6 +828,196 @@ namespace LongBetterWindows.Host.Services
                     && secondaryContrast >= 4.5);
         }
 
+        private static PluginSettingsThemeSnapshot CapturePluginSettingsTheme(
+            PluginWindowHost window,
+            string theme,
+            int expectedControlCount,
+            bool allControlsAccessible)
+        {
+            var controls = FindVisualChildren<HotkeySettingsControl>(window)
+                .ToArray();
+            var inputs = FindVisualChildren<System.Windows.Controls.TextBox>(window)
+                .Where(input =>
+                    System.Windows.Automation.AutomationProperties
+                        .GetAutomationId(input)
+                        == "Long.HotkeySettings.Input")
+                .ToArray();
+            var buttons = FindVisualChildren<System.Windows.Controls.Button>(window)
+                .Where(button =>
+                    System.Windows.Automation.AutomationProperties
+                        .GetAutomationId(button)
+                        == "Long.HotkeySettings.Apply")
+                .ToArray();
+            var surface = GetColor((Brush)window.FindResource(
+                "Long.Brush.Background.Base"));
+            var textForeground = GetColor((Brush)window.FindResource(
+                "Long.Brush.Text.Primary"));
+            var inputBackground = inputs.Length > 0
+                ? GetColor(inputs[0].Background)
+                : Colors.Transparent;
+            var inputForeground = inputs.Length > 0
+                ? GetColor(inputs[0].Foreground)
+                : Colors.Transparent;
+            var buttonBackground = buttons.Length > 0
+                ? GetColor(buttons[0].Background)
+                : Colors.Transparent;
+            var buttonForeground = buttons.Length > 0
+                ? GetColor(buttons[0].Foreground)
+                : Colors.Transparent;
+            var textContrast = ContrastRatio(textForeground, surface);
+            var inputContrast = ContrastRatio(
+                inputForeground,
+                inputBackground);
+            var buttonContrast = ContrastRatio(
+                buttonForeground,
+                buttonBackground);
+            var settingsScroll = FindVisualChildren<ScrollViewer>(window)
+                .Single(scroll =>
+                    System.Windows.Automation.AutomationProperties
+                        .GetAutomationId(scroll)
+                        == "Long.Plugin.Settings.Scroll");
+            var countsMatch = controls.Length == expectedControlCount
+                && inputs.Length == expectedControlCount
+                && buttons.Length == expectedControlCount;
+
+            return new PluginSettingsThemeSnapshot(
+                theme,
+                controls.Length,
+                inputs.Length,
+                buttons.Length,
+                Math.Round(window.ActualWidth, 1),
+                Math.Round(window.ActualHeight, 1),
+                settingsScroll.ScrollableHeight > 0,
+                allControlsAccessible,
+                ToHex(surface),
+                ToHex(textForeground),
+                ToHex(inputBackground),
+                ToHex(inputForeground),
+                ToHex(buttonBackground),
+                ToHex(buttonForeground),
+                Math.Round(textContrast, 2),
+                Math.Round(inputContrast, 2),
+                Math.Round(buttonContrast, 2),
+                countsMatch
+                    && allControlsAccessible
+                    && textContrast >= 4.5
+                    && inputContrast >= 4.5
+                    && buttonContrast >= 4.5);
+        }
+
+        private static bool VerifyThemedMessageDialogLayout(
+            ThemedMessageDialog dialog)
+        {
+            var actionButtons = FindVisualChildren<System.Windows.Controls.Button>(
+                    dialog)
+                .Where(button =>
+                {
+                    var automationId =
+                        System.Windows.Automation.AutomationProperties
+                            .GetAutomationId(button);
+                    return automationId is "Long.MessageDialog.Cancel"
+                        or "Long.MessageDialog.Primary";
+                })
+                .ToArray();
+            var message = FindVisualChildren<TextBlock>(dialog)
+                .FirstOrDefault(text =>
+                    System.Windows.Automation.AutomationProperties
+                        .GetLiveSetting(text)
+                    == System.Windows.Automation.AutomationLiveSetting.Assertive);
+            return dialog.ActualWidth <= 380.5
+                && dialog.ActualHeight <= dialog.MaxHeight
+                && actionButtons.Length == 2
+                && actionButtons.All(button => IsFullyVisible(button, dialog))
+                && message is not null
+                && IsFullyVisible(message, dialog);
+        }
+
+        private async Task<bool> VerifySettingsControlsAccessibleAsync(
+            PluginWindowHost window)
+        {
+            var scroll = FindVisualChildren<ScrollViewer>(window)
+                .Single(candidate =>
+                    System.Windows.Automation.AutomationProperties
+                        .GetAutomationId(candidate)
+                        == "Long.Plugin.Settings.Scroll");
+            var controls = FindVisualChildren<HotkeySettingsControl>(window)
+                .ToArray();
+            var inputs = FindVisualChildren<System.Windows.Controls.TextBox>(window)
+                .Where(input =>
+                    System.Windows.Automation.AutomationProperties
+                        .GetAutomationId(input)
+                        == "Long.HotkeySettings.Input")
+                .ToArray();
+            var buttons = FindVisualChildren<System.Windows.Controls.Button>(window)
+                .Where(button =>
+                    System.Windows.Automation.AutomationProperties
+                        .GetAutomationId(button)
+                        == "Long.HotkeySettings.Apply")
+                .ToArray();
+            if (controls.Length == 0
+                || inputs.Length != controls.Length
+                || buttons.Length != controls.Length)
+            {
+                return false;
+            }
+
+            scroll.ScrollToHome();
+            await _application.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.Render);
+            window.UpdateLayout();
+            var firstVisible = new FrameworkElement[]
+            {
+                controls[0],
+                inputs[0],
+                buttons[0],
+            }.All(element => IsFullyVisible(element, window));
+            var allVisible = controls.Cast<FrameworkElement>()
+                .Concat(inputs)
+                .Concat(buttons)
+                .All(element => IsFullyVisible(element, window));
+            if (allVisible)
+                return true;
+            if (scroll.ScrollableHeight <= 0 || !firstVisible)
+                return false;
+
+            scroll.ScrollToEnd();
+            await _application.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.Render);
+            window.UpdateLayout();
+            var lastIndex = controls.Length - 1;
+            var lastVisible = new FrameworkElement[]
+            {
+                controls[lastIndex],
+                inputs[lastIndex],
+                buttons[lastIndex],
+            }.All(element => IsFullyVisible(element, window));
+            scroll.ScrollToHome();
+            await _application.Dispatcher.InvokeAsync(
+                () => { },
+                DispatcherPriority.Render);
+            window.UpdateLayout();
+            return lastVisible;
+        }
+
+        private static bool IsFullyVisible(
+            FrameworkElement element,
+            Window window)
+        {
+            if (element.ActualWidth <= 0 || element.ActualHeight <= 0)
+                return false;
+            var origin = element.TransformToAncestor(window)
+                .Transform(new Point(0, 0));
+            const double tolerance = 0.5;
+            return origin.X >= -tolerance
+                && origin.Y >= -tolerance
+                && origin.X + element.ActualWidth
+                    <= window.ActualWidth + tolerance
+                && origin.Y + element.ActualHeight
+                    <= window.ActualHeight + tolerance;
+        }
+
         private static Color GetColor(Brush brush)
             => brush is SolidColorBrush solid
                 ? solid.Color
@@ -782,6 +1145,41 @@ namespace LongBetterWindows.Host.Services
             double MessageContrast,
             double PrimaryButtonContrast,
             double SecondaryButtonContrast,
+            bool Passed);
+
+        private sealed record PluginSettingsProbeResult(
+            string PluginId,
+            int ExpectedControlCount,
+            int ActualControlCount,
+            bool Passed,
+            bool RuntimeThemeChanged,
+            string? DarkScreenshot,
+            string? DarkScreenshotSha256,
+            string? LightScreenshot,
+            string? LightScreenshotSha256)
+        {
+            public IReadOnlyList<PluginSettingsThemeSnapshot> Themes { get; init; } =
+                [];
+        }
+
+        private sealed record PluginSettingsThemeSnapshot(
+            string Theme,
+            int ControlCount,
+            int InputCount,
+            int ButtonCount,
+            double WindowWidth,
+            double WindowHeight,
+            bool VerticalScrollAvailable,
+            bool AllControlsAccessible,
+            string Surface,
+            string TextForeground,
+            string InputBackground,
+            string InputForeground,
+            string ButtonBackground,
+            string ButtonForeground,
+            double TextContrast,
+            double InputContrast,
+            double ButtonContrast,
             bool Passed);
     }
 }

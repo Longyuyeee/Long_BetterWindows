@@ -68,12 +68,16 @@ public partial class ThemedMessageDialog : Window
     }
 
     internal static ThemedMessageDialog CreateForQuality()
-        => Create(
+    {
+        var dialog = Create(
             owner: null,
-            "This action changes protected workflow data. Review the details before continuing.",
-            "Confirm protected action",
+            "即将覆盖当前尚未保存的组合动作草稿，并重新加载外部文件中的步骤、参数与权限声明。请确认已检查来源、目标路径和授权范围；取消操作不会修改当前内容。",
+            "确认覆盖当前未保存的组合动作草稿",
             confirmation: true,
             ThemedMessageDialogTone.Warning);
+        dialog.Width = 380;
+        return dialog;
+    }
 
     internal ThemedMessageDialogThemeSnapshot GetThemeSnapshot()
         => new(

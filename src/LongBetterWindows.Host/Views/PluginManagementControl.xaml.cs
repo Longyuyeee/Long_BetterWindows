@@ -359,26 +359,52 @@ namespace LongBetterWindows.Host.Views
 
             try
             {
-                var content = settingsUi.CreateSettingsUI();
-                if (content is null) return;
-
-                new PluginWindowHost(
-                    entry.Id,
-                    string.Format(I18n("plugins.settingsTitle"), entry.DisplayName),
-                    content,
-                    entry.Manifest.Window)
-                {
-                    Owner = Window.GetWindow(this),
-                    Width = 520,
-                    Height = 420,
-                    ResizeMode = ResizeMode.NoResize,
-                    ShowInTaskbar = false,
-                }.ShowDialog();
+                CreateSettingsWindow(
+                    entry,
+                    settingsUi,
+                    Window.GetWindow(this)).ShowDialog();
             }
             catch (Exception exception)
             {
                 System.Diagnostics.Debug.WriteLine($"Settings UI error: {exception.Message}");
             }
+        }
+
+        internal static PluginWindowHost CreateSettingsWindow(
+            PluginEntry entry,
+            IHasSettingsUI settingsUi,
+            Window? owner)
+        {
+            var content = settingsUi.CreateSettingsUI()
+                ?? throw new InvalidOperationException(
+                    $"Plugin '{entry.Id}' returned an empty settings UI.");
+            var scrollViewer = new ScrollViewer
+            {
+                Content = content,
+                Padding = new Thickness(16),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            };
+            scrollViewer.SetResourceReference(
+                FrameworkElement.StyleProperty,
+                "DarkScrollViewerStyle");
+            System.Windows.Automation.AutomationProperties.SetAutomationId(
+                scrollViewer,
+                "Long.Plugin.Settings.Scroll");
+            return new PluginWindowHost(
+                entry.Id,
+                string.Format(
+                    I18n("plugins.settingsTitle"),
+                    entry.DisplayName),
+                scrollViewer,
+                entry.Manifest.Window)
+            {
+                Owner = owner,
+                Width = 520,
+                Height = 420,
+                ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false,
+            };
         }
 
         private void OpenCapabilityDetails(PluginCardItem item)

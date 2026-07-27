@@ -16,6 +16,11 @@ namespace LongBetterWindows.Host.Capabilities
         /// <summary>检测热键是否冲突</summary>
         Task<HostApiResponse<bool>> IsConflictAsync(string hotkey);
 
+        /// <summary>检测热键是否冲突，可排除正在被替换的当前热键</summary>
+        Task<HostApiResponse<bool>> IsConflictAsync(
+            string hotkey,
+            string? excludedHotkey);
+
         /// <summary>获取热键的拥有者插件 ID</summary>
         string? GetOwner(string hotkey);
 

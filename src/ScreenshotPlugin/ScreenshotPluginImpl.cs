@@ -210,7 +210,7 @@ public class ScreenshotPluginImpl :
 
     public FrameworkElement CreateSettingsUI()
     {
-        var panel = new StackPanel { Margin = new Thickness(16) };
+        var panel = new StackPanel();
         var full = new HotkeySettingsControl(
             Text("settings.fullTitle", "全屏截图"),
             Id,

@@ -33,6 +33,7 @@ public class AppStartupOptionsTests
             "--quality-taskbar-identity-report", "taskbar-identity.json",
             "--quality-ui-service-theme-report", "ui-service-theme.json",
             "--quality-themed-message-dialog-report", "message-dialog.json",
+            "--quality-plugin-settings-report", "plugin-settings.json",
             "--quality-skip-auto-start-plugin", "com.long.clipboardhistory",
             "--quality-skip-auto-start-plugin", "COM.LONG.MACRO",
             "--quality-hide-window-during-idle",
@@ -77,6 +78,9 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "message-dialog.json",
             options.QualityThemedMessageDialogReportPath);
+        Assert.Equal(
+            "plugin-settings.json",
+            options.QualityPluginSettingsReportPath);
         Assert.Equal(
             2,
             options.QualitySkippedAutoStartPluginIds.Count);

@@ -134,15 +134,16 @@ namespace LongBetterWindows.Host.Views
                 }
 
                 // 检查冲突
-                var conflictResult = await _hotKey.IsConflictAsync(newHotkey);
+                var conflictResult = await _hotKey.IsConflictAsync(
+                    newHotkey,
+                    _currentHotkey);
                 if (conflictResult.IsSuccess && conflictResult.Data)
                 {
                     var owner = _hotKey.GetOwner(newHotkey);
-                    if (owner != null && owner != _pluginId)
-                    {
-                        SetStatus(HotkeySettingsStatus.Conflict, owner);
-                        return;
-                    }
+                    SetStatus(
+                        HotkeySettingsStatus.Conflict,
+                        owner ?? newHotkey);
+                    return;
                 }
 
                 // 更换热键

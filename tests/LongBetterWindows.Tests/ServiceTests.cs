@@ -1,4 +1,7 @@
 using System.IO;
+using System.Runtime.ExceptionServices;
+using System.Windows.Interop;
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Tests;
@@ -208,6 +211,81 @@ public class ServiceTests
         var all = svc.GetAllHotkeys();
         Assert.Empty(all);
     }
+
+#pragma warning disable xUnit1031 // The isolated STA thread cannot use the xUnit async context.
+    [Fact]
+    public void HotKeyService_ChangeHotkey_IsAtomicAndDetectsSamePluginConflict()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var source = new HwndSource(new HwndSourceParameters(
+                    "LongBetterWindows.HotkeyServiceTests")
+                {
+                    Width = 1,
+                    Height = 1,
+                    WindowStyle = unchecked((int)0x80000000),
+                });
+                using var service = new HotKeyService();
+                service.Initialize(source.Handle);
+                const string pluginId = "com.long.quality-hotkey";
+                const string first = "Ctrl+Alt+Shift+F10";
+                const string second = "Ctrl+Alt+Shift+F11";
+                const string replacement = "Ctrl+Alt+Shift+F12";
+
+                Assert.True(service.RegisterAsync(
+                    first,
+                    pluginId,
+                    () => { }).GetAwaiter().GetResult().IsSuccess);
+                Assert.True(service.RegisterAsync(
+                    second,
+                    pluginId,
+                    () => { }).GetAwaiter().GetResult().IsSuccess);
+
+                var conflict = service.IsConflictAsync(second, first)
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.True(conflict.IsSuccess);
+                Assert.True(conflict.Data);
+
+                var rejected = service.ChangeHotkeyAsync(
+                        first,
+                        second,
+                        pluginId,
+                        () => { })
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.False(rejected.IsSuccess);
+                Assert.Equal(ApiErrorCode.HotKeyConflict, rejected.ErrorCode);
+                Assert.Contains(first, service.GetAllHotkeys().Keys);
+                Assert.Contains(second, service.GetAllHotkeys().Keys);
+
+                var changed = service.ChangeHotkeyAsync(
+                        first,
+                        replacement,
+                        pluginId,
+                        () => { })
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.True(changed.IsSuccess);
+                Assert.DoesNotContain(first, service.GetAllHotkeys().Keys);
+                Assert.Contains(second, service.GetAllHotkeys().Keys);
+                Assert.Contains(replacement, service.GetAllHotkeys().Keys);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(10)));
+        if (failure is not null)
+            ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+#pragma warning restore xUnit1031
 
     // ===== ADSService 测试 =====
 

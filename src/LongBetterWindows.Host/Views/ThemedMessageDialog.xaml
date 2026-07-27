@@ -62,6 +62,7 @@
             </Border>
 
             <ScrollViewer Grid.Row="1" MaxHeight="390"
+                          Style="{StaticResource DarkScrollViewerStyle}"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <TextBlock x:Name="DialogMessage"

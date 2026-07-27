@@ -217,7 +217,7 @@ public class MacroPluginImpl :
 
     public FrameworkElement CreateSettingsUI()
     {
-        var panel = new StackPanel { Margin = new Thickness(16) };
+        var panel = new StackPanel();
         AddSettingsControl(panel, "settings.record", "录制", _recordHotkey);
         AddSettingsControl(panel, "settings.playOnce", "播放单次", _playHotkey);
         AddSettingsControl(panel, "settings.loop", "循环播放", _loopHotkey);

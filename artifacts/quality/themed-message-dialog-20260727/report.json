@@ -1,14 +1,19 @@
 {
   "schema_version": 1,
-  "captured_at": "2026-07-27T08:52:26.3235868+00:00",
+  "captured_at": "2026-07-27T09:10:06.4525506+00:00",
   "passed": true,
   "runtime_theme_changed": true,
   "default_action": "cancel",
+  "compact_long_text_layout_passed": true,
+  "window": {
+    "width": 380,
+    "height": 215
+  },
   "screenshots": {
     "dark": "themed-message-dialog-dark.png",
-    "dark_sha256": "683b341e621f6e7d8d02f6cd29cce39fcb027305f5434523e7d39f01672d19fe",
+    "dark_sha256": "d658994a38ffc1586e78920e2a92f3f12740c6c3ab3d4d4ea58f091a4f89b876",
     "light": "themed-message-dialog-light.png",
-    "light_sha256": "3ce46abc5a32e73e7f7d6a9fd3778cb7e1e82388918222b99d927524cc501e6a"
+    "light_sha256": "20a945318284601a4c2f62f10a7abbfbd701dd7e62fc8995180b9ac0b5927411"
   },
   "themes": [
     {

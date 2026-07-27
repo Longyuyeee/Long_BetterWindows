@@ -152,11 +152,23 @@ namespace LongBetterWindows.Host.Services
         }
 
         public Task<HostApiResponse<bool>> IsConflictAsync(string hotkey)
+            => IsConflictAsync(hotkey, excludedHotkey: null);
+
+        public Task<HostApiResponse<bool>> IsConflictAsync(
+            string hotkey,
+            string? excludedHotkey)
         {
             lock (_lock)
             {
                 var normalized = Normalize(hotkey);
-                bool conflict = _entries.ContainsKey(normalized);
+                var excluded = string.IsNullOrWhiteSpace(excludedHotkey)
+                    ? null
+                    : Normalize(excludedHotkey);
+                var conflict = _entries.ContainsKey(normalized)
+                    && !string.Equals(
+                        normalized,
+                        excluded,
+                        StringComparison.OrdinalIgnoreCase);
                 return Task.FromResult(HostApiResponse<bool>.Success(conflict));
             }
         }
@@ -200,30 +212,132 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
-        public async Task<HostApiResponse> ChangeHotkeyAsync(
+        public Task<HostApiResponse> ChangeHotkeyAsync(
             string oldHotkey, string newHotkey, string pluginId, Action callback)
         {
-            // 检查新热键是否冲突（排除自己的旧热键）
-            var conflict = await IsConflictAsync(newHotkey);
-            if (conflict.IsSuccess && conflict.Data)
+            if (_dispatcher != null && !_dispatcher.CheckAccess())
             {
-                var owner = GetOwner(newHotkey);
-                if (owner != pluginId)
+                return _dispatcher.InvokeAsync(
+                    () => ChangeHotkeyCore(
+                        oldHotkey,
+                        newHotkey,
+                        pluginId,
+                        callback)).Task;
+            }
+
+            return Task.FromResult(ChangeHotkeyCore(
+                oldHotkey,
+                newHotkey,
+                pluginId,
+                callback));
+        }
+
+        private HostApiResponse ChangeHotkeyCore(
+            string oldHotkey,
+            string newHotkey,
+            string pluginId,
+            Action callback)
+        {
+            lock (_lock)
+            {
+                var oldNormalized = Normalize(oldHotkey);
+                var newNormalized = Normalize(newHotkey);
+                if (string.Equals(
+                        oldNormalized,
+                        newNormalized,
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    return HostApiResponse.Failure(ApiErrorCode.HotKeyConflict,
-                        $"热键 '{newHotkey}' 已被其他插件占用。");
+                    if (!_entries.TryGetValue(
+                            newNormalized,
+                            out var unchangedEntry))
+                    {
+                        return RegisterCore(
+                            newHotkey,
+                            pluginId,
+                            callback);
+                    }
+                    return string.Equals(
+                            unchangedEntry.PluginId,
+                            pluginId,
+                            StringComparison.OrdinalIgnoreCase)
+                        ? HostApiResponse.Success()
+                        : HostApiResponse.Failure(
+                            ApiErrorCode.HotKeyConflict,
+                            $"热键 '{newHotkey}' 已被「{unchangedEntry.OwnerName}」占用。");
                 }
-            }
 
-            // 注销旧热键
-            var unreg = await UnregisterAsync(oldHotkey);
-            if (!unreg.IsSuccess && unreg.ErrorMessage != null)
-            {
-                // 旧热键可能不存在（首次设置），忽略
-            }
+                if (_entries.TryGetValue(newNormalized, out var conflict))
+                {
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.HotKeyConflict,
+                        $"热键 '{newHotkey}' 已被「{conflict.OwnerName}」占用。");
+                }
 
-            // 注册新热键
-            return await RegisterAsync(newHotkey, pluginId, callback);
+                if (_entries.TryGetValue(oldNormalized, out var oldEntry)
+                    && !string.Equals(
+                        oldEntry.PluginId,
+                        pluginId,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.InvalidArgument,
+                        $"热键 '{oldHotkey}' 不属于插件 '{pluginId}'。");
+                }
+
+                if (!TryParseHotkey(
+                        newHotkey,
+                        out var modifiers,
+                        out var vk,
+                        out var error))
+                {
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.InvalidArgument,
+                        error);
+                }
+                if (_hwnd == IntPtr.Zero)
+                {
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.Unknown,
+                        "HotKeyService 未初始化，请先调用 Initialize。");
+                }
+
+                var newId = _nextId++;
+                if (!RegisterHotKey(_hwnd, newId, modifiers, vk))
+                {
+                    var win32Error = Marshal.GetLastWin32Error();
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.HotKeyRegistrationFailed,
+                        $"注册热键失败 (Win32 Error: {win32Error})。");
+                }
+
+                if (oldEntry is not null
+                    && !UnregisterHotKey(_hwnd, oldEntry.Id))
+                {
+                    var win32Error = Marshal.GetLastWin32Error();
+                    UnregisterHotKey(_hwnd, newId);
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.HotKeyRegistrationFailed,
+                        $"注销旧热键失败 (Win32 Error: {win32Error})。");
+                }
+
+                if (oldEntry is not null)
+                    _entries.Remove(oldNormalized);
+                _entries[newNormalized] = new HotKeyEntry
+                {
+                    Id = newId,
+                    Original = newHotkey,
+                    PluginId = pluginId,
+                    Modifiers = modifiers,
+                    Key = vk,
+                    Callback = callback,
+                };
+                Log.Information(
+                    "热键已原子更换: {OldHotkey} -> {NewHotkey} (ID={Id})",
+                    oldHotkey,
+                    newHotkey,
+                    newId);
+                return HostApiResponse.Success();
+            }
         }
 
         private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)

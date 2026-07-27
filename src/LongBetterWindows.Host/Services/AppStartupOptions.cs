@@ -21,6 +21,7 @@ namespace LongBetterWindows.Host.Services
         public string? QualityTaskbarIdentityReportPath { get; private init; }
         public string? QualityUiServiceThemeReportPath { get; private init; }
         public string? QualityThemedMessageDialogReportPath { get; private init; }
+        public string? QualityPluginSettingsReportPath { get; private init; }
         public IReadOnlySet<string> QualitySkippedAutoStartPluginIds { get; private init; } =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public bool QualityHideWindowDuringIdle { get; private init; }
@@ -101,6 +102,9 @@ namespace LongBetterWindows.Host.Services
                 QualityThemedMessageDialogReportPath = ReadArgument(
                     arguments,
                     "--quality-themed-message-dialog-report"),
+                QualityPluginSettingsReportPath = ReadArgument(
+                    arguments,
+                    "--quality-plugin-settings-report"),
                 QualitySkippedAutoStartPluginIds = ReadArguments(
                     arguments,
                     "--quality-skip-auto-start-plugin"),
