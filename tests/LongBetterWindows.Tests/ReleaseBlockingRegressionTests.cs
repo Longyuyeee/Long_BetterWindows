@@ -130,6 +130,20 @@ public sealed class ReleaseBlockingRegressionTests
             "PluginTaskbarIdentity.cs"));
         Assert.Contains("StableHash(pluginId)", identity);
         Assert.DoesNotContain("GetHashCode(pluginId)", identity);
+
+        var qualityRuntime = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "QualityRuntimeService.cs"));
+        Assert.Contains(
+            "HostProvider.Instance.PluginStore.GetAll()",
+            qualityRuntime);
+        Assert.Contains(
+            "distinct_actual_identity_count",
+            qualityRuntime);
+        Assert.Contains("distinct_icon_count", qualityRuntime);
     }
 
     [Fact]

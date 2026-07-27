@@ -195,46 +195,77 @@ namespace LongBetterWindows.Host.Services
 
         public async Task RunTaskbarIdentityProbeAsync(string reportPath)
         {
-            const string firstPluginId = "com.long.quality-taskbar";
-            const string secondPluginId = "com.long.quality_taskbar";
-            var first = new PluginWindowHost(
-                firstPluginId,
-                "Taskbar Alpha",
-                new System.Windows.Controls.Border());
-            var second = new PluginWindowHost(
-                secondPluginId,
-                "Taskbar Beta",
-                new System.Windows.Controls.Border());
+            const int expectedPluginCount = 25;
+            var entries = HostProvider.Instance.PluginStore.GetAll()
+                .OrderBy(entry => entry.Id, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var windows = entries
+                .Select(entry =>
+                {
+                    var window = new PluginWindowHost(
+                        entry.Id,
+                        entry.DisplayName,
+                        new Border())
+                    {
+                        ShowActivated = false,
+                    };
+                    return (Entry: entry, Window: window);
+                })
+                .ToArray();
 
             try
             {
-                first.Show();
-                second.Show();
+                foreach (var item in windows)
+                    item.Window.Show();
                 await _application.Dispatcher.InvokeAsync(
                     () => { },
                     DispatcherPriority.ContextIdle);
 
-                var firstExpected =
-                    PluginTaskbarIdentity.CreateAppUserModelId(firstPluginId);
-                var secondExpected =
-                    PluginTaskbarIdentity.CreateAppUserModelId(secondPluginId);
-                var firstActual =
-                    PluginTaskbarIdentity.ReadAppUserModelId(first);
-                var secondActual =
-                    PluginTaskbarIdentity.ReadAppUserModelId(second);
-                var firstIcon = GetIconFingerprint(first.Icon);
-                var secondIcon = GetIconFingerprint(second.Icon);
+                var results = windows
+                    .Select(item =>
+                    {
+                        var expected = PluginTaskbarIdentity
+                            .CreateAppUserModelId(item.Entry.Id);
+                        var actual = PluginTaskbarIdentity
+                            .ReadAppUserModelId(item.Window);
+                        var icon = GetIconFingerprint(item.Window.Icon);
+                        return new
+                        {
+                            plugin_id = item.Entry.Id,
+                            plugin_title = item.Entry.DisplayName,
+                            expected_app_user_model_id = expected,
+                            actual_app_user_model_id = actual,
+                            icon_sha256 = icon,
+                            has_owner = item.Window.Owner is not null,
+                            show_in_taskbar = item.Window.ShowInTaskbar,
+                        };
+                    })
+                    .ToArray();
+                var distinctExpectedCount = results
+                    .Select(result => result.expected_app_user_model_id)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
+                var distinctActualCount = results
+                    .Select(result => result.actual_app_user_model_id)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
+                var distinctIconCount = results
+                    .Select(result => result.icon_sha256)
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
                 var passed =
-                    firstActual == firstExpected
-                    && secondActual == secondExpected
-                    && firstActual != secondActual
-                    && firstIcon is not null
-                    && secondIcon is not null
-                    && firstIcon != secondIcon
-                    && first.Owner is null
-                    && second.Owner is null
-                    && first.ShowInTaskbar
-                    && second.ShowInTaskbar;
+                    results.Length == expectedPluginCount
+                    && distinctExpectedCount == expectedPluginCount
+                    && distinctActualCount == expectedPluginCount
+                    && distinctIconCount == expectedPluginCount
+                    && results.All(result =>
+                        result.actual_app_user_model_id
+                            == result.expected_app_user_model_id
+                        && result.icon_sha256 is not null
+                        && !result.has_owner
+                        && result.show_in_taskbar);
 
                 var fullPath = Path.GetFullPath(reportPath);
                 Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -246,35 +277,22 @@ namespace LongBetterWindows.Host.Services
                             schema_version = 1,
                             captured_at = DateTimeOffset.UtcNow,
                             passed,
-                            windows = new[]
-                            {
-                                new
-                                {
-                                    plugin_id = firstPluginId,
-                                    expected_app_user_model_id = firstExpected,
-                                    actual_app_user_model_id = firstActual,
-                                    icon_sha256 = firstIcon,
-                                    has_owner = first.Owner is not null,
-                                    show_in_taskbar = first.ShowInTaskbar,
-                                },
-                                new
-                                {
-                                    plugin_id = secondPluginId,
-                                    expected_app_user_model_id = secondExpected,
-                                    actual_app_user_model_id = secondActual,
-                                    icon_sha256 = secondIcon,
-                                    has_owner = second.Owner is not null,
-                                    show_in_taskbar = second.ShowInTaskbar,
-                                },
-                            },
+                            expected_plugin_count = expectedPluginCount,
+                            plugin_count = results.Length,
+                            distinct_expected_identity_count =
+                                distinctExpectedCount,
+                            distinct_actual_identity_count =
+                                distinctActualCount,
+                            distinct_icon_count = distinctIconCount,
+                            windows = results,
                         },
                         new JsonSerializerOptions { WriteIndented = true }));
                 _application.Shutdown(passed ? 0 : 5);
             }
             finally
             {
-                first.Close();
-                second.Close();
+                foreach (var item in windows)
+                    item.Window.Close();
             }
         }
 
