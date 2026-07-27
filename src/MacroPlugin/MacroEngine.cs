@@ -1,10 +1,21 @@
-using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace MacroPlugin;
 
-public enum MacroState { Idle, Recording, Playing, PlayingLoop }
-public enum MacroActionType { MouseClick, KeyPress }
+public enum MacroState
+{
+    Idle,
+    Recording,
+    Playing,
+    PlayingLoop,
+    Faulted,
+}
+
+public enum MacroActionType
+{
+    MouseClick,
+    KeyPress,
+}
 
 public class MacroAction
 {
@@ -12,290 +23,739 @@ public class MacroAction
     public int X { get; init; }
     public int Y { get; init; }
     public bool IsRightButton { get; init; }
-    public int KeyCode { get; init; }  // VK key code for keyboard
+    public int KeyCode { get; init; }
     public int DelayMs { get; set; }
 
-    public static MacroAction Mouse(int x, int y, bool right, int delay)
-        => new() { Type = MacroActionType.MouseClick, X = x, Y = y, IsRightButton = right, DelayMs = delay };
+    public static MacroAction Mouse(
+        int x,
+        int y,
+        bool right,
+        int delay)
+        => new()
+        {
+            Type = MacroActionType.MouseClick,
+            X = x,
+            Y = y,
+            IsRightButton = right,
+            DelayMs = delay,
+        };
 
-    public static MacroAction Key(int vk, int delay)
-        => new() { Type = MacroActionType.KeyPress, KeyCode = vk, DelayMs = delay };
+    public static MacroAction Key(int virtualKey, int delay)
+        => new()
+        {
+            Type = MacroActionType.KeyPress,
+            KeyCode = virtualKey,
+            DelayMs = delay,
+        };
 }
 
-public class MacroEngine : IDisposable
+public sealed class MacroEngine : IDisposable, IAsyncDisposable
 {
-    private const int WH_MOUSE_LL = 14;
-    private const int WH_KEYBOARD_LL = 13;
-    private const int WM_LBUTTONDOWN = 0x0201;
-    private const int WM_RBUTTONDOWN = 0x0204;
-    private const int WM_KEYDOWN = 0x0100;
+    private const int MouseHookType = 14;
+    private const int KeyboardHookType = 13;
+    private const int LeftButtonDownMessage = 0x0201;
+    private const int RightButtonDownMessage = 0x0204;
+    private const int KeyDownMessage = 0x0100;
+    private const int ReleaseAttemptCount = 3;
 
-    private IntPtr _mouseHook = IntPtr.Zero;
-    private IntPtr _keyboardHook = IntPtr.Zero;
-    private readonly HookProc _mouseProc;
-    private readonly HookProc _keyboardProc;
-    private readonly List<MacroAction> _actions = new();
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+    };
+
+    private readonly IMacroNativeApi _native;
+    private readonly TimeSpan _pressDuration;
+    private readonly TimeSpan _loopInterval;
+    private readonly MacroHookProc _mouseHookCallback;
+    private readonly MacroHookProc _keyboardHookCallback;
+    private readonly List<MacroAction> _actions = [];
+    private readonly HashSet<int> _pendingKeyReleases = [];
+    private readonly Dictionary<
+        MacroMouseButton,
+        (int X, int Y)> _pendingMouseReleases = [];
+    private readonly object _sync = new();
+    private IntPtr _mouseHook;
+    private IntPtr _keyboardHook;
     private DateTime _lastEvent;
-    private CancellationTokenSource? _playCts;
-    private Task? _playTask;
-    private readonly object _lock = new();
+    private CancellationTokenSource? _playCancellation;
+    private Task<bool>? _playTask;
+    private MacroState _state = MacroState.Idle;
+    private string? _lastError;
+    private bool _disposed;
 
-    private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
+    public MacroEngine()
+        : this(
+            new MacroNativeApi(),
+            TimeSpan.FromMilliseconds(30),
+            TimeSpan.FromMilliseconds(100))
+    {
+    }
 
-    public MacroState State { get; private set; } = MacroState.Idle;
+    internal MacroEngine(
+        IMacroNativeApi native,
+        TimeSpan pressDuration,
+        TimeSpan loopInterval)
+    {
+        _native = native ?? throw new ArgumentNullException(nameof(native));
+        _pressDuration = pressDuration;
+        _loopInterval = loopInterval;
+        _mouseHookCallback = MouseHookCallback;
+        _keyboardHookCallback = KeyboardHookCallback;
+    }
+
+    public MacroState State
+    {
+        get
+        {
+            lock (_sync)
+                return _state;
+        }
+    }
+
+    public string? LastError
+    {
+        get
+        {
+            lock (_sync)
+                return _lastError;
+        }
+    }
+
     public int ActionCount
     {
         get
         {
-            lock (_lock)
+            lock (_sync)
                 return _actions.Count;
         }
     }
-    public event Action<MacroState>? StateChanged;
 
-    public MacroEngine()
-    {
-        _mouseProc = MouseHookCallback;
-        _keyboardProc = KeyboardHookCallback;
-    }
+    public event Action<MacroState>? StateChanged;
+    public event Action<string>? PlaybackFailed;
 
     public bool StartRecording()
     {
-        if (State != MacroState.Idle)
-            return false;
-
-        lock (_lock) { _actions.Clear(); _lastEvent = DateTime.UtcNow; }
-        _mouseHook = SetHook(WH_MOUSE_LL, _mouseProc);
-        _keyboardHook = SetHook(WH_KEYBOARD_LL, _keyboardProc);
-        if (_mouseHook == IntPtr.Zero || _keyboardHook == IntPtr.Zero)
+        MacroState? stateToPublish = null;
+        lock (_sync)
         {
-            StopRecording();
-            return false;
+            ThrowIfDisposed();
+            if (_state != MacroState.Idle)
+                return false;
+            if (HasPendingInputReleases())
+            {
+                _lastError = "Previously pressed inputs have not been released.";
+                return false;
+            }
+
+            _actions.Clear();
+            _lastEvent = DateTime.UtcNow;
+            _lastError = null;
+            _mouseHook = _native.InstallHook(
+                MouseHookType,
+                _mouseHookCallback,
+                out var mouseError);
+            if (_mouseHook == IntPtr.Zero)
+            {
+                _lastError = NativeFailure(
+                    "SetWindowsHookEx(mouse)",
+                    mouseError);
+                return false;
+            }
+
+            _keyboardHook = _native.InstallHook(
+                KeyboardHookType,
+                _keyboardHookCallback,
+                out var keyboardError);
+            if (_keyboardHook == IntPtr.Zero)
+            {
+                _lastError = NativeFailure(
+                    "SetWindowsHookEx(keyboard)",
+                    keyboardError);
+                if (!_native.UninstallHook(
+                        _mouseHook,
+                        out var cleanupError))
+                {
+                    _lastError += " " + NativeFailure(
+                        "UnhookWindowsHookEx(mouse)",
+                        cleanupError);
+                    _state = MacroState.Faulted;
+                    stateToPublish = _state;
+                }
+                else
+                {
+                    _mouseHook = IntPtr.Zero;
+                }
+            }
+            else
+            {
+                _state = MacroState.Recording;
+                stateToPublish = _state;
+            }
         }
-        State = MacroState.Recording;
-        StateChanged?.Invoke(State);
-        return true;
+
+        PublishState(stateToPublish);
+        return stateToPublish == MacroState.Recording;
     }
 
-    public void StopRecording()
+    public bool StopRecording()
     {
-        if (_mouseHook != IntPtr.Zero) { UnhookWindowsHookEx(_mouseHook); _mouseHook = IntPtr.Zero; }
-        if (_keyboardHook != IntPtr.Zero) { UnhookWindowsHookEx(_keyboardHook); _keyboardHook = IntPtr.Zero; }
-        State = MacroState.Idle;
-        StateChanged?.Invoke(State);
+        MacroState? stateToPublish = null;
+        lock (_sync)
+        {
+            if (_mouseHook == IntPtr.Zero
+                && _keyboardHook == IntPtr.Zero)
+            {
+                if (_state == MacroState.Recording
+                    || _state == MacroState.Faulted)
+                {
+                    _state = MacroState.Idle;
+                    stateToPublish = _state;
+                }
+            }
+            else
+            {
+                var errors = new List<string>();
+                TryReleaseHook(
+                    ref _mouseHook,
+                    "mouse",
+                    errors);
+                TryReleaseHook(
+                    ref _keyboardHook,
+                    "keyboard",
+                    errors);
+                if (errors.Count == 0)
+                {
+                    _lastError = null;
+                    _state = MacroState.Idle;
+                }
+                else
+                {
+                    _lastError = string.Join(" ", errors);
+                    _state = MacroState.Faulted;
+                }
+                stateToPublish = _state;
+            }
+        }
+
+        PublishState(stateToPublish);
+        return State == MacroState.Idle;
     }
 
-    public async Task<bool> PlayOnceAsync(
+    public Task<bool> PlayOnceAsync(
         CancellationToken cancellationToken = default)
     {
-        if (State != MacroState.Idle || ActionCount == 0)
-            return false;
-
-        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken);
-        _playCts = cancellation;
-        State = MacroState.Playing;
-        StateChanged?.Invoke(State);
-        try
+        MacroState? stateToPublish;
+        Task<bool> task;
+        var startGate = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_sync)
         {
-            await PlayActionsAsync(cancellation.Token);
-            return true;
-        }
-        finally
-        {
-            if (ReferenceEquals(_playCts, cancellation))
+            ThrowIfDisposed();
+            if (_state != MacroState.Idle
+                || _actions.Count == 0
+                || HasPendingInputReleases())
             {
-                _playCts = null;
-                State = MacroState.Idle;
-                StateChanged?.Invoke(State);
+                return Task.FromResult(false);
             }
-            cancellation.Dispose();
+
+            _lastError = null;
+            var cancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken);
+            _playCancellation = cancellation;
+            _state = MacroState.Playing;
+            stateToPublish = _state;
+            task = RunPlaybackAsync(
+                cancellation,
+                loop: false,
+                startGate.Task);
+            _playTask = task;
         }
+
+        PublishState(stateToPublish);
+        startGate.SetResult();
+        return task;
     }
 
     public bool PlayLoop()
     {
-        if (State != MacroState.Idle || ActionCount == 0)
-            return false;
+        MacroState? stateToPublish;
+        var startGate = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_sync)
+        {
+            ThrowIfDisposed();
+            if (_state != MacroState.Idle
+                || _actions.Count == 0
+                || HasPendingInputReleases())
+            {
+                return false;
+            }
 
-        var cancellation = new CancellationTokenSource();
-        _playCts = cancellation;
-        State = MacroState.PlayingLoop;
-        StateChanged?.Invoke(State);
-        _playTask = Task.Run(() => PlayLoopAsync(cancellation));
+            _lastError = null;
+            var cancellation = new CancellationTokenSource();
+            _playCancellation = cancellation;
+            _state = MacroState.PlayingLoop;
+            stateToPublish = _state;
+            _playTask = RunPlaybackAsync(
+                cancellation,
+                loop: true,
+                startGate.Task);
+        }
+
+        PublishState(stateToPublish);
+        startGate.SetResult();
         return true;
     }
 
-    public void StopPlay() => _playCts?.Cancel();
+    public async Task<bool> StopPlayAsync()
+    {
+        Task<bool>? task;
+        lock (_sync)
+        {
+            _playCancellation?.Cancel();
+            task = _playTask;
+        }
+
+        if (task is null)
+            return true;
+        var succeeded = await task.ConfigureAwait(false);
+        return succeeded || LastError is null;
+    }
+
+    public async Task<bool> StopAsync()
+    {
+        _ = await StopPlayAsync().ConfigureAwait(false);
+        var releaseErrors = ReleasePressedInputs();
+        var recordingStopped = StopRecording();
+        return releaseErrors.Count == 0 && recordingStopped;
+    }
 
     public string SaveToJson()
     {
-        lock (_lock) return JsonSerializer.Serialize(_actions, JsonOpts);
+        lock (_sync)
+            return JsonSerializer.Serialize(_actions, JsonOptions);
     }
 
     public void LoadFromJson(string json)
     {
-        lock (_lock)
+        ArgumentNullException.ThrowIfNull(json);
+        lock (_sync)
         {
+            ThrowIfDisposed();
+            if (_state != MacroState.Idle)
+            {
+                throw new InvalidOperationException(
+                    "A macro cannot be loaded while the engine is active.");
+            }
+
+            var loaded =
+                JsonSerializer.Deserialize<List<MacroAction>>(json)
+                ?? [];
             _actions.Clear();
-            var loaded = JsonSerializer.Deserialize<List<MacroAction>>(json);
-            if (loaded != null) _actions.AddRange(loaded);
+            _actions.AddRange(loaded);
         }
     }
 
-    private async Task PlayLoopAsync(CancellationTokenSource cancellation)
+    public void Dispose()
     {
+        if (_disposed)
+            return;
+
+        if (!StopAsync().GetAwaiter().GetResult())
+        {
+            throw new InvalidOperationException(
+                LastError ?? "Macro engine cleanup failed.");
+        }
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+            return;
+
+        if (!await StopAsync().ConfigureAwait(false))
+        {
+            throw new InvalidOperationException(
+                LastError ?? "Macro engine cleanup failed.");
+        }
+        _disposed = true;
+        GC.SuppressFinalize(this);
+    }
+
+    private async Task<bool> RunPlaybackAsync(
+        CancellationTokenSource cancellation,
+        bool loop,
+        Task startGate)
+    {
+        var succeeded = true;
         try
         {
-            while (!cancellation.IsCancellationRequested)
+            await startGate.ConfigureAwait(false);
+            do
             {
-                await PlayActionsAsync(cancellation.Token);
-                await Task.Delay(100, cancellation.Token);
+                await PlayActionsAsync(
+                    cancellation.Token).ConfigureAwait(false);
+                if (loop)
+                {
+                    await Task.Delay(
+                        _loopInterval,
+                        cancellation.Token).ConfigureAwait(false);
+                }
             }
+            while (loop);
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        catch (OperationCanceledException)
+            when (cancellation.IsCancellationRequested)
         {
+            succeeded = loop;
+        }
+        catch (Exception exception)
+        {
+            succeeded = false;
+            var message = exception.Message;
+            lock (_sync)
+                _lastError = message;
+            PublishPlaybackFailure(message);
         }
         finally
         {
-            if (ReferenceEquals(_playCts, cancellation))
+            MacroState? stateToPublish = null;
+            lock (_sync)
             {
-                _playCts = null;
-                _playTask = null;
-                State = MacroState.Idle;
-                StateChanged?.Invoke(State);
+                if (ReferenceEquals(
+                        _playCancellation,
+                        cancellation))
+                {
+                    _playCancellation = null;
+                    _playTask = null;
+                    _state = MacroState.Idle;
+                    stateToPublish = _state;
+                }
             }
             cancellation.Dispose();
+            PublishState(stateToPublish);
         }
+
+        return succeeded;
     }
 
-    private async Task PlayActionsAsync(CancellationToken cancellationToken)
+    private async Task PlayActionsAsync(
+        CancellationToken cancellationToken)
     {
         List<MacroAction> snapshot;
-        lock (_lock) { snapshot = _actions.ToList(); }
-        if (snapshot.Count == 0) return;
+        lock (_sync)
+            snapshot = [.. _actions];
 
-        foreach (var action in snapshot)
+        Exception? playbackError = null;
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (action.Type == MacroActionType.MouseClick)
+            foreach (var action in snapshot)
             {
-                SetCursorPos(action.X, action.Y);
-                await Task.Delay(20, cancellationToken);
-                uint down = action.IsRightButton ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_LEFTDOWN;
-                uint up = action.IsRightButton ? MOUSEEVENTF_RIGHTUP : MOUSEEVENTF_LEFTUP;
-                SendMouseInput(action.X, action.Y, down);
-                await Task.Delay(30, cancellationToken);
-                SendMouseInput(action.X, action.Y, up);
-            }
-            else if (action.Type == MacroActionType.KeyPress)
-            {
-                keybd_event((byte)action.KeyCode, 0, 0, UIntPtr.Zero);
-                await Task.Delay(30, cancellationToken);
-                keybd_event((byte)action.KeyCode, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                switch (action.Type)
+                {
+                    case MacroActionType.MouseClick:
+                        await PlayMouseActionAsync(
+                            action,
+                            cancellationToken).ConfigureAwait(false);
+                        break;
+                    case MacroActionType.KeyPress:
+                        await PlayKeyActionAsync(
+                            action,
+                            cancellationToken).ConfigureAwait(false);
+                        break;
+                    default:
+                        throw new InvalidOperationException(
+                            $"Unsupported macro action: {action.Type}.");
+                }
 
-            if (action.DelayMs > 0)
-                await Task.Delay(action.DelayMs, cancellationToken);
+                if (action.DelayMs > 0)
+                {
+                    await Task.Delay(
+                        action.DelayMs,
+                        cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            playbackError = exception;
+            throw;
+        }
+        finally
+        {
+            var releaseErrors = ReleasePressedInputs();
+            if (releaseErrors.Count > 0)
+            {
+                var releaseException = new InvalidOperationException(
+                    string.Join(" ", releaseErrors));
+                if (playbackError is null)
+                    throw releaseException;
+                throw new AggregateException(
+                    "Macro playback failed and pressed inputs could not "
+                    + "be fully released.",
+                    playbackError,
+                    releaseException);
+            }
         }
     }
 
-    private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    private async Task PlayMouseActionAsync(
+        MacroAction action,
+        CancellationToken cancellationToken)
     {
-        if (nCode >= 0)
+        if (!_native.TrySetCursorPosition(
+                action.X,
+                action.Y,
+                out var cursorError))
         {
-            int msg = wParam.ToInt32();
-            if (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN)
+            throw new InvalidOperationException(
+                NativeFailure("SetCursorPos", cursorError));
+        }
+
+        var button = action.IsRightButton
+            ? MacroMouseButton.Right
+            : MacroMouseButton.Left;
+        if (!_native.TrySendMouseButton(
+                action.X,
+                action.Y,
+                button,
+                isDown: true,
+                out var downError))
+        {
+            throw new InvalidOperationException(
+                NativeFailure("SendInput(mouse down)", downError));
+        }
+        lock (_sync)
+            _pendingMouseReleases[button] = (action.X, action.Y);
+        await Task.Delay(
+            _pressDuration,
+            cancellationToken).ConfigureAwait(false);
+        if (!_native.TrySendMouseButton(
+                action.X,
+                action.Y,
+                button,
+                isDown: false,
+                out var upError))
+        {
+            throw new InvalidOperationException(
+                NativeFailure("SendInput(mouse up)", upError));
+        }
+        lock (_sync)
+            _pendingMouseReleases.Remove(button);
+    }
+
+    private async Task PlayKeyActionAsync(
+        MacroAction action,
+        CancellationToken cancellationToken)
+    {
+        if (!_native.TrySendKey(
+                action.KeyCode,
+                isDown: true,
+                out var downError))
+        {
+            throw new InvalidOperationException(
+                NativeFailure("SendInput(key down)", downError));
+        }
+        lock (_sync)
+            _pendingKeyReleases.Add(action.KeyCode);
+        await Task.Delay(
+            _pressDuration,
+            cancellationToken).ConfigureAwait(false);
+        if (!_native.TrySendKey(
+                action.KeyCode,
+                isDown: false,
+                out var upError))
+        {
+            throw new InvalidOperationException(
+                NativeFailure("SendInput(key up)", upError));
+        }
+        lock (_sync)
+            _pendingKeyReleases.Remove(action.KeyCode);
+    }
+
+    private List<string> ReleasePressedInputs()
+    {
+        var errors = new List<string>();
+        List<int> pressedKeys;
+        List<KeyValuePair<MacroMouseButton, (int X, int Y)>>
+            pressedButtons;
+        lock (_sync)
+        {
+            pressedKeys = [.. _pendingKeyReleases];
+            pressedButtons = [.. _pendingMouseReleases];
+        }
+        foreach (var key in pressedKeys)
+        {
+            var released = false;
+            var error = 0;
+            for (var attempt = 0;
+                attempt < ReleaseAttemptCount && !released;
+                attempt++)
             {
-                var hs = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                var now = DateTime.UtcNow;
-                lock (_lock) _actions.Add(MacroAction.Mouse(hs.pt.X, hs.pt.Y, msg == WM_RBUTTONDOWN, (int)(now - _lastEvent).TotalMilliseconds));
+                released = _native.TrySendKey(
+                    key,
+                    isDown: false,
+                    out error);
+            }
+            if (!released)
+            {
+                errors.Add(NativeFailure(
+                    $"Release key {key}",
+                    error));
+            }
+            else
+            {
+                lock (_sync)
+                    _pendingKeyReleases.Remove(key);
+            }
+        }
+        foreach (var pressedButton in pressedButtons)
+        {
+            var released = false;
+            var error = 0;
+            for (var attempt = 0;
+                attempt < ReleaseAttemptCount && !released;
+                attempt++)
+            {
+                released = _native.TrySendMouseButton(
+                    pressedButton.Value.X,
+                    pressedButton.Value.Y,
+                    pressedButton.Key,
+                    isDown: false,
+                    out error);
+            }
+            if (!released)
+            {
+                errors.Add(NativeFailure(
+                    $"Release {pressedButton.Key} mouse button",
+                    error));
+            }
+            else
+            {
+                lock (_sync)
+                    _pendingMouseReleases.Remove(pressedButton.Key);
+            }
+        }
+        return errors;
+    }
+
+    private IntPtr MouseHookCallback(
+        int code,
+        IntPtr message,
+        IntPtr data)
+    {
+        if (code >= 0
+            && State == MacroState.Recording
+            && (message.ToInt32() == LeftButtonDownMessage
+                || message.ToInt32() == RightButtonDownMessage))
+        {
+            var hookData = _native.ReadMouseHookData(data);
+            var now = DateTime.UtcNow;
+            lock (_sync)
+            {
+                _actions.Add(MacroAction.Mouse(
+                    hookData.X,
+                    hookData.Y,
+                    message.ToInt32() == RightButtonDownMessage,
+                    ElapsedMilliseconds(now)));
                 _lastEvent = now;
             }
         }
-        return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
+        return _native.CallNextHook(code, message, data);
     }
 
-    private IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+    private IntPtr KeyboardHookCallback(
+        int code,
+        IntPtr message,
+        IntPtr data)
     {
-        if (nCode >= 0 && wParam.ToInt32() == WM_KEYDOWN)
+        if (code >= 0
+            && State == MacroState.Recording
+            && message.ToInt32() == KeyDownMessage)
         {
-            var hs = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
+            var hookData = _native.ReadKeyboardHookData(data);
             var now = DateTime.UtcNow;
-            lock (_lock) _actions.Add(MacroAction.Key((int)hs.vkCode, (int)(now - _lastEvent).TotalMilliseconds));
-            _lastEvent = now;
-        }
-        return CallNextHookEx(IntPtr.Zero, nCode, wParam, lParam);
-    }
-
-    private static void SendMouseInput(int x, int y, uint flags)
-    {
-        var virtualLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
-        var virtualTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
-        var virtualWidth = Math.Max(1, GetSystemMetrics(SM_CXVIRTUALSCREEN));
-        var virtualHeight = Math.Max(1, GetSystemMetrics(SM_CYVIRTUALSCREEN));
-        var normalizedX = NormalizeAbsoluteCoordinate(x, virtualLeft, virtualWidth);
-        var normalizedY = NormalizeAbsoluteCoordinate(y, virtualTop, virtualHeight);
-        var input = new INPUT
-        {
-            type = INPUT_MOUSE,
-            u = new INPUTUNION
+            lock (_sync)
             {
-                mi = new MOUSEINPUT
-                {
-                    dx = normalizedX,
-                    dy = normalizedY,
-                    dwFlags = flags | MOUSEEVENTF_ABSOLUTE
-                        | MOUSEEVENTF_MOVE | MOUSEEVENTF_VIRTUALDESK,
-                },
-            },
-        };
-        SendInput(1, ref input, Marshal.SizeOf<INPUT>());
+                _actions.Add(MacroAction.Key(
+                    checked((int)hookData.VirtualKey),
+                    ElapsedMilliseconds(now)));
+                _lastEvent = now;
+            }
+        }
+        return _native.CallNextHook(code, message, data);
     }
 
-    private static int NormalizeAbsoluteCoordinate(
-        int coordinate,
-        int origin,
-        int extent)
-        => (int)Math.Round(
-            Math.Clamp(
-                (coordinate - origin) / (double)Math.Max(1, extent - 1),
-                0,
-                1)
-            * 65535);
+    private int ElapsedMilliseconds(DateTime now)
+        => (int)Math.Clamp(
+            (now - _lastEvent).TotalMilliseconds,
+            0,
+            int.MaxValue);
 
-    public void Dispose() { StopPlay(); StopRecording(); }
-
-    #region P/Invoke
-    private delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
-    [DllImport("user32.dll")] static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
-    [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hhk);
-    [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-    [DllImport("user32.dll")] static extern uint SendInput(uint nInputs, ref INPUT pInputs, int cbSize);
-    [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
-    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
-    [DllImport("user32.dll")] static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-    [DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string? lpModuleName);
-
-    // 缓存进程模块句柄，避免每次 SetHook 都调用 GetCurrentProcess()
-    private static readonly IntPtr _cachedModuleHandle = GetModuleHandle(
-        System.Diagnostics.Process.GetCurrentProcess().MainModule?.ModuleName);
-
-    static IntPtr SetHook(int type, HookProc proc)
+    private void TryReleaseHook(
+        ref IntPtr hook,
+        string name,
+        ICollection<string> errors)
     {
-        return SetWindowsHookEx(type, proc, _cachedModuleHandle, 0);
+        if (hook == IntPtr.Zero)
+            return;
+        if (_native.UninstallHook(hook, out var error))
+        {
+            hook = IntPtr.Zero;
+            return;
+        }
+        errors.Add(NativeFailure(
+            $"UnhookWindowsHookEx({name})",
+            error));
     }
 
-    const uint INPUT_MOUSE = 0, MOUSEEVENTF_MOVE = 0x0001, MOUSEEVENTF_LEFTDOWN = 0x0002, MOUSEEVENTF_LEFTUP = 0x0004;
-    const uint MOUSEEVENTF_RIGHTDOWN = 0x0008, MOUSEEVENTF_RIGHTUP = 0x0010, MOUSEEVENTF_VIRTUALDESK = 0x4000, MOUSEEVENTF_ABSOLUTE = 0x8000;
-    const uint KEYEVENTF_KEYUP = 0x0002;
-    const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77, SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
+    private void PublishState(MacroState? state)
+    {
+        if (state is null)
+            return;
+        PublishHandlers(
+            StateChanged,
+            state.Value);
+    }
 
-    [StructLayout(LayoutKind.Sequential)] struct POINT { public int X; public int Y; }
-    [StructLayout(LayoutKind.Sequential)] struct MSLLHOOKSTRUCT { public POINT pt; public uint mouseData, flags, time; public IntPtr dwExtraInfo; }
-    [StructLayout(LayoutKind.Sequential)] struct KBDLLHOOKSTRUCT { public uint vkCode, scanCode, flags, time; public IntPtr dwExtraInfo; }
-    struct INPUT { public uint type; public INPUTUNION u; }
-    [StructLayout(LayoutKind.Explicit)] struct INPUTUNION { [FieldOffset(0)] public MOUSEINPUT mi; }
-    struct MOUSEINPUT { public int dx, dy; public uint mouseData, dwFlags, time; public IntPtr dwExtraInfo; }
-    #endregion
+    private void PublishPlaybackFailure(string message)
+        => PublishHandlers(PlaybackFailed, message);
+
+    private static void PublishHandlers<T>(
+        Action<T>? handlers,
+        T value)
+    {
+        if (handlers is null)
+            return;
+        foreach (Action<T> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(value);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private static string NativeFailure(
+        string operation,
+        int error)
+        => error == 0
+            ? $"{operation} failed."
+            : $"{operation} failed with Win32 error {error}.";
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+    }
+
+    private bool HasPendingInputReleases()
+        => _pendingKeyReleases.Count > 0
+            || _pendingMouseReleases.Count > 0;
 }

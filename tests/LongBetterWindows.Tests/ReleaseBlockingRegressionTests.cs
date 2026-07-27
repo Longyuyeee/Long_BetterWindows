@@ -406,13 +406,21 @@ public sealed class ReleaseBlockingRegressionTests
             "src",
             "MacroPlugin",
             "MacroPluginImpl.cs"));
+        var native = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "MacroPlugin",
+            "MacroNativeApi.cs"));
 
-        Assert.Contains("NormalizeAbsoluteCoordinate", engine);
-        Assert.Contains("MOUSEEVENTF_VIRTUALDESK", engine);
-        Assert.Contains("GetSystemMetrics(SM_XVIRTUALSCREEN)", engine);
-        Assert.Contains("Task.Delay(action.DelayMs, cancellationToken)", engine);
-        Assert.Contains("_mouseHook == IntPtr.Zero || _keyboardHook == IntPtr.Zero", engine);
-        Assert.Contains("_engine?.StopPlay()", plugin);
+        Assert.Contains("NormalizeAbsoluteCoordinate", native);
+        Assert.Contains("MouseEventVirtualDesk", native);
+        Assert.Contains("GetSystemMetrics(SmXVirtualScreen)", native);
+        Assert.Contains("action.DelayMs", engine);
+        Assert.Contains("cancellationToken", engine);
+        Assert.Contains("ReleasePressedInputs", engine);
+        Assert.Contains("StopPlayAsync", engine);
+        Assert.Contains("await _engine.StopAsync()", plugin);
+        Assert.Contains("PlaybackFailed", plugin);
         Assert.Contains("PluginCommandResult.Failure", plugin);
     }
 

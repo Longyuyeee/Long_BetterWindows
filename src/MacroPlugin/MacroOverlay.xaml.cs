@@ -22,6 +22,11 @@ public partial class MacroOverlay : Window
     public MacroOverlay()
     {
         InitializeComponent();
+        Closed += (_, _) =>
+        {
+            CancelPendingHide();
+            StatusDot.BeginAnimation(OpacityProperty, null);
+        };
     }
 
     public static MacroOverlay ShowOverlay(MacroOverlayLocalization localization)

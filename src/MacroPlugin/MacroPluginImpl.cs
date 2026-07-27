@@ -34,7 +34,7 @@ public class MacroPluginImpl :
 
     public string Id => "com.long.macro";
     public string Name => Text("plugin.name", "宏录制器");
-    public string Version => "1.1.0";
+    public string Version => "1.1.1";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -60,6 +60,7 @@ public class MacroPluginImpl :
             _configuredLoopHotkey);
         _engine = new MacroEngine();
         _engine.StateChanged += OnStateChanged;
+        _engine.PlaybackFailed += OnPlaybackFailed;
 
         Log.Information("[Macro] 初始化完成");
         return true;
@@ -78,12 +79,12 @@ public class MacroPluginImpl :
             hotKey,
             _configuredPlayHotkey,
             "Ctrl+Alt+F7",
-            () => _ = PlayOnce());
+            () => Observe(PlayOnce()));
         _registeredLoopHotkey = await RegisterWithFallbackAsync(
             hotKey,
             _configuredLoopHotkey,
             "Ctrl+Alt+F8",
-            ToggleLoopPlay);
+            () => Observe(TryToggleLoopPlayAsync()));
 
         State = PluginState.Running;
         Log.Information("[Macro] 已启动: {Record}录制 {Play}播放 {Loop}循环",
@@ -132,11 +133,33 @@ public class MacroPluginImpl :
         _registeredPlayHotkey = null;
         _registeredLoopHotkey = null;
 
-        _engine?.StopPlay();
-        _engine?.StopRecording();
-        _engine?.Dispose();
+        if (_engine is not null)
+        {
+            var stopped = await _engine.StopAsync();
+            if (!stopped)
+            {
+                State = PluginState.Error;
+                Log.Error(
+                    "[Macro] 停止失败，仍有 Hook 或输入清理未完成: {Error}",
+                    _engine.LastError);
+                return false;
+            }
 
-        Application.Current.Dispatcher.Invoke(() => _overlay?.Close());
+            _engine.StateChanged -= OnStateChanged;
+            _engine.PlaybackFailed -= OnPlaybackFailed;
+            await _engine.DisposeAsync();
+            _engine = null;
+        }
+
+        var application = Application.Current;
+        if (application is not null)
+        {
+            application.Dispatcher.Invoke(() =>
+            {
+                _overlay?.Close();
+                _overlay = null;
+            });
+        }
         State = PluginState.Stopped;
         return true;
     }
@@ -151,7 +174,13 @@ public class MacroPluginImpl :
 
         if (_engine.State == MacroState.Recording)
         {
-            _engine.StopRecording();
+            if (!_engine.StopRecording())
+            {
+                Log.Error(
+                    "[Macro] 录制 Hook 清理失败: {Error}",
+                    _engine.LastError);
+                return false;
+            }
             _overlay?.SetIdle();
             Log.Information("[Macro] 录制停止，共 {Count} 个动作", _engine.ActionCount);
             return true;
@@ -161,7 +190,9 @@ public class MacroPluginImpl :
             if (!_engine.StartRecording())
             {
                 _overlay?.SetIdle();
-                Log.Error("[Macro] 全局输入钩子安装失败，未进入录制状态");
+                Log.Error(
+                    "[Macro] 全局输入钩子安装失败，未进入录制状态: {Error}",
+                    _engine.LastError);
                 return false;
             }
             _overlay?.SetRecording(_engine.ActionCount);
@@ -184,22 +215,37 @@ public class MacroPluginImpl :
 
         EnsureOverlay();
         _overlay?.SetPlaying(false);
-        var played = await _engine.PlayOnceAsync(cancellationToken);
-        _overlay?.SetIdle();
-        return played;
+        try
+        {
+            var played = await _engine.PlayOnceAsync(cancellationToken);
+            if (!played && _engine.LastError is not null)
+            {
+                Log.Error(
+                    "[Macro] 单次播放失败: {Error}",
+                    _engine.LastError);
+            }
+            return played;
+        }
+        finally
+        {
+            _overlay?.SetIdle();
+        }
     }
 
-    private void ToggleLoopPlay() => TryToggleLoopPlay();
-
-    private bool TryToggleLoopPlay()
+    private async Task<bool> TryToggleLoopPlayAsync()
     {
         if (_engine == null) return false;
         if (_engine.State == MacroState.PlayingLoop)
         {
-            _engine.StopPlay();
+            var stopped = await _engine.StopPlayAsync();
             _overlay?.SetIdle();
-            Log.Information("[Macro] 循环播放停止");
-            return true;
+            if (stopped)
+                Log.Information("[Macro] 循环播放停止");
+            else
+                Log.Error(
+                    "[Macro] 循环播放停止失败: {Error}",
+                    _engine.LastError);
+            return stopped;
         }
         if (_engine.State != MacroState.Idle) return false;
         if (_engine.ActionCount == 0) return false;
@@ -284,7 +330,7 @@ public class MacroPluginImpl :
             "循环播放",
             "play_loop_hotkey",
             _registeredLoopHotkey,
-            ToggleLoopPlay,
+            () => Observe(TryToggleLoopPlayAsync()),
             value =>
             {
                 ReplaceRegisteredHotkey(_registeredLoopHotkey, value);
@@ -375,7 +421,7 @@ public class MacroPluginImpl :
                     : PluginCommandResult.Failure(
                         Text("error.playUnavailable", "没有可播放的宏，或宏当前正忙"));
             case "macro.loop-toggle":
-                return TryToggleLoopPlay()
+                return await TryToggleLoopPlayAsync()
                     ? PluginCommandResult.Success(
                         Text("result.loopToggled", "循环播放状态已切换"))
                     : PluginCommandResult.Failure(
@@ -437,4 +483,34 @@ public class MacroPluginImpl :
             && !string.IsNullOrWhiteSpace(value)
                 ? value
                 : fallback;
+
+    private void OnPlaybackFailed(string message)
+    {
+        Log.Error("[Macro] 播放失败并已执行输入释放: {Error}", message);
+        var application = Application.Current;
+        if (application is null)
+            return;
+        application.Dispatcher.BeginInvoke(() =>
+        {
+            _overlay?.SetIdle();
+            FloatingHudWindow.ShowToast(string.Format(
+                Text("error.playFailed", "宏播放失败：{0}"),
+                message));
+        });
+    }
+
+    private static void Observe(Task task)
+        => _ = ObserveCoreAsync(task);
+
+    private static async Task ObserveCoreAsync(Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception, "[Macro] 后台操作异常");
+        }
+    }
 }
