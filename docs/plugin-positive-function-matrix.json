@@ -279,10 +279,15 @@
       "risk": "critical",
       "commands": ["macro.record-toggle", "macro.play-once", "macro.loop-toggle"],
       "automated_evidence": [
-        {
-          "level": "component",
-          "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
-          "symbol": "StopPlayAsync_ReleasesPressedMouseButtonAndWaits"
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "StopPlayAsync_ReleasesPressedMouseButtonAndWaits"
+          },
+          {
+            "level": "integration",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "PluginStop_MacroCleansEngineAndRetainsFailedHotkeyForRetry"
         }
       ],
       "manual_checks": [
@@ -633,10 +638,15 @@
         "window.third-right"
       ],
       "automated_evidence": [
-        {
-          "level": "integration",
-          "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
-          "symbol": "ApplyLayout_WorksAgainstIsolatedNativeWindow"
+          {
+            "level": "integration",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_WorksAgainstIsolatedNativeWindow"
+          },
+          {
+            "level": "integration",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "PluginStop_WindowManagerRetainsFailedHotkeyForRetry"
         }
       ],
       "manual_checks": [

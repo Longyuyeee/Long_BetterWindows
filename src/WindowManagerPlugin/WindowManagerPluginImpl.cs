@@ -26,7 +26,7 @@ public class WindowManagerPluginImpl :
 
     public string Id => "com.long.window-manager";
     public string Name => Text("plugin.name", "窗口管理");
-    public string Version => "2.1.1";
+    public string Version => "2.1.2";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -78,11 +78,41 @@ public class WindowManagerPluginImpl :
 
     public async Task<bool> StopAsync()
     {
-        foreach (var key in _registeredHotkeys)
-            await _host.HotKey.UnregisterAsync(key);
-        _registeredHotkeys.Clear();
-        _registeredTopmostHotkey = null;
-        Application.Current.Dispatcher.Invoke(() => _guide?.Close());
+        var failures = new List<string>();
+        foreach (var key in _registeredHotkeys.ToArray())
+        {
+            var result = await _host.HotKey.UnregisterAsync(key);
+            if (result.IsSuccess)
+            {
+                _registeredHotkeys.RemoveAll(existing =>
+                    existing.Equals(key, StringComparison.OrdinalIgnoreCase));
+                continue;
+            }
+
+            failures.Add($"{key}: {result.ErrorMessage ?? result.ErrorCode.ToString()}");
+        }
+
+        if (_registeredTopmostHotkey is not null
+            && !_registeredHotkeys.Contains(
+                _registeredTopmostHotkey,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            _registeredTopmostHotkey = null;
+        }
+
+        var application = Application.Current;
+        if (application is not null)
+            application.Dispatcher.Invoke(() => _guide?.Close());
+
+        if (failures.Count > 0)
+        {
+            State = PluginState.Error;
+            Log.Error(
+                "[WindowManager] 停止失败，仍有热键未注销: {Failures}",
+                string.Join("; ", failures));
+            return false;
+        }
+
         State = PluginState.Stopped;
         return true;
     }

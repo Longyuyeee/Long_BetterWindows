@@ -34,7 +34,7 @@ public class MacroPluginImpl :
 
     public string Id => "com.long.macro";
     public string Name => Text("plugin.name", "宏录制器");
-    public string Version => "1.1.1";
+    public string Version => "1.1.2";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -100,7 +100,7 @@ public class MacroPluginImpl :
         string fallback,
         Action callback)
     {
-        var result = await hotKey.RegisterAsync(preferred, callback);
+        var result = await hotKey.RegisterAsync(preferred, Id, callback);
         if (result.IsSuccess)
         {
             _registeredHotkeys.Add(preferred);
@@ -110,7 +110,7 @@ public class MacroPluginImpl :
         Log.Warning("[Macro] 热键 {Hotkey} 冲突，尝试 {Fallback}", preferred, fallback);
         if (!preferred.Equals(fallback, StringComparison.OrdinalIgnoreCase))
         {
-            result = await hotKey.RegisterAsync(fallback, callback);
+            result = await hotKey.RegisterAsync(fallback, Id, callback);
             if (result.IsSuccess)
             {
                 _registeredHotkeys.Add(fallback);
@@ -126,42 +126,95 @@ public class MacroPluginImpl :
     public async Task<bool> StopAsync()
     {
         var hotKey = _host!.HotKey!;
-        foreach (var hotkey in _registeredHotkeys)
-            await hotKey.UnregisterAsync(hotkey);
-        _registeredHotkeys.Clear();
-        _registeredRecordHotkey = null;
-        _registeredPlayHotkey = null;
-        _registeredLoopHotkey = null;
+        var unregisterFailures = new List<string>();
+        foreach (var hotkey in _registeredHotkeys.ToArray())
+        {
+            var result = await hotKey.UnregisterAsync(hotkey);
+            if (result.IsSuccess)
+            {
+                _registeredHotkeys.RemoveAll(existing =>
+                    existing.Equals(
+                        hotkey,
+                        StringComparison.OrdinalIgnoreCase));
+                continue;
+            }
 
+            unregisterFailures.Add(
+                $"{hotkey}: {result.ErrorMessage ?? result.ErrorCode.ToString()}");
+        }
+        ClearReleasedHotkeyReferences();
+
+        var engineStopped = true;
         if (_engine is not null)
         {
-            var stopped = await _engine.StopAsync();
-            if (!stopped)
+            engineStopped = await _engine.StopAsync();
+            if (!engineStopped)
             {
-                State = PluginState.Error;
                 Log.Error(
                     "[Macro] 停止失败，仍有 Hook 或输入清理未完成: {Error}",
                     _engine.LastError);
-                return false;
             }
-
-            _engine.StateChanged -= OnStateChanged;
-            _engine.PlaybackFailed -= OnPlaybackFailed;
-            await _engine.DisposeAsync();
-            _engine = null;
-        }
-
-        var application = Application.Current;
-        if (application is not null)
-        {
-            application.Dispatcher.Invoke(() =>
+            else
             {
-                _overlay?.Close();
-                _overlay = null;
-            });
+                _engine.StateChanged -= OnStateChanged;
+                _engine.PlaybackFailed -= OnPlaybackFailed;
+                await _engine.DisposeAsync();
+                _engine = null;
+            }
         }
+
+        if (engineStopped)
+        {
+            var application = Application.Current;
+            if (application is not null)
+            {
+                application.Dispatcher.Invoke(() =>
+                {
+                    _overlay?.Close();
+                    _overlay = null;
+                });
+            }
+        }
+
+        if (unregisterFailures.Count > 0)
+        {
+            Log.Error(
+                "[Macro] 停止失败，仍有热键未注销: {Failures}",
+                string.Join("; ", unregisterFailures));
+        }
+        if (!engineStopped || unregisterFailures.Count > 0)
+        {
+            State = PluginState.Error;
+            return false;
+        }
+
         State = PluginState.Stopped;
         return true;
+    }
+
+    private void ClearReleasedHotkeyReferences()
+    {
+        if (_registeredRecordHotkey is not null
+            && !_registeredHotkeys.Contains(
+                _registeredRecordHotkey,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            _registeredRecordHotkey = null;
+        }
+        if (_registeredPlayHotkey is not null
+            && !_registeredHotkeys.Contains(
+                _registeredPlayHotkey,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            _registeredPlayHotkey = null;
+        }
+        if (_registeredLoopHotkey is not null
+            && !_registeredHotkeys.Contains(
+                _registeredLoopHotkey,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            _registeredLoopHotkey = null;
+        }
     }
 
     private void ToggleRecording() => TryToggleRecording();

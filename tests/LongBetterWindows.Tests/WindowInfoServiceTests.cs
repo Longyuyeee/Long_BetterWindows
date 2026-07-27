@@ -3,6 +3,7 @@ using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Services;
+using MacroPlugin;
 using WindowManagerPlugin;
 
 namespace LongBetterWindows.Tests;
@@ -181,6 +182,52 @@ public sealed class WindowInfoServiceTests
         Assert.False(result.IsSuccess);
         Assert.Contains("SetWindowPos failed with Win32 error 5.", result.Message);
         Assert.Equal(WindowLayout.Left, windowInfo.LastLayout);
+    }
+
+    [Fact]
+    public async Task PluginStop_WindowManagerRetainsFailedHotkeyForRetry()
+    {
+        var hotkeys = new StubHotKeyService();
+        var plugin = new WindowManagerPluginImpl();
+        await plugin.InitializeAsync(new StubHostApi(
+            new StubWindowInfoService(),
+            hotkeys));
+        Assert.True(await plugin.StartAsync());
+        Assert.Equal(11, hotkeys.Registered.Count);
+        hotkeys.FailNextUnregister = "Ctrl+Alt+Left";
+
+        Assert.False(await plugin.StopAsync());
+        Assert.Equal(PluginState.Error, plugin.State);
+        Assert.Equal(
+            "com.long.window-manager",
+            hotkeys.GetOwner("Ctrl+Alt+Left"));
+        Assert.Single(hotkeys.Registered);
+
+        Assert.True(await plugin.StopAsync());
+        Assert.Equal(PluginState.Stopped, plugin.State);
+        Assert.Empty(hotkeys.Registered);
+    }
+
+    [Fact]
+    public async Task PluginStop_MacroCleansEngineAndRetainsFailedHotkeyForRetry()
+    {
+        var hotkeys = new StubHotKeyService();
+        var plugin = new MacroPluginImpl();
+        await plugin.InitializeAsync(new StubHostApi(
+            new StubWindowInfoService(),
+            hotkeys));
+        Assert.True(await plugin.StartAsync());
+        Assert.Equal(3, hotkeys.Registered.Count);
+        hotkeys.FailNextUnregister = "F7";
+
+        Assert.False(await plugin.StopAsync());
+        Assert.Equal(PluginState.Error, plugin.State);
+        Assert.Equal("com.long.macro", hotkeys.GetOwner("F7"));
+        Assert.Single(hotkeys.Registered);
+
+        Assert.True(await plugin.StopAsync());
+        Assert.Equal(PluginState.Stopped, plugin.State);
+        Assert.Empty(hotkeys.Registered);
     }
 
     [Fact]
@@ -385,11 +432,102 @@ public sealed class WindowInfoServiceTests
             => Task.FromResult(HostApiResponse.Success());
     }
 
-    private sealed class StubHostApi(IWindowInfoService windowInfo) : IHostApi
+    private sealed class StubHotKeyService : IHotKeyService
     {
+        private readonly Dictionary<string, (string Owner, Action Callback)>
+            _registered = new(StringComparer.OrdinalIgnoreCase);
+
+        public string? FailNextUnregister { get; set; }
+        public IReadOnlyDictionary<string, (string Owner, Action Callback)>
+            Registered => _registered;
+
+        public Task<HostApiResponse> RegisterAsync(
+            string hotkey,
+            Action callback)
+            => RegisterAsync(hotkey, "test.plugin", callback);
+
+        public Task<HostApiResponse> RegisterAsync(
+            string hotkey,
+            string pluginId,
+            Action callback)
+        {
+            if (!_registered.TryAdd(hotkey, (pluginId, callback)))
+            {
+                return Task.FromResult(HostApiResponse.Failure(
+                    ApiErrorCode.Conflict,
+                    "Hotkey already registered."));
+            }
+            return Task.FromResult(HostApiResponse.Success());
+        }
+
+        public Task<HostApiResponse> UnregisterAsync(string hotkey)
+        {
+            if (hotkey.Equals(
+                    FailNextUnregister,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                FailNextUnregister = null;
+                return Task.FromResult(HostApiResponse.Failure(
+                    ApiErrorCode.Win32Error,
+                    "Injected unregister failure."));
+            }
+            _registered.Remove(hotkey);
+            return Task.FromResult(HostApiResponse.Success());
+        }
+
+        public Task<HostApiResponse<bool>> IsConflictAsync(string hotkey)
+            => IsConflictAsync(hotkey, null);
+
+        public Task<HostApiResponse<bool>> IsConflictAsync(
+            string hotkey,
+            string? excludedHotkey)
+            => Task.FromResult(HostApiResponse<bool>.Success(
+                _registered.ContainsKey(hotkey)
+                && !hotkey.Equals(
+                    excludedHotkey,
+                    StringComparison.OrdinalIgnoreCase)));
+
+        public string? GetOwner(string hotkey)
+            => _registered.TryGetValue(hotkey, out var registration)
+                ? registration.Owner
+                : null;
+
+        public IReadOnlyDictionary<string, string> GetAllHotkeys()
+            => _registered.ToDictionary(
+                item => item.Key,
+                item => item.Value.Owner,
+                StringComparer.OrdinalIgnoreCase);
+
+        public async Task<HostApiResponse> ChangeHotkeyAsync(
+            string oldHotkey,
+            string newHotkey,
+            string pluginId,
+            Action callback)
+        {
+            var removed = _registered.Remove(oldHotkey);
+            var registered = await RegisterAsync(
+                newHotkey,
+                pluginId,
+                callback);
+            if (!registered.IsSuccess && removed)
+                _registered[oldHotkey] = (pluginId, callback);
+            return registered;
+        }
+    }
+
+    private sealed class StubHostApi : IHostApi
+    {
+        public StubHostApi(
+            IWindowInfoService windowInfo,
+            IHotKeyService? hotKey = null)
+        {
+            WindowInfo = windowInfo;
+            HotKey = hotKey ?? new StubHotKeyService();
+        }
+
         public string? LastAccessError => null;
         public bool HasCapability(string capability) => true;
-        public IHotKeyService HotKey => null!;
+        public IHotKeyService HotKey { get; }
         public IPluginSettingsService Settings { get; } =
             new StubPluginSettingsService();
         public IShellSelectionService ShellSelection => null!;
@@ -399,7 +537,7 @@ public sealed class WindowInfoServiceTests
         public IClipboardService Clipboard => null!;
         public INotificationService Notification => null!;
         public IFileOpsService FileOps => null!;
-        public IWindowInfoService WindowInfo { get; } = windowInfo;
+        public IWindowInfoService WindowInfo { get; }
         public IScreenCaptureService ScreenCapture => null!;
         public IInputService Input => null!;
         public IProcessService Process => null!;
