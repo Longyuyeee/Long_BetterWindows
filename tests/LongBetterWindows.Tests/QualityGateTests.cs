@@ -880,11 +880,17 @@ public class QualityGateTests
         Assert.Contains("PluginToggle_Click", code);
         Assert.Contains("PluginSettings_Click", code);
         Assert.Contains("CapabilityDetails_Click", code);
+        Assert.Contains("Interlocked.Exchange(ref _refreshPending, 1)", code);
+        Assert.Contains("DispatcherPriority.ContextIdle", code);
 
         var toolCenterXaml = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
         var toolCenterCode = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
-        Assert.Contains("PluginManagementControl", toolCenterXaml);
-        Assert.Contains("PluginManagementHost.Refresh()", toolCenterCode);
+        Assert.Contains("x:Name=\"PluginManagementHost\"", toolCenterXaml);
+        Assert.DoesNotContain("<local:PluginManagementControl", toolCenterXaml);
+        Assert.Contains("PluginManagementHost.Content ??= new PluginManagementControl()", toolCenterCode);
+        Assert.Contains("((PluginManagementControl)PluginManagementHost.Content).Refresh()", toolCenterCode);
+        Assert.Contains("EnsureSystemStatusInitializedAsync", toolCenterCode);
+        Assert.Contains("EnsureSettingsStatusInitializedAsync", toolCenterCode);
         Assert.Contains("OpenPluginsForQuality", toolCenterCode);
         Assert.DoesNotContain("CreatePluginCard", toolCenterCode);
         Assert.DoesNotContain("PluginToggle_Click", toolCenterCode);

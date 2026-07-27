@@ -30,26 +30,19 @@ namespace LongBetterWindows.Host.Views
         private UpdateCheckResult? _availableUpdate;
         private string? _downloadedUpdatePath;
         private bool _automaticUpdateCheckStarted;
+        private bool _systemStatusInitialized;
+        private bool _settingsStatusInitialized;
 
         public ToolCenterControl()
         {
             InitializeComponent();
             InitializeLanguageSelector();
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
-            RefreshColumnStatus();
-            RefreshContextMenuStatus();
-            Loaded += async (_, _) =>
-            {
-                await RefreshSparsePackageStatusAsync();
-                await StartAutomaticUpdateCheckAsync();
-            };
             Unloaded += (_, _) =>
             {
                 _updateService?.Dispose();
                 _updateService = null;
             };
-            RefreshStartupStatus();
-            RefreshMouseGestureControls();
             ShowPage("overview");
 
             // 同步主题按钮状态
@@ -417,7 +410,10 @@ namespace LongBetterWindows.Host.Views
                 PageSubtitle.Text = subtitle;
                 ContentScrollViewer.ScrollToTop();
                 if (key == "plugins")
-                    PluginManagementHost.Refresh();
+                {
+                    PluginManagementHost.Content ??= new PluginManagementControl();
+                    ((PluginManagementControl)PluginManagementHost.Content).Refresh();
+                }
                 else if (key == "workflows" && WorkflowEditorHost.Content == null)
                 {
                     var editor = new WorkflowEditorControl();
@@ -435,16 +431,38 @@ namespace LongBetterWindows.Host.Views
                     MarketHost.Content = new MarketplaceControl();
                 else if (key == "diagnostics" && DiagnosticsHost.Content == null)
                     DiagnosticsHost.Content = new PerformancePanel();
+                else if (key == "system")
+                    _ = EnsureSystemStatusInitializedAsync();
                 else if (key == "developer")
                 {
                     UpdateAboutInfo();
                     RefreshDocLinks();
                 }
+                else if (key == "settings")
+                    _ = EnsureSettingsStatusInitializedAsync();
                 Helpers.AnimationHelper.FadeInElement(panel, durationMs: 160);
                 _ = Dispatcher.BeginInvoke(
                     new Action(ContentScrollViewer.ScrollToTop),
                     System.Windows.Threading.DispatcherPriority.ContextIdle);
             }
+        }
+
+        private async Task EnsureSystemStatusInitializedAsync()
+        {
+            if (_systemStatusInitialized) return;
+            _systemStatusInitialized = true;
+            RefreshColumnStatus();
+            RefreshContextMenuStatus();
+            RefreshStartupStatus();
+            await RefreshSparsePackageStatusAsync();
+        }
+
+        private async Task EnsureSettingsStatusInitializedAsync()
+        {
+            if (_settingsStatusInitialized) return;
+            _settingsStatusInitialized = true;
+            RefreshMouseGestureControls();
+            await StartAutomaticUpdateCheckAsync();
         }
 
         private void WelcomeDismiss_Click(object sender, RoutedEventArgs e)
@@ -876,10 +894,15 @@ namespace LongBetterWindows.Host.Views
             ServicesInitializer.I18n.SetLanguage(language);
             ServicesInitializer.I18n.ApplyTo(Application.Current.Resources);
             ShowPage(_activePage);
-            RefreshColumnStatus();
-            RefreshContextMenuStatus();
-            RefreshStartupStatus();
-            _ = RefreshSparsePackageStatusAsync();
+            if (_systemStatusInitialized)
+            {
+                RefreshColumnStatus();
+                RefreshContextMenuStatus();
+                RefreshStartupStatus();
+                _ = RefreshSparsePackageStatusAsync();
+            }
+            if (_settingsStatusInitialized)
+                RefreshMouseGestureControls();
         }
 
         private void SetSparsePackageBusy(bool busy, string? status = null)

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
@@ -9,6 +10,8 @@ namespace LongBetterWindows.Host.Views
 {
     public partial class PluginManagementControl : UserControl
     {
+        private int _refreshPending;
+
         public PluginManagementControl()
         {
             InitializeComponent();
@@ -42,12 +45,16 @@ namespace LongBetterWindows.Host.Views
 
         private void OnPluginsChanged()
         {
-            if (!Dispatcher.CheckAccess())
-            {
-                Dispatcher.Invoke(Refresh);
+            if (Interlocked.Exchange(ref _refreshPending, 1) != 0)
                 return;
-            }
-            Refresh();
+
+            _ = Dispatcher.BeginInvoke(
+                new Action(() =>
+                {
+                    Interlocked.Exchange(ref _refreshPending, 0);
+                    Refresh();
+                }),
+                DispatcherPriority.ContextIdle);
         }
 
         private void ApplyResponsiveLayout(double width)

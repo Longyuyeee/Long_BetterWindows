@@ -181,7 +181,9 @@
 
                     <!-- 插件管理 -->
                     <Grid x:Name="PanelPlugins" Visibility="Collapsed">
-                        <local:PluginManagementControl x:Name="PluginManagementHost" />
+                        <ContentControl x:Name="PluginManagementHost"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Stretch" />
                     </Grid>
 
                     <!-- Long 原生插件市场 -->
