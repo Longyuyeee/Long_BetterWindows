@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Services;
 
@@ -31,12 +30,6 @@ namespace LongBetterWindows.Host.Views
     /// </summary>
     public partial class HotkeySettingsControl : UserControl
     {
-        private static readonly SolidColorBrush GrayBrush = new(Color.FromRgb(0x80, 0x80, 0x80));
-        private static readonly SolidColorBrush BlueBrush = new(Color.FromRgb(0x00, 0x7A, 0xFF));
-
-        private static Brush? TryFindBrush(string key)
-            => Application.Current.TryFindResource(key) as Brush;
-
         private readonly IHotKeyService _hotKey;
         private readonly string _pluginId;
         private readonly Action<string> _onHotkeyChanged;
@@ -65,6 +58,9 @@ namespace LongBetterWindows.Host.Views
             _hotkeyCallback = hotkeyCallback ?? (() => { });
             _hotKey = ServicesInitializer.HotKey;
             _localization = localization ?? HotkeySettingsLocalization.Chinese;
+            SetResourceReference(
+                ForegroundProperty,
+                "Long.Brush.Text.Primary");
 
             var panel = new StackPanel();
 
@@ -75,13 +71,18 @@ namespace LongBetterWindows.Host.Views
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 0, 16),
             };
+            _title.SetResourceReference(
+                TextBlock.ForegroundProperty,
+                "Long.Brush.Text.Primary");
             panel.Children.Add(_title);
 
             _label = new TextBlock
             {
                 FontSize = 12,
-                Foreground = TryFindBrush("TextSecondaryBrush") ?? GrayBrush,
             };
+            _label.SetResourceReference(
+                TextBlock.ForegroundProperty,
+                "Long.Brush.Text.Secondary");
             panel.Children.Add(_label);
 
             var hotkeyRow = new StackPanel
@@ -96,20 +97,26 @@ namespace LongBetterWindows.Host.Views
                 FontSize = 16,
                 FontWeight = FontWeights.Medium,
                 Width = 180,
-                Padding = new Thickness(8, 4, 8, 4),
                 VerticalContentAlignment = VerticalAlignment.Center,
             };
+            hotkeyBox.SetResourceReference(
+                FrameworkElement.StyleProperty,
+                "LongTextBox");
+            System.Windows.Automation.AutomationProperties.SetAutomationId(
+                hotkeyBox,
+                "Long.HotkeySettings.Input");
 
             _applyButton = new Button
             {
-                Width = 56,
-                Height = 30,
                 Margin = new Thickness(8, 0, 0, 0),
                 FontSize = 12,
-                Background = TryFindBrush("AccentBlueBrush") ?? BlueBrush,
-                Foreground = Brushes.White,
-                BorderThickness = new Thickness(0),
             };
+            _applyButton.SetResourceReference(
+                FrameworkElement.StyleProperty,
+                "LongButton.Primary");
+            System.Windows.Automation.AutomationProperties.SetAutomationId(
+                _applyButton,
+                "Long.HotkeySettings.Apply");
 
             _statusText = new TextBlock
             {
@@ -164,10 +171,12 @@ namespace LongBetterWindows.Host.Views
             _hint = new TextBlock
             {
                 FontSize = 11,
-                Foreground = TryFindBrush("TextDimBrush") ?? GrayBrush,
                 Margin = new Thickness(0, 8, 0, 0),
                 TextWrapping = TextWrapping.Wrap,
             };
+            _hint.SetResourceReference(
+                TextBlock.ForegroundProperty,
+                "Long.Brush.Text.Muted");
             panel.Children.Add(_hint);
 
             Content = panel;
@@ -207,14 +216,16 @@ namespace LongBetterWindows.Host.Views
                     _statusDetail),
                 _ => string.Empty,
             };
-            _statusText.Foreground = _status switch
+            _statusText.SetResourceReference(
+                TextBlock.ForegroundProperty,
+                _status switch
             {
                 HotkeySettingsStatus.Conflict or HotkeySettingsStatus.Failed
-                    => new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30)),
+                    => "Long.Brush.State.Danger",
                 HotkeySettingsStatus.Updated
-                    => new SolidColorBrush(Color.FromRgb(0x34, 0xC7, 0x59)),
-                _ => new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80)),
-            };
+                    => "Long.Brush.State.Success",
+                _ => "Long.Brush.Text.Muted",
+            });
         }
 
         private enum HotkeySettingsStatus

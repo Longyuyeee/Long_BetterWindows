@@ -536,6 +536,11 @@ public sealed class BuiltInPluginLocalizationTests
             "_currentHotkey, newHotkey, _pluginId, _hotkeyCallback",
             source);
         Assert.Contains("RenderStatus();", source);
+        Assert.Contains("\"LongTextBox\"", source);
+        Assert.Contains("\"LongButton.Primary\"", source);
+        Assert.Contains("\"Long.Brush.State.Danger\"", source);
+        Assert.Contains("\"Long.Brush.State.Success\"", source);
+        Assert.DoesNotContain("Color.FromRgb", source);
     }
 
     [Theory]

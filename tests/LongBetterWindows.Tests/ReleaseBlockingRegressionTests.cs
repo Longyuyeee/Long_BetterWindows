@@ -213,6 +213,10 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.DoesNotMatch("#[0-9a-fA-F]{3,8}\\b", developerToolkit);
         Assert.DoesNotMatch("#[0-9a-fA-F]{3,8}\\b", scriptDialog);
         Assert.Contains("var(--long-bg-base)", developerToolkit);
+        Assert.Contains("class=\"btn-primary\"", developerToolkit);
+        Assert.Contains("class=\"btn-secondary\"", developerToolkit);
+        Assert.Contains("background: transparent !important", developerToolkit);
+        Assert.Contains("prefers-reduced-motion: reduce", developerToolkit);
         Assert.Contains("DynamicResource Long.Brush.Surface.Card", scriptDialog);
     }
 

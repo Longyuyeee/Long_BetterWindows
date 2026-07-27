@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27T08:39:48.5960429+00:00",
+  "view": "plugin",
+  "theme": "light",
+  "render_dpi": 96,
+  "actual_monitor_dpi": 192,
+  "capture_kind": "webview_preview",
+  "logical_width": 900,
+  "logical_height": 700,
+  "pixel_width": 1792,
+  "pixel_height": 1188,
+  "high_contrast": false,
+  "reduced_motion": false
+}

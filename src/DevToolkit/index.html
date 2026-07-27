@@ -42,23 +42,26 @@
     }
 
     .tab {
-      padding: 8px 16px;
-      background: transparent;
-      border: none;
-      color: var(--long-text-muted);
+      min-height: 38px;
+      padding: 8px 16px !important;
+      background: transparent !important;
+      border: 0 !important;
+      border-bottom: 2px solid transparent !important;
+      border-radius: 0 !important;
+      color: var(--long-text-muted) !important;
       cursor: pointer;
       font-size: 14px;
-      transition: all 0.2s;
-      border-bottom: 2px solid transparent;
+      transition: color var(--long-motion-fast), border-color var(--long-motion-fast) !important;
     }
 
     .tab:hover {
-      color: var(--long-text-primary);
+      background: var(--long-surface-hover) !important;
+      color: var(--long-text-primary) !important;
     }
 
     .tab.active {
-      color: var(--long-text-primary);
-      border-bottom-color: var(--long-accent);
+      color: var(--long-text-primary) !important;
+      border-bottom-color: var(--long-accent) !important;
     }
 
     .tab-content {
@@ -124,27 +127,16 @@
     }
 
     button {
-      padding: 8px 16px;
-      background: var(--long-accent);
-      border: none;
-      border-radius: 4px;
-      color: var(--long-text-primary);
       font-size: 13px;
       cursor: pointer;
-      transition: all 0.2s;
     }
 
-    button:hover {
-      background: var(--long-accent-hover);
+    button:not(.tab):not(.quick-btn):hover {
       transform: translateY(-1px);
     }
 
-    button.secondary {
-      background: var(--long-surface-card);
-    }
-
-    button.secondary:hover {
-      background: var(--long-surface-hover);
+    button:disabled {
+      transform: none !important;
     }
 
     .result {
@@ -178,15 +170,16 @@
     }
 
     .quick-btn {
-      padding: 12px;
-      background: var(--long-surface-card);
-      border: 1px solid var(--long-stroke);
-      border-radius: 6px;
-      color: var(--long-text-primary);
+      min-height: 68px;
+      padding: 12px !important;
+      background: var(--long-surface-card) !important;
+      border: 1px solid var(--long-stroke) !important;
+      border-radius: 6px !important;
+      color: var(--long-text-primary) !important;
       font-size: 13px;
       cursor: pointer;
-      transition: all 0.2s;
-      text-align: left;
+      transition: background var(--long-motion-fast), border-color var(--long-motion-fast), transform var(--long-motion-fast) !important;
+      text-align: left !important;
     }
 
     .quick-btn:hover {
@@ -203,6 +196,12 @@
     .quick-btn-desc {
       font-size: 11px;
       color: var(--long-text-muted);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      button, .quick-btn {
+        transform: none !important;
+      }
     }
   </style>
 </head>
@@ -228,10 +227,10 @@
           <textarea id="base64Input" placeholder="输入要编码或解码的文本..." data-i18n-placeholder="field.base64Placeholder"></textarea>
         </div>
         <div class="button-row">
-          <button onclick="base64Encode()" data-i18n="action.encode">编码</button>
-          <button onclick="base64Decode()" data-i18n="action.decode">解码</button>
-          <button class="secondary" onclick="copyFromClipboard('base64Input')" data-i18n="action.paste">从剪贴板粘贴</button>
-          <button class="secondary" onclick="copyResult('base64Result')" data-i18n="action.copyResult">复制结果</button>
+          <button class="btn-primary" onclick="base64Encode()" data-i18n="action.encode">编码</button>
+          <button class="btn-primary" onclick="base64Decode()" data-i18n="action.decode">解码</button>
+          <button class="btn-secondary" onclick="copyFromClipboard('base64Input')" data-i18n="action.paste">从剪贴板粘贴</button>
+          <button class="btn-secondary" onclick="copyResult('base64Result')" data-i18n="action.copyResult">复制结果</button>
         </div>
         <div class="result" id="base64Result">结果将显示在这里...</div>
       </div>
@@ -246,10 +245,10 @@
           <textarea id="hashInput" placeholder="输入要计算哈希的文本..." data-i18n-placeholder="field.hashPlaceholder"></textarea>
         </div>
         <div class="button-row">
-          <button onclick="hashMD5()">MD5</button>
-          <button onclick="hashSHA1()">SHA-1</button>
-          <button onclick="hashSHA256()">SHA-256</button>
-          <button class="secondary" onclick="copyFromClipboard('hashInput')" data-i18n="action.paste">从剪贴板粘贴</button>
+          <button class="btn-primary" onclick="hashMD5()">MD5</button>
+          <button class="btn-primary" onclick="hashSHA1()">SHA-1</button>
+          <button class="btn-primary" onclick="hashSHA256()">SHA-256</button>
+          <button class="btn-secondary" onclick="copyFromClipboard('hashInput')" data-i18n="action.paste">从剪贴板粘贴</button>
         </div>
         <div class="result" id="hashResult">结果将显示在这里...</div>
       </div>
@@ -283,9 +282,9 @@
           <input type="text" id="timestampInput" placeholder="输入时间戳，如 1234567890" data-i18n-placeholder="field.timestampPlaceholder">
         </div>
         <div class="button-row">
-          <button onclick="timestampToDate()" data-i18n="action.toDate">转为日期</button>
-          <button onclick="getCurrentTimestamp()" data-i18n="action.currentTimestamp">获取当前时间戳</button>
-          <button class="secondary" onclick="copyFromClipboard('timestampInput')" data-i18n="action.paste">从剪贴板粘贴</button>
+          <button class="btn-primary" onclick="timestampToDate()" data-i18n="action.toDate">转为日期</button>
+          <button class="btn-primary" onclick="getCurrentTimestamp()" data-i18n="action.currentTimestamp">获取当前时间戳</button>
+          <button class="btn-secondary" onclick="copyFromClipboard('timestampInput')" data-i18n="action.paste">从剪贴板粘贴</button>
         </div>
         <div class="result" id="timestampResult">结果将显示在这里...</div>
       </div>
@@ -297,7 +296,7 @@
           <input type="text" id="dateInput" placeholder="格式: 2024-01-15 08:30:00" data-i18n-placeholder="field.datePlaceholder">
         </div>
         <div class="button-row">
-          <button onclick="dateToTimestamp()" data-i18n="action.toTimestamp">转为时间戳</button>
+          <button class="btn-primary" onclick="dateToTimestamp()" data-i18n="action.toTimestamp">转为时间戳</button>
         </div>
         <div class="result" id="dateResult">结果将显示在这里...</div>
         <div class="info" data-i18n="date.supportedFormats">支持格式: YYYY-MM-DD HH:mm:ss 或 YYYY-MM-DD</div>
@@ -322,8 +321,8 @@
           </select>
         </div>
         <div class="button-row">
-          <button onclick="convertBase()" data-i18n="action.convertAll">转换全部</button>
-          <button class="secondary" onclick="copyFromClipboard('numberInput')" data-i18n="action.paste">从剪贴板粘贴</button>
+          <button class="btn-primary" onclick="convertBase()" data-i18n="action.convertAll">转换全部</button>
+          <button class="btn-secondary" onclick="copyFromClipboard('numberInput')" data-i18n="action.paste">从剪贴板粘贴</button>
         </div>
         <div class="result" id="convertResult">结果将显示在这里...</div>
       </div>
@@ -338,10 +337,10 @@
           <textarea id="urlInput" placeholder="输入要编码或解码的 URL..." data-i18n-placeholder="field.urlPlaceholder"></textarea>
         </div>
         <div class="button-row">
-          <button onclick="urlEncode()" data-i18n="action.urlEncode">URL 编码</button>
-          <button onclick="urlDecode()" data-i18n="action.urlDecode">URL 解码</button>
-          <button class="secondary" onclick="copyFromClipboard('urlInput')" data-i18n="action.paste">从剪贴板粘贴</button>
-          <button class="secondary" onclick="copyResult('urlResult')" data-i18n="action.copyResult">复制结果</button>
+          <button class="btn-primary" onclick="urlEncode()" data-i18n="action.urlEncode">URL 编码</button>
+          <button class="btn-primary" onclick="urlDecode()" data-i18n="action.urlDecode">URL 解码</button>
+          <button class="btn-secondary" onclick="copyFromClipboard('urlInput')" data-i18n="action.paste">从剪贴板粘贴</button>
+          <button class="btn-secondary" onclick="copyResult('urlResult')" data-i18n="action.copyResult">复制结果</button>
         </div>
         <div class="result" id="urlResult">结果将显示在这里...</div>
       </div>
@@ -353,10 +352,10 @@
           <textarea id="unicodeInput" placeholder="输入文本或 中文 格式..." data-i18n-placeholder="field.unicodePlaceholder"></textarea>
         </div>
         <div class="button-row">
-          <button onclick="toUnicode()" data-i18n="action.toUnicode">转为 Unicode</button>
-          <button onclick="fromUnicode()" data-i18n="action.unicodeDecode">Unicode 解码</button>
-          <button class="secondary" onclick="copyFromClipboard('unicodeInput')" data-i18n="action.paste">从剪贴板粘贴</button>
-          <button class="secondary" onclick="copyResult('unicodeResult')" data-i18n="action.copyResult">复制结果</button>
+          <button class="btn-primary" onclick="toUnicode()" data-i18n="action.toUnicode">转为 Unicode</button>
+          <button class="btn-primary" onclick="fromUnicode()" data-i18n="action.unicodeDecode">Unicode 解码</button>
+          <button class="btn-secondary" onclick="copyFromClipboard('unicodeInput')" data-i18n="action.paste">从剪贴板粘贴</button>
+          <button class="btn-secondary" onclick="copyResult('unicodeResult')" data-i18n="action.copyResult">复制结果</button>
         </div>
         <div class="result" id="unicodeResult">结果将显示在这里...</div>
       </div>
