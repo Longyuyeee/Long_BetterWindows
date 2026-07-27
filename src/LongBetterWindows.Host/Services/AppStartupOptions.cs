@@ -18,6 +18,9 @@ namespace LongBetterWindows.Host.Services
         public bool OpenPluginsForQuality { get; private init; }
         public string? QualityPluginPageReleaseReportPath { get; private init; }
         public string? QualityPluginPagePerformanceReportPath { get; private init; }
+        public IReadOnlySet<string> QualitySkippedAutoStartPluginIds { get; private init; } =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public bool QualityHideWindowDuringIdle { get; private init; }
         public string? QualityStartupReportPath { get; private init; }
         public bool QualityManagementCardShadows { get; private init; }
         public bool OpenSystemForQuality { get; private init; }
@@ -86,6 +89,12 @@ namespace LongBetterWindows.Host.Services
                 QualityPluginPageReleaseReportPath = pluginPageReleaseReport,
                 QualityPluginPagePerformanceReportPath =
                     pluginPagePerformanceReport,
+                QualitySkippedAutoStartPluginIds = ReadArguments(
+                    arguments,
+                    "--quality-skip-auto-start-plugin"),
+                QualityHideWindowDuringIdle = HasSwitch(
+                    arguments,
+                    "--quality-hide-window-during-idle"),
                 QualityStartupReportPath = ReadArgument(
                     arguments,
                     "--quality-startup-report"),
@@ -136,6 +145,25 @@ namespace LongBetterWindows.Host.Services
             }
 
             return null;
+        }
+
+        private static IReadOnlySet<string> ReadArguments(
+            IReadOnlyList<string> arguments,
+            string name)
+        {
+            var values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < arguments.Count - 1; index++)
+            {
+                if (string.Equals(
+                        arguments[index],
+                        name,
+                        StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(arguments[index + 1]))
+                {
+                    values.Add(arguments[index + 1].Trim());
+                }
+            }
+            return values;
         }
 
         private static int ReadIntegerArgument(

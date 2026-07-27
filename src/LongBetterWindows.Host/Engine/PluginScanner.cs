@@ -32,11 +32,13 @@ namespace LongBetterWindows.Host.Engine
         private readonly SemaphoreSlim _reloadGate = new(1, 1);
         private readonly Func<string>? _currentLanguage;
         private readonly Action<string>? _startupMark;
+        private readonly Func<string, bool>? _suppressAutoStart;
 
         public PluginScanner(
             string? pluginsDir = null,
             Func<string>? currentLanguage = null,
-            Action<string>? startupMark = null)
+            Action<string>? startupMark = null,
+            Func<string, bool>? suppressAutoStart = null)
         {
             _sourceDiscovery = new PluginSourceDiscovery(pluginsDir);
             _standaloneLoader = new StandalonePluginLoader(
@@ -46,6 +48,7 @@ namespace LongBetterWindows.Host.Engine
                 HandlePluginFileChangeAsync);
             _currentLanguage = currentLanguage;
             _startupMark = startupMark;
+            _suppressAutoStart = suppressAutoStart;
         }
 
         public List<PluginManifest> DiscoveredManifests { get; } = new();
@@ -321,13 +324,17 @@ namespace LongBetterWindows.Host.Engine
             if (_currentLanguage is not null)
                 await NotifyPluginLanguageAsync(entry, _currentLanguage());
             var autoStart = entry.GetAutoStartPreference();
+            var autoStartSuppressed =
+                autoStart.Enabled
+                && _suppressAutoStart?.Invoke(manifest.Id) == true;
             Log.Information(
-                "插件 {PluginId} 自动启动决策: Enabled={Enabled}, Source={Source}",
+                "插件 {PluginId} 自动启动决策: Enabled={Enabled}, Source={Source}, Suppressed={Suppressed}",
                 manifest.Id,
                 autoStart.Enabled,
-                autoStart.Source);
+                autoStart.Source,
+                autoStartSuppressed);
 
-            if (autoStart.Enabled)
+            if (autoStart.Enabled && !autoStartSuppressed)
             {
                 if (!await registry.StartPluginAsync(
                         manifest.Id,
@@ -341,7 +348,11 @@ namespace LongBetterWindows.Host.Engine
             }
             else
             {
-                Log.Information("插件 {PluginId} 已注册，运行时等待按需激活", manifest.Id);
+                Log.Information(
+                    autoStartSuppressed
+                        ? "插件 {PluginId} 已由质量归因模式抑制自动启动"
+                        : "插件 {PluginId} 已注册，运行时等待按需激活",
+                    manifest.Id);
             }
 
             LoadedPlugins.Add(entry);

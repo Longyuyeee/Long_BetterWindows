@@ -17,7 +17,8 @@ namespace LongBetterWindows.Host.Services
             string? pluginsDirectory = null,
             PluginRegistry? registry = null,
             I18nService? i18n = null,
-            StartupPerformanceTrace? startupTrace = null)
+            StartupPerformanceTrace? startupTrace = null,
+            IReadOnlySet<string>? suppressedAutoStartPluginIds = null)
         {
             _i18n = i18n ?? ServicesInitializer.I18n;
             _startupTrace = startupTrace;
@@ -26,7 +27,10 @@ namespace LongBetterWindows.Host.Services
                 () => _i18n.CurrentLanguage,
                 _startupTrace is null
                     ? null
-                    : stage => _startupTrace.Mark(stage));
+                    : stage => _startupTrace.Mark(stage),
+                suppressedAutoStartPluginIds is null
+                    ? null
+                    : id => suppressedAutoStartPluginIds.Contains(id));
             _registry = registry ?? HostProvider.Instance.PluginStore;
             PackageInstaller = new LpakInstaller(_scanner, pluginsDirectory);
             _i18n.LanguageChanged += OnLanguageChanged;

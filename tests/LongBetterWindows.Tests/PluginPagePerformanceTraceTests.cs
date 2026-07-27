@@ -17,14 +17,18 @@ public class PluginPagePerformanceTraceTests
 
         try
         {
-            var trace = new PluginPagePerformanceTrace(reportPath);
+            var trace = new PluginPagePerformanceTrace(
+                reportPath,
+                ["com.long.sample"]);
             trace.Mark(
                 "projection",
                 new PluginPageVisualMetrics(25, 8, 240));
+            trace.SetWindowVisibleDuringIdle(false);
             await trace.WriteAsync(
                 new PluginRuntimeStartResult(25, 0, 0, null),
                 commandCount: 42,
-                idleMilliseconds: 9_000);
+                idleMilliseconds: 9_000,
+                runningPluginIds: ["com.long.running"]);
 
             using var report = JsonDocument.Parse(
                 await File.ReadAllTextAsync(reportPath));
@@ -33,6 +37,15 @@ public class PluginPagePerformanceTraceTests
             Assert.Equal(9_000, root.GetProperty("idle_ms").GetInt32());
             Assert.Equal(25, root.GetProperty("loaded_plugin_count").GetInt32());
             Assert.Equal(42, root.GetProperty("command_count").GetInt32());
+            Assert.Equal(
+                "com.long.sample",
+                root.GetProperty("suppressed_auto_start_plugin_ids")[0]
+                    .GetString());
+            Assert.Equal(
+                "com.long.running",
+                root.GetProperty("running_plugin_ids")[0].GetString());
+            Assert.False(
+                root.GetProperty("window_visible_during_idle").GetBoolean());
             var sample = root.GetProperty("samples")[0];
             Assert.Equal("projection", sample.GetProperty("stage").GetString());
             Assert.Equal(25, sample.GetProperty("item_count").GetInt32());

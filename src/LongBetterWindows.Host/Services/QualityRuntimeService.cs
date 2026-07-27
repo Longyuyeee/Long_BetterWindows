@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Views;
 using Microsoft.Web.WebView2.Core;
@@ -193,22 +194,51 @@ namespace LongBetterWindows.Host.Services
             MainWindow window,
             PluginPagePerformanceTrace trace,
             PluginRuntimeStartResult result,
-            int idleMilliseconds)
+            int idleMilliseconds,
+            bool hideWindowDuringIdle)
         {
             trace.Mark(
                 "plugin_runtime_ready",
                 window.GetPluginPageVisualMetricsForQuality());
-            await Task.Delay(idleMilliseconds);
-            await _application.Dispatcher.InvokeAsync(
-                () => { },
-                DispatcherPriority.ContextIdle);
-            trace.Mark(
-                "plugin_page_idle",
-                window.GetPluginPageVisualMetricsForQuality());
+            if (hideWindowDuringIdle)
+            {
+                await _application.Dispatcher.InvokeAsync(
+                    window.Hide,
+                    DispatcherPriority.Send);
+                trace.SetWindowVisibleDuringIdle(false);
+                trace.Mark("window_hidden");
+            }
+
+            var checkpoints = new SortedSet<int> { idleMilliseconds };
+            if (idleMilliseconds > 1_000)
+                checkpoints.Add(1_000);
+            if (idleMilliseconds > 3_000)
+                checkpoints.Add(3_000);
+
+            var elapsed = 0;
+            foreach (var checkpoint in checkpoints)
+            {
+                await Task.Delay(checkpoint - elapsed);
+                elapsed = checkpoint;
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.ContextIdle);
+                trace.Mark(
+                    checkpoint == idleMilliseconds
+                        ? "plugin_page_idle"
+                        : $"plugin_page_idle_{checkpoint}ms",
+                    window.GetPluginPageVisualMetricsForQuality());
+            }
+            var registry = HostProvider.Instance.PluginStore;
             await trace.WriteAsync(
                 result,
-                HostProvider.Instance.PluginStore.Commands.Count,
-                idleMilliseconds);
+                registry.Commands.Count,
+                idleMilliseconds,
+                registry.GetAll()
+                    .Where(entry => entry.State == PluginState.Running)
+                    .Select(entry => entry.Id)
+                    .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                    .ToArray());
             _application.Shutdown(0);
         }
 

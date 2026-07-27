@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27",
+  "scope": "plugin-page auto-start and stable-idle attribution",
+  "auto_start_plugin_ids": [
+    "com.long.clipboardhistory",
+    "com.long.color-picker",
+    "com.long.folder-note",
+    "com.long.macro",
+    "com.long.quicklaunch",
+    "com.long.screenshot",
+    "com.long.window-manager"
+  ],
+  "individual_exclusion_conclusion": "No single exclusion consistently improved CPU, working set, and private memory.",
+  "all_suppressed_samples": [
+    {
+      "report": "14-skip-all-a.json",
+      "running_plugin_count": 0,
+      "final_working_set_mb": 209.3,
+      "final_private_memory_mb": 193.7,
+      "cpu_growth_after_runtime_ready_ms": 1890.6
+    },
+    {
+      "report": "15-skip-all-b.json",
+      "running_plugin_count": 0,
+      "final_working_set_mb": 210.1,
+      "final_private_memory_mb": 193.4,
+      "cpu_growth_after_runtime_ready_ms": 2125.0
+    }
+  ],
+  "adjacent_full_baseline": {
+    "report": "16-baseline-all-b.json",
+    "running_plugin_count": 7,
+    "final_working_set_mb": 204.1,
+    "final_private_memory_mb": 181.4,
+    "cpu_growth_after_runtime_ready_ms": 2750.0
+  },
+  "stable_idle_visibility_control": {
+    "visible_report": "19-visible-window-checkpoints.json",
+    "hidden_report": "20-hidden-window-checkpoints.json",
+    "visible_cpu_growth_3000_to_9000_ms": 46.9,
+    "hidden_cpu_growth_3000_to_9000_ms": 15.6,
+    "visible_final_working_set_mb": 206.2,
+    "hidden_final_working_set_mb": 192.3,
+    "hidden_final_managed_heap_mb": 10.2,
+    "hidden_final_gc_committed_mb": 15.8
+  },
+  "conclusions": [
+    "Auto-start plugins are not the primary cause of the plugin-page working-set gate failure.",
+    "The process reaches stable CPU idle after the three-second checkpoint.",
+    "The captured memory pattern does not show a monotonic managed-memory leak.",
+    "The next optimization target is the startup burst before stable idle."
+  ],
+  "release_gate": {
+    "performance_p0_closed": false,
+    "new_release_candidate_allowed": false,
+    "reason": "The strict plugin-page working-set threshold remains unmet and startup CPU burst remains user-visible."
+  }
+}

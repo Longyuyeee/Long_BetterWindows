@@ -1088,8 +1088,14 @@ public class QualityGateTests
             "PluginManagementControl.xaml.cs");
 
         Assert.Contains("--quality-plugin-page-performance-report", options);
+        Assert.Contains("--quality-skip-auto-start-plugin", options);
+        Assert.Contains("--quality-hide-window-during-idle", options);
         Assert.Contains("new PluginPagePerformanceTrace", app);
+        Assert.Contains("suppressedAutoStartPluginIds", app);
         Assert.Contains("RunPluginPagePerformanceProbeAsync", quality);
+        Assert.Contains("checkpoints.Add(1_000)", quality);
+        Assert.Contains("checkpoints.Add(3_000)", quality);
+        Assert.Contains("window.Hide", quality);
         Assert.Contains("plugin_page_constructor_begin", plugins);
         Assert.Contains("plugin_projection_begin", plugins);
         Assert.Contains("plugin_projection_end", plugins);

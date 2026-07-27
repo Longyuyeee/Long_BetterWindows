@@ -20,10 +20,19 @@ namespace LongBetterWindows.Host.Services
         private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
         private readonly List<PluginPagePerformanceSample> _samples = new();
         private readonly string _reportPath;
+        private readonly string[] _suppressedAutoStartPluginIds;
+        private bool _windowVisibleDuringIdle = true;
 
-        public PluginPagePerformanceTrace(string reportPath)
+        public PluginPagePerformanceTrace(
+            string reportPath,
+            IEnumerable<string>? suppressedAutoStartPluginIds = null)
         {
             _reportPath = Path.GetFullPath(reportPath);
+            _suppressedAutoStartPluginIds =
+                suppressedAutoStartPluginIds?
+                    .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+                ?? [];
         }
 
         public void Mark(
@@ -50,10 +59,14 @@ namespace LongBetterWindows.Host.Services
                 _samples.Add(sample);
         }
 
+        public void SetWindowVisibleDuringIdle(bool isVisible)
+            => _windowVisibleDuringIdle = isVisible;
+
         public async Task WriteAsync(
             PluginRuntimeStartResult result,
             int commandCount,
-            int idleMilliseconds)
+            int idleMilliseconds,
+            IReadOnlyList<string>? runningPluginIds = null)
         {
             PluginPagePerformanceSample[] samples;
             lock (_sync)
@@ -70,6 +83,10 @@ namespace LongBetterWindows.Host.Services
                 idle_ms = idleMilliseconds,
                 loaded_plugin_count = result.LoadedPluginCount,
                 command_count = commandCount,
+                suppressed_auto_start_plugin_ids =
+                    _suppressedAutoStartPluginIds,
+                window_visible_during_idle = _windowVisibleDuringIdle,
+                running_plugin_ids = runningPluginIds ?? [],
                 samples = samples.Select(sample => new
                 {
                     stage = sample.Stage,

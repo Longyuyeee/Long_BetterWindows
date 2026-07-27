@@ -78,7 +78,8 @@ namespace LongBetterWindows.Host
                     _startupOptions.QualityPluginPagePerformanceReportPath))
             {
                 _pluginPageTrace = new PluginPagePerformanceTrace(
-                    _startupOptions.QualityPluginPagePerformanceReportPath);
+                    _startupOptions.QualityPluginPagePerformanceReportPath,
+                    _startupOptions.QualitySkippedAutoStartPluginIds);
                 _pluginPageTrace.Mark("quality_options_parsed");
             }
             if (!string.IsNullOrWhiteSpace(_startupOptions.QualityStartupReportPath))
@@ -179,7 +180,11 @@ namespace LongBetterWindows.Host
                 _startupTrace?.Mark("plugin_runtime_begin");
                 _pluginRuntime = new PluginRuntimeCoordinator(
                     _startupOptions.RequestedPluginsDirectory,
-                    startupTrace: _startupTrace);
+                    startupTrace: _startupTrace,
+                    suppressedAutoStartPluginIds:
+                        _startupOptions.QualitySkippedAutoStartPluginIds.Count > 0
+                            ? _startupOptions.QualitySkippedAutoStartPluginIds
+                            : null);
                 var runtimeResult = await _pluginRuntime.StartAsync(
                     new PluginRuntimeStartRequest(
                         _startupOptions.RequestedCommandKey,
@@ -255,7 +260,8 @@ namespace LongBetterWindows.Host
                         performanceProbeWindow,
                         _pluginPageTrace,
                         runtimeResult,
-                        idleMilliseconds);
+                        idleMilliseconds,
+                        _startupOptions.QualityHideWindowDuringIdle);
                     return;
                 }
 

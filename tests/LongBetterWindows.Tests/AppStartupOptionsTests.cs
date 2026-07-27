@@ -30,6 +30,9 @@ public class AppStartupOptionsTests
             "--quality-terminal-export-dir", "quality-exports",
             "--quality-plugin-page-release-report", "plugin-release.json",
             "--quality-plugin-page-performance-report", "plugin-performance.json",
+            "--quality-skip-auto-start-plugin", "com.long.clipboardhistory",
+            "--quality-skip-auto-start-plugin", "COM.LONG.MACRO",
+            "--quality-hide-window-during-idle",
             "--quality-startup-report", "startup.json",
             "--quality-management-card-shadows",
             "--quality-show-welcome",
@@ -62,6 +65,16 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "plugin-performance.json",
             options.QualityPluginPagePerformanceReportPath);
+        Assert.Equal(
+            2,
+            options.QualitySkippedAutoStartPluginIds.Count);
+        Assert.Contains(
+            "com.long.clipboardhistory",
+            options.QualitySkippedAutoStartPluginIds);
+        Assert.Contains(
+            "com.long.macro",
+            options.QualitySkippedAutoStartPluginIds);
+        Assert.True(options.QualityHideWindowDuringIdle);
         Assert.Equal("startup.json", options.QualityStartupReportPath);
         Assert.True(options.QualityManagementCardShadows);
         Assert.True(options.ShowWelcomeForQuality);
