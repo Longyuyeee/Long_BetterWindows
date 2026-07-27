@@ -1,14 +1,10 @@
-using System.IO;
-using System.Diagnostics;
 using System.Windows;
-using System.Windows.Automation;
 using System.Windows.Controls;
 using LongBetterWindows.Host.Interaction;
 using System.Windows.Input;
 using System.Windows.Media.Effects;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
-using Serilog;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -19,12 +15,6 @@ namespace LongBetterWindows.Host.Views
         internal event Action<WorkflowExecutionResultState>? WorkflowExecutionResultChanged;
         internal event EventHandler? WorkflowTerminalOutputsCleared;
         private bool? _isNarrowLayout;
-        private bool _languageSelectorReady;
-        private UpdateService? _updateService;
-        private UpdateCheckResult? _availableUpdate;
-        private string? _downloadedUpdatePath;
-        private bool _automaticUpdateCheckStarted;
-        private bool _settingsStatusInitialized;
 
         public ToolCenterControl()
         {
@@ -37,7 +27,6 @@ namespace LongBetterWindows.Host.Views
                     throw new InvalidOperationException(
                         "Quality management-card shadow baseline did not find any cards.");
             }
-            InitializeLanguageSelector();
             SizeChanged += (_, _) => ApplyResponsiveLayout(ActualWidth);
             Unloaded += (_, _) =>
             {
@@ -52,14 +41,14 @@ namespace LongBetterWindows.Host.Views
                     SystemHost.Content = null;
                     systemPage.Dispose();
                 }
-                _updateService?.Dispose();
-                _updateService = null;
+                if (SettingsHost.Content is SettingsPageControl settingsPage)
+                {
+                    SettingsHost.Content = null;
+                    settingsPage.LanguageApplied -= SettingsPage_LanguageApplied;
+                    settingsPage.Dispose();
+                }
             };
             ShowPage("overview");
-
-            // 同步主题按钮状态
-            var currentTheme = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme();
-            _isLightMode = currentTheme == Wpf.Ui.Appearance.ApplicationTheme.Light;
 
             // 首次运行显示欢迎横幅
             if (App.IsFirstRun())
@@ -76,40 +65,6 @@ namespace LongBetterWindows.Host.Views
                     RefreshOverviewMetrics();
                 });
             };
-        }
-
-        private void RefreshMouseGestureControls()
-        {
-            var mode = ServicesInitializer.MouseGestures.Mode;
-            foreach (var button in MouseGestureButtons.Children.OfType<Button>())
-            {
-                var active = string.Equals(
-                    button.Tag?.ToString(), mode.ToString(), StringComparison.OrdinalIgnoreCase);
-                button.SetResourceReference(
-                    FrameworkElement.StyleProperty,
-                    active ? "LongButton.Primary" : "LongButton");
-            }
-            MouseGestureStatusText.Text = mode switch
-            {
-                MouseGestureMode.MiddleButton => I18n("settings.gesture.status.middle"),
-                MouseGestureMode.LongRightPress => string.Format(
-                    I18n("settings.gesture.status.longRight"),
-                    LongRightPressRecognizer.HoldMilliseconds),
-                _ => I18n("settings.gesture.status.disabled"),
-            };
-        }
-
-        private async void MouseGestureMode_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button { Tag: string value }
-                || !Enum.TryParse<MouseGestureMode>(value, out var mode)) return;
-            MouseGestureButtons.IsEnabled = false;
-            try
-            {
-                await ServicesInitializer.MouseGestures.SetModeAsync(mode);
-                RefreshMouseGestureControls();
-            }
-            finally { MouseGestureButtons.IsEnabled = true; }
         }
 
         private void ApplyResponsiveLayout(double width)
@@ -176,130 +131,6 @@ namespace LongBetterWindows.Host.Views
             OverviewPluginCount.Text = plugins.Count.ToString();
             OverviewCommandCount.Text = HostProvider.Instance.PluginStore.Commands.Count.ToString();
             OverviewCapabilityCount.Text = capCount.ToString();
-        }
-
-        private async void ClearSearchPreferences_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is not Button button) return;
-            button.IsEnabled = false;
-            await ServicesInitializer.SearchPreferences.ClearAsync();
-            await ServicesInitializer.SuperPanelGroups.ClearAsync();
-            SearchPreferenceStatusText.Text =
-                I18n("settings.searchPreferences.cleared");
-            button.IsEnabled = true;
-        }
-
-        private async Task StartAutomaticUpdateCheckAsync()
-        {
-            if (_automaticUpdateCheckStarted) return;
-            _automaticUpdateCheckStarted = true;
-            await CheckForUpdatesAsync(silent: true);
-        }
-
-        private async void UpdateAction_Click(object sender, RoutedEventArgs e)
-        {
-            if (_downloadedUpdatePath is not null
-                && File.Exists(_downloadedUpdatePath))
-            {
-                OpenUpdatePackage(_downloadedUpdatePath);
-                return;
-            }
-            if (_availableUpdate?.Package is { } package)
-            {
-                await DownloadUpdateAsync(package);
-                return;
-            }
-            await CheckForUpdatesAsync(silent: false);
-        }
-
-        private async Task CheckForUpdatesAsync(bool silent)
-        {
-            UpdateActionButton.IsEnabled = false;
-            if (!silent)
-                UpdateStatusText.Text = I18n("settings.update.status.checking");
-            try
-            {
-                _updateService ??= UpdateService.CreateDefault();
-                var includePrereleases = App.ProductVersion.Contains(
-                    '-',
-                    StringComparison.Ordinal);
-                var result = await _updateService.CheckAsync(includePrereleases);
-                _availableUpdate = result.State == UpdateCheckState.Available
-                    ? result
-                    : null;
-                _downloadedUpdatePath = null;
-                if (_availableUpdate is not null)
-                {
-                    UpdateStatusText.Text = string.Format(
-                        I18n("settings.update.status.available"),
-                        _availableUpdate.AvailableVersion);
-                    UpdateActionButton.Content = I18n("settings.update.action.download");
-                    AutomationProperties.SetName(
-                        UpdateActionButton,
-                        I18n("settings.update.action.download"));
-                }
-                else if (!silent)
-                {
-                    UpdateStatusText.Text = string.Format(
-                        I18n("settings.update.status.current"),
-                        App.ProductVersion);
-                }
-            }
-            catch (Exception exception)
-            {
-                Log.Warning(exception, "Automatic update check failed");
-                if (!silent)
-                    UpdateStatusText.Text = I18n("settings.update.status.failed");
-            }
-            finally
-            {
-                UpdateActionButton.IsEnabled = true;
-            }
-        }
-
-        private async Task DownloadUpdateAsync(UpdatePackage package)
-        {
-            if (_updateService is null) return;
-            UpdateActionButton.IsEnabled = false;
-            UpdateStatusText.Text = I18n("settings.update.status.downloading");
-            try
-            {
-                var updateDirectory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LongBetterWindows",
-                    "Updates",
-                    _availableUpdate?.AvailableVersion ?? "latest");
-                var packagePath = await _updateService.DownloadAsync(
-                    package,
-                    updateDirectory);
-                _downloadedUpdatePath = packagePath;
-                UpdateStatusText.Text = I18n("settings.update.status.downloaded");
-                UpdateActionButton.Content = I18n("settings.update.action.open");
-                AutomationProperties.SetName(
-                    UpdateActionButton,
-                    I18n("settings.update.action.open"));
-                _availableUpdate = null;
-                OpenUpdatePackage(packagePath);
-            }
-            catch (Exception exception)
-            {
-                Log.Warning(exception, "Verified update download failed");
-                UpdateStatusText.Text = I18n("settings.update.status.failed");
-            }
-            finally
-            {
-                UpdateActionButton.IsEnabled = true;
-            }
-        }
-
-        private static void OpenUpdatePackage(string packagePath)
-        {
-            Process.Start(new ProcessStartInfo(
-                    "explorer.exe",
-                    $"/select,\"{packagePath}\"")
-            {
-                UseShellExecute = true,
-            });
         }
 
         #region Navigation
@@ -494,7 +325,14 @@ namespace LongBetterWindows.Host.Views
                     DeveloperHost.Content ??= new DeveloperPageControl();
                 }
                 else if (key == "settings")
-                    _ = EnsureSettingsStatusInitializedAsync();
+                {
+                    if (SettingsHost.Content is null)
+                    {
+                        var settingsPage = new SettingsPageControl();
+                        settingsPage.LanguageApplied += SettingsPage_LanguageApplied;
+                        SettingsHost.Content = settingsPage;
+                    }
+                }
                 Helpers.AnimationHelper.FadeInElement(panel, durationMs: 160);
                 _ = Dispatcher.BeginInvoke(
                     new Action(ContentScrollViewer.ScrollToTop),
@@ -509,14 +347,6 @@ namespace LongBetterWindows.Host.Views
 
             PluginManagementHost.Content = null;
             plugins.Dispose();
-        }
-
-        private async Task EnsureSettingsStatusInitializedAsync()
-        {
-            if (_settingsStatusInitialized) return;
-            _settingsStatusInitialized = true;
-            RefreshMouseGestureControls();
-            await StartAutomaticUpdateCheckAsync();
         }
 
         private void WelcomeDismiss_Click(object sender, RoutedEventArgs e)
@@ -542,58 +372,8 @@ namespace LongBetterWindows.Host.Views
         private void OpenPalette_Click(object sender, RoutedEventArgs e)
             => CommandPaletteWindow.ShowPalette();
 
-        private static bool _isLightMode;
-        private void ThemeToggle_Click(object sender, RoutedEventArgs e)
-        {
-            _isLightMode = !_isLightMode;
-
-            // 使用 WPF-UI 主题管理器切换整个 Application
-            var theme = _isLightMode
-                ? Wpf.Ui.Appearance.ApplicationTheme.Light
-                : Wpf.Ui.Appearance.ApplicationTheme.Dark;
-            Wpf.Ui.Appearance.ApplicationThemeManager.Apply(theme);
-            App.SaveThemeSetting(_isLightMode);
-            App.UpdateThemeResources(_isLightMode);
-
-            if (sender is Button btn)
-                btn.Content = _isLightMode
-                    ? I18n("action.darkMode")
-                    : I18n("action.lightMode");
-        }
-
-        private void InitializeLanguageSelector()
-        {
-            var language = ServicesInitializer.I18n.CurrentLanguage;
-            LanguageSelector.SelectedItem = LanguageSelector.Items
-                .OfType<ComboBoxItem>()
-                .FirstOrDefault(item => string.Equals(
-                    item.Tag?.ToString(),
-                    language,
-                    StringComparison.OrdinalIgnoreCase));
-            _languageSelectorReady = true;
-        }
-
-        private void LanguageSelector_SelectionChanged(
-            object sender,
-            SelectionChangedEventArgs e)
-        {
-            if (!_languageSelectorReady ||
-                LanguageSelector.SelectedItem is not ComboBoxItem
-                {
-                    Tag: string language,
-                } ||
-                string.Equals(
-                    language,
-                    ServicesInitializer.I18n.CurrentLanguage,
-                    StringComparison.OrdinalIgnoreCase))
-                return;
-
-            ServicesInitializer.I18n.SetLanguage(language);
-            ServicesInitializer.I18n.ApplyTo(Application.Current.Resources);
-            ShowPage(_activePage);
-            if (_settingsStatusInitialized)
-                RefreshMouseGestureControls();
-        }
+        private void SettingsPage_LanguageApplied(object? sender, EventArgs e)
+            => ShowPage(_activePage);
 
         private static string I18n(string key)
             => ServicesInitializer.I18n.T(key);

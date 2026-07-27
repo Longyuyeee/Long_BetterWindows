@@ -760,7 +760,7 @@ public class QualityGateTests
         var adapter = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginAdapter.cs");
         var presentation = Read(
             "src", "LongBetterWindows.Host", "Engine", "WebPluginPresentationCoordinator.cs");
-        var settings = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
+        var settings = Read("src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml");
         var zhResources = Read("src", "LongBetterWindows.Host", "i18n", "zh-CN.json");
         var gestures = Read("src", "LongBetterWindows.Host", "Services", "MouseGestureService.cs");
 
@@ -902,7 +902,7 @@ public class QualityGateTests
         Assert.Contains("PluginManagementHost.Content = null", toolCenterCode);
         Assert.Contains("plugins.Dispose()", toolCenterCode);
         Assert.Contains("SystemHost.Content ??= new SystemIntegrationPageControl()", toolCenterCode);
-        Assert.Contains("EnsureSettingsStatusInitializedAsync", toolCenterCode);
+        Assert.Contains("new SettingsPageControl()", toolCenterCode);
         Assert.Contains("OpenPluginsForQuality", toolCenterCode);
         Assert.DoesNotContain("CreatePluginCard", toolCenterCode);
         Assert.DoesNotContain("PluginToggle_Click", toolCenterCode);
@@ -920,10 +920,14 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Views", "SystemIntegrationPageControl.xaml");
         var systemCode = Read(
             "src", "LongBetterWindows.Host", "Views", "SystemIntegrationPageControl.xaml.cs");
+        var settingsXaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml");
+        var settingsCode = Read(
+            "src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml.cs");
 
         Assert.Contains("x:Key=\"ManagementCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource LongCard}\"", xaml);
-        Assert.Equal(7, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
+        Assert.Equal(1, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
         Assert.Contains("x:Key=\"OverviewCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource ManagementCard}\"", xaml);
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
@@ -949,6 +953,16 @@ public class QualityGateTests
         Assert.Contains("LanguageChanged -= OnLanguageChanged", systemCode);
         Assert.True(
             systemCode.Split("SetSparsePackageBusy(false)").Length - 1 >= 3);
+        Assert.Contains("x:Name=\"SettingsHost\"", xaml);
+        Assert.DoesNotContain("<local:SettingsPageControl", xaml);
+        Assert.Contains("SettingsHost.Content is null", code);
+        Assert.Contains("new SettingsPageControl()", code);
+        Assert.Equal(6, settingsXaml.Split("Style=\"{StaticResource SettingsCard}\"").Length - 1);
+        Assert.Contains("VerticalAlignment=\"Top\"", settingsXaml);
+        Assert.Contains("IDisposable", settingsCode);
+        Assert.Contains("UpdateUiState", settingsCode);
+        Assert.Contains("LanguageApplied?.Invoke", settingsCode);
+        Assert.Contains("_updateService?.Dispose()", settingsCode);
     }
 
     [Fact]

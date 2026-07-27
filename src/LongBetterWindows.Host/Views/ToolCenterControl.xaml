@@ -217,64 +217,11 @@
                     </Grid>
 
                     <!-- 设置 -->
-                    <StackPanel x:Name="PanelSettings" Visibility="Collapsed">
-                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12">
-                            <Grid>
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Margin="0,0,16,0">
-                                    <TextBlock Text="{DynamicResource i18n.settings.language.title}" FontSize="14" FontWeight="SemiBold"/>
-                                    <TextBlock Text="{DynamicResource i18n.settings.language.desc}" Margin="0,5,0,0"
-                                               TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
-                                </StackPanel>
-                                <ComboBox x:Name="LanguageSelector" Grid.Column="1" Width="156"
-                                          VerticalAlignment="Center"
-                                          SelectionChanged="LanguageSelector_SelectionChanged">
-                                    <ComboBoxItem Tag="zh-CN" Content="{DynamicResource i18n.settings.language.zh}"/>
-                                    <ComboBoxItem Tag="en-US" Content="{DynamicResource i18n.settings.language.en}"/>
-                                </ComboBox>
-                            </Grid>
-                        </Border>
-                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.theme.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.theme.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.theme.action}" Style="{StaticResource LongButton}" Click="ThemeToggle_Click"/></Grid></Border>
-                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.motion.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.motion.desc}" Margin="0,5,0,0" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/></StackPanel><ToggleButton Grid.Column="1" Style="{StaticResource LongToggle}" IsChecked="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}, Mode=OneWay}" IsEnabled="False"/></Grid></Border>
-                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12">
-                            <Grid>
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel Margin="0,0,16,0">
-                                    <TextBlock Text="{DynamicResource i18n.settings.update.title}" FontSize="14" FontWeight="SemiBold"/>
-                                    <TextBlock Text="{DynamicResource i18n.settings.update.desc}" Margin="0,5,0,0"
-                                               TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
-                                    <TextBlock x:Name="UpdateStatusText" Margin="0,8,0,0"
-                                               Text="{DynamicResource i18n.settings.update.status.ready}"
-                                               TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}"
-                                               AutomationProperties.LiveSetting="Polite"/>
-                                </StackPanel>
-                                <Button x:Name="UpdateActionButton" Grid.Column="1"
-                                        Content="{DynamicResource i18n.settings.update.action.check}"
-                                        Style="{StaticResource LongButton.Primary}"
-                                        Click="UpdateAction_Click"
-                                        AutomationProperties.Name="{DynamicResource i18n.settings.update.action.check}"/>
-                            </Grid>
-                        </Border>
-                        <Border Style="{StaticResource ManagementCard}" Margin="0,0,0,12">
-                            <StackPanel>
-                                <TextBlock Text="{DynamicResource i18n.settings.gesture.title}" FontSize="14" FontWeight="SemiBold"/>
-                                <TextBlock Text="{DynamicResource i18n.settings.gesture.desc}"
-                                           Margin="0,5,0,0" TextWrapping="Wrap"
-                                           Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
-                                <TextBlock x:Name="MouseGestureStatusText" Margin="0,8,0,0" TextWrapping="Wrap"
-                                           Foreground="{DynamicResource Long.Brush.Text.Muted}"/>
-                                <WrapPanel x:Name="MouseGestureButtons" Margin="0,12,0,0">
-                                    <Button Content="{DynamicResource i18n.settings.gesture.disabled}" Tag="Disabled" Style="{StaticResource LongButton}"
-                                            Click="MouseGestureMode_Click"/>
-                                    <Button Content="{DynamicResource i18n.settings.gesture.middle}" Tag="MiddleButton" Style="{StaticResource LongButton}"
-                                            Margin="6,0,0,0" Click="MouseGestureMode_Click"/>
-                                    <Button Content="{DynamicResource i18n.settings.gesture.longRight}" Tag="LongRightPress" Style="{StaticResource LongButton}"
-                                            Margin="6,0,0,0" Click="MouseGestureMode_Click"/>
-                                </WrapPanel>
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource ManagementCard}"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{DynamicResource i18n.settings.privacy.title}" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="{DynamicResource i18n.settings.privacy.desc}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}"/><TextBlock x:Name="SearchPreferenceStatusText" Margin="0,8,0,0" Foreground="{DynamicResource Long.Brush.Text.Muted}"/></StackPanel><Button Grid.Column="1" Content="{DynamicResource i18n.settings.privacy.clear}" Style="{StaticResource LongButton}" Click="ClearSearchPreferences_Click"/></Grid></Border>
-                    </StackPanel>
+                    <Grid x:Name="PanelSettings" Visibility="Collapsed">
+                        <ContentControl x:Name="SettingsHost"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Stretch" />
+                    </Grid>
                 </Grid>
                 </Border>
             </ScrollViewer>

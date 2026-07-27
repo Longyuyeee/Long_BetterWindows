@@ -229,6 +229,7 @@ public class DesignSystemTests
             Path.Combine("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "SystemIntegrationPageControl.xaml"),
+            Path.Combine("src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml"),
             Path.Combine("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml"),

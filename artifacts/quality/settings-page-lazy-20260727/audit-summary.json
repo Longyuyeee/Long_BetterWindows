@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27",
+  "scope": "settings-page-first-navigation-creation",
+  "sample_method": "four sequential Release runs before and after",
+  "before_runs": 4,
+  "after_runs": 4,
+  "management_card_shadow_count": 6,
+  "medians": {
+    "main_window_loaded": {
+      "before_elapsed_ms": 2370.85,
+      "after_elapsed_ms": 1323.30,
+      "before_private_memory_mb": 137.90,
+      "after_private_memory_mb": 134.05,
+      "before_working_set_mb": 179.90,
+      "after_working_set_mb": 170.40
+    },
+    "plugin_runtime_ready": {
+      "before_elapsed_ms": 3455.90,
+      "after_elapsed_ms": 1944.95,
+      "before_private_memory_mb": 149.75,
+      "after_private_memory_mb": 144.95,
+      "before_working_set_mb": 197.40,
+      "after_working_set_mb": 186.55
+    }
+  },
+  "visual_audit": {
+    "wide_light_english": "pass",
+    "narrow_dark_simplified_chinese": "pass",
+    "overlap_or_horizontal_overflow": false,
+    "contrast_regression_observed": false
+  },
+  "conclusion": "The settings page now initializes on first navigation. Sequential samples improved, but the performance P0 remains open until the balanced interleaved matrix and nine-second idle gate are rerun."
+}
