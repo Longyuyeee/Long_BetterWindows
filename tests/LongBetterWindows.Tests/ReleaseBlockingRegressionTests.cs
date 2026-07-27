@@ -174,6 +174,93 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains("DynamicResource Long.Brush.Surface.Card", scriptDialog);
     }
 
+    [Fact]
+    public void SideEffectingPluginCommands_ReportActualCompletion()
+    {
+        var root = FindRepositoryRoot();
+        var translate = File.ReadAllText(
+            Path.Combine(root, "src", "TranslatePlugin", "index.html"));
+        var screenshot = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ScreenshotPlugin",
+            "ScreenshotPluginImpl.cs"));
+        var folderNote = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "FolderNotePlugin",
+            "FolderNotePluginImpl.cs"));
+
+        Assert.Contains("onCommand(async function", translate);
+        Assert.Contains("const success = await translate()", translate);
+        Assert.Contains("success: success", translate);
+        Assert.Contains("return await CaptureFullScreenAsync()", screenshot);
+        Assert.Contains("Task<PluginCommandResult> CaptureFullScreenAsync()", screenshot);
+        Assert.Contains("return await ShowNoteHudAsync(folderPath)", folderNote);
+        Assert.Contains("Application.Current.Dispatcher.Invoke(() => _activeHud?.Close())", folderNote);
+    }
+
+    [Fact]
+    public void FolderNoteSave_AwaitsStorageBeforeClosing()
+    {
+        var root = FindRepositoryRoot();
+        var hud = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "FloatingHudWindow.xaml.cs"));
+        var folderNote = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "FolderNotePlugin",
+            "FolderNotePluginImpl.cs"));
+
+        Assert.Contains("Func<string, Task>? _onSave", hud);
+        Assert.Contains("await _onSave(text)", hud);
+        Assert.Contains("catch (Exception exception)", hud);
+        Assert.Contains("if (!result.IsSuccess)", folderNote);
+        Assert.Contains("\"error.saveFailed\"", folderNote);
+    }
+
+    [Fact]
+    public void MacroPlayback_UsesVirtualDesktopCoordinatesAndCancelableLifecycle()
+    {
+        var root = FindRepositoryRoot();
+        var engine = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "MacroPlugin",
+            "MacroEngine.cs"));
+        var plugin = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "MacroPlugin",
+            "MacroPluginImpl.cs"));
+
+        Assert.Contains("NormalizeAbsoluteCoordinate", engine);
+        Assert.Contains("MOUSEEVENTF_VIRTUALDESK", engine);
+        Assert.Contains("GetSystemMetrics(SM_XVIRTUALSCREEN)", engine);
+        Assert.Contains("Task.Delay(action.DelayMs, cancellationToken)", engine);
+        Assert.Contains("_mouseHook == IntPtr.Zero || _keyboardHook == IntPtr.Zero", engine);
+        Assert.Contains("_engine?.StopPlay()", plugin);
+        Assert.Contains("PluginCommandResult.Failure", plugin);
+    }
+
+    [Fact]
+    public void ColorPicker_ClosesWhenDesktopSamplingIsUnavailable()
+    {
+        var root = FindRepositoryRoot();
+        var picker = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ColorPickerPlugin",
+            "ColorPickerWindow.xaml.cs"));
+
+        Assert.Contains("if (!GetCursorPos(out var point))", picker);
+        Assert.Contains("if (pixel == uint.MaxValue)", picker);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

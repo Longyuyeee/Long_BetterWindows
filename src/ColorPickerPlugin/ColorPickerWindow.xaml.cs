@@ -58,7 +58,11 @@ public partial class ColorPickerWindow : Window
         {
             try
             {
-                if (!GetCursorPos(out var point)) break;
+                if (!GetCursorPos(out var point))
+                {
+                    Close();
+                    return;
+                }
                 UpdateSample(point);
                 PositionNearCursor(point);
 
@@ -85,6 +89,8 @@ public partial class ColorPickerWindow : Window
         try
         {
             var pixel = GetPixel(dc, point.X, point.Y);
+            if (pixel == uint.MaxValue)
+                return;
             var red = (byte)(pixel & 0xFF);
             var green = (byte)((pixel >> 8) & 0xFF);
             var blue = (byte)((pixel >> 16) & 0xFF);

@@ -783,6 +783,7 @@
   "superPanel.quality.clipboardLink": "剪贴板链接 · {0}",
   "action.save": "保存",
   "folderNote.error.folderMissing": "目标文件夹不存在。",
+  "folderNote.error.saveFailed": "文件夹备注保存失败，请重试。",
   "folderNote.hud.title": "备注",
   "folderNote.hud.inputAutomationName": "文件夹备注内容",
   "folderNote.hud.emptyHint": "输入备注内容...",

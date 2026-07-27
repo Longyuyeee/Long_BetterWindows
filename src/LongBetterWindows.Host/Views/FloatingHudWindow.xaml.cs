@@ -21,7 +21,7 @@ namespace LongBetterWindows.Host.Views
 
     public partial class FloatingHudWindow : Window
     {
-        private Action<string>? _onSave;
+        private Func<string, Task>? _onSave;
         private bool _dirty;
         private bool _isClosing;
         private System.Threading.CancellationTokenSource? _closeCts;
@@ -37,7 +37,7 @@ namespace LongBetterWindows.Host.Views
             double x, double y,
             string? existingNote,
             string? folderPath,
-            Action<string> onSave,
+            Func<string, Task> onSave,
             FloatingHudLocalization? localization = null)
         {
             var window = new FloatingHudWindow
@@ -97,10 +97,13 @@ namespace LongBetterWindows.Host.Views
             _closeCts?.Cancel();
             _closeCts = new System.Threading.CancellationTokenSource();
             var token = _closeCts.Token;
-            Task.Delay(3000, token).ContinueWith(_ =>
+            Task.Delay(3000, token).ContinueWith(completed =>
             {
                 if (!token.IsCancellationRequested)
-                    Dispatcher.Invoke(() => SaveAndClose());
+                {
+                    var operation = Dispatcher.InvokeAsync(SaveAndCloseAsync);
+                    _ = operation.Task.Unwrap();
+                }
             });
         }
 
@@ -110,7 +113,7 @@ namespace LongBetterWindows.Host.Views
             _closeCts?.Cancel();
         }
 
-        private void Window_KeyDown(object sender, KeyEventArgs e)
+        private async void Window_KeyDown(object sender, KeyEventArgs e)
         {
             switch (e.Key)
             {
@@ -120,7 +123,7 @@ namespace LongBetterWindows.Host.Views
                     break;
                 case Key.Enter when Keyboard.Modifiers == ModifierKeys.Control:
                     _closeCts?.Cancel();
-                    SaveAndClose();
+                    await SaveAndCloseAsync();
                     break;
             }
         }
@@ -132,18 +135,27 @@ namespace LongBetterWindows.Host.Views
             HintText.Text = _localization.ModifiedHint;
         }
 
-        private void SaveAndClose()
+        private async Task SaveAndCloseAsync()
         {
             if (_isClosing) return;
             _isClosing = true;
 
-            if (_dirty && _onSave != null)
+            try
             {
-                var text = NoteTextBox.Text.Trim();
-                _onSave(text);
-            }
+                if (_dirty && _onSave != null)
+                {
+                    var text = NoteTextBox.Text.Trim();
+                    await _onSave(text);
+                }
 
-            Helpers.AnimationHelper.FadeOut(this, durationMs: 150);
+                Helpers.AnimationHelper.FadeOut(this, durationMs: 150);
+            }
+            catch (Exception exception)
+            {
+                _isClosing = false;
+                ShowToast(exception.Message);
+                NoteTextBox.Focus();
+            }
         }
     }
 }

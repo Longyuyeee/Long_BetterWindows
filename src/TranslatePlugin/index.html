@@ -121,9 +121,13 @@
     }
 
     async function translate() {
-      if (isTranslating) return;
+      if (isTranslating) return false;
       const text = input.value.trim();
-      if (!text) { setStatus('error.enterText', 'warning', '请输入需要翻译的文本'); input.focus(); return; }
+      if (!text) {
+        setStatus('error.enterText', 'warning', '请输入需要翻译的文本');
+        input.focus();
+        return false;
+      }
       isTranslating = true;
       window.LongUI?.setBusy(translateButton, true);
       renderRequestState();
@@ -144,12 +148,14 @@
         detectedLanguage = data[2] || 'auto';
         renderRequestState();
         setStatus('status.completed', 'success', '翻译完成');
+        return true;
       } catch (error) {
         setStatus(
           'error.translate',
           'danger',
           '翻译失败：{detail}',
           { detail: error && error.message ? error.message : String(error) });
+        return false;
       } finally {
         isTranslating = false;
         window.LongUI?.setBusy(translateButton, false);
@@ -180,9 +186,21 @@
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); translate(); }
     });
-    window.LongUI?.onCommand(function (command) {
+    window.LongUI?.onCommand(async function (command) {
       const text = window.LongUI.commandText(command);
-      if (text) { input.value = text; translate(); } else input.focus();
+      if (!text) {
+        input.focus();
+        return {
+          success: true,
+          message: t('command.opened', '翻译工具已打开')
+        };
+      }
+      input.value = text;
+      const success = await translate();
+      return {
+        success: success,
+        message: status.textContent
+      };
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);

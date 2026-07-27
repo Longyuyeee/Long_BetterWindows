@@ -24,5 +24,7 @@
   "result.recordToggled": "Macro recording state toggled",
   "result.playedOnce": "Macro playback completed",
   "result.loopToggled": "Loop playback state toggled",
+  "error.recordUnavailable": "Macro recording could not be toggled",
+  "error.playUnavailable": "No macro is available to play, or the macro engine is busy",
   "error.unknownCommand": "Unknown macro command"
 }

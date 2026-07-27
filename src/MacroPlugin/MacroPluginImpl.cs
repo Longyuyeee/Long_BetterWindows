@@ -107,9 +107,11 @@ public class MacroPluginImpl :
         return true;
     }
 
-    private void ToggleRecording()
+    private void ToggleRecording() => TryToggleRecording();
+
+    private bool TryToggleRecording()
     {
-        if (_engine == null) return;
+        if (_engine == null) return false;
 
         EnsureOverlay();
 
@@ -118,48 +120,65 @@ public class MacroPluginImpl :
             _engine.StopRecording();
             _overlay?.SetIdle();
             Log.Information("[Macro] 录制停止，共 {Count} 个动作", _engine.ActionCount);
+            return true;
         }
         else if (_engine.State == MacroState.Idle)
         {
-            _engine.StartRecording();
+            if (!_engine.StartRecording())
+            {
+                _overlay?.SetIdle();
+                Log.Error("[Macro] 全局输入钩子安装失败，未进入录制状态");
+                return false;
+            }
             _overlay?.SetRecording(_engine.ActionCount);
             Log.Information("[Macro] 开始录制...");
+            return true;
         }
+        return false;
     }
 
-    private async Task PlayOnce()
+    private async Task<bool> PlayOnce(
+        CancellationToken cancellationToken = default)
     {
-        if (_engine == null) return;
-        if (_engine.State != MacroState.Idle) return;
+        if (_engine == null) return false;
+        if (_engine.State != MacroState.Idle) return false;
         if (_engine.ActionCount == 0)
         {
             Log.Debug("[Macro] 无录制动作");
-            return;
+            return false;
         }
 
         EnsureOverlay();
         _overlay?.SetPlaying(false);
-        await _engine.PlayOnceAsync();
+        var played = await _engine.PlayOnceAsync(cancellationToken);
         _overlay?.SetIdle();
+        return played;
     }
 
-    private void ToggleLoopPlay()
+    private void ToggleLoopPlay() => TryToggleLoopPlay();
+
+    private bool TryToggleLoopPlay()
     {
-        if (_engine == null) return;
+        if (_engine == null) return false;
         if (_engine.State == MacroState.PlayingLoop)
         {
             _engine.StopPlay();
             _overlay?.SetIdle();
             Log.Information("[Macro] 循环播放停止");
-            return;
+            return true;
         }
-        if (_engine.State != MacroState.Idle) return;
-        if (_engine.ActionCount == 0) return;
+        if (_engine.State != MacroState.Idle) return false;
+        if (_engine.ActionCount == 0) return false;
 
         EnsureOverlay();
         _overlay?.SetPlaying(true);
-        _engine.PlayLoop();
+        if (!_engine.PlayLoop())
+        {
+            _overlay?.SetIdle();
+            return false;
+        }
         Log.Information("[Macro] 循环播放开始...");
+        return true;
     }
 
     private void EnsureOverlay()
@@ -236,17 +255,23 @@ public class MacroPluginImpl :
         switch (invocation.CommandId)
         {
             case "macro.record-toggle":
-                ToggleRecording();
-                return PluginCommandResult.Success(
-                    Text("result.recordToggled", "宏录制状态已切换"));
+                return TryToggleRecording()
+                    ? PluginCommandResult.Success(
+                        Text("result.recordToggled", "宏录制状态已切换"))
+                    : PluginCommandResult.Failure(
+                        Text("error.recordUnavailable", "无法切换宏录制状态"));
             case "macro.play-once":
-                await PlayOnce();
-                return PluginCommandResult.Success(
-                    Text("result.playedOnce", "宏播放已执行"));
+                return await PlayOnce(cancellationToken)
+                    ? PluginCommandResult.Success(
+                        Text("result.playedOnce", "宏播放已执行"))
+                    : PluginCommandResult.Failure(
+                        Text("error.playUnavailable", "没有可播放的宏，或宏当前正忙"));
             case "macro.loop-toggle":
-                ToggleLoopPlay();
-                return PluginCommandResult.Success(
-                    Text("result.loopToggled", "循环播放状态已切换"));
+                return TryToggleLoopPlay()
+                    ? PluginCommandResult.Success(
+                        Text("result.loopToggled", "循环播放状态已切换"))
+                    : PluginCommandResult.Failure(
+                        Text("error.playUnavailable", "没有可播放的宏，或宏当前正忙"));
             default:
                 return PluginCommandResult.Failure(
                     Text("error.unknownCommand", "未知宏命令"));

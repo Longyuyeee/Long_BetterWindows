@@ -37,12 +37,20 @@ public class MacroEngine : IDisposable
     private readonly List<MacroAction> _actions = new();
     private DateTime _lastEvent;
     private CancellationTokenSource? _playCts;
+    private Task? _playTask;
     private readonly object _lock = new();
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
     public MacroState State { get; private set; } = MacroState.Idle;
-    public int ActionCount => _actions.Count;
+    public int ActionCount
+    {
+        get
+        {
+            lock (_lock)
+                return _actions.Count;
+        }
+    }
     public event Action<MacroState>? StateChanged;
 
     public MacroEngine()
@@ -51,13 +59,22 @@ public class MacroEngine : IDisposable
         _keyboardProc = KeyboardHookCallback;
     }
 
-    public void StartRecording()
+    public bool StartRecording()
     {
+        if (State != MacroState.Idle)
+            return false;
+
         lock (_lock) { _actions.Clear(); _lastEvent = DateTime.UtcNow; }
         _mouseHook = SetHook(WH_MOUSE_LL, _mouseProc);
         _keyboardHook = SetHook(WH_KEYBOARD_LL, _keyboardProc);
+        if (_mouseHook == IntPtr.Zero || _keyboardHook == IntPtr.Zero)
+        {
+            StopRecording();
+            return false;
+        }
         State = MacroState.Recording;
         StateChanged?.Invoke(State);
+        return true;
     }
 
     public void StopRecording()
@@ -68,22 +85,48 @@ public class MacroEngine : IDisposable
         StateChanged?.Invoke(State);
     }
 
-    public async Task PlayOnceAsync() => await PlayInternal(false);
-    public void PlayLoop()
+    public async Task<bool> PlayOnceAsync(
+        CancellationToken cancellationToken = default)
     {
-        _playCts = new CancellationTokenSource();
-        _ = Task.Run(async () =>
+        if (State != MacroState.Idle || ActionCount == 0)
+            return false;
+
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken);
+        _playCts = cancellation;
+        State = MacroState.Playing;
+        StateChanged?.Invoke(State);
+        try
         {
-            State = MacroState.PlayingLoop; StateChanged?.Invoke(State);
-            while (!_playCts.Token.IsCancellationRequested)
+            await PlayActionsAsync(cancellation.Token);
+            return true;
+        }
+        finally
+        {
+            if (ReferenceEquals(_playCts, cancellation))
             {
-                await PlayInternal(false);
-                await Task.Delay(100, _playCts.Token);
+                _playCts = null;
+                State = MacroState.Idle;
+                StateChanged?.Invoke(State);
             }
-        }, _playCts.Token);
+            cancellation.Dispose();
+        }
     }
 
-    public void StopPlay() { _playCts?.Cancel(); _playCts?.Dispose(); _playCts = null; State = MacroState.Idle; StateChanged?.Invoke(State); }
+    public bool PlayLoop()
+    {
+        if (State != MacroState.Idle || ActionCount == 0)
+            return false;
+
+        var cancellation = new CancellationTokenSource();
+        _playCts = cancellation;
+        State = MacroState.PlayingLoop;
+        StateChanged?.Invoke(State);
+        _playTask = Task.Run(() => PlayLoopAsync(cancellation));
+        return true;
+    }
+
+    public void StopPlay() => _playCts?.Cancel();
 
     public string SaveToJson()
     {
@@ -100,36 +143,61 @@ public class MacroEngine : IDisposable
         }
     }
 
-    private async Task PlayInternal(bool loop)
+    private async Task PlayLoopAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            while (!cancellation.IsCancellationRequested)
+            {
+                await PlayActionsAsync(cancellation.Token);
+                await Task.Delay(100, cancellation.Token);
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_playCts, cancellation))
+            {
+                _playCts = null;
+                _playTask = null;
+                State = MacroState.Idle;
+                StateChanged?.Invoke(State);
+            }
+            cancellation.Dispose();
+        }
+    }
+
+    private async Task PlayActionsAsync(CancellationToken cancellationToken)
     {
         List<MacroAction> snapshot;
         lock (_lock) { snapshot = _actions.ToList(); }
         if (snapshot.Count == 0) return;
-        State = MacroState.Playing; StateChanged?.Invoke(State);
 
         foreach (var action in snapshot)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (action.Type == MacroActionType.MouseClick)
             {
                 SetCursorPos(action.X, action.Y);
-                await Task.Delay(20);
+                await Task.Delay(20, cancellationToken);
                 uint down = action.IsRightButton ? MOUSEEVENTF_RIGHTDOWN : MOUSEEVENTF_LEFTDOWN;
                 uint up = action.IsRightButton ? MOUSEEVENTF_RIGHTUP : MOUSEEVENTF_LEFTUP;
                 SendMouseInput(action.X, action.Y, down);
-                await Task.Delay(30);
+                await Task.Delay(30, cancellationToken);
                 SendMouseInput(action.X, action.Y, up);
             }
             else if (action.Type == MacroActionType.KeyPress)
             {
                 keybd_event((byte)action.KeyCode, 0, 0, UIntPtr.Zero);
-                await Task.Delay(30);
+                await Task.Delay(30, cancellationToken);
                 keybd_event((byte)action.KeyCode, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             }
 
-            if (action.DelayMs > 0) await Task.Delay(action.DelayMs);
+            if (action.DelayMs > 0)
+                await Task.Delay(action.DelayMs, cancellationToken);
         }
-
-        State = MacroState.Idle; StateChanged?.Invoke(State);
     }
 
     private IntPtr MouseHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -162,9 +230,39 @@ public class MacroEngine : IDisposable
 
     private static void SendMouseInput(int x, int y, uint flags)
     {
-        var input = new INPUT { type = INPUT_MOUSE, u = new INPUTUNION { mi = new MOUSEINPUT { dx = x, dy = y, dwFlags = flags | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE } } };
+        var virtualLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        var virtualTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        var virtualWidth = Math.Max(1, GetSystemMetrics(SM_CXVIRTUALSCREEN));
+        var virtualHeight = Math.Max(1, GetSystemMetrics(SM_CYVIRTUALSCREEN));
+        var normalizedX = NormalizeAbsoluteCoordinate(x, virtualLeft, virtualWidth);
+        var normalizedY = NormalizeAbsoluteCoordinate(y, virtualTop, virtualHeight);
+        var input = new INPUT
+        {
+            type = INPUT_MOUSE,
+            u = new INPUTUNION
+            {
+                mi = new MOUSEINPUT
+                {
+                    dx = normalizedX,
+                    dy = normalizedY,
+                    dwFlags = flags | MOUSEEVENTF_ABSOLUTE
+                        | MOUSEEVENTF_MOVE | MOUSEEVENTF_VIRTUALDESK,
+                },
+            },
+        };
         SendInput(1, ref input, Marshal.SizeOf<INPUT>());
     }
+
+    private static int NormalizeAbsoluteCoordinate(
+        int coordinate,
+        int origin,
+        int extent)
+        => (int)Math.Round(
+            Math.Clamp(
+                (coordinate - origin) / (double)Math.Max(1, extent - 1),
+                0,
+                1)
+            * 65535);
 
     public void Dispose() { StopPlay(); StopRecording(); }
 
@@ -175,6 +273,7 @@ public class MacroEngine : IDisposable
     [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] static extern uint SendInput(uint nInputs, ref INPUT pInputs, int cbSize);
     [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll")] static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
     [DllImport("kernel32.dll")] static extern IntPtr GetModuleHandle(string? lpModuleName);
 
@@ -188,8 +287,9 @@ public class MacroEngine : IDisposable
     }
 
     const uint INPUT_MOUSE = 0, MOUSEEVENTF_MOVE = 0x0001, MOUSEEVENTF_LEFTDOWN = 0x0002, MOUSEEVENTF_LEFTUP = 0x0004;
-    const uint MOUSEEVENTF_RIGHTDOWN = 0x0008, MOUSEEVENTF_RIGHTUP = 0x0010, MOUSEEVENTF_ABSOLUTE = 0x8000;
+    const uint MOUSEEVENTF_RIGHTDOWN = 0x0008, MOUSEEVENTF_RIGHTUP = 0x0010, MOUSEEVENTF_VIRTUALDESK = 0x4000, MOUSEEVENTF_ABSOLUTE = 0x8000;
     const uint KEYEVENTF_KEYUP = 0x0002;
+    const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77, SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
 
     [StructLayout(LayoutKind.Sequential)] struct POINT { public int X; public int Y; }
     [StructLayout(LayoutKind.Sequential)] struct MSLLHOOKSTRUCT { public POINT pt; public uint mouseData, flags, time; public IntPtr dwExtraInfo; }

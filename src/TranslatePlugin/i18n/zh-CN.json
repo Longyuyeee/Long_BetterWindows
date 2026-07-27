@@ -20,6 +20,7 @@
   "status.connecting": "正在连接翻译服务",
   "status.completed": "翻译完成",
   "status.copied": "翻译结果已复制",
+  "command.opened": "翻译工具已打开",
   "error.enterText": "请输入需要翻译的文本",
   "error.network": "网络请求失败",
   "error.emptyResponse": "服务没有返回翻译内容",

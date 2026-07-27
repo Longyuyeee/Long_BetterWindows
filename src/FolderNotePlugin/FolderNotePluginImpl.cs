@@ -67,6 +67,8 @@ public class FolderNotePluginImpl :
         if (_registeredHotkey != null)
             await _hotKey.UnregisterAsync(_registeredHotkey);
         _registeredHotkey = null;
+        Application.Current.Dispatcher.Invoke(() => _activeHud?.Close());
+        _activeHud = null;
 
         State = PluginState.Stopped;
         Log.Information("[FolderNotePlugin] 已停止");
@@ -94,7 +96,8 @@ public class FolderNotePluginImpl :
         }
     }
 
-    private async Task ShowNoteHudAsync(string? requestedFolderPath = null)
+    private async Task<PluginCommandResult> ShowNoteHudAsync(
+        string? requestedFolderPath = null)
     {
         var shell = _host.ShellSelection;
         var ads = _host.ADS;
@@ -108,7 +111,9 @@ public class FolderNotePluginImpl :
                 FloatingHudWindow.ShowToast(Text(
                     "error.selectFolder",
                     "请先打开资源管理器并选中文件夹。"));
-                return;
+                return PluginCommandResult.Failure(Text(
+                    "error.selectFolder",
+                    "请先打开资源管理器并选中文件夹。"));
             }
 
             folderPath = folderResult.Data;
@@ -119,7 +124,9 @@ public class FolderNotePluginImpl :
             FloatingHudWindow.ShowToast(Text(
                 "error.folderMissing",
                 "目标文件夹不存在。"));
-            return;
+            return PluginCommandResult.Failure(Text(
+                "error.folderMissing",
+                "目标文件夹不存在。"));
         }
 
         var noteResult = await ads.ReadAsync(folderPath, "long_note");
@@ -152,10 +159,15 @@ public class FolderNotePluginImpl :
                 folderPath,
                 async (text) =>
                 {
-                    if (string.IsNullOrEmpty(text))
-                        await ads.DeleteAsync(folderPath, "long_note");
-                    else
-                        await ads.WriteAsync(folderPath, "long_note", text);
+                    var result = string.IsNullOrEmpty(text)
+                        ? await ads.DeleteAsync(folderPath, "long_note")
+                        : await ads.WriteAsync(folderPath, "long_note", text);
+                    if (!result.IsSuccess)
+                    {
+                        throw new InvalidOperationException(Text(
+                            "error.saveFailed",
+                            "文件夹备注保存失败，请重试。"));
+                    }
 
                     Log.Information("[FolderNotePlugin] 备注已保存: {Path}", folderPath);
                 },
@@ -167,6 +179,13 @@ public class FolderNotePluginImpl :
                     _activeHud = null;
             };
         });
+        return PluginCommandResult.Success(
+            outputs: new Dictionary<string, PluginCommandOutput>
+            {
+                ["selected-folder"] = new(
+                    PluginCommandOutputType.Path,
+                    folderPath),
+            });
     }
 
     public async Task<LongBetterWindows.Host.Contracts.PluginCommandResult> ExecuteCommandAsync(
@@ -189,16 +208,7 @@ public class FolderNotePluginImpl :
             : invocation.InputType == LongBetterWindows.Host.Contracts.AcceptedInputType.ExplorerSelection
                 ? invocation.Paths.FirstOrDefault(Directory.Exists)
                 : null;
-        await ShowNoteHudAsync(folderPath);
-        return LongBetterWindows.Host.Contracts.PluginCommandResult.Success(
-            outputs: string.IsNullOrWhiteSpace(folderPath)
-                ? null
-                : new Dictionary<string, LongBetterWindows.Host.Contracts.PluginCommandOutput>
-                {
-                    ["selected-folder"] = new(
-                        LongBetterWindows.Host.Contracts.PluginCommandOutputType.Path,
-                        folderPath),
-                });
+        return await ShowNoteHudAsync(folderPath);
     }
 
     public void ShowMainUI() => OnHotkeyTriggered();

@@ -783,6 +783,7 @@
   "superPanel.quality.clipboardLink": "Clipboard link · {0}",
   "action.save": "Save",
   "folderNote.error.folderMissing": "The target folder no longer exists.",
+  "folderNote.error.saveFailed": "The folder note could not be saved. Try again.",
   "folderNote.hud.title": "Folder note",
   "folderNote.hud.inputAutomationName": "Folder note content",
   "folderNote.hud.emptyHint": "Enter a note...",

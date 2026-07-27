@@ -309,15 +309,20 @@ namespace LongBetterWindows.Host
                     folderPath,
                     async (text) =>
                     {
-                        if (string.IsNullOrEmpty(text))
-                            await ServicesInitializer.ADS.DeleteAsync(
+                        var result = string.IsNullOrEmpty(text)
+                            ? await ServicesInitializer.ADS.DeleteAsync(
                                 folderPath,
-                                "long_note");
-                        else
-                            await ServicesInitializer.ADS.WriteAsync(
+                                "long_note")
+                            : await ServicesInitializer.ADS.WriteAsync(
                                 folderPath,
                                 "long_note",
                                 text);
+                        if (!result.IsSuccess)
+                        {
+                            throw new InvalidOperationException(
+                                ServicesInitializer.I18n.T(
+                                    "folderNote.error.saveFailed"));
+                        }
 
                         Log.Information("右键备注已保存: {Path}", folderPath);
                     },

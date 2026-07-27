@@ -94,7 +94,7 @@ public class ScreenshotPluginImpl :
 
     public void ShowMainUI() => CaptureRegion();
 
-    public Task<PluginCommandResult> ExecuteCommandAsync(
+    public async Task<PluginCommandResult> ExecuteCommandAsync(
         PluginCommandInvocation invocation,
         CancellationToken cancellationToken = default)
     {
@@ -102,49 +102,60 @@ public class ScreenshotPluginImpl :
         switch (invocation.CommandId)
         {
             case "screenshot.full":
-                CaptureFullScreen();
-                return Task.FromResult(PluginCommandResult.Success(
-                    Text("command.fullStarted", "全屏截图已开始")));
+                return await CaptureFullScreenAsync();
             case "screenshot.region":
                 CaptureRegion();
-                return Task.FromResult(PluginCommandResult.Success(
-                    Text("command.regionStarted", "拖拽选择截图区域")));
+                return PluginCommandResult.Success(
+                    Text("command.regionStarted", "拖拽选择截图区域"));
             default:
-                return Task.FromResult(PluginCommandResult.Failure(string.Format(
+                return PluginCommandResult.Failure(string.Format(
                     Text("error.unknownCommand", "未知截图命令: {0}"),
-                    invocation.CommandId)));
+                    invocation.CommandId));
         }
     }
 
-    private void CaptureFullScreen()
+    private void CaptureFullScreen() => _ = CaptureFullScreenAsync();
+
+    private async Task<PluginCommandResult> CaptureFullScreenAsync()
     {
-        Application.Current.Dispatcher.Invoke(async () =>
+        try
         {
-            try
-            {
-                var bitmap = ScreenCapture.Capture(
+            var bitmap = await Application.Current.Dispatcher.InvokeAsync(() =>
+                ScreenCapture.Capture(
                     (int)SystemParameters.VirtualScreenLeft,
                     (int)SystemParameters.VirtualScreenTop,
                     (int)SystemParameters.VirtualScreenWidth,
-                    (int)SystemParameters.VirtualScreenHeight);
-                var result = await _host.Clipboard.SetImageAsync(bitmap);
-                if (!result.IsSuccess)
-                    throw new InvalidOperationException(result.ErrorMessage ?? "剪贴板写入失败");
-
-                FloatingHudWindow.ShowToast(string.Format(
-                    Text("toast.fullCopied", "全屏截图已复制 · {0} × {1}"),
-                    bitmap.PixelWidth,
-                    bitmap.PixelHeight));
-            }
-            catch (Exception ex)
+                    (int)SystemParameters.VirtualScreenHeight));
+            var result = await _host.Clipboard.SetImageAsync(bitmap);
+            if (!result.IsSuccess)
             {
-                Log.Error(ex, "[Screenshot] 全屏截图失败");
-                FloatingHudWindow.ShowToast(Text(
-                    "toast.captureFailed",
-                    "截图失败，请稍后重试"));
+                throw new InvalidOperationException(
+                    result.ErrorMessage ?? Text(
+                        "toast.clipboardFailed",
+                        "截图完成，但写入剪贴板失败"));
             }
-        });
+
+            var message = string.Format(
+                Text("toast.fullCopied", "全屏截图已复制 · {0} × {1}"),
+                bitmap.PixelWidth,
+                bitmap.PixelHeight);
+            ShowToast(message);
+            return PluginCommandResult.Success(message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[Screenshot] 全屏截图失败");
+            var message = Text(
+                "toast.captureFailed",
+                "截图失败，请稍后重试");
+            ShowToast(message);
+            return PluginCommandResult.Failure(message);
+        }
     }
+
+    private static void ShowToast(string message)
+        => Application.Current.Dispatcher.Invoke(
+            () => FloatingHudWindow.ShowToast(message));
 
     private void CaptureRegion()
     {

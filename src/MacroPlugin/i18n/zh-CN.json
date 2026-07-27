@@ -24,5 +24,7 @@
   "result.recordToggled": "宏录制状态已切换",
   "result.playedOnce": "宏播放已执行",
   "result.loopToggled": "循环播放状态已切换",
+  "error.recordUnavailable": "无法切换宏录制状态",
+  "error.playUnavailable": "没有可播放的宏，或宏当前正忙",
   "error.unknownCommand": "未知宏命令"
 }
