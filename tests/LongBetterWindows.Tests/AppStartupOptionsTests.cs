@@ -30,6 +30,7 @@ public class AppStartupOptionsTests
             "--quality-terminal-export-dir", "quality-exports",
             "--quality-plugin-page-release-report", "plugin-release.json",
             "--quality-plugin-page-performance-report", "plugin-performance.json",
+            "--quality-taskbar-identity-report", "taskbar-identity.json",
             "--quality-skip-auto-start-plugin", "com.long.clipboardhistory",
             "--quality-skip-auto-start-plugin", "COM.LONG.MACRO",
             "--quality-hide-window-during-idle",
@@ -65,6 +66,9 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "plugin-performance.json",
             options.QualityPluginPagePerformanceReportPath);
+        Assert.Equal(
+            "taskbar-identity.json",
+            options.QualityTaskbarIdentityReportPath);
         Assert.Equal(
             2,
             options.QualitySkippedAutoStartPluginIds.Count);

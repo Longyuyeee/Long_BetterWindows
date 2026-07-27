@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
@@ -190,6 +191,91 @@ namespace LongBetterWindows.Host.Services
             _application.Shutdown(collected ? 0 : 4);
         }
 
+        public async Task RunTaskbarIdentityProbeAsync(string reportPath)
+        {
+            const string firstPluginId = "com.long.quality-taskbar";
+            const string secondPluginId = "com.long.quality_taskbar";
+            var first = new PluginWindowHost(
+                firstPluginId,
+                "Taskbar Alpha",
+                new System.Windows.Controls.Border());
+            var second = new PluginWindowHost(
+                secondPluginId,
+                "Taskbar Beta",
+                new System.Windows.Controls.Border());
+
+            try
+            {
+                first.Show();
+                second.Show();
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.ContextIdle);
+
+                var firstExpected =
+                    PluginTaskbarIdentity.CreateAppUserModelId(firstPluginId);
+                var secondExpected =
+                    PluginTaskbarIdentity.CreateAppUserModelId(secondPluginId);
+                var firstActual =
+                    PluginTaskbarIdentity.ReadAppUserModelId(first);
+                var secondActual =
+                    PluginTaskbarIdentity.ReadAppUserModelId(second);
+                var firstIcon = GetIconFingerprint(first.Icon);
+                var secondIcon = GetIconFingerprint(second.Icon);
+                var passed =
+                    firstActual == firstExpected
+                    && secondActual == secondExpected
+                    && firstActual != secondActual
+                    && firstIcon is not null
+                    && secondIcon is not null
+                    && firstIcon != secondIcon
+                    && first.Owner is null
+                    && second.Owner is null
+                    && first.ShowInTaskbar
+                    && second.ShowInTaskbar;
+
+                var fullPath = Path.GetFullPath(reportPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                await File.WriteAllTextAsync(
+                    fullPath,
+                    JsonSerializer.Serialize(
+                        new
+                        {
+                            schema_version = 1,
+                            captured_at = DateTimeOffset.UtcNow,
+                            passed,
+                            windows = new[]
+                            {
+                                new
+                                {
+                                    plugin_id = firstPluginId,
+                                    expected_app_user_model_id = firstExpected,
+                                    actual_app_user_model_id = firstActual,
+                                    icon_sha256 = firstIcon,
+                                    has_owner = first.Owner is not null,
+                                    show_in_taskbar = first.ShowInTaskbar,
+                                },
+                                new
+                                {
+                                    plugin_id = secondPluginId,
+                                    expected_app_user_model_id = secondExpected,
+                                    actual_app_user_model_id = secondActual,
+                                    icon_sha256 = secondIcon,
+                                    has_owner = second.Owner is not null,
+                                    show_in_taskbar = second.ShowInTaskbar,
+                                },
+                            },
+                        },
+                        new JsonSerializerOptions { WriteIndented = true }));
+                _application.Shutdown(passed ? 0 : 5);
+            }
+            finally
+            {
+                first.Close();
+                second.Close();
+            }
+        }
+
         public async Task RunPluginPagePerformanceProbeAsync(
             MainWindow window,
             PluginPagePerformanceTrace trace,
@@ -287,6 +373,19 @@ namespace LongBetterWindows.Host.Services
                 Math.Max(1, (int)Math.Ceiling(webView.ActualHeight * webDpi.DpiScaleY)),
                 webDpi.PixelsPerInchX, "webview_preview",
                 isLight, highContrast, reducedMotion);
+        }
+
+        private static string? GetIconFingerprint(ImageSource? icon)
+        {
+            if (icon is not BitmapSource bitmap)
+                return null;
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            return Convert.ToHexString(SHA256.HashData(stream.ToArray()))
+                .ToLowerInvariant();
         }
 
         private static async Task WriteCaptureMetadataAsync(

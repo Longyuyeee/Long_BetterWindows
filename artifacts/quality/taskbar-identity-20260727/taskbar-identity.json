@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-07-27T08:21:06.5216863+00:00",
+  "passed": true,
+  "windows": [
+    {
+      "plugin_id": "com.long.quality-taskbar",
+      "expected_app_user_model_id": "LongAssistant.Plugin.com.long.quality.taskbar.5d234d74f4f2",
+      "actual_app_user_model_id": "LongAssistant.Plugin.com.long.quality.taskbar.5d234d74f4f2",
+      "icon_sha256": "94b175a11e0f353c0a87e14e1dc83f35a286aac0faaf68093c99d2e1f499dba6",
+      "has_owner": false,
+      "show_in_taskbar": true
+    },
+    {
+      "plugin_id": "com.long.quality_taskbar",
+      "expected_app_user_model_id": "LongAssistant.Plugin.com.long.quality.taskbar.73ad7f64b3de",
+      "actual_app_user_model_id": "LongAssistant.Plugin.com.long.quality.taskbar.73ad7f64b3de",
+      "icon_sha256": "e4f869ac932d1e2367c696206e60960df79ca602e6f1df5ffb50ac7240243158",
+      "has_owner": false,
+      "show_in_taskbar": true
+    }
+  ]
+}

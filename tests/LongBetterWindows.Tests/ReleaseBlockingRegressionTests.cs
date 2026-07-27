@@ -95,9 +95,18 @@ public sealed class ReleaseBlockingRegressionTests
             "com.long.password-gen");
 
         Assert.Equal(
-            "LongAssistant.Plugin.com.long.json.formatter",
+            "LongAssistant.Plugin.com.long.json.formatter.6f6cf7597d46",
             first);
         Assert.NotEqual(first, second);
+        Assert.Equal(
+            PluginTaskbarIdentity.CreateAppUserModelId("PLUGIN-A"),
+            PluginTaskbarIdentity.CreateAppUserModelId("plugin-a"));
+        Assert.NotEqual(
+            PluginTaskbarIdentity.CreateAppUserModelId("plugin-a"),
+            PluginTaskbarIdentity.CreateAppUserModelId("plugin_a"));
+        Assert.True(
+            PluginTaskbarIdentity.CreateAppUserModelId(new string('a', 300))
+                .Length <= 128);
 
         var root = FindRepositoryRoot();
         var presentation = File.ReadAllText(Path.Combine(

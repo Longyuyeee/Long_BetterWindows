@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -10,17 +12,19 @@ namespace LongBetterWindows.Host.Views;
 internal static class PluginTaskbarIdentity
 {
     private const string AppIdPrefix = "LongAssistant.Plugin.";
+    private const int MaximumAppUserModelIdLength = 128;
+    private const int HashLength = 12;
     private static readonly Guid PropertyStoreGuid =
         new("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99");
     private static readonly PropertyKey AppUserModelIdKey = new(
         new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
         5);
 
-    internal static void Apply(Window window, string pluginId)
+    internal static bool Apply(Window window, string pluginId)
     {
         var handle = new WindowInteropHelper(window).Handle;
         if (handle == IntPtr.Zero)
-            return;
+            return false;
 
         IPropertyStore? store = null;
         PropVariant value = default;
@@ -32,12 +36,51 @@ internal static class PluginTaskbarIdentity
                 ref interfaceId,
                 out store);
             if (result != 0 || store is null)
-                return;
+                return false;
 
             value = PropVariant.FromString(CreateAppUserModelId(pluginId));
             var appUserModelIdKey = AppUserModelIdKey;
             store.SetValue(ref appUserModelIdKey, ref value);
             store.Commit();
+            return true;
+        }
+        catch (COMException)
+        {
+            return false;
+        }
+        finally
+        {
+            value.Dispose();
+            if (store is not null)
+                Marshal.ReleaseComObject(store);
+        }
+    }
+
+    internal static string? ReadAppUserModelId(Window window)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        if (handle == IntPtr.Zero)
+            return null;
+
+        IPropertyStore? store = null;
+        PropVariant value = default;
+        try
+        {
+            var interfaceId = PropertyStoreGuid;
+            var result = SHGetPropertyStoreForWindow(
+                handle,
+                ref interfaceId,
+                out store);
+            if (result != 0 || store is null)
+                return null;
+
+            var appUserModelIdKey = AppUserModelIdKey;
+            store.GetValue(ref appUserModelIdKey, out value);
+            return value.GetString();
+        }
+        catch (COMException)
+        {
+            return null;
         }
         finally
         {
@@ -94,13 +137,26 @@ internal static class PluginTaskbarIdentity
 
     internal static string CreateAppUserModelId(string pluginId)
     {
-        var safe = new string(pluginId
+        var normalized = new string(pluginId
+            .ToLowerInvariant()
             .Select(character => char.IsLetterOrDigit(character) || character == '.'
                 ? character
                 : '.')
             .ToArray())
             .Trim('.');
-        return AppIdPrefix + (safe.Length == 0 ? "Unknown" : safe);
+        if (normalized.Length == 0)
+            normalized = "Unknown";
+
+        var hash = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(
+                    pluginId.ToUpperInvariant())))
+            .ToLowerInvariant()[..HashLength];
+        var maximumNameLength =
+            MaximumAppUserModelIdLength - AppIdPrefix.Length - HashLength - 1;
+        if (normalized.Length > maximumNameLength)
+            normalized = normalized[..maximumNameLength].TrimEnd('.');
+
+        return $"{AppIdPrefix}{normalized}.{hash}";
     }
 
     private static uint StableHash(string value)
@@ -185,6 +241,11 @@ internal static class PluginTaskbarIdentity
                 valueType = 31, // VT_LPWSTR
                 pointerValue = Marshal.StringToCoTaskMemUni(value),
             };
+
+        internal readonly string? GetString()
+            => valueType == 31 && pointerValue != IntPtr.Zero
+                ? Marshal.PtrToStringUni(pointerValue)
+                : null;
 
         public void Dispose()
         {

@@ -18,6 +18,7 @@ namespace LongBetterWindows.Host.Services
         public bool OpenPluginsForQuality { get; private init; }
         public string? QualityPluginPageReleaseReportPath { get; private init; }
         public string? QualityPluginPagePerformanceReportPath { get; private init; }
+        public string? QualityTaskbarIdentityReportPath { get; private init; }
         public IReadOnlySet<string> QualitySkippedAutoStartPluginIds { get; private init; } =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public bool QualityHideWindowDuringIdle { get; private init; }
@@ -89,6 +90,9 @@ namespace LongBetterWindows.Host.Services
                 QualityPluginPageReleaseReportPath = pluginPageReleaseReport,
                 QualityPluginPagePerformanceReportPath =
                     pluginPagePerformanceReport,
+                QualityTaskbarIdentityReportPath = ReadArgument(
+                    arguments,
+                    "--quality-taskbar-identity-report"),
                 QualitySkippedAutoStartPluginIds = ReadArguments(
                     arguments,
                     "--quality-skip-auto-start-plugin"),

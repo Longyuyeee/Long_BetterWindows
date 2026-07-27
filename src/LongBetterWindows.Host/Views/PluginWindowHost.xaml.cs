@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using LongBetterWindows.Host.Contracts;
+using Serilog;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -20,7 +21,12 @@ namespace LongBetterWindows.Host.Views
             PluginContent.Content = content;
             Icon = PluginTaskbarIdentity.CreateIcon(pluginId, title);
             SourceInitialized += (_, _) =>
-                PluginTaskbarIdentity.Apply(this, pluginId);
+            {
+                if (!PluginTaskbarIdentity.Apply(this, pluginId))
+                    Log.Warning(
+                        "Could not apply detached taskbar identity for plugin {PluginId}",
+                        pluginId);
+            };
             ApplyWindowPreference(preference);
         }
 
