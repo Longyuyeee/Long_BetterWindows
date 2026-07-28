@@ -64,6 +64,8 @@ namespace LongBetterWindows.Host.Services
         internal static WorkspaceModuleResolver WorkspaceModules { get; private set; } = null!;
         internal static LauncherContinuityCoordinator LauncherContinuity
             { get; private set; } = new();
+        internal static PluginWorkspaceSessionManager PluginSessions
+            { get; private set; } = new();
 
         public static void Initialize(string? workflowsDirectory = null)
         {

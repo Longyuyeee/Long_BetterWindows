@@ -135,6 +135,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <Button Style="{StaticResource LongIconButton}" Width="32" Height="30"
                                     Click="EmbeddedBack_Click" ToolTip="{DynamicResource i18n.pluginWindow.back}"
@@ -162,7 +163,15 @@
                                     Height="30" Margin="0,0,7,0" Click="DetachEmbedded_Click"
                                     AutomationProperties.AutomationId="Long.Plugin.Detach"
                                     AutomationProperties.Name="{DynamicResource i18n.pluginWindow.detachAutomation}" />
-                            <Button Grid.Column="3" Style="{StaticResource LongIconButton}" Width="32" Height="30"
+                            <Button x:Name="EmbeddedEndRunButton"
+                                    Grid.Column="3"
+                                    Content="{DynamicResource i18n.pluginWindow.endRun}"
+                                    Style="{StaticResource LongButton}"
+                                    Height="30" Margin="0,0,7,0"
+                                    Click="EmbeddedEndRun_Click"
+                                    AutomationProperties.AutomationId="Long.Plugin.EmbeddedEndRun"
+                                    AutomationProperties.Name="{DynamicResource i18n.pluginWindow.endRun}" />
+                            <Button Grid.Column="4" Style="{StaticResource LongIconButton}" Width="32" Height="30"
                                     Click="EmbeddedClose_Click"
                                     AutomationProperties.AutomationId="Long.Plugin.EmbeddedClose"
                                     AutomationProperties.Name="{DynamicResource i18n.pluginWindow.close}">

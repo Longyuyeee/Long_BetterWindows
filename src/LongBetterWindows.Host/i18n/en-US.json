@@ -826,6 +826,7 @@
   "pluginWindow.detach": "Detach",
   "pluginWindow.detachAutomation": "Detach plugin window",
   "pluginWindow.close": "Close plugin interface",
+  "pluginWindow.endRun": "End run",
   "pluginWindow.title": "Plugin",
   "pluginWindow.detachedAutomation": "Long detached plugin window",
   "pluginLoad.error.title": "Plugin loading error",

@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Input;
 using LongBetterWindows.Host.Contracts;
 using Serilog;
@@ -8,17 +9,30 @@ namespace LongBetterWindows.Host.Views
     public partial class PluginWindowHost : Window
     {
         private Window? _returnTarget;
+        private readonly Func<Task>? _endRequested;
 
         public PluginWindowHost(
             string pluginId,
             string title,
             FrameworkElement content,
-            PluginWindowPreference? preference = null)
+            PluginWindowPreference? preference = null,
+            string? sessionId = null,
+            Func<Task>? endRequested = null)
         {
             InitializeComponent();
             Title = title;
             PluginTitle.Text = title;
             PluginContent.Content = content;
+            _endRequested = endRequested;
+            EndRunButton.Visibility = endRequested is null
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            if (!string.IsNullOrWhiteSpace(sessionId))
+            {
+                AutomationProperties.SetItemStatus(
+                    this,
+                    $"plugin-session:{sessionId};placement:detached");
+            }
             Icon = PluginTaskbarIdentity.CreateIcon(pluginId, title);
             SourceInitialized += (_, _) =>
             {
@@ -31,6 +45,7 @@ namespace LongBetterWindows.Host.Views
         }
 
         internal void SetReturnTarget(Window? target) => _returnTarget = target;
+        internal bool ReturnRequested { get; private set; }
 
         private void ApplyWindowPreference(PluginWindowPreference? preference)
         {
@@ -77,6 +92,22 @@ namespace LongBetterWindows.Host.Views
 
         private void Back_Click(object sender, RoutedEventArgs e) => ReturnToOwner();
 
+        private async void EndRun_Click(object sender, RoutedEventArgs e)
+        {
+            if (_endRequested is null)
+                return;
+            EndRunButton.IsEnabled = false;
+            try
+            {
+                await _endRequested();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(exception, "Could not end detached plugin run");
+                EndRunButton.IsEnabled = true;
+            }
+        }
+
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key != Key.Escape) return;
@@ -86,6 +117,7 @@ namespace LongBetterWindows.Host.Views
 
         private void ReturnToOwner()
         {
+            ReturnRequested = true;
             var owner = _returnTarget ?? Owner;
             Close();
             if (owner is null) return;

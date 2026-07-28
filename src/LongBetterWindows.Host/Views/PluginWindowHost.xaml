@@ -45,13 +45,24 @@
                                        Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                         </Border>
                     </StackPanel>
-                    <Button HorizontalAlignment="Right" Style="{StaticResource LongIconButton}"
-                            Width="32" Height="30" Click="Close_Click"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            AutomationProperties.AutomationId="Long.Plugin.DetachedClose"
-                            AutomationProperties.Name="{DynamicResource i18n.pluginWindow.close}">
-                        <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}" Width="13" Height="13" />
-                    </Button>
+                    <StackPanel HorizontalAlignment="Right"
+                                Orientation="Horizontal">
+                        <Button x:Name="EndRunButton"
+                                Content="{DynamicResource i18n.pluginWindow.endRun}"
+                                Style="{StaticResource LongButton}"
+                                Height="30" Margin="0,0,7,0"
+                                Click="EndRun_Click"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                AutomationProperties.AutomationId="Long.Plugin.DetachedEndRun"
+                                AutomationProperties.Name="{DynamicResource i18n.pluginWindow.endRun}" />
+                        <Button Style="{StaticResource LongIconButton}"
+                                Width="32" Height="30" Click="Close_Click"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                AutomationProperties.AutomationId="Long.Plugin.DetachedClose"
+                                AutomationProperties.Name="{DynamicResource i18n.pluginWindow.close}">
+                            <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}" Width="13" Height="13" />
+                        </Button>
+                    </StackPanel>
                 </Grid>
             </Border>
 

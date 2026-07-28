@@ -826,6 +826,7 @@
   "pluginWindow.detach": "分离窗口",
   "pluginWindow.detachAutomation": "分离插件窗口",
   "pluginWindow.close": "关闭插件界面",
+  "pluginWindow.endRun": "结束运行",
   "pluginWindow.title": "插件",
   "pluginWindow.detachedAutomation": "Long 分离插件窗口",
   "pluginLoad.error.title": "插件加载出错",
