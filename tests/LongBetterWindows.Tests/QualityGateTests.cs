@@ -1568,6 +1568,32 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void WorkspacePluginRail_IsVirtualizedIncrementalAndForwardsIntents()
+    {
+        var xaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "InstalledPluginRailControl.xaml");
+        var code = Read(
+            "src", "LongBetterWindows.Host", "Views", "InstalledPluginRailControl.xaml.cs");
+        var projection = Read(
+            "src", "LongBetterWindows.Host", "Interaction",
+            "InstalledPluginRailProjection.cs");
+        var shell = Read(
+            "src", "LongBetterWindows.Host", "Views", "WorkspaceShellControl.xaml");
+
+        Assert.Contains("VirtualizingPanel.IsVirtualizing=\"True\"", xaml);
+        Assert.Contains("VirtualizationMode=\"Recycling\"", xaml);
+        Assert.Contains("<Setter Property=\"Height\" Value=\"54\"", xaml);
+        Assert.Contains("ImageFailed=\"PluginIcon_ImageFailed\"", xaml);
+        Assert.Contains("Long.Workspace.PluginRail.Search", xaml);
+        Assert.Contains("_plugins.PluginsChanged += Plugins_PluginsChanged", code);
+        Assert.Contains("InstalledPluginRailProjection.Reconcile", code);
+        Assert.Contains("PluginSettingsRequested?.Invoke", code);
+        Assert.Contains("PluginRunRequested?.Invoke", code);
+        Assert.Contains("current[targetIndex] != target", projection);
+        Assert.Contains("<local:InstalledPluginRailControl", shell);
+    }
+
+    [Fact]
     public void IsolatedMarketplaceTransaction_CoversSignedLifecycleAndProductionIsolation()
     {
         var script = Read("run-isolated-marketplace-transaction.ps1");

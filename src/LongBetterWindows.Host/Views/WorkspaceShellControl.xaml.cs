@@ -35,6 +35,8 @@ namespace LongBetterWindows.Host.Views
                 Unsubscribe();
                 _searchDebounce.Stop();
             };
+            SizeChanged += (_, _) =>
+                InstalledPluginRail.SetCompact(ActualWidth < 980);
         }
 
         internal ObservableCollection<WorkspaceModuleTabState> ModuleTabs { get; } = [];
@@ -42,6 +44,16 @@ namespace LongBetterWindows.Host.Views
 
         internal event Action<WorkspaceModuleKey>? ModuleActivationRequested;
         internal event Action<WorkspaceModuleKey>? ModuleCloseRequested;
+        internal event Action<string>? PluginSettingsRequested
+        {
+            add => InstalledPluginRail.PluginSettingsRequested += value;
+            remove => InstalledPluginRail.PluginSettingsRequested -= value;
+        }
+        internal event Action<string>? PluginRunRequested
+        {
+            add => InstalledPluginRail.PluginRunRequested += value;
+            remove => InstalledPluginRail.PluginRunRequested -= value;
+        }
         internal event Action<Exception>? ScopedSearchFailed;
 
         internal void Bind(
@@ -70,6 +82,12 @@ namespace LongBetterWindows.Host.Views
         {
             if (_coordinator is not null)
                 ApplyState(_coordinator.State);
+        }
+
+        internal void ApplyLanguage()
+        {
+            InstalledPluginRail.ApplyLanguage();
+            Refresh();
         }
 
         internal void FocusActiveModule()
@@ -163,6 +181,10 @@ namespace LongBetterWindows.Host.Views
             }
 
             ActivateSearchScope(state.ActiveModuleKey);
+            InstalledPluginRail.SetActivePlugin(
+                state.ActiveModuleKey.Kind == "plugin-settings"
+                    ? state.ActiveModuleKey.ResourceId
+                    : null);
         }
 
         private void ActivateSearchScope(WorkspaceModuleKey key)

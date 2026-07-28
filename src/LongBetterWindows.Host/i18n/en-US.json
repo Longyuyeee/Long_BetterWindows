@@ -63,6 +63,7 @@
   "plugins.noMatch": "No plugins match “{0}”",
   "plugins.list": "Installed plugins list",
   "plugins.open": "Open plugin",
+  "plugins.updateAvailable": "Update available",
   "plugins.settings": "Plugin settings",
   "plugins.openSettings": "Open plugin settings",
   "plugins.capabilities": "Permissions and activity",

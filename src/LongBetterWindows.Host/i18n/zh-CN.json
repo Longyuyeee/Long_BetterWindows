@@ -63,6 +63,7 @@
   "plugins.noMatch": "没有找到匹配“{0}”的插件",
   "plugins.list": "已安装插件列表",
   "plugins.open": "打开插件",
+  "plugins.updateAvailable": "可更新",
   "plugins.settings": "插件设置",
   "plugins.openSettings": "打开插件设置",
   "plugins.capabilities": "权限与调用记录",

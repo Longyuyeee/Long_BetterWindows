@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Automation;
+using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Interaction;
@@ -51,6 +52,10 @@ namespace LongBetterWindows.Host
                 WorkspaceShell_ModuleActivationRequested;
             WorkspaceShell.ModuleCloseRequested +=
                 WorkspaceShell_ModuleCloseRequested;
+            WorkspaceShell.PluginSettingsRequested +=
+                WorkspaceShell_PluginSettingsRequested;
+            WorkspaceShell.PluginRunRequested +=
+                WorkspaceShell_PluginRunRequested;
             WorkspaceShell.ScopedSearchFailed += exception =>
                 Log.Error(exception, "Workspace scoped search failed");
             ToolCenter.AddHandler(
@@ -373,6 +378,67 @@ namespace LongBetterWindows.Host
             }
         }
 
+        private async void WorkspaceShell_PluginSettingsRequested(
+            string pluginId)
+        {
+            try
+            {
+                var resolution = await ResolveWorkspaceModuleAsync(
+                    $"plugin-settings:{pluginId}",
+                    CancellationToken.None);
+                if (!resolution.IsSuccess || resolution.Module is null)
+                {
+                    Log.Warning(
+                        "Plugin {PluginId} does not expose workspace settings",
+                        pluginId);
+                    return;
+                }
+
+                var error = await OpenWorkspaceModuleAsync(
+                    resolution.Module,
+                    CancellationToken.None);
+                if (error is not null)
+                    Log.Warning(
+                        "Plugin {PluginId} settings could not open: {Error}",
+                        pluginId,
+                        error);
+            }
+            catch (Exception exception)
+            {
+                Log.Error(
+                    exception,
+                    "Plugin {PluginId} settings navigation failed",
+                    pluginId);
+            }
+        }
+
+        private async void WorkspaceShell_PluginRunRequested(string pluginId)
+        {
+            try
+            {
+                var entry = HostProvider.Instance.PluginStore.Get(pluginId);
+                if (entry is null)
+                    return;
+                if (entry.State is not PluginState.Running and not PluginState.Background
+                    && !await HostProvider.Instance.PluginStore.StartPluginAsync(
+                        pluginId,
+                        persistAutoStart: false))
+                {
+                    return;
+                }
+
+                if (entry.Instance is IHasMainUI mainUi)
+                    mainUi.ShowMainUI();
+            }
+            catch (Exception exception)
+            {
+                Log.Error(
+                    exception,
+                    "Plugin {PluginId} launch from workspace rail failed",
+                    pluginId);
+            }
+        }
+
         private async Task CloseWorkspaceModuleAsync(WorkspaceModuleKey key)
         {
             var before = ServicesInitializer.Workspace.State;
@@ -426,7 +492,7 @@ namespace LongBetterWindows.Host
         }
 
         private void I18n_LanguageChanged(string language)
-            => WorkspaceShell.Refresh();
+            => WorkspaceShell.ApplyLanguage();
 
         private void ToolCenter_GotKeyboardFocus(
             object sender,
