@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Interaction;
+using Serilog;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -16,6 +17,12 @@ namespace LongBetterWindows.Host.Views
         private readonly WorkspaceSearchSession _searchSession = new();
         private readonly DispatcherTimer _searchDebounce;
         private bool _updatingSearchText;
+        private WorkspaceModuleKey? _runtimeModuleKey;
+        private FrameworkElement? _runtimeContent;
+        private Action? _runtimeShown;
+        private Action? _runtimeHidden;
+        private Action? _runtimeDetachRequested;
+        private Func<Task>? _runtimeEndRequested;
 
         public WorkspaceShellControl()
         {
@@ -54,7 +61,141 @@ namespace LongBetterWindows.Host.Views
             add => InstalledPluginRail.PluginRunRequested += value;
             remove => InstalledPluginRail.PluginRunRequested -= value;
         }
+        internal event Action<string>? PluginRuntimeSettingsRequested;
         internal event Action<Exception>? ScopedSearchFailed;
+
+        internal bool IsHostingPluginRuntime(FrameworkElement content)
+            => PluginRuntimeSurface.Visibility == Visibility.Visible
+                && ReferenceEquals(PluginRuntimeContent.Content, content);
+
+        internal void ShowPluginRuntime(
+            WorkspaceModuleKey moduleKey,
+            string title,
+            FrameworkElement content,
+            Action shown,
+            Action hidden,
+            Action detachRequested,
+            Func<Task> endRequested)
+        {
+            ArgumentNullException.ThrowIfNull(content);
+            if (_runtimeContent is not null
+                && !ReferenceEquals(_runtimeContent, content))
+            {
+                HidePluginRuntime(notifyHidden: true);
+            }
+
+            _runtimeModuleKey = moduleKey;
+            _runtimeContent = content;
+            _runtimeShown = shown;
+            _runtimeHidden = hidden;
+            _runtimeDetachRequested = detachRequested;
+            _runtimeEndRequested = endRequested;
+            PluginRuntimeTitle.Text = title;
+            PluginRuntimeDetachedText.Visibility = Visibility.Collapsed;
+            PluginRuntimeContent.Content = content;
+            ToolCenterContent.Visibility = Visibility.Collapsed;
+            PluginRuntimeSurface.Visibility = Visibility.Visible;
+            PluginRuntimeEndButton.IsEnabled = true;
+            System.Windows.Automation.AutomationProperties.SetItemStatus(
+                PluginRuntimeSurface,
+                $"plugin-session:{moduleKey.InstanceId};placement:embedded");
+            shown();
+        }
+
+        internal void ShowDetachedPluginRuntime(
+            WorkspaceModuleKey moduleKey,
+            string title,
+            FrameworkElement content,
+            Action shown,
+            Action hidden,
+            Action detachRequested,
+            Func<Task> endRequested)
+        {
+            _runtimeModuleKey = moduleKey;
+            _runtimeContent = content;
+            _runtimeShown = shown;
+            _runtimeHidden = hidden;
+            _runtimeDetachRequested = detachRequested;
+            _runtimeEndRequested = endRequested;
+            PluginRuntimeTitle.Text = title;
+            PluginRuntimeContent.Content = null;
+            PluginRuntimeDetachedText.Visibility = Visibility.Visible;
+            ToolCenterContent.Visibility = Visibility.Collapsed;
+            PluginRuntimeSurface.Visibility = Visibility.Visible;
+            PluginRuntimeEndButton.IsEnabled = true;
+            System.Windows.Automation.AutomationProperties.SetItemStatus(
+                PluginRuntimeSurface,
+                $"plugin-session:{moduleKey.InstanceId};placement:detached");
+        }
+
+        internal bool HidePluginRuntime(bool notifyHidden)
+        {
+            if (PluginRuntimeSurface.Visibility != Visibility.Visible)
+                return false;
+            var wasAttached = _runtimeContent is not null
+                && ReferenceEquals(
+                    PluginRuntimeContent.Content,
+                    _runtimeContent);
+            PluginRuntimeContent.Content = null;
+            PluginRuntimeSurface.Visibility = Visibility.Collapsed;
+            ToolCenterContent.Visibility = Visibility.Visible;
+            if (notifyHidden && wasAttached)
+                _runtimeHidden?.Invoke();
+            return true;
+        }
+
+        internal void ReleasePluginRuntime(FrameworkElement content)
+        {
+            if (!ReferenceEquals(_runtimeContent, content))
+                return;
+            PluginRuntimeContent.Content = null;
+            PluginRuntimeSurface.Visibility = Visibility.Collapsed;
+            ToolCenterContent.Visibility = Visibility.Visible;
+            ClearPluginRuntimeState();
+        }
+
+        internal void RemovePluginRuntime(WorkspaceModuleKey key)
+        {
+            if (_runtimeModuleKey != key)
+                return;
+            PluginRuntimeContent.Content = null;
+            PluginRuntimeSurface.Visibility = Visibility.Collapsed;
+            ToolCenterContent.Visibility = Visibility.Visible;
+            ClearPluginRuntimeState();
+        }
+
+        internal bool DetachActivePluginRuntime()
+        {
+            if (_runtimeContent is null
+                || !ReferenceEquals(
+                    PluginRuntimeContent.Content,
+                    _runtimeContent))
+            {
+                return false;
+            }
+            PluginRuntimeContent.Content = null;
+            PluginRuntimeDetachedText.Visibility = Visibility.Visible;
+            System.Windows.Automation.AutomationProperties.SetItemStatus(
+                PluginRuntimeSurface,
+                $"plugin-session:{_runtimeModuleKey?.InstanceId};placement:detached");
+            _runtimeDetachRequested?.Invoke();
+            return true;
+        }
+
+        private void ClearPluginRuntimeState()
+        {
+            _runtimeModuleKey = null;
+            _runtimeContent = null;
+            _runtimeShown = null;
+            _runtimeHidden = null;
+            _runtimeDetachRequested = null;
+            _runtimeEndRequested = null;
+            PluginRuntimeDetachedText.Visibility = Visibility.Collapsed;
+            PluginRuntimeEndButton.IsEnabled = true;
+            System.Windows.Automation.AutomationProperties.SetItemStatus(
+                PluginRuntimeSurface,
+                string.Empty);
+        }
 
         internal void Bind(
             WorkspaceSessionCoordinator coordinator,
@@ -182,9 +323,42 @@ namespace LongBetterWindows.Host.Views
 
             ActivateSearchScope(state.ActiveModuleKey);
             InstalledPluginRail.SetActivePlugin(
-                state.ActiveModuleKey.Kind == "plugin-settings"
+                state.ActiveModuleKey.Kind is "plugin-settings" or "plugin-runtime"
                     ? state.ActiveModuleKey.ResourceId
                     : null);
+        }
+
+        private void PluginRuntimeSettings_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_runtimeModuleKey is { } key)
+                PluginRuntimeSettingsRequested?.Invoke(key.ResourceId);
+        }
+
+        private void PluginRuntimeDetach_Click(
+            object sender,
+            RoutedEventArgs e)
+            => DetachActivePluginRuntime();
+
+        private async void PluginRuntimeEnd_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            if (_runtimeEndRequested is null)
+                return;
+            PluginRuntimeEndButton.IsEnabled = false;
+            try
+            {
+                await _runtimeEndRequested();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Could not end workspace plugin runtime");
+                PluginRuntimeEndButton.IsEnabled = true;
+            }
         }
 
         private void ActivateSearchScope(WorkspaceModuleKey key)

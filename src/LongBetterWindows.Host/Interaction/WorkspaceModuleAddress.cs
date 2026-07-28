@@ -12,13 +12,17 @@ namespace LongBetterWindows.Host.Interaction
         Developer,
         Workflow,
         PluginSettings,
+        PluginRuntime,
     }
 
     internal readonly record struct WorkspaceModuleAddress(
         WorkspaceModuleAddressKind Kind,
-        string ResourceId)
+        string ResourceId,
+        string? InstanceId = null)
     {
-        public string CanonicalValue => $"{GetKindName(Kind)}:{ResourceId}";
+        public string CanonicalValue => InstanceId is null
+            ? $"{GetKindName(Kind)}:{ResourceId}"
+            : $"{GetKindName(Kind)}:{ResourceId}:{InstanceId}";
 
         public static bool TryParse(
             string? value,
@@ -29,28 +33,36 @@ namespace LongBetterWindows.Host.Interaction
                 return false;
 
             var candidate = value.Trim();
-            var separator = candidate.IndexOf(':');
-            if (separator <= 0
-                || separator == candidate.Length - 1
-                || candidate.IndexOf(':', separator + 1) >= 0)
+            var parts = candidate.Split(':');
+            if (parts.Length is < 2 or > 3
+                || parts.Any(string.IsNullOrWhiteSpace))
             {
                 return false;
             }
 
-            var kindText = candidate[..separator];
-            var resourceId = candidate[(separator + 1)..];
+            var kindText = parts[0];
+            var resourceId = parts[1];
             if (!TryParseKind(kindText, out var kind)
-                || !IsAllowedResource(kind, resourceId))
+                || !IsAllowedResource(kind, resourceId)
+                || (kind == WorkspaceModuleAddressKind.PluginRuntime)
+                    != (parts.Length == 3))
             {
                 return false;
             }
 
             if (kind is not WorkspaceModuleAddressKind.Workflow
-                and not WorkspaceModuleAddressKind.PluginSettings)
+                and not WorkspaceModuleAddressKind.PluginSettings
+                and not WorkspaceModuleAddressKind.PluginRuntime)
             {
                 resourceId = resourceId.ToLowerInvariant();
             }
-            address = new WorkspaceModuleAddress(kind, resourceId);
+            var instanceId = parts.Length == 3 ? parts[2] : null;
+            if (instanceId is not null && !IsSafeIdentifier(instanceId))
+                return false;
+            address = new WorkspaceModuleAddress(
+                kind,
+                resourceId,
+                instanceId?.ToLowerInvariant());
             return true;
         }
 
@@ -67,6 +79,7 @@ namespace LongBetterWindows.Host.Interaction
                 "developer" => WorkspaceModuleAddressKind.Developer,
                 "workflow" => WorkspaceModuleAddressKind.Workflow,
                 "plugin-settings" => WorkspaceModuleAddressKind.PluginSettings,
+                "plugin-runtime" => WorkspaceModuleAddressKind.PluginRuntime,
                 _ => default,
             };
             return GetKindName(kind).Equals(value, StringComparison.OrdinalIgnoreCase);
@@ -92,10 +105,13 @@ namespace LongBetterWindows.Host.Interaction
                     StringComparison.OrdinalIgnoreCase);
             }
 
-            return resourceId.Length <= 128
-                && resourceId.All(character => char.IsAsciiLetterOrDigit(character)
-                    || character is '.' or '_' or '-');
+            return IsSafeIdentifier(resourceId);
         }
+
+        private static bool IsSafeIdentifier(string value)
+            => value.Length <= 128
+                && value.All(character => char.IsAsciiLetterOrDigit(character)
+                    || character is '.' or '_' or '-');
 
         private static string GetKindName(WorkspaceModuleAddressKind kind)
             => kind switch
@@ -107,6 +123,7 @@ namespace LongBetterWindows.Host.Interaction
                 WorkspaceModuleAddressKind.Developer => "developer",
                 WorkspaceModuleAddressKind.Workflow => "workflow",
                 WorkspaceModuleAddressKind.PluginSettings => "plugin-settings",
+                WorkspaceModuleAddressKind.PluginRuntime => "plugin-runtime",
                 _ => string.Empty,
             };
     }
@@ -133,15 +150,18 @@ namespace LongBetterWindows.Host.Interaction
         private readonly PluginRegistry _plugins;
         private readonly CommandWorkflowRepository _workflows;
         private readonly Func<string, string>? _localize;
+        private readonly PluginWorkspaceSessionManager _pluginSessions;
 
         public WorkspaceModuleResolver(
             PluginRegistry plugins,
             CommandWorkflowRepository workflows,
-            Func<string, string>? localize = null)
+            Func<string, string>? localize = null,
+            PluginWorkspaceSessionManager? pluginSessions = null)
         {
             _plugins = plugins ?? throw new ArgumentNullException(nameof(plugins));
             _workflows = workflows ?? throw new ArgumentNullException(nameof(workflows));
             _localize = localize;
+            _pluginSessions = pluginSessions ?? new PluginWorkspaceSessionManager();
         }
 
         public async Task<WorkspaceModuleResolution> ResolveAsync(
@@ -193,6 +213,26 @@ namespace LongBetterWindows.Host.Interaction
                         canonical,
                         $"{plugin.DisplayName} - {Text("plugins.settings", "设置")}",
                         searchScopeId: $"plugin:{plugin.Id}");
+                case WorkspaceModuleAddressKind.PluginRuntime:
+                    var runtimePlugin = _plugins.Get(canonical.ResourceId);
+                    var session = _pluginSessions.GetBySessionId(
+                        canonical.InstanceId!);
+                    if (runtimePlugin is null
+                        || session is null
+                        || session.State.IsEnded
+                        || !string.Equals(
+                            session.State.PluginId,
+                            runtimePlugin.Id,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Failure(
+                            canonical,
+                            WorkspaceModuleResolutionError.ResourceNotFound);
+                    }
+                    return Success(
+                        canonical,
+                        runtimePlugin.DisplayName,
+                        supportsDetach: true);
                 default:
                     return Failure(
                         canonical,
@@ -204,15 +244,18 @@ namespace LongBetterWindows.Host.Interaction
             WorkspaceModuleAddress address,
             string title,
             bool canClose = true,
+            bool supportsDetach = false,
             string? searchScopeId = null)
             => new(
                 address,
                 new WorkspaceModuleDescriptor(
                     new WorkspaceModuleKey(
                         address.CanonicalValue[..address.CanonicalValue.IndexOf(':')],
-                        address.ResourceId),
+                        address.ResourceId,
+                        address.InstanceId),
                     title,
                     canClose,
+                    supportsDetach,
                     searchScopeId: searchScopeId),
                 WorkspaceModuleResolutionError.None);
 

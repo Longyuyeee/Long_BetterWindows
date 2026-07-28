@@ -47,7 +47,7 @@ namespace LongBetterWindows.Host.Engine
 
             if (_isEmbedded
                 && System.Windows.Application.Current.MainWindow is MainWindow embeddedOwner
-                && embeddedOwner.IsHostingEmbedded(webView))
+                && embeddedOwner.IsHostingPluginRuntime(webView))
             {
                 session.ShowEmbedded();
                 embeddedOwner.Activate();
@@ -86,9 +86,15 @@ namespace LongBetterWindows.Host.Engine
                 && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
             {
                 _session?.Hide();
-                mainWindow.CloseEmbeddedPlugin(webView);
+                mainWindow.ReleasePluginRuntimeView(webView);
                 _isEmbedded = false;
                 _ = NotifyWindowClosedAsync();
+                if (_session is not null)
+                {
+                    _ = mainWindow.RemovePluginRuntimeModuleAsync(
+                        _session.State.SessionId,
+                        webView);
+                }
             }
 
             if (_window is not null)
@@ -128,30 +134,70 @@ namespace LongBetterWindows.Host.Engine
             return _session;
         }
 
-        private void ShowEmbedded(
+        private async void ShowEmbedded(
             MainWindow mainWindow,
             System.Windows.FrameworkElement webView)
         {
             var session = GetOrCreateSession();
-            session.ShowEmbedded();
-            _isEmbedded = true;
-            mainWindow.ShowEmbeddedPlugin(
-                _pluginName,
-                webView,
-                async () =>
-                {
-                    _isEmbedded = false;
-                    session.Hide();
-                    await NotifyWindowClosedAsync();
-                },
-                () =>
-                {
-                    _isEmbedded = false;
-                    session.ShowDetached();
-                    ShowDetachedWindow(webView);
-                },
-                session.State.SessionId,
-                EndRunAsync);
+            try
+            {
+                var error = await mainWindow.ShowPluginRuntimeModuleAsync(
+                    _pluginId,
+                    session.State.SessionId,
+                    _pluginName,
+                    webView,
+                    () =>
+                    {
+                        _isEmbedded = true;
+                        session.ShowEmbedded();
+                    },
+                    () =>
+                    {
+                        _isEmbedded = false;
+                        session.Hide();
+                    },
+                    () => CloseWorkspaceViewAsync(session),
+                    () =>
+                    {
+                        _isEmbedded = false;
+                        session.ShowDetached();
+                        ShowDetachedWindow(webView);
+                    },
+                    EndRunAsync);
+                if (error is null)
+                    return;
+
+                _isEmbedded = false;
+                session.Hide();
+                Log.Warning(
+                    "Plugin runtime module {PluginId}:{SessionId} could not open: {Error}",
+                    _pluginId,
+                    session.State.SessionId,
+                    error);
+            }
+            catch (Exception exception)
+            {
+                _isEmbedded = false;
+                session.Hide();
+                Log.Error(
+                    exception,
+                    "Plugin runtime module {PluginId}:{SessionId} navigation failed",
+                    _pluginId,
+                    session.State.SessionId);
+            }
+        }
+
+        private async Task CloseWorkspaceViewAsync(
+            PluginWorkspaceSession session)
+        {
+            _isEmbedded = false;
+            session.Hide();
+            if (_window is not null)
+            {
+                _window.Close();
+                return;
+            }
+            await NotifyWindowClosedAsync();
         }
 
         private void ShowDetachedWindow(System.Windows.FrameworkElement webView)
@@ -185,10 +231,69 @@ namespace LongBetterWindows.Host.Engine
                     case PluginSurfaceCloseAction.HideAndApplyLifecycle:
                         session.Hide();
                         await NotifyWindowClosedAsync();
+                        if (mainWindow is not null)
+                        {
+                            await mainWindow.RemovePluginRuntimeModuleAsync(
+                                session.State.SessionId,
+                                webView);
+                        }
                         break;
                 }
             };
             window.Show();
+            if (System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
+            {
+                _ = RegisterDetachedWorkspaceModuleAsync(
+                    mainWindow,
+                    webView,
+                    session);
+            }
+        }
+
+        private async Task RegisterDetachedWorkspaceModuleAsync(
+            MainWindow mainWindow,
+            System.Windows.FrameworkElement webView,
+            PluginWorkspaceSession session)
+        {
+            try
+            {
+                var error = await mainWindow.ShowPluginRuntimeModuleAsync(
+                    _pluginId,
+                    session.State.SessionId,
+                    _pluginName,
+                    webView,
+                    () =>
+                    {
+                        _isEmbedded = true;
+                        session.ShowEmbedded();
+                    },
+                    () =>
+                    {
+                        if (_window is null)
+                            session.Hide();
+                        _isEmbedded = false;
+                    },
+                    () => CloseWorkspaceViewAsync(session),
+                    () => { },
+                    EndRunAsync,
+                    isDetached: true);
+                if (error is not null)
+                {
+                    Log.Warning(
+                        "Detached plugin runtime module {PluginId}:{SessionId} could not open: {Error}",
+                        _pluginId,
+                        session.State.SessionId,
+                        error);
+                }
+            }
+            catch (Exception exception)
+            {
+                Log.Error(
+                    exception,
+                    "Detached plugin runtime module {PluginId}:{SessionId} navigation failed",
+                    _pluginId,
+                    session.State.SessionId);
+            }
         }
 
         private void ReleaseOnUiThread()
@@ -200,7 +305,7 @@ namespace LongBetterWindows.Host.Engine
                 if (_isEmbedded && webView is not null
                     && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
                 {
-                    mainWindow.CloseEmbeddedPlugin(webView);
+                    mainWindow.ReleasePluginRuntimeView(webView);
                     _isEmbedded = false;
                 }
 

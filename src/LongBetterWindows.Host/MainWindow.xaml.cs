@@ -30,7 +30,19 @@ namespace LongBetterWindows.Host
         private int _qualityWorkflowDuplicateStatus;
         private bool _workflowExecutionRejected;
         private readonly WorkspaceFocusBookmarkStore _workspaceFocusBookmarks = new();
+        private readonly Dictionary<WorkspaceModuleKey, PluginRuntimePresentation>
+            _pluginRuntimePresentations = [];
         private ToolCenterControl ToolCenter => WorkspaceShell.ToolCenter;
+
+        private sealed record PluginRuntimePresentation(
+            string Title,
+            FrameworkElement Content,
+            bool IsDetached,
+            Action Shown,
+            Action Hidden,
+            Func<Task> CloseRequested,
+            Action DetachRequested,
+            Func<Task> EndRequested);
 
         public MainWindow()
         {
@@ -57,6 +69,8 @@ namespace LongBetterWindows.Host
                 WorkspaceShell_PluginSettingsRequested;
             WorkspaceShell.PluginRunRequested +=
                 WorkspaceShell_PluginRunRequested;
+            WorkspaceShell.PluginRuntimeSettingsRequested +=
+                WorkspaceShell_PluginSettingsRequested;
             ToolCenter.PluginSettingsNavigationRequested +=
                 WorkspaceShell_PluginSettingsRequested;
             ToolCenter.PluginRunRequested +=
@@ -301,6 +315,41 @@ namespace LongBetterWindows.Host
             cancellationToken.ThrowIfCancellationRequested();
             if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
                 await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
+            if (module.Key.Kind == "plugin-runtime")
+            {
+                if (!_pluginRuntimePresentations.TryGetValue(
+                        module.Key,
+                        out var runtime))
+                {
+                    return I18nOrFallback(
+                        "search.error.workspaceResourceUnsupported",
+                        "The plugin runtime view is no longer available.");
+                }
+                if (runtime.IsDetached)
+                {
+                    WorkspaceShell.ShowDetachedPluginRuntime(
+                        module.Key,
+                        runtime.Title,
+                        runtime.Content,
+                        runtime.Shown,
+                        runtime.Hidden,
+                        runtime.DetachRequested,
+                        runtime.EndRequested);
+                }
+                else
+                {
+                    WorkspaceShell.ShowPluginRuntime(
+                        module.Key,
+                        runtime.Title,
+                        runtime.Content,
+                        runtime.Shown,
+                        runtime.Hidden,
+                        runtime.DetachRequested,
+                        runtime.EndRequested);
+                }
+                return null;
+            }
+            WorkspaceShell.HidePluginRuntime(notifyHidden: true);
             ToolCenter.Visibility = Visibility.Visible;
 
             return module.Key.Kind switch
@@ -320,6 +369,75 @@ namespace LongBetterWindows.Host
                         "search.error.workspaceResourceUnsupported",
                         "该资源不支持工作区模块。"),
             };
+        }
+
+        internal async Task<string?> ShowPluginRuntimeModuleAsync(
+            string pluginId,
+            string sessionId,
+            string title,
+            FrameworkElement content,
+            Action shown,
+            Action hidden,
+            Func<Task> closeRequested,
+            Action detachRequested,
+            Func<Task> endRequested,
+            bool isDetached = false)
+        {
+            var resolution = await ResolveWorkspaceModuleAsync(
+                $"plugin-runtime:{pluginId}:{sessionId}",
+                CancellationToken.None);
+            if (!resolution.IsSuccess || resolution.Module is null)
+            {
+                return I18nOrFallback(
+                    "search.error.workspaceResourceUnsupported",
+                    "The plugin runtime session is unavailable.");
+            }
+
+            var displayTitle = HostProvider.Instance.PluginStore.Get(pluginId)?
+                .DisplayName ?? title;
+            _pluginRuntimePresentations[resolution.Module.Key] = new(
+                displayTitle,
+                content,
+                isDetached,
+                shown,
+                hidden,
+                closeRequested,
+                detachRequested,
+                endRequested);
+            var error = await OpenWorkspaceModuleAsync(
+                resolution.Module,
+                CancellationToken.None);
+            if (error is not null)
+                _pluginRuntimePresentations.Remove(resolution.Module.Key);
+            return error;
+        }
+
+        internal bool IsHostingPluginRuntime(FrameworkElement content)
+            => WorkspaceShell.IsHostingPluginRuntime(content);
+
+        internal void ReleasePluginRuntimeView(FrameworkElement content)
+            => WorkspaceShell.ReleasePluginRuntime(content);
+
+        internal async Task RemovePluginRuntimeModuleAsync(
+            string sessionId,
+            FrameworkElement content)
+        {
+            var key = _pluginRuntimePresentations
+                .Where(pair =>
+                    pair.Key.Kind == "plugin-runtime"
+                    && string.Equals(
+                        pair.Key.InstanceId,
+                        sessionId,
+                        StringComparison.OrdinalIgnoreCase)
+                    && ReferenceEquals(pair.Value.Content, content))
+                .Select(pair => (WorkspaceModuleKey?)pair.Key)
+                .FirstOrDefault();
+            if (key is not null)
+            {
+                await CloseWorkspaceModuleAsync(
+                    key.Value,
+                    notifyRuntimeLifecycle: false);
+            }
         }
 
         private async Task OpenLegacyWorkspacePageAsync(string page)
@@ -508,18 +626,29 @@ namespace LongBetterWindows.Host
             var missing = ServicesInitializer.Workspace.State.Modules
                 .Where(module =>
                     module.Key.Kind == "plugin-settings"
-                    && HostProvider.Instance.PluginStore.Get(
-                        module.Key.ResourceId) is null)
+                        && HostProvider.Instance.PluginStore.Get(
+                            module.Key.ResourceId) is null
+                    || module.Key.Kind == "plugin-runtime"
+                        && (HostProvider.Instance.PluginStore.Get(
+                                module.Key.ResourceId) is null
+                            || module.Key.InstanceId is null
+                            || ServicesInitializer.PluginSessions
+                                .GetBySessionId(module.Key.InstanceId) is null))
                 .Select(module => module.Key)
                 .ToArray();
             foreach (var key in missing)
             {
-                ToolCenter.RemovePluginSettingsModule(key.ResourceId);
-                await CloseWorkspaceModuleAsync(key);
+                if (key.Kind == "plugin-settings")
+                    ToolCenter.RemovePluginSettingsModule(key.ResourceId);
+                await CloseWorkspaceModuleAsync(
+                    key,
+                    notifyRuntimeLifecycle: false);
             }
         }
 
-        private async Task CloseWorkspaceModuleAsync(WorkspaceModuleKey key)
+        private async Task CloseWorkspaceModuleAsync(
+            WorkspaceModuleKey key,
+            bool notifyRuntimeLifecycle = true)
         {
             var before = ServicesInitializer.Workspace.State;
             var wasActive = before.ActiveModuleKey == key;
@@ -529,6 +658,14 @@ namespace LongBetterWindows.Host
 
             WorkspaceShell.RemoveModuleSearch(key);
             _workspaceFocusBookmarks.Remove(key);
+            if (_pluginRuntimePresentations.Remove(
+                    key,
+                    out var runtime))
+            {
+                WorkspaceShell.RemovePluginRuntime(key);
+                if (notifyRuntimeLifecycle)
+                    await runtime.CloseRequested();
+            }
             if (wasActive)
             {
                 var returnsToLauncher =
@@ -628,6 +765,13 @@ namespace LongBetterWindows.Host
                     module.Key.ResourceId);
                 if (plugin is not null)
                     return $"{plugin.DisplayName} - {I18n("plugins.settings")}";
+            }
+            if (module.Key.Kind == "plugin-runtime")
+            {
+                var plugin = HostProvider.Instance.PluginStore.Get(
+                    module.Key.ResourceId);
+                if (plugin is not null)
+                    return plugin.DisplayName;
             }
             return module.Title;
         }
@@ -794,7 +938,8 @@ namespace LongBetterWindows.Host
             }
             if (key == Key.D
                 && modifiers.HasFlag(ModifierKeys.Control)
-                && DetachEmbeddedSurface())
+                && (WorkspaceShell.DetachActivePluginRuntime()
+                    || DetachEmbeddedSurface()))
             {
                 e.Handled = true;
                 return;

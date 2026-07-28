@@ -129,7 +129,8 @@ namespace LongBetterWindows.Host.Services
             WorkspaceModules = new WorkspaceModuleResolver(
                 provider.PluginStore,
                 Workflows,
-                key => I18n.T(key));
+                key => I18n.T(key),
+                PluginSessions);
             Search = new SearchCoordinator(
                 new ISearchProvider[]
                 {

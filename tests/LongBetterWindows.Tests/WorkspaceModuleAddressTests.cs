@@ -22,6 +22,9 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
     [InlineData("developer:root", "developer:root")]
     [InlineData("workflow:workflow.safe", "workflow:workflow.safe")]
     [InlineData("plugin-settings:plugin.safe", "plugin-settings:plugin.safe")]
+    [InlineData(
+        "plugin-runtime:plugin.safe:SESSION_1",
+        "plugin-runtime:plugin.safe:session_1")]
     public void TryParse_AllowedAddress_ReturnsCanonicalValue(
         string target,
         string expected)
@@ -38,6 +41,9 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
     [InlineData("workflow:unsafe/id")]
     [InlineData("workflow:safe:extra")]
     [InlineData("plugin-settings:unsafe id")]
+    [InlineData("plugin-runtime:plugin.safe")]
+    [InlineData("plugin-runtime:plugin.safe:unsafe/id")]
+    [InlineData("plugin-runtime:plugin.safe:session:extra")]
     public void TryParse_UnknownOrMalformedAddress_FailsClosed(string target)
         => Assert.False(WorkspaceModuleAddress.TryParse(target, out _));
 
@@ -168,6 +174,65 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
         Assert.True(result.IsSuccess);
         Assert.True(registry.Get("deferred-plain")!.IsActivated);
         Assert.Equal(PluginState.Loaded, registry.Get("deferred-plain")!.State);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_PluginRuntime_RequiresMatchingActiveSession()
+    {
+        var registry = new PluginRegistry();
+        Register(registry, "plugin.safe", new object());
+        Register(registry, "plugin.other", new object());
+        var sessions = new PluginWorkspaceSessionManager(() => "session_1");
+        sessions.GetOrCreate(
+            "plugin.safe",
+            PluginWorkspacePlacement.Embedded);
+        var resolver = new WorkspaceModuleResolver(
+            registry,
+            Repository(),
+            pluginSessions: sessions);
+        WorkspaceModuleAddress.TryParse(
+            "plugin-runtime:plugin.safe:session_1",
+            out var matching);
+        WorkspaceModuleAddress.TryParse(
+            "plugin-runtime:plugin.other:session_1",
+            out var mismatched);
+
+        var matchingResult = await resolver.ResolveAsync(matching);
+        var mismatchedResult = await resolver.ResolveAsync(mismatched);
+
+        Assert.True(matchingResult.IsSuccess);
+        Assert.Equal(
+            "plugin-runtime:plugin.safe:session_1",
+            matchingResult.Module!.Key.ToString());
+        Assert.True(matchingResult.Module.SupportsDetach);
+        Assert.Equal(
+            WorkspaceModuleResolutionError.ResourceNotFound,
+            mismatchedResult.Error);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_PluginRuntime_RejectsEndedSession()
+    {
+        var registry = new PluginRegistry();
+        Register(registry, "plugin.safe", new object());
+        var sessions = new PluginWorkspaceSessionManager(() => "session_1");
+        var session = sessions.GetOrCreate(
+            "plugin.safe",
+            PluginWorkspacePlacement.Embedded);
+        sessions.End(session.State.SessionId);
+        var resolver = new WorkspaceModuleResolver(
+            registry,
+            Repository(),
+            pluginSessions: sessions);
+        WorkspaceModuleAddress.TryParse(
+            "plugin-runtime:plugin.safe:session_1",
+            out var address);
+
+        var result = await resolver.ResolveAsync(address);
+
+        Assert.Equal(
+            WorkspaceModuleResolutionError.ResourceNotFound,
+            result.Error);
     }
 
     private WorkspaceModuleResolver Resolver(PluginRegistry registry)

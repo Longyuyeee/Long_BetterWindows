@@ -185,7 +185,86 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <local:InstalledPluginRailControl x:Name="InstalledPluginRail" />
-            <local:ToolCenterControl x:Name="ToolCenterContent" Grid.Column="1" />
+            <Grid Grid.Column="1">
+                <local:ToolCenterControl x:Name="ToolCenterContent" />
+                <Grid x:Name="PluginRuntimeSurface"
+                      Visibility="Collapsed"
+                      Background="{DynamicResource Long.Brush.Background.Base}"
+                      AutomationProperties.AutomationId="Long.Workspace.PluginRuntime">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="48" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                            BorderThickness="0,0,0,1"
+                            Background="{DynamicResource Long.Brush.Background.Raised}">
+                        <Grid Margin="16,0,12,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <Border Width="26" Height="26" CornerRadius="6"
+                                        Background="{DynamicResource Long.Brush.Accent.Soft}">
+                                    <Path Data="{StaticResource Long.Icon.Plugin}"
+                                          Style="{StaticResource LongIcon}"
+                                          Width="14" Height="14"
+                                          Stroke="{DynamicResource Long.Brush.Accent.Primary}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock x:Name="PluginRuntimeTitle"
+                                           Margin="9,0,0,0"
+                                           FontSize="14"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                                <Border Style="{StaticResource LongBadge}"
+                                        Margin="9,0,0,0"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="{DynamicResource i18n.pluginWindow.embeddedMode}"
+                                               FontSize="9"
+                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                </Border>
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Style="{StaticResource LongButton}"
+                                    Height="30"
+                                    Margin="0,0,7,0"
+                                    Content="{DynamicResource i18n.plugins.settings}"
+                                    Click="PluginRuntimeSettings_Click"
+                                    AutomationProperties.AutomationId="Long.Workspace.PluginRuntime.Settings" />
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource LongButton}"
+                                    Height="30"
+                                    Margin="0,0,7,0"
+                                    Content="{DynamicResource i18n.pluginWindow.detach}"
+                                    Click="PluginRuntimeDetach_Click"
+                                    AutomationProperties.AutomationId="Long.Workspace.PluginRuntime.Detach" />
+                            <Button x:Name="PluginRuntimeEndButton"
+                                    Grid.Column="3"
+                                    Style="{StaticResource LongButton}"
+                                    Height="30"
+                                    Content="{DynamicResource i18n.pluginWindow.endRun}"
+                                    Click="PluginRuntimeEnd_Click"
+                                    AutomationProperties.AutomationId="Long.Workspace.PluginRuntime.End" />
+                        </Grid>
+                    </Border>
+                    <Grid Grid.Row="1">
+                        <ContentControl x:Name="PluginRuntimeContent" />
+                        <TextBlock x:Name="PluginRuntimeDetachedText"
+                                   Visibility="Collapsed"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                   FontSize="13"
+                                   Text="{DynamicResource i18n.pluginWindow.detachedMode}" />
+                    </Grid>
+                </Grid>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>
