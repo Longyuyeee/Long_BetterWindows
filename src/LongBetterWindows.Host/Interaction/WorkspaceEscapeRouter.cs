@@ -5,7 +5,8 @@ namespace LongBetterWindows.Host.Interaction
         bool HasScopedSearchQuery,
         bool CanNavigateBackInModule,
         bool CanNavigateBackInWorkspace,
-        bool CanCloseActiveModule);
+        bool CanCloseActiveModule,
+        bool CanReturnToLauncher = false);
 
     internal enum WorkspaceEscapeAction
     {
@@ -15,6 +16,7 @@ namespace LongBetterWindows.Host.Interaction
         NavigateBackInModule,
         NavigateBackInWorkspace,
         CloseActiveModule,
+        ReturnToLauncher,
     }
 
     internal static class WorkspaceEscapeRouter
@@ -31,6 +33,8 @@ namespace LongBetterWindows.Host.Interaction
                 return WorkspaceEscapeAction.NavigateBackInWorkspace;
             if (context.CanCloseActiveModule)
                 return WorkspaceEscapeAction.CloseActiveModule;
+            if (context.CanReturnToLauncher)
+                return WorkspaceEscapeAction.ReturnToLauncher;
             return WorkspaceEscapeAction.None;
         }
     }

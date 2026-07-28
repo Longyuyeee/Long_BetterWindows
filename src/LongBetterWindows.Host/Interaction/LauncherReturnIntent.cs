@@ -95,8 +95,12 @@ namespace LongBetterWindows.Host.Interaction
                     && _originWindowHandle != nint.Zero
                     && originWindowIsAvailable;
                 var restoreLauncherState = Mode == LauncherReturnMode.RestoreLauncher;
+                var availableOrigin = _originWindowHandle != nint.Zero
+                    && originWindowIsAvailable
+                        ? _originWindowHandle
+                        : nint.Zero;
                 var state = new LauncherReturnState(
-                    restoreOrigin ? _originWindowHandle : nint.Zero,
+                    availableOrigin,
                     restoreLauncherState ? _query : string.Empty,
                     restoreLauncherState ? _context : ContextSnapshot.Empty,
                     restoreOrigin

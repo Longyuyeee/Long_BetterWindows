@@ -7,6 +7,18 @@ namespace LongBetterWindows.Host.Interaction
         Continuation,
     }
 
+    public enum SearchResultIconKind
+    {
+        Command,
+        Management,
+        Marketplace,
+        Plugin,
+        Settings,
+        Workflow,
+        File,
+        Folder,
+    }
+
     public enum SearchActionKind
     {
         ExecuteCommand,
@@ -48,6 +60,9 @@ namespace LongBetterWindows.Host.Interaction
         public required string Title { get; init; }
         public string Subtitle { get; init; } = string.Empty;
         public string Source { get; init; } = string.Empty;
+        public SearchResultIconKind IconKind { get; init; } =
+            SearchResultIconKind.Command;
+        public string? IconPath { get; init; }
         public int Score { get; init; }
         public int ProviderPriority { get; init; }
         public int PreferenceScore { get; init; }

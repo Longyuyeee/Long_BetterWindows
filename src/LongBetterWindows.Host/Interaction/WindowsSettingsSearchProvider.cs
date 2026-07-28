@@ -84,6 +84,7 @@ namespace LongBetterWindows.Host.Interaction
                 Title = entry.Title,
                 Subtitle = entry.Description,
                 Source = "Windows 设置",
+                IconKind = SearchResultIconKind.Settings,
                 Score = score,
                 Kind = SearchResultKind.Data,
                 PrimaryAction = new SearchResultAction(

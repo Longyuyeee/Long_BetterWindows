@@ -3,10 +3,17 @@ namespace LongBetterWindows.Host.Interaction
     public sealed class StaticCommandSearchProvider : ISearchProvider
     {
         private readonly CommandRegistry _commands;
+        private readonly Func<string, string?>? _pluginIconResolver;
+        private readonly Dictionary<string, string?> _pluginIcons =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly object _iconLock = new();
 
-        public StaticCommandSearchProvider(CommandRegistry commands)
+        public StaticCommandSearchProvider(
+            CommandRegistry commands,
+            Func<string, string?>? pluginIconResolver = null)
         {
             _commands = commands;
+            _pluginIconResolver = pluginIconResolver;
         }
 
         public string Id => "commands";
@@ -56,6 +63,8 @@ namespace LongBetterWindows.Host.Interaction
                 Title = descriptor.Title,
                 Subtitle = descriptor.Description,
                 Source = descriptor.PluginName,
+                IconKind = SearchResultIconKind.Plugin,
+                IconPath = ResolvePluginIcon(descriptor.PluginId),
                 Score = score,
                 Kind = SearchResultKind.Command,
                 PrimaryAction = new SearchResultAction(
@@ -63,5 +72,19 @@ namespace LongBetterWindows.Host.Interaction
                     descriptor.Key),
                 CanPin = true,
             };
+
+        private string? ResolvePluginIcon(string pluginId)
+        {
+            if (_pluginIconResolver is null)
+                return null;
+            lock (_iconLock)
+            {
+                if (_pluginIcons.TryGetValue(pluginId, out var cached))
+                    return cached;
+                var resolved = _pluginIconResolver(pluginId);
+                _pluginIcons[pluginId] = resolved;
+                return resolved;
+            }
+        }
     }
 }

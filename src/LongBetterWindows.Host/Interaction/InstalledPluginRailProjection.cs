@@ -176,7 +176,7 @@ namespace LongBetterWindows.Host.Interaction
                 : StringInfo.GetNextTextElement(source).ToUpper(CultureInfo.CurrentCulture);
         }
 
-        private static string? FindIconPath(string directory)
+        internal static string? FindIconPath(string directory)
         {
             if (string.IsNullOrWhiteSpace(directory))
                 return null;

@@ -40,4 +40,18 @@ public class WorkspaceEscapeRouterTests
 
         Assert.Equal((WorkspaceEscapeAction)expected, action);
     }
+
+    [Fact]
+    public void Route_ReturnsToLauncherWhenProtectedRootHasPendingIntent()
+    {
+        var action = WorkspaceEscapeRouter.Route(new WorkspaceEscapeContext(
+            HasTransientLayer: false,
+            HasScopedSearchQuery: false,
+            CanNavigateBackInModule: false,
+            CanNavigateBackInWorkspace: false,
+            CanCloseActiveModule: false,
+            CanReturnToLauncher: true));
+
+        Assert.Equal(WorkspaceEscapeAction.ReturnToLauncher, action);
+    }
 }

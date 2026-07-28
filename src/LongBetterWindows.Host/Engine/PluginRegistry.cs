@@ -240,7 +240,11 @@ namespace LongBetterWindows.Host.Engine
             if (searchAvailable)
             {
                 _searchCoordinator.RegisterProvider(
-                    new PluginSearchProviderAdapter(entry.Id, provider));
+                    new PluginSearchProviderAdapter(
+                        entry.Id,
+                        provider,
+                        InstalledPluginRailProjection.FindIconPath(
+                            entry.Directory)));
             }
             else
             {

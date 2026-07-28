@@ -70,6 +70,7 @@ namespace LongBetterWindows.Host.Interaction
                     Source = string.Format(
                         Text("search.workflow.source", "组合动作 · {0} 步"),
                         summary.StepCount),
+                    IconKind = SearchResultIconKind.Workflow,
                     Score = score,
                     Kind = SearchResultKind.Command,
                     PrimaryAction = new SearchResultAction(

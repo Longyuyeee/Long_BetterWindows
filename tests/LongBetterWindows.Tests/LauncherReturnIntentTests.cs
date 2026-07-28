@@ -85,6 +85,21 @@ public class LauncherReturnIntentTests
     }
 
     [Fact]
+    public void RestoreLauncher_PreservesAvailableOriginForExplicitDismissal()
+    {
+        var intent = CreateIntent(
+            LauncherReturnMode.RestoreLauncher,
+            origin: (nint)42,
+            query: "market");
+
+        var state = intent.Consume(originWindowIsAvailable: true);
+
+        Assert.Equal(LauncherFocusTarget.LauncherInput, state.FocusTarget);
+        Assert.Equal((nint)42, state.OriginWindowHandle);
+        Assert.Equal("market", state.Query);
+    }
+
+    [Fact]
     public void Discard_ClearsPayloadAndIsIdempotent()
     {
         var intent = CreateIntent(

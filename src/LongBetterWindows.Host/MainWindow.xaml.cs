@@ -530,6 +530,9 @@ namespace LongBetterWindows.Host
             _workspaceFocusBookmarks.Remove(key);
             if (wasActive)
             {
+                var returnsToLauncher =
+                    ServicesInitializer.LauncherContinuity.HasPendingFor(
+                        key.ToString());
                 var error = await ShowWorkspaceModuleViewAsync(
                     result.State.ActiveModule,
                     CancellationToken.None);
@@ -540,7 +543,10 @@ namespace LongBetterWindows.Host
                         result.State.ActiveModuleKey,
                         error);
                 }
-                RestoreWorkspaceFocus(result.State.ActiveModuleKey);
+                if (returnsToLauncher)
+                    RestoreLauncherIfPending(key.ToString());
+                else
+                    RestoreWorkspaceFocus(result.State.ActiveModuleKey);
             }
         }
 
@@ -784,7 +790,10 @@ namespace LongBetterWindows.Host
                         && ToolCenter.CanNavigateBackInModule,
                     CanNavigateBackInWorkspace:
                         EmbeddedPluginSurface.Visibility == Visibility.Visible,
-                    CanCloseActiveModule: state.ActiveModule.CanClose));
+                    CanCloseActiveModule: state.ActiveModule.CanClose,
+                    CanReturnToLauncher:
+                        ServicesInitializer.LauncherContinuity.HasPendingFor(
+                            state.ActiveModuleKey.ToString())));
             switch (action)
             {
                 case WorkspaceEscapeAction.DismissTransientLayer:
@@ -805,7 +814,29 @@ namespace LongBetterWindows.Host
                     await CloseWorkspaceModuleAsync(state.ActiveModuleKey);
                     e.Handled = true;
                     break;
+                case WorkspaceEscapeAction.ReturnToLauncher:
+                    RestoreLauncherIfPending(state.ActiveModuleKey.ToString());
+                    e.Handled = true;
+                    break;
             }
+        }
+
+        private static void RestoreLauncherIfPending(string workspaceTarget)
+        {
+            var native = new WindowNativeApi();
+            var pending = ServicesInitializer.LauncherContinuity.TryConsume(
+                workspaceTarget,
+                originWindowIsAvailable: true);
+            if (pending is null)
+                return;
+
+            var originAvailable = pending.OriginWindowHandle == nint.Zero
+                || native.IsWindow(pending.OriginWindowHandle);
+            if (!originAvailable)
+            {
+                pending = pending with { OriginWindowHandle = nint.Zero };
+            }
+            CommandPaletteWindow.RestoreFromWorkspace(pending);
         }
 
         private void CancelWorkflowReview_Click(object sender, RoutedEventArgs e)

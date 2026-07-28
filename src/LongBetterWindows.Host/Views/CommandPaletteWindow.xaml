@@ -1,6 +1,7 @@
 <Window x:Class="LongBetterWindows.Host.Views.CommandPaletteWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:interaction="clr-namespace:LongBetterWindows.Host.Interaction"
         Title="Long Command Palette"
         Width="700" Height="470"
         MinWidth="560" MinHeight="320"
@@ -81,6 +82,19 @@
                 <ListBox.Resources>
                     <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}" />
                 </ListBox.Resources>
+                <ListBox.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.HeaderTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"
+                                           Margin="8,9,8,5"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                            </DataTemplate>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </ListBox.GroupStyle>
                 <ListBox.ItemContainerStyle>
                     <StaticResource ResourceKey="LongCommandItem" />
                 </ListBox.ItemContainerStyle>
@@ -88,12 +102,68 @@
                     <DataTemplate>
                         <Grid>
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel>
+                            <Border Width="34" Height="34" Margin="0,0,11,0"
+                                    CornerRadius="6"
+                                    Background="{DynamicResource Long.Brush.Background.Raised}"
+                                    BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                                    BorderThickness="1">
+                                <Grid>
+                                    <Path Width="17" Height="17"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Stretch="Uniform"
+                                          Stroke="{DynamicResource Long.Brush.Accent.Primary}"
+                                          StrokeThickness="1.6">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Data" Value="{StaticResource Long.Icon.Command}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IconKind}"
+                                                                 Value="{x:Static interaction:SearchResultIconKind.Management}">
+                                                        <Setter Property="Data" Value="{StaticResource Long.Icon.Settings}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IconKind}"
+                                                                 Value="{x:Static interaction:SearchResultIconKind.Marketplace}">
+                                                        <Setter Property="Data" Value="{StaticResource Long.Icon.Plugin}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IconKind}"
+                                                                 Value="{x:Static interaction:SearchResultIconKind.Plugin}">
+                                                        <Setter Property="Data" Value="{StaticResource Long.Icon.Plugin}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IconKind}"
+                                                                 Value="{x:Static interaction:SearchResultIconKind.Settings}">
+                                                        <Setter Property="Data" Value="{StaticResource Long.Icon.Settings}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding HasIconPath}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                    <Image Source="{Binding IconPath}"
+                                           Width="26" Height="26"
+                                           Stretch="Uniform">
+                                        <Image.Style>
+                                            <Style TargetType="Image">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasIconPath}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Image.Style>
+                                    </Image>
+                                </Grid>
+                            </Border>
+                            <StackPanel Grid.Column="1">
                                 <TextBlock Text="{Binding Title}"
                                            FontSize="14" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Long.Brush.Text.Primary}" />
@@ -102,7 +172,7 @@
                                            Foreground="{DynamicResource Long.Brush.Text.Secondary}"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-                            <Button Grid.Column="1" Click="SecondaryActions_Click"
+                            <Button Grid.Column="2" Click="SecondaryActions_Click"
                                     Width="28" Height="28" Margin="8,0,2,0"
                                     ToolTip="{DynamicResource i18n.palette.moreActions}" Content="⋯"
                                     AutomationProperties.AutomationId="Long.Result.MoreActions"
@@ -118,7 +188,7 @@
                                     </Style>
                                 </Button.Style>
                             </Button>
-                            <Button Grid.Column="2" Tag="{Binding Id}"
+                            <Button Grid.Column="3" Tag="{Binding Id}"
                                     Click="PinResult_Click"
                                     Width="28" Height="28" Margin="8,0,2,0"
                                     ToolTip="{DynamicResource i18n.palette.togglePin}"
@@ -140,7 +210,7 @@
                                     </Style>
                                 </Button.Style>
                             </Button>
-                            <TextBlock Grid.Column="3"
+                            <TextBlock Grid.Column="4"
                                        Text="{Binding Source}"
                                        FontSize="11" Margin="16,0,2,0"
                                        Foreground="{DynamicResource Long.Brush.Text.Muted}"

@@ -7,11 +7,16 @@ namespace LongBetterWindows.Host.Interaction
     {
         private readonly string _pluginId;
         private readonly ISearchProvider _inner;
+        private readonly string? _iconPath;
 
-        public PluginSearchProviderAdapter(string pluginId, ISearchProvider inner)
+        public PluginSearchProviderAdapter(
+            string pluginId,
+            ISearchProvider inner,
+            string? iconPath = null)
         {
             _pluginId = pluginId;
             _inner = inner;
+            _iconPath = iconPath;
         }
 
         public string Id => "plugin:" + _pluginId;
@@ -55,6 +60,8 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     Id = _pluginId + ":" + item.Id,
                     ProviderId = Id,
+                    IconKind = SearchResultIconKind.Plugin,
+                    IconPath = _iconPath,
                 });
             }
 

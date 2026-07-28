@@ -62,6 +62,8 @@ namespace LongBetterWindows.Host.Services
         public static MouseGestureService MouseGestures { get; private set; } = null!;
         internal static WorkspaceSessionCoordinator Workspace { get; private set; } = null!;
         internal static WorkspaceModuleResolver WorkspaceModules { get; private set; } = null!;
+        internal static LauncherContinuityCoordinator LauncherContinuity
+            { get; private set; } = new();
 
         public static void Initialize(string? workflowsDirectory = null)
         {
@@ -129,7 +131,14 @@ namespace LongBetterWindows.Host.Services
             Search = new SearchCoordinator(
                 new ISearchProvider[]
                 {
-                    new StaticCommandSearchProvider(provider.PluginStore.Commands),
+                    new WorkspaceLauncherSearchProvider(
+                        provider.PluginStore,
+                        key => I18n.T(key)),
+                    new StaticCommandSearchProvider(
+                        provider.PluginStore.Commands,
+                        pluginId => InstalledPluginRailProjection.FindIconPath(
+                            provider.PluginStore.Get(pluginId)?.Directory
+                                ?? string.Empty)),
                     new ManagedWorkflowSearchProvider(
                         provider.PluginStore,
                         Workflows,

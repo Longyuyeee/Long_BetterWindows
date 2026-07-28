@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Diagnostics;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -20,6 +21,7 @@ namespace LongBetterWindows.Host.Views
         private readonly CommandExecutor _executor;
         private readonly SearchResultActionExecutor _actionExecutor;
         private ContextSnapshot _contextSnapshot = ContextSnapshot.Empty;
+        private nint _originWindowHandle;
         private CancellationTokenSource? _contextCts;
         private CancellationTokenSource? _searchCts;
 
@@ -62,6 +64,8 @@ namespace LongBetterWindows.Host.Views
                 Shell32.GetForegroundWindow(),
                 DateTimeOffset.UtcNow);
             _instance ??= new CommandPaletteWindow();
+            ServicesInitializer.LauncherContinuity.Discard();
+            _instance._originWindowHandle = captureRequest.ForegroundWindowHandle;
             _instance.SearchBox.Text = initialQuery ?? string.Empty;
             _instance.SearchBox.CaretIndex = _instance.SearchBox.Text.Length;
             _instance.BeginSearch();
@@ -76,6 +80,29 @@ namespace LongBetterWindows.Host.Views
             _instance.AnimateIn();
             Log.Debug("Command Palette 可输入: {ElapsedMs:F1}ms",
                 Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+        }
+
+        internal static void RestoreFromWorkspace(LauncherReturnState state)
+        {
+            var dispatcher = Application.Current.Dispatcher;
+            if (!dispatcher.CheckAccess())
+            {
+                dispatcher.Invoke(() => RestoreFromWorkspace(state));
+                return;
+            }
+
+            _instance ??= new CommandPaletteWindow();
+            _instance._originWindowHandle = state.OriginWindowHandle;
+            _instance._contextSnapshot = state.Context;
+            _instance.SearchBox.Text = state.Query;
+            _instance.SearchBox.CaretIndex = state.Query.Length;
+            _instance.RenderContextBadges();
+            _instance.StatusText.Text = string.Empty;
+            if (!_instance.IsVisible)
+                _instance.Show();
+            _instance.Activate();
+            _instance.SearchBox.Focus();
+            _instance.AnimateIn();
         }
 
         private void AnimateIn()
@@ -216,34 +243,46 @@ namespace LongBetterWindows.Host.Views
         {
             if (!IsInitialized) return;
 
-            var selectedId = (ResultsList.SelectedItem as SearchResultItem)?.Id;
-            ResultsList.ItemsSource = results;
+            var selectedId = (ResultsList.SelectedItem as LauncherResultViewItem)?.Id;
+            var projected = LauncherResultProjection.Build(
+                results,
+                SearchBox.Text,
+                _contextSnapshot,
+                ServicesInitializer.SearchPreferences.GetRecentResultIds(),
+                key => ServicesInitializer.I18n.T(key));
+            var view = CollectionViewSource.GetDefaultView(projected);
+            if (view is ListCollectionView listView)
+                listView.GroupDescriptions.Add(
+                    new PropertyGroupDescription(
+                        nameof(LauncherResultViewItem.SectionTitle)));
+            ResultsList.ItemsSource = view;
             var selectedIndex = selectedId is null
                 ? -1
-                : results.ToList().FindIndex(item =>
+                : projected.ToList().FindIndex(item =>
                     string.Equals(item.Id, selectedId, StringComparison.OrdinalIgnoreCase));
             ResultsList.SelectedIndex = selectedIndex >= 0
                 ? selectedIndex
-                : results.Count > 0 ? 0 : -1;
-            EmptyState.Visibility = completed && results.Count == 0
+                : projected.Count > 0 ? 0 : -1;
+            EmptyState.Visibility = completed && projected.Count == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             EmptyStateText.Text = _plugins.Commands.Count == 0
                 ? I18n("palette.status.pluginsLoading")
                 : I18n("palette.empty");
-            StatusText.Text = results.Count == 0
+            StatusText.Text = projected.Count == 0
                 ? completed
                     ? I18n("palette.empty")
                     : I18n("palette.status.searching")
                 : string.Format(
                     I18n("palette.status.resultCount"),
-                    results.Count);
+                    projected.Count);
         }
 
         private async Task ExecuteSelectedAsync()
         {
-            if (ResultsList.SelectedItem is not SearchResultItem selected)
+            if (ResultsList.SelectedItem is not LauncherResultViewItem viewItem)
                 return;
+            var selected = viewItem.Result;
 
             if (selected.PrimaryAction.Kind == SearchActionKind.ContinueSearch)
             {
@@ -255,11 +294,6 @@ namespace LongBetterWindows.Host.Views
 
             if (selected.PrimaryAction.Kind != SearchActionKind.ExecuteCommand)
             {
-                if (selected.PrimaryAction.Kind == SearchActionKind.OpenWorkflowReview)
-                {
-                    Hide();
-                    await Task.Delay(40);
-                }
                 await ExecuteHostActionAsync(selected, selected.PrimaryAction);
                 return;
             }
@@ -346,7 +380,10 @@ namespace LongBetterWindows.Host.Views
 
         private void SecondaryActions_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button { DataContext: SearchResultItem selected } button
+            if (sender is not Button
+                {
+                    DataContext: LauncherResultViewItem { Result: var selected },
+                } button
                 || !selected.HasSecondaryActions) return;
 
             e.Handled = true;
@@ -374,7 +411,30 @@ namespace LongBetterWindows.Host.Views
             SearchResultItem selected,
             SearchResultAction action)
         {
+            var workspaceTarget = action.Kind switch
+            {
+                SearchActionKind.OpenWorkspaceModule => action.Target,
+                SearchActionKind.OpenWorkflowReview => $"workflow:{action.Target}",
+                _ => null,
+            };
+            if (workspaceTarget is not null)
+            {
+                ServicesInitializer.LauncherContinuity.Begin(
+                    workspaceTarget,
+                    new LauncherReturnIntent(
+                        _originWindowHandle,
+                        SearchBox.Text,
+                        _contextSnapshot,
+                        LauncherReturnMode.RestoreLauncher,
+                        DateTimeOffset.UtcNow));
+                if (!App.KeepPaletteVisibleForQuality)
+                    Hide();
+                await Task.Delay(40);
+            }
+
             var result = await _actionExecutor.ExecuteAsync(action, _contextSnapshot);
+            if (workspaceTarget is not null && !result.IsSuccess)
+                ServicesInitializer.LauncherContinuity.Cancel(workspaceTarget);
             if (result.IsSuccess)
                 await ServicesInitializer.SearchPreferences.RecordUseAsync(selected.Id);
 
@@ -405,7 +465,11 @@ namespace LongBetterWindows.Host.Views
         {
             if (e.Key == Key.Enter
                 && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)
-                && ResultsList.SelectedItem is SearchResultItem selectedWithSecondary
+                && ResultsList.SelectedItem is
+                    LauncherResultViewItem
+                    {
+                        Result: var selectedWithSecondary,
+                    }
                 && selectedWithSecondary.SecondaryActions.Count > 0)
             {
                 e.Handled = true;
@@ -416,7 +480,11 @@ namespace LongBetterWindows.Host.Views
             }
 
             if (e.Key == Key.P && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)
-                && ResultsList.SelectedItem is SearchResultItem { CanPin: true } selected)
+                && ResultsList.SelectedItem is
+                    LauncherResultViewItem
+                    {
+                        Result: { CanPin: true } selected,
+                    })
             {
                 var pinned = await ServicesInitializer.SearchPreferences.TogglePinnedAsync(selected.Id);
                 StatusText.Text = pinned
@@ -428,8 +496,16 @@ namespace LongBetterWindows.Host.Views
             }
 
             if (e.Key != Key.Escape) return;
-            Hide();
+            DismissAndRestoreOrigin();
             e.Handled = true;
+        }
+
+        private void DismissAndRestoreOrigin()
+        {
+            Hide();
+            if (_originWindowHandle != nint.Zero)
+                Shell32.SetForegroundWindow(_originWindowHandle);
+            _originWindowHandle = nint.Zero;
         }
 
         private void Window_Deactivated(object? sender, EventArgs e)

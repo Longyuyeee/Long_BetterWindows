@@ -174,6 +174,9 @@ namespace LongBetterWindows.Host.Interaction
                 Source = item.IsDirectory
                     ? Text("search.local.directory", "本地文件夹")
                     : Text("search.local.file", "本地文件"),
+                IconKind = item.IsDirectory
+                    ? SearchResultIconKind.Folder
+                    : SearchResultIconKind.File,
                 Score = score,
                 Kind = SearchResultKind.Data,
                 PrimaryAction = new SearchResultAction(
