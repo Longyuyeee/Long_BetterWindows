@@ -17,6 +17,9 @@ namespace LongBetterWindows.Host.Interaction
         public string Kind { get; }
         public string ResourceId { get; }
         public string? InstanceId { get; }
+        public bool IsValid
+            => !string.IsNullOrWhiteSpace(Kind)
+                && !string.IsNullOrWhiteSpace(ResourceId);
 
         public override string ToString()
             => InstanceId is null
@@ -39,8 +42,7 @@ namespace LongBetterWindows.Host.Interaction
             bool supportsDetach = false,
             string? searchScopeId = null)
         {
-            if (string.IsNullOrWhiteSpace(key.Kind)
-                || string.IsNullOrWhiteSpace(key.ResourceId))
+            if (!key.IsValid)
             {
                 throw new ArgumentException(
                     "Workspace module keys must be created with a kind and resource ID.",
