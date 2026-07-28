@@ -31,7 +31,8 @@ namespace LongBetterWindows.Host.Views
             _actionExecutor = new SearchResultActionExecutor(
                 _plugins,
                 WorkflowReviewNavigation.OpenAsync,
-                key => ServicesInitializer.I18n.T(key));
+                key => ServicesInitializer.I18n.T(key),
+                WorkspaceModuleNavigation.OpenAsync);
             _plugins.PluginsChanged += OnPluginsChanged;
             Closed += (_, _) =>
             {

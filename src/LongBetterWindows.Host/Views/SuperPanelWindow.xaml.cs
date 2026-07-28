@@ -32,7 +32,8 @@ namespace LongBetterWindows.Host.Views
                 _plugins,
                 ServicesInitializer.SearchPreferences,
                 WorkflowReviewNavigation.OpenAsync,
-                key => ServicesInitializer.I18n.T(key));
+                key => ServicesInitializer.I18n.T(key),
+                WorkspaceModuleNavigation.OpenAsync);
             _groupCoordinator = new SuperPanelGroupCoordinator(
                 ServicesInitializer.SearchPreferences,
                 ServicesInitializer.SuperPanelGroups,

@@ -16,6 +16,7 @@ namespace LongBetterWindows.Host.Interaction
         OpenContainingFolder,
         OpenUri,
         CopyText,
+        OpenWorkspaceModule,
     }
 
     public sealed record SearchRequest(

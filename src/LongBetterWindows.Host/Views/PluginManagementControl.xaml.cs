@@ -370,6 +370,28 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
+        internal bool OpenPluginSettings(string pluginId)
+        {
+            var entry = HostProvider.Instance.PluginStore.Get(pluginId);
+            if (entry?.Instance is not IHasSettingsUI settingsUi)
+                return false;
+
+            try
+            {
+                CreateSettingsWindow(
+                    entry,
+                    settingsUi,
+                    Window.GetWindow(this)).ShowDialog();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"Settings UI error: {exception.Message}");
+                return false;
+            }
+        }
+
         internal static PluginWindowHost CreateSettingsWindow(
             PluginEntry entry,
             IHasSettingsUI settingsUi,

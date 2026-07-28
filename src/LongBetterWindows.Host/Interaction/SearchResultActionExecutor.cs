@@ -15,6 +15,10 @@ namespace LongBetterWindows.Host.Interaction
             CancellationToken,
             Task<PluginCommandResult>>? _workflowReviewLauncher;
         private readonly Func<string, string>? _localize;
+        private readonly Func<
+            string,
+            CancellationToken,
+            Task<PluginCommandResult>>? _workspaceModuleLauncher;
 
         public SearchResultActionExecutor(
             PluginRegistry plugins,
@@ -23,12 +27,17 @@ namespace LongBetterWindows.Host.Interaction
                 string?,
                 CancellationToken,
                 Task<PluginCommandResult>>? workflowReviewLauncher = null,
-            Func<string, string>? localize = null)
+            Func<string, string>? localize = null,
+            Func<
+                string,
+                CancellationToken,
+                Task<PluginCommandResult>>? workspaceModuleLauncher = null)
         {
             _plugins = plugins;
             _commands = new CommandExecutor(plugins);
             _workflowReviewLauncher = workflowReviewLauncher;
             _localize = localize;
+            _workspaceModuleLauncher = workspaceModuleLauncher;
         }
 
         public async Task<PluginCommandResult> ExecuteAsync(
@@ -88,6 +97,25 @@ namespace LongBetterWindows.Host.Interaction
                         await ServicesInitializer.Clipboard.SetTextAsync(action.Target),
                         Text("search.result.copied", "已复制到剪贴板。"),
                         keepOpen: true);
+
+                case SearchActionKind.OpenWorkspaceModule:
+                    if (!WorkspaceModuleAddress.TryParse(
+                        action.Target,
+                        out var address))
+                    {
+                        return Failure(
+                            "search.error.workspaceAddressInvalid",
+                            "工作区模块地址无效。");
+                    }
+                    if (_workspaceModuleLauncher is null)
+                    {
+                        return Failure(
+                            "search.error.workspaceUnavailable",
+                            "工作区导航当前不可用。");
+                    }
+                    return await _workspaceModuleLauncher(
+                        address.CanonicalValue,
+                        cancellationToken);
 
                 default:
                     return Failure(

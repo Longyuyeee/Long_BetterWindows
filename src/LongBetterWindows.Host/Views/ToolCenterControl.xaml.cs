@@ -201,6 +201,30 @@ namespace LongBetterWindows.Host.Views
         }
         internal void OpenSystemForQuality() => ShowPage("system");
         internal void OpenSettingsForQuality() => ShowPage("settings");
+        internal bool OpenWorkspaceModule(WorkspaceModuleKey key)
+        {
+            var page = (key.Kind, key.ResourceId) switch
+            {
+                ("management", "root") => "overview",
+                ("marketplace", "catalog") => "market",
+                ("settings", "root") => "settings",
+                ("diagnostics", "root") => "diagnostics",
+                ("developer", "root") => "developer",
+                _ => null,
+            };
+            if (page is null)
+                return false;
+            ShowPage(page);
+            return true;
+        }
+
+        internal bool OpenPluginSettings(string pluginId)
+        {
+            ShowPage("plugins");
+            return PluginManagementHost.Content is PluginManagementControl plugins
+                && plugins.OpenPluginSettings(pluginId);
+        }
+
         internal void ShowWelcomeForQuality()
         {
             ShowPage("overview");

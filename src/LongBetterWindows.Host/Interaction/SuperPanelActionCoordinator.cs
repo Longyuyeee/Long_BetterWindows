@@ -25,13 +25,18 @@ namespace LongBetterWindows.Host.Interaction
                 string?,
                 CancellationToken,
                 Task<PluginCommandResult>>? workflowReviewLauncher = null,
-            Func<string, string>? localize = null)
+            Func<string, string>? localize = null,
+            Func<
+                string,
+                CancellationToken,
+                Task<PluginCommandResult>>? workspaceModuleLauncher = null)
         {
             _plugins = plugins;
             _executor = new SearchResultActionExecutor(
                 plugins,
                 workflowReviewLauncher,
-                localize);
+                localize,
+                workspaceModuleLauncher);
             _preferences = preferences;
             _localize = localize;
         }
@@ -70,6 +75,7 @@ namespace LongBetterWindows.Host.Interaction
 
             if (action.Kind is SearchActionKind.ExecuteCommand
                 or SearchActionKind.OpenWorkflowReview
+                or SearchActionKind.OpenWorkspaceModule
                 && beforeCommandExecution is not null)
                 await beforeCommandExecution();
 

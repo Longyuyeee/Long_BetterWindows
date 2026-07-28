@@ -60,6 +60,8 @@ namespace LongBetterWindows.Host.Services
         public static SearchPreferenceService SearchPreferences { get; private set; } = null!;
         public static SuperPanelGroupService SuperPanelGroups { get; private set; } = null!;
         public static MouseGestureService MouseGestures { get; private set; } = null!;
+        internal static WorkspaceSessionCoordinator Workspace { get; private set; } = null!;
+        internal static WorkspaceModuleResolver WorkspaceModules { get; private set; } = null!;
 
         public static void Initialize(string? workflowsDirectory = null)
         {
@@ -120,6 +122,18 @@ namespace LongBetterWindows.Host.Services
             WorkflowTemplates = new CommandWorkflowTemplateCatalog(
                 Path.Combine(AppContext.BaseDirectory, "WorkflowTemplates"),
                 Workflows);
+            WorkspaceModules = new WorkspaceModuleResolver(
+                provider.PluginStore,
+                Workflows,
+                key => I18n.T(key));
+            var management = WorkspaceModules.ResolveAsync(
+                new WorkspaceModuleAddress(
+                    WorkspaceModuleAddressKind.Management,
+                    "root")).GetAwaiter().GetResult();
+            Workspace = new WorkspaceSessionCoordinator(
+                management.Module
+                ?? throw new InvalidOperationException(
+                    "The management workspace root could not be created."));
             Search = new SearchCoordinator(
                 new ISearchProvider[]
                 {

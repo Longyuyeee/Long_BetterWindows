@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Helpers;
+using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
 using Serilog;
@@ -185,6 +186,63 @@ namespace LongBetterWindows.Host
             return await ToolCenter.OpenWorkflowEditorAsync(
                 workflowId,
                 cancellationToken);
+        }
+
+        internal async Task<string?> OpenWorkspaceModuleAsync(
+            WorkspaceModuleDescriptor module,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(module);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
+                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
+
+            var previousActive = ServicesInitializer.Workspace.State.ActiveModuleKey;
+            var navigation = ServicesInitializer.Workspace.Open(module);
+            ToolCenter.Visibility = Visibility.Visible;
+
+            string? error;
+            try
+            {
+                error = module.Key.Kind switch
+                {
+                    "workflow" => await ToolCenter.OpenWorkflowEditorAsync(
+                        module.Key.ResourceId,
+                        cancellationToken),
+                    "plugin-settings" => ToolCenter.OpenPluginSettings(
+                        module.Key.ResourceId)
+                            ? null
+                            : I18nOrFallback(
+                                "plugins.settingsUnavailable",
+                                "插件设置当前不可用。"),
+                    _ => ToolCenter.OpenWorkspaceModule(module.Key)
+                        ? null
+                        : I18nOrFallback(
+                            "search.error.workspaceResourceUnsupported",
+                            "该资源不支持工作区模块。"),
+                };
+            }
+            catch
+            {
+                RollbackWorkspaceNavigation(navigation, module.Key, previousActive);
+                throw;
+            }
+            if (error is null)
+                return null;
+
+            RollbackWorkspaceNavigation(navigation, module.Key, previousActive);
+            return error;
+        }
+
+        private static void RollbackWorkspaceNavigation(
+            WorkspaceNavigationResult navigation,
+            WorkspaceModuleKey moduleKey,
+            WorkspaceModuleKey previousActive)
+        {
+            if (navigation.Kind == WorkspaceNavigationChangeKind.Opened)
+                ServicesInitializer.Workspace.Close(moduleKey);
+            else if (navigation.Kind == WorkspaceNavigationChangeKind.Activated)
+                ServicesInitializer.Workspace.Activate(previousActive);
         }
 
         private void SetWorkflowLayoutAutomationStatus(
@@ -377,6 +435,14 @@ namespace LongBetterWindows.Host
 
         private static string I18n(string key)
             => ServicesInitializer.I18n.T(key);
+
+        private static string I18nOrFallback(string key, string fallback)
+        {
+            var value = I18n(key);
+            return string.IsNullOrWhiteSpace(value) || value == key
+                ? fallback
+                : value;
+        }
 
         private void ClearWorkflowTerminalOutputs_Click(object sender, RoutedEventArgs e)
             => ToolCenter.ClearWorkflowTerminalOutputs();
