@@ -221,8 +221,74 @@ namespace LongBetterWindows.Host.Views
             };
             if (page is null)
                 return false;
+            if (key != new WorkspaceModuleKey("management", "root"))
+                FilterManagementNavigation(string.Empty);
             ShowPage(page);
             return true;
+        }
+
+        internal Task ApplyWorkspaceSearchAsync(
+            WorkspaceSearchRequest request)
+        {
+            request.CancellationToken.ThrowIfCancellationRequested();
+            switch (request.ModuleKey.Kind, request.ModuleKey.ResourceId)
+            {
+                case ("management", "root"):
+                    FilterManagementNavigation(request.Query);
+                    break;
+                case ("marketplace", "catalog")
+                    when MarketHost.Content is MarketplaceControl marketplace:
+                    return marketplace.ApplyWorkspaceSearchAsync(
+                        request.Query,
+                        request.CancellationToken);
+                case ("management-page", "plugins")
+                    when PluginManagementHost.Content is PluginManagementControl plugins:
+                    plugins.ApplyWorkspaceSearch(request.Query);
+                    break;
+            }
+            return Task.CompletedTask;
+        }
+
+        internal bool HasDismissibleTransientLayer
+            => MarketHost.Content is MarketplaceControl marketplace
+                && marketplace.HasDismissibleTransientLayer;
+
+        internal bool CanNavigateBackInModule
+            => MarketHost.Content is MarketplaceControl marketplace
+                && marketplace.CanNavigateBackInModule;
+
+        internal bool DismissTransientLayer()
+            => MarketHost.Content is MarketplaceControl marketplace
+                && marketplace.DismissTransientLayer();
+
+        internal bool NavigateBackInModule()
+            => MarketHost.Content is MarketplaceControl marketplace
+                && marketplace.NavigateBackInModule();
+
+        private void FilterManagementNavigation(string query)
+        {
+            var normalized = query.Trim();
+            RadioButton[] destinations =
+            [
+                NavOverview,
+                NavWorkflows,
+                NavPlugins,
+                NavMarket,
+                NavSystem,
+                NavDiagnostics,
+                NavDeveloper,
+                NavSettings,
+            ];
+            foreach (var destination in destinations)
+            {
+                var label = destination.Content?.ToString() ?? string.Empty;
+                var target = destination.Tag?.ToString() ?? string.Empty;
+                destination.Visibility = string.IsNullOrEmpty(normalized)
+                    || label.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+                    || target.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+            }
         }
 
         internal bool OpenPluginSettings(string pluginId)

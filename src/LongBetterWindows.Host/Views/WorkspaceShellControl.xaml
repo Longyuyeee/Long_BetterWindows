@@ -75,53 +75,108 @@
                 Background="{DynamicResource Long.Brush.Background.Raised}"
                 BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
                 BorderThickness="0,0,0,1">
-            <ScrollViewer x:Name="ModuleScroller"
-                          HorizontalScrollBarVisibility="Auto"
-                          VerticalScrollBarVisibility="Disabled"
-                          CanContentScroll="True"
-                          Padding="10,5">
-                <ItemsControl x:Name="ModuleItems">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,0,4,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Button x:Name="ModuleTabButton"
-                                        Style="{StaticResource WorkspaceModuleTabStyle}"
-                                        Tag="{Binding Key}"
-                                        ToolTip="{Binding Title}"
-                                        Click="ModuleTab_Click"
-                                        AutomationProperties.Name="{Binding Title}"
-                                        AutomationProperties.AutomationId="Long.Workspace.ModuleTab">
-                                    <TextBlock Text="{Binding Title}"
-                                               FontSize="12"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" />
-                                </Button>
-                                <Button Grid.Column="1"
-                                        Style="{StaticResource WorkspaceModuleCloseStyle}"
-                                        Tag="{Binding Key}"
-                                        Click="ModuleClose_Click"
-                                        ToolTip="{DynamicResource i18n.app.close}"
-                                        AutomationProperties.Name="{DynamicResource i18n.app.close}"
-                                        AutomationProperties.AutomationId="Long.Workspace.ModuleClose">
-                                    <Path Data="{StaticResource Long.Icon.Close}"
-                                          Style="{StaticResource LongIcon}"
-                                          Width="11"
-                                          Height="11" />
-                                </Button>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="180" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ScrollViewer x:Name="ModuleScroller"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled"
+                              CanContentScroll="True"
+                              Padding="10,5">
+                    <ItemsControl x:Name="ModuleItems">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,4,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button x:Name="ModuleTabButton"
+                                            Style="{StaticResource WorkspaceModuleTabStyle}"
+                                            Tag="{Binding Key}"
+                                            ToolTip="{Binding Title}"
+                                            Click="ModuleTab_Click"
+                                            AutomationProperties.Name="{Binding Title}"
+                                            AutomationProperties.AutomationId="Long.Workspace.ModuleTab">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Button>
+                                    <Button Grid.Column="1"
+                                            Style="{StaticResource WorkspaceModuleCloseStyle}"
+                                            Tag="{Binding Key}"
+                                            Click="ModuleClose_Click"
+                                            ToolTip="{DynamicResource i18n.app.close}"
+                                            AutomationProperties.Name="{DynamicResource i18n.app.close}"
+                                            AutomationProperties.AutomationId="Long.Workspace.ModuleClose">
+                                        <Path Data="{StaticResource Long.Icon.Close}"
+                                              Style="{StaticResource LongIcon}"
+                                              Width="11"
+                                              Height="11" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Grid x:Name="WorkspaceSearchHost"
+                      Grid.Column="1"
+                      Width="280"
+                      Margin="8,5,10,5"
+                      Visibility="Collapsed">
+                    <TextBox x:Name="WorkspaceSearchBox"
+                             Style="{StaticResource LongSearchBox}"
+                             Height="34"
+                             Padding="12,0,34,0"
+                             FontSize="12"
+                             FontWeight="Normal"
+                             TextChanged="WorkspaceSearchBox_TextChanged"
+                             AutomationProperties.AutomationId="Long.Workspace.Search" />
+                    <TextBlock x:Name="WorkspaceSearchHint"
+                               Margin="12,0,34,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                               IsHitTestVisible="False"
+                               TextTrimming="CharacterEllipsis">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=WorkspaceSearchBox}" Value="">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Button x:Name="ClearWorkspaceSearchButton"
+                            Width="28"
+                            Height="28"
+                            Margin="0,0,3,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource LongIconButton}"
+                            ToolTip="{DynamicResource i18n.action.clear}"
+                            AutomationProperties.Name="{DynamicResource i18n.action.clear}"
+                            AutomationProperties.AutomationId="Long.Workspace.Search.Clear"
+                            Visibility="Collapsed"
+                            Click="ClearWorkspaceSearch_Click">
+                        <Path Data="{StaticResource Long.Icon.Close}"
+                              Style="{StaticResource LongIcon}"
+                              Width="10"
+                              Height="10" />
+                    </Button>
+                </Grid>
+            </Grid>
         </Border>
 
         <local:ToolCenterControl x:Name="ToolCenterContent" Grid.Row="1" />

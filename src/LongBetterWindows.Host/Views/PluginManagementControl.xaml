@@ -30,33 +30,11 @@
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="PluginHeaderColumn" Width="*" />
-                <ColumnDefinition x:Name="PluginSearchColumn" Width="280" />
                 <ColumnDefinition x:Name="PluginRefreshColumn" Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="PluginsHeader" Text="{DynamicResource i18n.plugins.installed}" FontSize="16" FontWeight="SemiBold"
                        VerticalAlignment="Center" />
-            <Grid x:Name="PluginSearchHost" Grid.Column="1" Margin="0,0,10,0">
-                <TextBox x:Name="PluginSearchBox" Style="{StaticResource LongTextBox}"
-                         TextChanged="PluginSearch_TextChanged"
-                         automation:AutomationProperties.AutomationId="Long.Plugins.Search"
-                         automation:AutomationProperties.Name="{DynamicResource i18n.plugins.search}" />
-                <TextBlock Text="{DynamicResource i18n.plugins.searchHint}"
-                           Margin="12,0,8,0" VerticalAlignment="Center"
-                           IsHitTestVisible="False"
-                           Foreground="{DynamicResource Long.Brush.Text.Muted}">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Text, ElementName=PluginSearchBox}" Value="">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </Grid>
-            <Button x:Name="RefreshPluginsButton" Grid.Column="2"
+            <Button x:Name="RefreshPluginsButton" Grid.Column="1"
                     Content="{DynamicResource i18n.action.refresh}"
                     automation:AutomationProperties.Name="{DynamicResource i18n.action.refresh}"
                     Style="{StaticResource LongButton}"

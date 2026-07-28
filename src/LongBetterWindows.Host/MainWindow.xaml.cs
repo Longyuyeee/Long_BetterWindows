@@ -27,6 +27,7 @@ namespace LongBetterWindows.Host
         private int _qualityTerminalOutputExportStatus;
         private int _qualityWorkflowDuplicateStatus;
         private bool _workflowExecutionRejected;
+        private readonly WorkspaceFocusBookmarkStore _workspaceFocusBookmarks = new();
         private ToolCenterControl ToolCenter => WorkspaceShell.ToolCenter;
 
         public MainWindow()
@@ -43,11 +44,20 @@ namespace LongBetterWindows.Host
             _tray = new TrayService(this);
             WorkspaceShell.Bind(
                 ServicesInitializer.Workspace,
-                GetWorkspaceModuleTitle);
+                GetWorkspaceModuleTitle,
+                GetWorkspaceSearchPlaceholder,
+                request => ToolCenter.ApplyWorkspaceSearchAsync(request));
             WorkspaceShell.ModuleActivationRequested +=
                 WorkspaceShell_ModuleActivationRequested;
             WorkspaceShell.ModuleCloseRequested +=
                 WorkspaceShell_ModuleCloseRequested;
+            WorkspaceShell.ScopedSearchFailed += exception =>
+                Log.Error(exception, "Workspace scoped search failed");
+            ToolCenter.AddHandler(
+                Keyboard.GotKeyboardFocusEvent,
+                new KeyboardFocusChangedEventHandler(
+                    ToolCenter_GotKeyboardFocus),
+                handledEventsToo: true);
             ServicesInitializer.I18n.LanguageChanged += I18n_LanguageChanged;
             Closed += (_, _) =>
                 ServicesInitializer.I18n.LanguageChanged -= I18n_LanguageChanged;
@@ -244,7 +254,10 @@ namespace LongBetterWindows.Host
                 throw;
             }
             if (error is null)
+            {
+                RestoreWorkspaceFocus(module.Key);
                 return null;
+            }
 
             RollbackWorkspaceNavigation(navigation, module.Key, previousActive);
             return error;
@@ -334,7 +347,6 @@ namespace LongBetterWindows.Host
                         key,
                         error);
                 }
-                WorkspaceShell.FocusActiveModule();
             }
             catch (Exception exception)
             {
@@ -350,26 +362,7 @@ namespace LongBetterWindows.Host
         {
             try
             {
-                var before = ServicesInitializer.Workspace.State;
-                var wasActive = before.ActiveModuleKey == key;
-                var result = ServicesInitializer.Workspace.Close(key);
-                if (!result.Changed)
-                    return;
-
-                if (wasActive)
-                {
-                    var error = await ShowWorkspaceModuleViewAsync(
-                        result.State.ActiveModule,
-                        CancellationToken.None);
-                    if (error is not null)
-                    {
-                        Log.Warning(
-                            "Workspace fallback module {Module} could not display: {Error}",
-                            result.State.ActiveModuleKey,
-                            error);
-                    }
-                }
-                WorkspaceShell.FocusActiveModule();
+                await CloseWorkspaceModuleAsync(key);
             }
             catch (Exception exception)
             {
@@ -377,6 +370,32 @@ namespace LongBetterWindows.Host
                     exception,
                     "Workspace module {Module} close failed",
                     key);
+            }
+        }
+
+        private async Task CloseWorkspaceModuleAsync(WorkspaceModuleKey key)
+        {
+            var before = ServicesInitializer.Workspace.State;
+            var wasActive = before.ActiveModuleKey == key;
+            var result = ServicesInitializer.Workspace.Close(key);
+            if (!result.Changed)
+                return;
+
+            WorkspaceShell.RemoveModuleSearch(key);
+            _workspaceFocusBookmarks.Remove(key);
+            if (wasActive)
+            {
+                var error = await ShowWorkspaceModuleViewAsync(
+                    result.State.ActiveModule,
+                    CancellationToken.None);
+                if (error is not null)
+                {
+                    Log.Warning(
+                        "Workspace fallback module {Module} could not display: {Error}",
+                        result.State.ActiveModuleKey,
+                        error);
+                }
+                RestoreWorkspaceFocus(result.State.ActiveModuleKey);
             }
         }
 
@@ -409,6 +428,28 @@ namespace LongBetterWindows.Host
         private void I18n_LanguageChanged(string language)
             => WorkspaceShell.Refresh();
 
+        private void ToolCenter_GotKeyboardFocus(
+            object sender,
+            KeyboardFocusChangedEventArgs e)
+        {
+            if (e.NewFocus is not IInputElement element)
+                return;
+            _workspaceFocusBookmarks.Remember(
+                ServicesInitializer.Workspace.State.ActiveModuleKey,
+                element);
+        }
+
+        private void RestoreWorkspaceFocus(WorkspaceModuleKey key)
+        {
+            _ = Dispatcher.BeginInvoke(
+                () =>
+                {
+                    if (!_workspaceFocusBookmarks.Restore(key))
+                        WorkspaceShell.FocusActiveModule();
+                },
+                DispatcherPriority.Input);
+        }
+
         private static string GetWorkspaceModuleTitle(
             WorkspaceModuleDescriptor module)
         {
@@ -434,6 +475,15 @@ namespace LongBetterWindows.Host
                     return $"{plugin.DisplayName} - {I18n("plugins.settings")}";
             }
             return module.Title;
+        }
+
+        private static string GetWorkspaceSearchPlaceholder(
+            WorkspaceModuleKey key)
+        {
+            var scope = WorkspaceSearchScopeCatalog.Resolve(key);
+            return scope is null
+                ? string.Empty
+                : I18n(scope.PlaceholderResourceKey);
         }
 
         private void SetWorkflowLayoutAutomationStatus(
@@ -536,6 +586,11 @@ namespace LongBetterWindows.Host
         {
             var modifiers = Keyboard.Modifiers;
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (key == Key.K && modifiers.HasFlag(ModifierKeys.Control))
+            {
+                e.Handled = WorkspaceShell.FocusScopedSearch();
+                return;
+            }
             if (_activeWorkflowReviewId is not null
                 && key == Key.T
                 && modifiers.HasFlag(ModifierKeys.Control)
@@ -561,15 +616,48 @@ namespace LongBetterWindows.Host
                 e.Handled = ToolCenter.ClearWorkflowTerminalOutputs();
                 return;
             }
-            if (e.Key == Key.Escape && ToolCenter.CancelWorkflowReview())
-            {
-                e.Handled = true;
+            if (key != Key.Escape)
                 return;
+
+            var state = ServicesInitializer.Workspace.State;
+            var workspaceIsVisible =
+                EmbeddedPluginSurface.Visibility != Visibility.Visible;
+            var action = WorkspaceEscapeRouter.Route(
+                new WorkspaceEscapeContext(
+                    HasTransientLayer:
+                        workspaceIsVisible
+                        && (_activeWorkflowReviewId is not null
+                            || ToolCenter.HasDismissibleTransientLayer),
+                    HasScopedSearchQuery:
+                        workspaceIsVisible
+                        && WorkspaceShell.HasScopedSearchQuery,
+                    CanNavigateBackInModule:
+                        workspaceIsVisible
+                        && ToolCenter.CanNavigateBackInModule,
+                    CanNavigateBackInWorkspace:
+                        EmbeddedPluginSurface.Visibility == Visibility.Visible,
+                    CanCloseActiveModule: state.ActiveModule.CanClose));
+            switch (action)
+            {
+                case WorkspaceEscapeAction.DismissTransientLayer:
+                    e.Handled = ToolCenter.CancelWorkflowReview()
+                        || ToolCenter.DismissTransientLayer();
+                    break;
+                case WorkspaceEscapeAction.ClearScopedSearch:
+                    e.Handled = WorkspaceShell.ClearScopedSearch();
+                    break;
+                case WorkspaceEscapeAction.NavigateBackInModule:
+                    e.Handled = ToolCenter.NavigateBackInModule();
+                    break;
+                case WorkspaceEscapeAction.NavigateBackInWorkspace:
+                    await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
+                    e.Handled = true;
+                    break;
+                case WorkspaceEscapeAction.CloseActiveModule:
+                    await CloseWorkspaceModuleAsync(state.ActiveModuleKey);
+                    e.Handled = true;
+                    break;
             }
-            if (e.Key != Key.Escape
-                || EmbeddedPluginSurface.Visibility != Visibility.Visible) return;
-            await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
-            e.Handled = true;
         }
 
         private void CancelWorkflowReview_Click(object sender, RoutedEventArgs e)

@@ -1122,8 +1122,8 @@ try {
         Find-WindowByAutomationId $marketProcess.Id 'Long.MainWindow'
     } 'The main window did not appear for the Marketplace workflow.'
     $marketSearch = Wait-Until {
-        Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Marketplace.Search'
-    } 'The Marketplace search box was not discoverable.'
+        Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Workspace.Search'
+    } 'The workspace-scoped Marketplace search box was not discoverable.'
     $marketResults = Wait-Until {
         Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Marketplace.Results'
     } 'The Marketplace result list was not discoverable.'

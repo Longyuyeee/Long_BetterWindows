@@ -16,6 +16,7 @@ namespace LongBetterWindows.Host.Views
         private readonly PluginRegistry _pluginStore;
         private CancellationTokenSource? _refreshDebounce;
         private int _disposed;
+        private string _workspaceQuery = string.Empty;
 
         public PluginManagementControl()
         {
@@ -39,7 +40,7 @@ namespace LongBetterWindows.Host.Views
                 I18n("plugins.installedCount"),
                 plugins.Count);
 
-            var filter = PluginSearchBox.Text.Trim();
+            var filter = _workspaceQuery.Trim();
             var filtered = string.IsNullOrEmpty(filter)
                 ? plugins
                 : plugins.Where(plugin =>
@@ -191,48 +192,24 @@ namespace LongBetterWindows.Host.Views
 
         private void ApplyResponsiveLayout(double width)
         {
-            var compact = width < 620;
-            if (compact)
-            {
-                PluginHeaderColumn.Width = new GridLength(1, GridUnitType.Star);
-                PluginSearchColumn.Width = new GridLength(1, GridUnitType.Star);
-                PluginRefreshColumn.Width = GridLength.Auto;
-                Grid.SetRow(PluginsHeader, 0);
-                Grid.SetColumn(PluginsHeader, 0);
-                Grid.SetColumnSpan(PluginsHeader, 3);
-                Grid.SetRow(PluginSearchHost, 1);
-                Grid.SetColumn(PluginSearchHost, 0);
-                Grid.SetColumnSpan(PluginSearchHost, 2);
-                PluginSearchHost.Margin = new Thickness(0, 12, 10, 0);
-                Grid.SetRow(RefreshPluginsButton, 1);
-                Grid.SetColumn(RefreshPluginsButton, 2);
-                RefreshPluginsButton.Margin = new Thickness(0, 12, 0, 0);
-            }
-            else
-            {
-                PluginHeaderColumn.Width = new GridLength(1, GridUnitType.Star);
-                PluginSearchColumn.Width = new GridLength(280);
-                PluginRefreshColumn.Width = GridLength.Auto;
-                Grid.SetRow(PluginsHeader, 0);
-                Grid.SetColumn(PluginsHeader, 0);
-                Grid.SetColumnSpan(PluginsHeader, 1);
-                Grid.SetRow(PluginSearchHost, 0);
-                Grid.SetColumn(PluginSearchHost, 1);
-                Grid.SetColumnSpan(PluginSearchHost, 1);
-                PluginSearchHost.Margin = new Thickness(0, 0, 10, 0);
-                Grid.SetRow(RefreshPluginsButton, 0);
-                Grid.SetColumn(RefreshPluginsButton, 2);
-                RefreshPluginsButton.Margin = new Thickness(0);
-            }
+            PluginHeaderColumn.Width = new GridLength(1, GridUnitType.Star);
+            PluginRefreshColumn.Width = GridLength.Auto;
+            Grid.SetRow(PluginsHeader, 0);
+            Grid.SetColumn(PluginsHeader, 0);
+            Grid.SetColumnSpan(PluginsHeader, 1);
+            Grid.SetRow(RefreshPluginsButton, 0);
+            Grid.SetColumn(RefreshPluginsButton, 1);
+            RefreshPluginsButton.Margin = new Thickness(0);
         }
 
-        private void PluginSearch_TextChanged(object sender, TextChangedEventArgs e) => Refresh();
-
-        private void RefreshPlugins_Click(object sender, RoutedEventArgs e)
+        internal void ApplyWorkspaceSearch(string query)
         {
-            PluginSearchBox.Clear();
+            _workspaceQuery = query ?? string.Empty;
             Refresh();
         }
+
+        private void RefreshPlugins_Click(object sender, RoutedEventArgs e)
+            => Refresh();
 
         private void PluginActions_Click(object sender, RoutedEventArgs e)
         {

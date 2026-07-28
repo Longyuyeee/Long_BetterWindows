@@ -98,6 +98,32 @@ public sealed class WorkspaceShellProjectionTests
         Assert.Equal(settings.Key, closed.State.ActiveModuleKey);
     }
 
+    [Theory]
+    [InlineData("management", "root", "management")]
+    [InlineData("marketplace", "catalog", "marketplace")]
+    [InlineData("management-page", "plugins", "installed-plugins")]
+    public void SearchScopeCatalog_MapsSupportedWorkspaceModules(
+        string kind,
+        string resourceId,
+        string expectedScope)
+    {
+        var scope = WorkspaceSearchScopeCatalog.Resolve(
+            new WorkspaceModuleKey(kind, resourceId));
+
+        Assert.NotNull(scope);
+        Assert.Equal(expectedScope, scope.ScopeId);
+        Assert.StartsWith("workspace.search.", scope.PlaceholderResourceKey);
+    }
+
+    [Fact]
+    public void SearchScopeCatalog_LeavesUnsupportedModulesWithoutFakeSearch()
+    {
+        Assert.Null(WorkspaceSearchScopeCatalog.Resolve(
+            new WorkspaceModuleKey("settings", "root")));
+        Assert.Null(WorkspaceSearchScopeCatalog.Resolve(
+            new WorkspaceModuleKey("workflow", "sample")));
+    }
+
     private static WorkspaceModuleDescriptor Legacy(string page)
     {
         Assert.True(WorkspaceLegacyModuleCatalog.TryCreate(

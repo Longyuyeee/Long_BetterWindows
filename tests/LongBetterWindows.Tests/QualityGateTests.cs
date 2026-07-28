@@ -17,7 +17,8 @@ public class QualityGateTests
         var session = Read(
             "src", "LongBetterWindows.Host", "Interaction", "MarketplaceSessionCoordinator.cs");
 
-        Assert.Contains("MarketSearchBox", xaml);
+        Assert.DoesNotContain("MarketSearchBox", xaml);
+        Assert.Contains("_workspaceQuery", source);
         Assert.Contains("VersionBox", xaml);
         Assert.Contains("PermissionDiffItems", xaml);
         Assert.Contains("HighTrustWarning", xaml);
@@ -1524,9 +1525,12 @@ public class QualityGateTests
         var script = Read("run-desktop-ui-smoke.ps1");
         var market = Read(
             "src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml");
+        var workspace = Read(
+            "src", "LongBetterWindows.Host", "Views", "WorkspaceShellControl.xaml");
         var app = Read("src", "LongBetterWindows.Host", "App.xaml.cs");
 
-        Assert.Contains("Long.Marketplace.Search", market);
+        Assert.Contains("Long.Workspace.Search", workspace);
+        Assert.DoesNotContain("Long.Marketplace.Search", market);
         Assert.Contains("Long.Marketplace.Results", market);
         Assert.Contains("Long.Marketplace.ConfirmCancel", market);
         Assert.Contains("x:Name=\"MarketHeroTitle\"", market);
@@ -1539,6 +1543,28 @@ public class QualityGateTests
         Assert.Contains("--quality-reduce-motion", script);
         Assert.Contains("requested_state_confirmed", script);
         Assert.Contains("Quality accessibility mode:", app);
+    }
+
+    [Fact]
+    public void WorkspaceShell_UsesScopedSearchFocusBookmarksAndSingleLayerEscape()
+    {
+        var shell = Read(
+            "src", "LongBetterWindows.Host", "Views", "WorkspaceShellControl.xaml.cs");
+        var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
+        var market = Read(
+            "src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml.cs");
+        var pluginXaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml");
+
+        Assert.Contains("WorkspaceSearchSession", shell);
+        Assert.Contains("TimeSpan.FromMilliseconds(180)", shell);
+        Assert.Contains("FocusScopedSearch", shell);
+        Assert.Contains("WorkspaceEscapeRouter.Route", main);
+        Assert.Contains("WorkspaceFocusBookmarkStore", main);
+        Assert.Contains("key == Key.K", main);
+        Assert.Contains("RememberConfirmationFocus", market);
+        Assert.Contains("DismissConfirmation", market);
+        Assert.DoesNotContain("PluginSearchBox", pluginXaml);
     }
 
     [Fact]

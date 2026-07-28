@@ -164,9 +164,16 @@ public sealed class I18nServiceTests : IDisposable
             "LongBetterWindows.Host",
             "Views",
             "PluginManagementControl.xaml.cs"));
+        var workspace = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "WorkspaceShellControl.xaml"));
 
         Assert.Contains("i18n.plugins.installed", xaml);
-        Assert.Contains("i18n.plugins.search", xaml);
+        Assert.Contains("Long.Workspace.Search", workspace);
+        Assert.Contains("ApplyWorkspaceSearch", source);
         Assert.Contains("i18n.plugins.actions", xaml);
         Assert.Contains("I18n(\"plugins.capabilities\")", source);
         Assert.Contains("ApplyResponsiveLayout", source);

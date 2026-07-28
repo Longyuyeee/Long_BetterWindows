@@ -58,25 +58,6 @@
                 <ColumnDefinition x:Name="MarketCategoryColumn" Width="190" />
                 <ColumnDefinition x:Name="MarketRefreshColumn" Width="Auto" />
             </Grid.ColumnDefinitions>
-            <Grid x:Name="MarketSearchHost">
-                <TextBox x:Name="MarketSearchBox" Style="{StaticResource LongSearchBox}"
-                         AutomationProperties.AutomationId="Long.Marketplace.Search"
-                         AutomationProperties.Name="{DynamicResource i18n.market.search}"
-                         TextChanged="MarketSearchBox_TextChanged" />
-                <TextBlock Text="{DynamicResource i18n.market.searchHint}" Margin="16,0" VerticalAlignment="Center"
-                           IsHitTestVisible="False" Foreground="{DynamicResource Long.Brush.Text.Muted}">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Text, ElementName=MarketSearchBox}" Value="">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </Grid>
             <ComboBox x:Name="CategoryBox" Grid.Column="1" Height="48" Margin="10,0"
                       Style="{StaticResource LongComboBox}"
                       AutomationProperties.AutomationId="Long.Marketplace.Category"
@@ -287,15 +268,21 @@
         <Grid x:Name="ConfirmOverlay" Grid.RowSpan="3" Visibility="Collapsed"
               Background="{DynamicResource OverlayDarkBrush}">
             <Border Width="520" MaxHeight="590" VerticalAlignment="Center" HorizontalAlignment="Center"
-                    Style="{StaticResource LongCard}" Padding="26" Effect="{DynamicResource Long.Shadow.Level3}">
+                    Style="{StaticResource LongCard}" Padding="26" Effect="{DynamicResource Long.Shadow.Level3}"
+                    KeyboardNavigation.TabNavigation="Cycle">
                 <StackPanel>
                     <Grid>
                         <TextBlock x:Name="ConfirmTitle" Text="{DynamicResource i18n.market.confirm.installTitle}" FontSize="20" FontWeight="SemiBold"
                                    AutomationProperties.AutomationId="Long.Marketplace.ConfirmTitle" />
-                        <Button Content="×" HorizontalAlignment="Right" Style="{StaticResource LongIconButton}"
+                        <Button HorizontalAlignment="Right" Style="{StaticResource LongIconButton}"
                                 AutomationProperties.AutomationId="Long.Marketplace.ConfirmClose"
                                 AutomationProperties.Name="{DynamicResource i18n.market.confirm.close}"
-                                Click="CancelConfirmation_Click" />
+                                Click="CancelConfirmation_Click">
+                            <Path Data="{StaticResource Long.Icon.Close}"
+                                  Style="{StaticResource LongIcon}"
+                                  Width="11"
+                                  Height="11" />
+                        </Button>
                     </Grid>
                     <TextBlock x:Name="ConfirmSubtitle" Margin="0,8,42,0" TextWrapping="Wrap"
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
@@ -331,7 +318,7 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <ProgressBar x:Name="InstallProgress" Width="120" Height="4" Visibility="Collapsed" IsIndeterminate="True"
                                      AutomationProperties.Name="{DynamicResource i18n.market.operationInProgress}" />
-                        <Button Grid.Column="1" Content="{DynamicResource i18n.action.cancel}" Margin="0,0,8,0" Style="{StaticResource LongButton}"
+                        <Button x:Name="ConfirmCancelButton" Grid.Column="1" Content="{DynamicResource i18n.action.cancel}" Margin="0,0,8,0" Style="{StaticResource LongButton}"
                                 AutomationProperties.AutomationId="Long.Marketplace.ConfirmCancel"
                                 AutomationProperties.Name="{DynamicResource i18n.market.cancelOperation}"
                                 Click="CancelConfirmation_Click" />
