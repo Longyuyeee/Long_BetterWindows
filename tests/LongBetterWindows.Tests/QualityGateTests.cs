@@ -871,7 +871,7 @@ public class QualityGateTests
     }
 
     [Fact]
-    public void PluginManagement_UsesRecyclingVirtualizationAndOwnsPluginActions()
+    public void PluginManagement_UsesRecyclingVirtualizationAndRoutesDetailsToWorkspace()
     {
         var xaml = Read("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml");
         Assert.Contains("x:Name=\"PluginsPanel\"", xaml);
@@ -885,8 +885,8 @@ public class QualityGateTests
         var code = Read("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs");
         Assert.Contains("PluginActions_Click", code);
         Assert.Contains("OpenPluginAsync", code);
-        Assert.Contains("OpenPluginSettings", code);
-        Assert.Contains("OpenCapabilityDetails", code);
+        Assert.Contains("PluginSettingsRequested?.Invoke", code);
+        Assert.DoesNotContain("OpenCapabilityDetails", code);
         Assert.Contains("TogglePluginAsync", code);
         Assert.Contains("AddMenuAction", code);
         Assert.Equal(1, xaml.Split("Click=\"PluginActions_Click\"").Length - 1);
@@ -911,16 +911,31 @@ public class QualityGateTests
         var toolCenterCode = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
         Assert.Contains("x:Name=\"PluginManagementHost\"", toolCenterXaml);
         Assert.DoesNotContain("<local:PluginManagementControl", toolCenterXaml);
-        Assert.Contains("PluginManagementHost.Content ??= new PluginManagementControl()", toolCenterCode);
-        Assert.Contains("((PluginManagementControl)PluginManagementHost.Content).Refresh()", toolCenterCode);
+        Assert.Contains("plugins = new PluginManagementControl()", toolCenterCode);
+        Assert.Contains("plugins.Refresh()", toolCenterCode);
         Assert.Contains("ReleasePluginManagementPage()", toolCenterCode);
         Assert.Contains("PluginManagementHost.Content = null", toolCenterCode);
         Assert.Contains("plugins.Dispose()", toolCenterCode);
+        Assert.Contains("OpenPluginSettingsModule", toolCenterCode);
+        Assert.Contains("_pluginSettingsModules", toolCenterCode);
+        Assert.Contains("PanelPluginSettings", toolCenterXaml);
+        Assert.Contains("PluginSettingsModuleHost", toolCenterXaml);
         Assert.Contains("SystemHost.Content ??= new SystemIntegrationPageControl()", toolCenterCode);
         Assert.Contains("new SettingsPageControl()", toolCenterCode);
         Assert.Contains("OpenPluginsForQuality", toolCenterCode);
         Assert.DoesNotContain("CreatePluginCard", toolCenterCode);
         Assert.DoesNotContain("PluginToggle_Click", toolCenterCode);
+        var showPageStart = toolCenterCode.IndexOf(
+            "private void ShowPage",
+            StringComparison.Ordinal);
+        var releaseMethodStart = toolCenterCode.IndexOf(
+            "private void ReleasePluginManagementPage",
+            StringComparison.Ordinal);
+        Assert.True(showPageStart >= 0);
+        Assert.True(releaseMethodStart > showPageStart);
+        Assert.DoesNotContain(
+            "ReleasePluginManagementPage()",
+            toolCenterCode[showPageStart..releaseMethodStart]);
     }
 
     [Fact]
@@ -1591,6 +1606,37 @@ public class QualityGateTests
         Assert.Contains("PluginRunRequested?.Invoke", code);
         Assert.Contains("current[targetIndex] != target", projection);
         Assert.Contains("<local:InstalledPluginRailControl", shell);
+    }
+
+    [Fact]
+    public void PluginSettingsModule_EmbedsSettingsAndKeepsLifecycleInHost()
+    {
+        var xaml = Read(
+            "src", "LongBetterWindows.Host", "Views",
+            "PluginSettingsModuleControl.xaml");
+        var code = Read(
+            "src", "LongBetterWindows.Host", "Views",
+            "PluginSettingsModuleControl.xaml.cs");
+        var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
+        var resolver = Read(
+            "src", "LongBetterWindows.Host", "Interaction",
+            "WorkspaceModuleAddress.cs");
+
+        Assert.Contains("Long.Workspace.PluginSettings.Tabs", xaml);
+        Assert.Contains("Long.Workspace.PluginSettings.Content", xaml);
+        Assert.Contains("<local:CapabilityDetailPanel", xaml);
+        Assert.Contains("CreateSettingsUI()", code);
+        Assert.Contains("PluginRunRequested?.Invoke", code);
+        Assert.Contains("PluginToggleRequested?.Invoke", code);
+        Assert.DoesNotContain("StartPluginAsync", code);
+        Assert.DoesNotContain("StopPluginAsync", code);
+        Assert.DoesNotContain("DynamicResource plugins.", xaml);
+        Assert.Contains("OpenPluginSettingsModule", main);
+        Assert.Contains("HandleMissingPluginModulesAsync", main);
+        Assert.Contains("await plugin.EnsureActivatedAsync()", resolver);
+        Assert.DoesNotContain(
+            "plugin.Instance is not IHasSettingsUI",
+            resolver);
     }
 
     [Fact]

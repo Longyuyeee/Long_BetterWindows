@@ -44,7 +44,9 @@
 
                 <Border Style="{StaticResource LongCard}" Margin="0,8,0,0">
                     <StackPanel>
-                        <TextBlock Text="本地调用记录" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock Text="{DynamicResource i18n.plugins.usage.title}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold" />
                         <TextBlock x:Name="StatsText" Margin="0,8,0,0" TextWrapping="Wrap"
                                    Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                     </StackPanel>

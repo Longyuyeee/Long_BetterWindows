@@ -279,6 +279,9 @@ public class DesignSystemTests
             root, "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs"));
         var pluginManagementView = File.ReadAllText(Path.Combine(
             root, "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml"));
+        var pluginSettingsView = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views",
+            "PluginSettingsModuleControl.xaml"));
         var zhResources = File.ReadAllText(Path.Combine(
             root, "src", "LongBetterWindows.Host", "i18n", "zh-CN.json"));
         var performance = File.ReadAllText(Path.Combine(
@@ -291,10 +294,11 @@ public class DesignSystemTests
         Assert.Contains("DiagnosticsHost.Content == null", toolCenter);
         Assert.Contains("DiagnosticsHost.Content = new PerformancePanel()", toolCenter);
         Assert.Contains("OpenDiagnosticsForQuality", toolCenter);
-        Assert.Contains("OpenCapabilityDetails", pluginManagement);
+        Assert.Contains("PluginSettingsRequested?.Invoke", pluginManagement);
         Assert.Contains("I18n(\"plugins.capabilities\")", pluginManagement);
         Assert.Contains("Long.Icon.MoreHorizontal", pluginManagementView);
         Assert.Contains("i18n.plugins.actions", pluginManagementView);
+        Assert.Contains("CapabilityDetailPanel", pluginSettingsView);
         Assert.Contains("查看插件权限", zhResources);
         Assert.DoesNotContain("CapabilityDetails_Click", toolCenter);
         Assert.DoesNotContain("DispatcherTimer", performance);

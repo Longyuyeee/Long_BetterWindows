@@ -12,15 +12,36 @@ namespace LongBetterWindows.Host.Views
             InitializeComponent();
         }
 
+        internal void ApplyLanguage()
+        {
+            if (string.IsNullOrWhiteSpace(_pluginId))
+                return;
+            LoadCapabilities(
+                _pluginId,
+                _pluginName,
+                _capabilities);
+        }
+
+        private string _pluginId = string.Empty;
+        private string _pluginName = string.Empty;
+        private IReadOnlyList<string> _capabilities = [];
+
         public void LoadCapabilities(
             string pluginId,
             string pluginName,
             IReadOnlyList<string> capabilities)
         {
+            _pluginId = pluginId;
+            _pluginName = pluginName;
+            _capabilities = capabilities.ToArray();
             PluginNameText.Text = pluginName;
             PermissionSummaryText.Text = capabilities.Count == 0
-                ? "无需访问宿主能力"
-                : $"已声明 {capabilities.Count} 项宿主能力";
+                ? Text("plugins.capabilities.none", "No host capabilities required")
+                : string.Format(
+                    Text(
+                        "plugins.capabilities.count",
+                        "{0} host capabilities declared"),
+                    capabilities.Count);
 
             var items = capabilities.Select(capability =>
             {
@@ -34,6 +55,9 @@ namespace LongBetterWindows.Host.Views
             }).ToArray();
 
             CapabilityItems.ItemsSource = items;
+            NoCapabilitiesText.Text = Text(
+                "plugins.capabilities.empty",
+                "This plugin declares no host capabilities.");
             NoCapabilitiesText.Visibility = items.Length == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -42,16 +66,28 @@ namespace LongBetterWindows.Host.Views
 
         private string BuildUsageSummary(string pluginId)
         {
-            var stats = CapabilityUsageTracker.Instance.GetStats(pluginId);
+            var stats = CapabilityUsageTracker.Instance.GetStatsSnapshot(pluginId);
             if (stats is null || stats.TotalCalls == 0)
-                return "本次宿主会话暂无能力调用记录。";
+                return Text(
+                    "plugins.usage.empty",
+                    "No capability calls in this host session.");
 
-            var lastCall = stats.LastCallTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "未知";
+            var lastCall = stats.LastCallTime?.ToString("yyyy-MM-dd HH:mm:ss")
+                ?? Text("plugins.usage.unknown", "Unknown");
             var topCalls = string.Join("\n", stats.CapabilityCalls
                 .OrderByDescending(item => item.Value)
                 .Take(5)
-                .Select(item => $"{CapabilityMetadata.GetInfo(item.Key).DisplayName} · {item.Value} 次"));
-            return $"总调用 {stats.TotalCalls} 次\n最后调用 {lastCall}\n\n{topCalls}";
+                .Select(item => string.Format(
+                    Text("plugins.usage.item", "{0} · {1} calls"),
+                    CapabilityMetadata.GetInfo(item.Key).DisplayName,
+                    item.Value)));
+            return string.Format(
+                Text(
+                    "plugins.usage.summary",
+                    "{0} total calls\nLast call {1}\n\n{2}"),
+                stats.TotalCalls,
+                lastCall,
+                topCalls);
         }
 
         private Brush GetLevelBrush(SecurityLevel level)
@@ -66,13 +102,21 @@ namespace LongBetterWindows.Host.Views
             return (Brush)FindResource(key);
         }
 
-        private static string GetLevelText(SecurityLevel level) => level switch
+        private string GetLevelText(SecurityLevel level) => level switch
         {
-            SecurityLevel.Safe => "常规",
-            SecurityLevel.Medium => "敏感",
-            SecurityLevel.High => "高权限",
-            _ => "未知",
+            SecurityLevel.Safe => Text("plugins.capabilities.level.safe", "Standard"),
+            SecurityLevel.Medium => Text("plugins.capabilities.level.medium", "Sensitive"),
+            SecurityLevel.High => Text("plugins.capabilities.level.high", "High privilege"),
+            _ => Text("plugins.capabilities.level.unknown", "Unknown"),
         };
+
+        private static string Text(string key, string fallback)
+        {
+            var value = ServicesInitializer.I18n.T(key);
+            return string.IsNullOrWhiteSpace(value) || value == key
+                ? fallback
+                : value;
+        }
 
         private sealed record CapabilityDetailItem(
             string CapabilityKey,

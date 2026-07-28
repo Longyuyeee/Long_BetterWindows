@@ -39,6 +39,7 @@ public class AppStartupOptionsTests
             "--quality-themed-message-dialog-report", "message-dialog.json",
             "--quality-plugin-settings-report", "plugin-settings.json",
             "--quality-plugin-settings-persistence-report", "plugin-settings-persistence.json",
+            "--quality-open-plugin-settings", "com.long.folder-note",
             "--quality-skip-auto-start-plugin", "com.long.clipboardhistory",
             "--quality-skip-auto-start-plugin", "COM.LONG.MACRO",
             "--quality-hide-window-during-idle",
@@ -94,6 +95,9 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "plugin-settings-persistence.json",
             options.QualityPluginSettingsPersistenceReportPath);
+        Assert.Equal(
+            "com.long.folder-note",
+            options.QualityPluginSettingsId);
         Assert.Equal(
             2,
             options.QualitySkippedAutoStartPluginIds.Count);

@@ -192,6 +192,14 @@
                                         VerticalContentAlignment="Stretch" />
                     </Grid>
 
+                    <!-- 工作区插件设置模块 -->
+                    <Grid x:Name="PanelPluginSettings" Visibility="Collapsed">
+                        <ContentControl x:Name="PluginSettingsModuleHost"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Stretch"
+                                        automation:AutomationProperties.AutomationId="Long.ToolCenter.PluginSettingsHost" />
+                    </Grid>
+
                     <!-- Long 原生插件市场 -->
                     <Grid x:Name="PanelMarket" Visibility="Collapsed">
                         <ContentControl x:Name="MarketHost" />

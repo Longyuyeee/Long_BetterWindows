@@ -189,12 +189,6 @@ namespace LongBetterWindows.Host.Interaction
                     }
                     if (plugin.Instance is null)
                         await plugin.EnsureActivatedAsync();
-                    if (plugin.Instance is not IHasSettingsUI)
-                    {
-                        return Failure(
-                            canonical,
-                            WorkspaceModuleResolutionError.ResourceUnsupported);
-                    }
                     return Success(
                         canonical,
                         $"{plugin.DisplayName} - {Text("plugins.settings", "设置")}",

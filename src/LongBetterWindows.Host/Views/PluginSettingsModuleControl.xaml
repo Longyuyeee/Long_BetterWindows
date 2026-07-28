@@ -1,0 +1,159 @@
+<UserControl x:Class="LongBetterWindows.Host.Views.PluginSettingsModuleControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="Long.Workspace.PluginSettings">
+    <UserControl.Resources>
+        <Style x:Key="PluginModuleTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource Long.Brush.Text.Secondary}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabSurface"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabSurface"
+                                        Property="Background"
+                                        Value="{DynamicResource Long.Brush.Background.Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabSurface"
+                                        Property="Background"
+                                        Value="{DynamicResource Long.Brush.Accent.Soft}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Long.Brush.Text.Primary}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PluginModuleTabControlStyle" TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TabPanel Grid.Row="0"
+                                      IsItemsHost="True"
+                                      Background="Transparent" />
+                            <Border Grid.Row="1"
+                                    Margin="0,10,0,0"
+                                    Background="Transparent"
+                                    BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                                    BorderThickness="0,1,0,0">
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  Margin="0,14,0,0"
+                                                  ContentSource="SelectedContent" />
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Ellipse x:Name="StateDot"
+                         Width="8"
+                         Height="8"
+                         Margin="0,0,8,0"
+                         VerticalAlignment="Center"
+                         Fill="{DynamicResource Long.Brush.Text.Muted}" />
+                <TextBlock x:Name="StatusText"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                <Border Margin="9,0,0,0"
+                        Style="{StaticResource LongBadge}"
+                        VerticalAlignment="Center">
+                    <TextBlock x:Name="RuntimeText"
+                               FontSize="10"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                </Border>
+                <TextBlock x:Name="HotkeyText"
+                           Margin="10,0,0,0"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           FontFamily="{DynamicResource Long.Font.Mono}"
+                           Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                           Visibility="Collapsed" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button x:Name="ToggleButton"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource LongButton}"
+                        Click="ToggleButton_Click"
+                        AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Toggle" />
+                <Button x:Name="RunButton"
+                        Style="{StaticResource LongButton.Primary}"
+                        Click="RunButton_Click"
+                        AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Run">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Long.Icon.Play}"
+                              Style="{StaticResource LongIcon}"
+                              Width="12"
+                              Height="12"
+                              Margin="0,0,7,0" />
+                        <TextBlock x:Name="RunButtonText" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Border BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                BorderThickness="0,1,0,0"
+                Padding="0,14,0,0">
+            <TabControl x:Name="ModuleTabs"
+                        MinHeight="420"
+                        Style="{StaticResource PluginModuleTabControlStyle}"
+                        SelectionChanged="ModuleTabs_SelectionChanged"
+                        AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Tabs">
+                <TabItem x:Name="SettingsTab"
+                         Style="{StaticResource PluginModuleTabItemStyle}"
+                         Header="{DynamicResource i18n.plugins.settings}">
+                    <Grid Margin="0,16,0,0">
+                        <ContentControl x:Name="SettingsHost"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Top"
+                                        AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Content" />
+                        <TextBlock x:Name="SettingsUnavailableText"
+                                   Style="{StaticResource LongEmptyState}"
+                                   Text="{DynamicResource i18n.plugins.settingsUnavailable}"
+                                   Visibility="Collapsed" />
+                    </Grid>
+                </TabItem>
+                <TabItem x:Name="CapabilitiesTab"
+                         Style="{StaticResource PluginModuleTabItemStyle}"
+                         Header="{DynamicResource i18n.plugins.capabilities}">
+                    <Grid Margin="0,16,0,0">
+                        <local:CapabilityDetailPanel x:Name="CapabilityPanel"
+                                                     xmlns:local="clr-namespace:LongBetterWindows.Host.Views" />
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Border>
+    </StackPanel>
+</UserControl>

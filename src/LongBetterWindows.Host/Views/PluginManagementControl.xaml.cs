@@ -18,6 +18,8 @@ namespace LongBetterWindows.Host.Views
         private int _disposed;
         private string _workspaceQuery = string.Empty;
 
+        internal event Action<string>? PluginSettingsRequested;
+
         public PluginManagementControl()
         {
             App.MarkPluginPageStage("plugin_page_constructor_begin");
@@ -234,7 +236,7 @@ namespace LongBetterWindows.Host.Views
                     button,
                     () =>
                     {
-                        OpenPluginSettings(item);
+                        PluginSettingsRequested?.Invoke(item.Entry.Id);
                         return Task.CompletedTask;
                     });
             AddMenuAction(
@@ -243,7 +245,7 @@ namespace LongBetterWindows.Host.Views
                 button,
                 () =>
                 {
-                    OpenCapabilityDetails(item);
+                    PluginSettingsRequested?.Invoke(item.Entry.Id);
                     return Task.CompletedTask;
                 });
             AddMenuAction(
@@ -329,46 +331,7 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
-        private void OpenPluginSettings(PluginCardItem item)
-        {
-            var entry = item.Entry;
-            if (entry.Instance is not IHasSettingsUI settingsUi) return;
-
-            try
-            {
-                CreateSettingsWindow(
-                    entry,
-                    settingsUi,
-                    Window.GetWindow(this)).ShowDialog();
-            }
-            catch (Exception exception)
-            {
-                System.Diagnostics.Debug.WriteLine($"Settings UI error: {exception.Message}");
-            }
-        }
-
-        internal bool OpenPluginSettings(string pluginId)
-        {
-            var entry = HostProvider.Instance.PluginStore.Get(pluginId);
-            if (entry?.Instance is not IHasSettingsUI settingsUi)
-                return false;
-
-            try
-            {
-                CreateSettingsWindow(
-                    entry,
-                    settingsUi,
-                    Window.GetWindow(this)).ShowDialog();
-                return true;
-            }
-            catch (Exception exception)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"Settings UI error: {exception.Message}");
-                return false;
-            }
-        }
-
+        // Retained only for deterministic detached-window quality probes.
         internal static PluginWindowHost CreateSettingsWindow(
             PluginEntry entry,
             IHasSettingsUI settingsUi,
@@ -406,30 +369,6 @@ namespace LongBetterWindows.Host.Views
             };
         }
 
-        private void OpenCapabilityDetails(PluginCardItem item)
-        {
-            var entry = item.Entry;
-
-            var panel = new CapabilityDetailPanel();
-            panel.LoadCapabilities(entry.Id, entry.DisplayName, entry.Manifest.Capabilities);
-            new PluginWindowHost(
-                entry.Id,
-                string.Format(I18n("plugins.capabilitiesTitle"), entry.DisplayName),
-                panel,
-                new PluginWindowPreference
-                {
-                    Mode = PluginWindowMode.Standard,
-                    PreferredWidth = 720,
-                    PreferredHeight = 640,
-                    MinWidth = 560,
-                    MinHeight = 460,
-                })
-            {
-                Owner = Window.GetWindow(this),
-                ShowInTaskbar = false,
-            }.ShowDialog();
-        }
-
         private sealed class PluginCardItem
         {
             private PluginCardItem(PluginEntry entry)
@@ -461,7 +400,7 @@ namespace LongBetterWindows.Host.Views
                     + (additionalCount > 0 ? $" · +{additionalCount}" : string.Empty);
                 CanOpen = entry.Instance is IHasMainUI
                     || entry.Manifest.Window is not null;
-                CanOpenSettings = entry.Instance is IHasSettingsUI;
+                CanOpenSettings = true;
             }
 
             public PluginEntry Entry { get; }

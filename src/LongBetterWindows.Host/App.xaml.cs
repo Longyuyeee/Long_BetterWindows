@@ -43,6 +43,8 @@ namespace LongBetterWindows.Host
         internal bool ShowMarketForQualityRequested => _startupOptions.OpenMarketForQuality;
         internal bool ShowDiagnosticsForQualityRequested => _startupOptions.OpenDiagnosticsForQuality;
         internal bool ShowPluginsForQualityRequested => _startupOptions.OpenPluginsForQuality;
+        internal string? PluginSettingsForQualityRequested
+            => _startupOptions.QualityPluginSettingsId;
         internal bool ShowSystemForQualityRequested => _startupOptions.OpenSystemForQuality;
         internal bool ShowSettingsForQualityRequested => _startupOptions.OpenSettingsForQuality;
         internal bool ShowDeveloperForQualityRequested => _startupOptions.OpenDeveloperForQuality;
@@ -227,6 +229,20 @@ namespace LongBetterWindows.Host
                     else
                         SuperPanelWindow.ShowPanelForQuality(
                             _startupOptions.UseEmptyContextForQuality);
+                }
+                if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginSettingsId))
+                {
+                    if (MainWindow is not MainWindow pluginSettingsWindow
+                        || !await pluginSettingsWindow.OpenPluginSettingsForQualityAsync(
+                            _startupOptions.QualityPluginSettingsId))
+                    {
+                        throw new InvalidOperationException(
+                            "Quality plugin settings module could not open.");
+                    }
+                    await Dispatcher.InvokeAsync(
+                        () => { },
+                        DispatcherPriority.Loaded);
                 }
                 if (!string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId)
                     && MainWindow is MainWindow workflowWindow)

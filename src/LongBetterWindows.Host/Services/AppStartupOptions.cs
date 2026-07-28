@@ -20,6 +20,7 @@ namespace LongBetterWindows.Host.Services
         public bool OpenMarketForQuality { get; private init; }
         public bool OpenDiagnosticsForQuality { get; private init; }
         public bool OpenPluginsForQuality { get; private init; }
+        public string? QualityPluginSettingsId { get; private init; }
         public string? QualityPluginPageReleaseReportPath { get; private init; }
         public string? QualityPluginPagePerformanceReportPath { get; private init; }
         public string? QualityTaskbarIdentityReportPath { get; private init; }
@@ -104,6 +105,9 @@ namespace LongBetterWindows.Host.Services
                     || captureView == "plugins"
                     || !string.IsNullOrWhiteSpace(pluginPageReleaseReport)
                     || !string.IsNullOrWhiteSpace(pluginPagePerformanceReport),
+                QualityPluginSettingsId = ReadArgument(
+                    arguments,
+                    "--quality-open-plugin-settings"),
                 QualityPluginPageReleaseReportPath = pluginPageReleaseReport,
                 QualityPluginPagePerformanceReportPath =
                     pluginPagePerformanceReport,

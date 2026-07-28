@@ -108,7 +108,7 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
     }
 
     [Fact]
-    public async Task ResolveAsync_PluginSettings_RequiresKnownSettingsProvider()
+    public async Task ResolveAsync_PluginSettings_RequiresKnownPlugin()
     {
         var registry = new PluginRegistry();
         Register(registry, "plain", new object());
@@ -125,9 +125,7 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
         Assert.Equal(
             WorkspaceModuleResolutionError.ResourceNotFound,
             missingResult.Error);
-        Assert.Equal(
-            WorkspaceModuleResolutionError.ResourceUnsupported,
-            plainResult.Error);
+        Assert.True(plainResult.IsSuccess);
         Assert.True(settingsResult.IsSuccess);
         Assert.Equal("plugin-settings:settings", settingsResult.Module!.Key.ToString());
     }
@@ -150,6 +148,26 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
         Assert.True(result.IsSuccess);
         Assert.True(registry.Get("deferred")!.IsActivated);
         Assert.Equal(PluginState.Loaded, registry.Get("deferred")!.State);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DeferredPlainPlugin_OpensGenericDetailsWithoutStarting()
+    {
+        var registry = new PluginRegistry();
+        registry.RegisterDeferred(
+            Manifest("deferred-plain"),
+            "/deferred-plain",
+            _ => Task.FromResult<object?>(new object()));
+        var resolver = Resolver(registry);
+        WorkspaceModuleAddress.TryParse(
+            "plugin-settings:deferred-plain",
+            out var address);
+
+        var result = await resolver.ResolveAsync(address);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(registry.Get("deferred-plain")!.IsActivated);
+        Assert.Equal(PluginState.Loaded, registry.Get("deferred-plain")!.State);
     }
 
     private WorkspaceModuleResolver Resolver(PluginRegistry registry)

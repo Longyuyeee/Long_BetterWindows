@@ -15,7 +15,12 @@ namespace LongBetterWindows.Host.Views
         internal event Action<WorkflowExecutionResultState>? WorkflowExecutionResultChanged;
         internal event EventHandler? WorkflowTerminalOutputsCleared;
         internal event Action<string>? PageNavigationRequested;
+        internal event Action<string>? PluginSettingsNavigationRequested;
+        internal event Action<string>? PluginRunRequested;
+        internal event Action<string>? PluginToggleRequested;
         private bool? _isNarrowLayout;
+        private readonly Dictionary<string, PluginSettingsModuleControl>
+            _pluginSettingsModules = new(StringComparer.OrdinalIgnoreCase);
 
         public ToolCenterControl()
         {
@@ -32,6 +37,7 @@ namespace LongBetterWindows.Host.Views
             Unloaded += (_, _) =>
             {
                 ReleasePluginManagementPage();
+                ReleasePluginSettingsModules();
                 if (DeveloperHost.Content is DeveloperPageControl developerPage)
                 {
                     DeveloperHost.Content = null;
@@ -158,6 +164,7 @@ namespace LongBetterWindows.Host.Views
             ShowPage("plugins");
             var reference = new WeakReference(PluginManagementHost.Content);
             ShowPage("overview");
+            ReleasePluginManagementPage();
             return reference;
         }
 
@@ -291,11 +298,75 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
-        internal bool OpenPluginSettings(string pluginId)
+        internal bool OpenPluginSettingsModule(string pluginId)
         {
-            ShowPage("plugins");
-            return PluginManagementHost.Content is PluginManagementControl plugins
-                && plugins.OpenPluginSettings(pluginId);
+            var entry = HostProvider.Instance.PluginStore.Get(pluginId);
+            if (entry is null)
+                return false;
+
+            RememberCurrentScrollOffset();
+            CollapseAllContentPanels();
+            ClearManagementNavigationSelection();
+            var module = GetOrCreatePluginSettingsModule(pluginId);
+            PluginSettingsModuleHost.Content = module;
+            PanelPluginSettings.Visibility = Visibility.Visible;
+            _activePage = $"plugin-settings:{pluginId}";
+            _pageInitialized = true;
+            PageTitle.Text = entry.DisplayName;
+            PageSubtitle.Text = string.Format(
+                I18n("plugins.module.subtitle"),
+                entry.Manifest.Version);
+            module.Refresh();
+            Helpers.AnimationHelper.FadeInElement(
+                PanelPluginSettings,
+                durationMs: 160);
+            _ = Dispatcher.BeginInvoke(
+                new Action(() =>
+                    ContentScrollViewer.ScrollToVerticalOffset(
+                        _pageScrollOffsets.TryGetValue(
+                            _activePage,
+                            out var offset)
+                                ? offset
+                                : 0)),
+                System.Windows.Threading.DispatcherPriority.ContextIdle);
+            return true;
+        }
+
+        internal void RemovePluginSettingsModule(string pluginId)
+        {
+            if (!_pluginSettingsModules.Remove(pluginId, out var module))
+                return;
+            if (ReferenceEquals(PluginSettingsModuleHost.Content, module))
+                PluginSettingsModuleHost.Content = null;
+            module.Dispose();
+            _pageScrollOffsets.Remove($"plugin-settings:{pluginId}");
+        }
+
+        internal void RefreshPluginSettingsModule(string pluginId)
+        {
+            if (_pluginSettingsModules.TryGetValue(pluginId, out var module))
+                module.Refresh();
+        }
+
+        internal void ApplyLanguage()
+        {
+            foreach (var module in _pluginSettingsModules.Values)
+                module.ApplyLanguage();
+            if (_activePage.StartsWith(
+                    "plugin-settings:",
+                    StringComparison.Ordinal))
+            {
+                var pluginId = _activePage["plugin-settings:".Length..];
+                if (HostProvider.Instance.PluginStore.Get(pluginId) is { } entry)
+                {
+                    PageTitle.Text = entry.DisplayName;
+                    PageSubtitle.Text = string.Format(
+                        I18n("plugins.module.subtitle"),
+                        entry.Manifest.Version);
+                }
+                return;
+            }
+            ShowPage(_activePage, forceRefresh: true);
         }
 
         internal void ShowWelcomeForQuality()
@@ -395,11 +466,9 @@ namespace LongBetterWindows.Host.Views
             {
                 return;
             }
-            if (_pageInitialized)
-                _pageScrollOffsets[_activePage] = ContentScrollViewer.VerticalOffset;
-
-            if (!string.Equals(page, "plugins", StringComparison.Ordinal))
-                ReleasePluginManagementPage();
+            RememberCurrentScrollOffset();
+            PanelPluginSettings.Visibility = Visibility.Collapsed;
+            PluginSettingsModuleHost.Content = null;
 
             (string Key, FrameworkElement Panel, RadioButton Navigation, string Title, string Subtitle)[] pages =
             {
@@ -426,8 +495,14 @@ namespace LongBetterWindows.Host.Views
                 PageSubtitle.Text = subtitle;
                 if (key == "plugins")
                 {
-                    PluginManagementHost.Content ??= new PluginManagementControl();
-                    ((PluginManagementControl)PluginManagementHost.Content).Refresh();
+                    if (PluginManagementHost.Content is not PluginManagementControl plugins)
+                    {
+                        plugins = new PluginManagementControl();
+                        plugins.PluginSettingsRequested +=
+                            pluginId => PluginSettingsNavigationRequested?.Invoke(pluginId);
+                        PluginManagementHost.Content = plugins;
+                    }
+                    plugins.Refresh();
                 }
                 else if (key == "workflows" && WorkflowEditorHost.Content == null)
                 {
@@ -478,6 +553,74 @@ namespace LongBetterWindows.Host.Views
 
             PluginManagementHost.Content = null;
             plugins.Dispose();
+        }
+
+        private PluginSettingsModuleControl GetOrCreatePluginSettingsModule(
+            string pluginId)
+        {
+            if (_pluginSettingsModules.TryGetValue(pluginId, out var existing))
+                return existing;
+            var module = new PluginSettingsModuleControl(pluginId);
+            module.PluginRunRequested +=
+                id => PluginRunRequested?.Invoke(id);
+            module.PluginToggleRequested +=
+                id => PluginToggleRequested?.Invoke(id);
+            module.PluginUnavailable += RemovePluginSettingsModule;
+            module.StateChanged += state =>
+            {
+                if (string.Equals(
+                    _activePage,
+                    $"plugin-settings:{state.Id}",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    PageTitle.Text = state.Name;
+                    PageSubtitle.Text = string.Format(
+                        I18n("plugins.module.subtitle"),
+                        state.Version);
+                }
+            };
+            _pluginSettingsModules[pluginId] = module;
+            return module;
+        }
+
+        private void ReleasePluginSettingsModules()
+        {
+            PluginSettingsModuleHost.Content = null;
+            foreach (var module in _pluginSettingsModules.Values)
+                module.Dispose();
+            _pluginSettingsModules.Clear();
+        }
+
+        private void RememberCurrentScrollOffset()
+        {
+            if (_pageInitialized)
+                _pageScrollOffsets[_activePage] =
+                    ContentScrollViewer.VerticalOffset;
+        }
+
+        private void CollapseAllContentPanels()
+        {
+            PanelOverview.Visibility = Visibility.Collapsed;
+            PanelWorkflows.Visibility = Visibility.Collapsed;
+            PanelPlugins.Visibility = Visibility.Collapsed;
+            PanelPluginSettings.Visibility = Visibility.Collapsed;
+            PanelMarket.Visibility = Visibility.Collapsed;
+            PanelSystem.Visibility = Visibility.Collapsed;
+            PanelDiagnostics.Visibility = Visibility.Collapsed;
+            PanelDev.Visibility = Visibility.Collapsed;
+            PanelSettings.Visibility = Visibility.Collapsed;
+        }
+
+        private void ClearManagementNavigationSelection()
+        {
+            NavOverview.IsChecked = false;
+            NavWorkflows.IsChecked = false;
+            NavPlugins.IsChecked = false;
+            NavMarket.IsChecked = false;
+            NavSystem.IsChecked = false;
+            NavDiagnostics.IsChecked = false;
+            NavDeveloper.IsChecked = false;
+            NavSettings.IsChecked = false;
         }
 
         private void WelcomeDismiss_Click(object sender, RoutedEventArgs e)

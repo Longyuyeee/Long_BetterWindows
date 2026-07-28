@@ -56,6 +56,12 @@ namespace LongBetterWindows.Host
                 WorkspaceShell_PluginSettingsRequested;
             WorkspaceShell.PluginRunRequested +=
                 WorkspaceShell_PluginRunRequested;
+            ToolCenter.PluginSettingsNavigationRequested +=
+                WorkspaceShell_PluginSettingsRequested;
+            ToolCenter.PluginRunRequested +=
+                WorkspaceShell_PluginRunRequested;
+            ToolCenter.PluginToggleRequested +=
+                ToolCenter_PluginToggleRequested;
             WorkspaceShell.ScopedSearchFailed += exception =>
                 Log.Error(exception, "Workspace scoped search failed");
             ToolCenter.AddHandler(
@@ -64,8 +70,14 @@ namespace LongBetterWindows.Host
                     ToolCenter_GotKeyboardFocus),
                 handledEventsToo: true);
             ServicesInitializer.I18n.LanguageChanged += I18n_LanguageChanged;
+            HostProvider.Instance.PluginStore.PluginsChanged +=
+                PluginStore_PluginsChanged;
             Closed += (_, _) =>
+            {
                 ServicesInitializer.I18n.LanguageChanged -= I18n_LanguageChanged;
+                HostProvider.Instance.PluginStore.PluginsChanged -=
+                    PluginStore_PluginsChanged;
+            };
             ToolCenter.PageNavigationRequested +=
                 ToolCenter_PageNavigationRequested;
             ToolCenter.WorkflowReviewClosed += (_, _) =>
@@ -234,6 +246,19 @@ namespace LongBetterWindows.Host
                     "工作流不存在或已失效。");
         }
 
+        internal async Task<bool> OpenPluginSettingsForQualityAsync(
+            string pluginId)
+        {
+            var resolution = await ResolveWorkspaceModuleAsync(
+                $"plugin-settings:{pluginId}",
+                CancellationToken.None);
+            return resolution.IsSuccess
+                && resolution.Module is not null
+                && await OpenWorkspaceModuleAsync(
+                    resolution.Module,
+                    CancellationToken.None) is null;
+        }
+
         internal async Task<string?> OpenWorkspaceModuleAsync(
             WorkspaceModuleDescriptor module,
             CancellationToken cancellationToken = default)
@@ -282,7 +307,7 @@ namespace LongBetterWindows.Host
                 "workflow" => await ToolCenter.OpenWorkflowEditorAsync(
                     module.Key.ResourceId,
                     cancellationToken),
-                "plugin-settings" => ToolCenter.OpenPluginSettings(
+                "plugin-settings" => ToolCenter.OpenPluginSettingsModule(
                     module.Key.ResourceId)
                         ? null
                         : I18nOrFallback(
@@ -439,6 +464,60 @@ namespace LongBetterWindows.Host
             }
         }
 
+        private async void ToolCenter_PluginToggleRequested(string pluginId)
+        {
+            try
+            {
+                var registry = HostProvider.Instance.PluginStore;
+                var entry = registry.Get(pluginId);
+                if (entry is null)
+                    return;
+                if (entry.State is PluginState.Running or PluginState.Background)
+                {
+                    await registry.StopPluginAsync(pluginId);
+                    return;
+                }
+                await registry.StartPluginAsync(pluginId);
+            }
+            catch (Exception exception)
+            {
+                Log.Error(
+                    exception,
+                    "Plugin {PluginId} toggle from workspace settings failed",
+                    pluginId);
+            }
+            finally
+            {
+                ToolCenter.RefreshPluginSettingsModule(pluginId);
+            }
+        }
+
+        private void PluginStore_PluginsChanged()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                _ = Dispatcher.BeginInvoke(HandleMissingPluginModulesAsync);
+                return;
+            }
+            _ = HandleMissingPluginModulesAsync();
+        }
+
+        private async Task HandleMissingPluginModulesAsync()
+        {
+            var missing = ServicesInitializer.Workspace.State.Modules
+                .Where(module =>
+                    module.Key.Kind == "plugin-settings"
+                    && HostProvider.Instance.PluginStore.Get(
+                        module.Key.ResourceId) is null)
+                .Select(module => module.Key)
+                .ToArray();
+            foreach (var key in missing)
+            {
+                ToolCenter.RemovePluginSettingsModule(key.ResourceId);
+                await CloseWorkspaceModuleAsync(key);
+            }
+        }
+
         private async Task CloseWorkspaceModuleAsync(WorkspaceModuleKey key)
         {
             var before = ServicesInitializer.Workspace.State;
@@ -492,7 +571,10 @@ namespace LongBetterWindows.Host
         }
 
         private void I18n_LanguageChanged(string language)
-            => WorkspaceShell.ApplyLanguage();
+        {
+            WorkspaceShell.ApplyLanguage();
+            ToolCenter.ApplyLanguage();
+        }
 
         private void ToolCenter_GotKeyboardFocus(
             object sender,
