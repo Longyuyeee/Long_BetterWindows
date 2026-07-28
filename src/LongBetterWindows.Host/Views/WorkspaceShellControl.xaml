@@ -1,0 +1,129 @@
+<UserControl x:Class="LongBetterWindows.Host.Views.WorkspaceShellControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:LongBetterWindows.Host.Views"
+             AutomationProperties.AutomationId="Long.Workspace.Shell">
+    <UserControl.Resources>
+        <Style x:Key="WorkspaceModuleTabStyle" TargetType="Button">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinWidth" Value="104" />
+            <Setter Property="MaxWidth" Value="220" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Text.Secondary}" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface"
+                                        Property="Background"
+                                        Value="{DynamicResource Long.Brush.Background.Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Surface"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource Long.Brush.Accent.Primary}" />
+                                <Setter TargetName="Surface"
+                                        Property="BorderThickness"
+                                        Value="1" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                <Setter TargetName="Surface"
+                                        Property="Background"
+                                        Value="{DynamicResource Long.Brush.Accent.Soft}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource Long.Brush.Text.Primary}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="WorkspaceModuleCloseStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource LongIconButton}">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="1,0,3,0" />
+            <Setter Property="Visibility" Value="Visible" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CanClose}" Value="False">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="{DynamicResource Long.Brush.Background.Base}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="44" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="{DynamicResource Long.Brush.Background.Raised}"
+                BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                BorderThickness="0,0,0,1">
+            <ScrollViewer x:Name="ModuleScroller"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled"
+                          CanContentScroll="True"
+                          Padding="10,5">
+                <ItemsControl x:Name="ModuleItems">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,0,4,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="ModuleTabButton"
+                                        Style="{StaticResource WorkspaceModuleTabStyle}"
+                                        Tag="{Binding Key}"
+                                        ToolTip="{Binding Title}"
+                                        Click="ModuleTab_Click"
+                                        AutomationProperties.Name="{Binding Title}"
+                                        AutomationProperties.AutomationId="Long.Workspace.ModuleTab">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Button>
+                                <Button Grid.Column="1"
+                                        Style="{StaticResource WorkspaceModuleCloseStyle}"
+                                        Tag="{Binding Key}"
+                                        Click="ModuleClose_Click"
+                                        ToolTip="{DynamicResource i18n.app.close}"
+                                        AutomationProperties.Name="{DynamicResource i18n.app.close}"
+                                        AutomationProperties.AutomationId="Long.Workspace.ModuleClose">
+                                    <Path Data="{StaticResource Long.Icon.Close}"
+                                          Style="{StaticResource LongIcon}"
+                                          Width="11"
+                                          Height="11" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <local:ToolCenterControl x:Name="ToolCenterContent" Grid.Row="1" />
+    </Grid>
+</UserControl>

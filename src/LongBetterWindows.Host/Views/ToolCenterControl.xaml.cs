@@ -14,6 +14,7 @@ namespace LongBetterWindows.Host.Views
         internal event Action<bool>? WorkflowLayoutChanged;
         internal event Action<WorkflowExecutionResultState>? WorkflowExecutionResultChanged;
         internal event EventHandler? WorkflowTerminalOutputsCleared;
+        internal event Action<string>? PageNavigationRequested;
         private bool? _isNarrowLayout;
 
         public ToolCenterControl()
@@ -136,6 +137,9 @@ namespace LongBetterWindows.Host.Views
         #region Navigation
 
         private string _activePage = "overview";
+        private readonly Dictionary<string, double> _pageScrollOffsets =
+            new(StringComparer.Ordinal);
+        private bool _pageInitialized;
 
         internal void OpenMarketForQuality() => ShowPage("market");
         internal void OpenDiagnosticsForQuality() => ShowPage("diagnostics");
@@ -210,6 +214,9 @@ namespace LongBetterWindows.Host.Views
                 ("settings", "root") => "settings",
                 ("diagnostics", "root") => "diagnostics",
                 ("developer", "root") => "developer",
+                ("management-page", "workflows") => "workflows",
+                ("management-page", "plugins") => "plugins",
+                ("management-page", "system") => "system",
                 _ => null,
             };
             if (page is null)
@@ -297,11 +304,34 @@ namespace LongBetterWindows.Host.Views
         private void Navigation_Click(object sender, RoutedEventArgs e)
         {
             if (sender is RadioButton { Tag: string page })
+                RequestPageNavigation(page);
+        }
+
+        private void RequestPageNavigation(string page)
+        {
+            if (_pageInitialized
+                && string.Equals(page, _activePage, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (PageNavigationRequested is not null)
+                PageNavigationRequested(page);
+            else
                 ShowPage(page);
         }
 
-        private void ShowPage(string page)
+        private void ShowPage(string page, bool forceRefresh = false)
         {
+            if (_pageInitialized
+                && !forceRefresh
+                && string.Equals(page, _activePage, StringComparison.Ordinal))
+            {
+                return;
+            }
+            if (_pageInitialized)
+                _pageScrollOffsets[_activePage] = ContentScrollViewer.VerticalOffset;
+
             if (!string.Equals(page, "plugins", StringComparison.Ordinal))
                 ReleasePluginManagementPage();
 
@@ -325,9 +355,9 @@ namespace LongBetterWindows.Host.Views
                 if (!selected) continue;
 
                 _activePage = key;
+                _pageInitialized = true;
                 PageTitle.Text = title;
                 PageSubtitle.Text = subtitle;
-                ContentScrollViewer.ScrollToTop();
                 if (key == "plugins")
                 {
                     PluginManagementHost.Content ??= new PluginManagementControl();
@@ -366,8 +396,11 @@ namespace LongBetterWindows.Host.Views
                     }
                 }
                 Helpers.AnimationHelper.FadeInElement(panel, durationMs: 160);
+                var offset = _pageScrollOffsets.TryGetValue(key, out var savedOffset)
+                    ? savedOffset
+                    : 0;
                 _ = Dispatcher.BeginInvoke(
-                    new Action(ContentScrollViewer.ScrollToTop),
+                    new Action(() => ContentScrollViewer.ScrollToVerticalOffset(offset)),
                     System.Windows.Threading.DispatcherPriority.ContextIdle);
             }
         }
@@ -395,7 +428,8 @@ namespace LongBetterWindows.Host.Views
                 var pages = new[] { "overview", "workflows", "plugins", "market", "system", "diagnostics", "developer", "settings" };
                 var current = Array.IndexOf(pages, _activePage);
                 var direction = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;
-                ShowPage(pages[(current + direction + pages.Length) % pages.Length]);
+                RequestPageNavigation(
+                    pages[(current + direction + pages.Length) % pages.Length]);
             }
         }
 
@@ -405,7 +439,7 @@ namespace LongBetterWindows.Host.Views
             => CommandPaletteWindow.ShowPalette();
 
         private void SettingsPage_LanguageApplied(object? sender, EventArgs e)
-            => ShowPage(_activePage);
+            => ShowPage(_activePage, forceRefresh: true);
 
         private static string I18n(string key)
             => ServicesInitializer.I18n.T(key);

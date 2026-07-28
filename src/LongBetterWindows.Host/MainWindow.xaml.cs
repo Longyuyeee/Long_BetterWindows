@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Automation;
+using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
@@ -26,6 +27,7 @@ namespace LongBetterWindows.Host
         private int _qualityTerminalOutputExportStatus;
         private int _qualityWorkflowDuplicateStatus;
         private bool _workflowExecutionRejected;
+        private ToolCenterControl ToolCenter => WorkspaceShell.ToolCenter;
 
         public MainWindow()
         {
@@ -39,6 +41,18 @@ namespace LongBetterWindows.Host
             };
             LayoutUpdated += firstLayout;
             _tray = new TrayService(this);
+            WorkspaceShell.Bind(
+                ServicesInitializer.Workspace,
+                GetWorkspaceModuleTitle);
+            WorkspaceShell.ModuleActivationRequested +=
+                WorkspaceShell_ModuleActivationRequested;
+            WorkspaceShell.ModuleCloseRequested +=
+                WorkspaceShell_ModuleCloseRequested;
+            ServicesInitializer.I18n.LanguageChanged += I18n_LanguageChanged;
+            Closed += (_, _) =>
+                ServicesInitializer.I18n.LanguageChanged -= I18n_LanguageChanged;
+            ToolCenter.PageNavigationRequested +=
+                ToolCenter_PageNavigationRequested;
             ToolCenter.WorkflowReviewClosed += (_, _) =>
             {
                 _activeWorkflowReviewId = null;
@@ -82,23 +96,26 @@ namespace LongBetterWindows.Host
             App.MarkStartupStage("main_window_first_render");
         }
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
             App.MarkStartupStage("main_window_loaded");
             if ((Application.Current as App)?.ShowMarketForQualityRequested == true)
-                ToolCenter.OpenMarketForQuality();
+                await OpenLegacyWorkspacePageAsync("market");
             if ((Application.Current as App)?.ShowDiagnosticsForQualityRequested == true)
-                ToolCenter.OpenDiagnosticsForQuality();
+                await OpenLegacyWorkspacePageAsync("diagnostics");
             if ((Application.Current as App)?.ShowPluginsForQualityRequested == true)
-                ToolCenter.OpenPluginsForQuality();
+                await OpenLegacyWorkspacePageAsync("plugins");
             if ((Application.Current as App)?.ShowSystemForQualityRequested == true)
-                ToolCenter.OpenSystemForQuality();
+                await OpenLegacyWorkspacePageAsync("system");
             if ((Application.Current as App)?.ShowSettingsForQualityRequested == true)
-                ToolCenter.OpenSettingsForQuality();
+                await OpenLegacyWorkspacePageAsync("settings");
             if ((Application.Current as App)?.ShowDeveloperForQualityRequested == true)
-                ToolCenter.OpenDeveloperForQuality();
+                await OpenLegacyWorkspacePageAsync("developer");
             if ((Application.Current as App)?.ShowWelcomeForQualityRequested == true)
+            {
+                await OpenLegacyWorkspacePageAsync("overview");
                 ToolCenter.ShowWelcomeForQuality();
+            }
 
             if ((Application.Current as App)?.ShowDesignSystemPreviewRequested == true)
             {
@@ -144,9 +161,19 @@ namespace LongBetterWindows.Host
             string? expectedStateFingerprint = null,
             CancellationToken cancellationToken = default)
         {
-            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
-                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
-            ToolCenter.Visibility = Visibility.Visible;
+            var resolution = await ResolveWorkspaceModuleAsync(
+                $"workflow:{workflowId}",
+                cancellationToken);
+            if (!resolution.IsSuccess || resolution.Module is null)
+                return I18nOrFallback(
+                    "workflow.error.invalidId",
+                    "工作流不存在或已失效。");
+            var navigationError = await OpenWorkspaceModuleAsync(
+                resolution.Module,
+                cancellationToken);
+            if (navigationError is not null)
+                return navigationError;
+
             var error = await ToolCenter.OpenWorkflowReviewAsync(
                 workflowId,
                 expectedStateFingerprint,
@@ -180,12 +207,16 @@ namespace LongBetterWindows.Host
             string workflowId,
             CancellationToken cancellationToken = default)
         {
-            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
-                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
-            ToolCenter.Visibility = Visibility.Visible;
-            return await ToolCenter.OpenWorkflowEditorAsync(
-                workflowId,
+            var resolution = await ResolveWorkspaceModuleAsync(
+                $"workflow:{workflowId}",
                 cancellationToken);
+            return resolution.IsSuccess && resolution.Module is not null
+                ? await OpenWorkspaceModuleAsync(
+                    resolution.Module,
+                    cancellationToken)
+                : I18nOrFallback(
+                    "workflow.error.invalidId",
+                    "工作流不存在或已失效。");
         }
 
         internal async Task<string?> OpenWorkspaceModuleAsync(
@@ -199,28 +230,13 @@ namespace LongBetterWindows.Host
 
             var previousActive = ServicesInitializer.Workspace.State.ActiveModuleKey;
             var navigation = ServicesInitializer.Workspace.Open(module);
-            ToolCenter.Visibility = Visibility.Visible;
 
             string? error;
             try
             {
-                error = module.Key.Kind switch
-                {
-                    "workflow" => await ToolCenter.OpenWorkflowEditorAsync(
-                        module.Key.ResourceId,
-                        cancellationToken),
-                    "plugin-settings" => ToolCenter.OpenPluginSettings(
-                        module.Key.ResourceId)
-                            ? null
-                            : I18nOrFallback(
-                                "plugins.settingsUnavailable",
-                                "插件设置当前不可用。"),
-                    _ => ToolCenter.OpenWorkspaceModule(module.Key)
-                        ? null
-                        : I18nOrFallback(
-                            "search.error.workspaceResourceUnsupported",
-                            "该资源不支持工作区模块。"),
-                };
+                error = await ShowWorkspaceModuleViewAsync(
+                    module,
+                    cancellationToken);
             }
             catch
             {
@@ -234,6 +250,151 @@ namespace LongBetterWindows.Host
             return error;
         }
 
+        private async Task<string?> ShowWorkspaceModuleViewAsync(
+            WorkspaceModuleDescriptor module,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
+                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
+            ToolCenter.Visibility = Visibility.Visible;
+
+            return module.Key.Kind switch
+            {
+                "workflow" => await ToolCenter.OpenWorkflowEditorAsync(
+                    module.Key.ResourceId,
+                    cancellationToken),
+                "plugin-settings" => ToolCenter.OpenPluginSettings(
+                    module.Key.ResourceId)
+                        ? null
+                        : I18nOrFallback(
+                            "plugins.settingsUnavailable",
+                            "插件设置当前不可用。"),
+                _ => ToolCenter.OpenWorkspaceModule(module.Key)
+                    ? null
+                    : I18nOrFallback(
+                        "search.error.workspaceResourceUnsupported",
+                        "该资源不支持工作区模块。"),
+            };
+        }
+
+        private async Task OpenLegacyWorkspacePageAsync(string page)
+        {
+            if (!WorkspaceLegacyModuleCatalog.TryCreate(
+                page,
+                key => ServicesInitializer.I18n.T(key),
+                out var module)
+                || module is null)
+            {
+                Log.Warning("Unknown legacy workspace page requested: {Page}", page);
+                return;
+            }
+
+            var error = await OpenWorkspaceModuleAsync(
+                module,
+                CancellationToken.None);
+            if (error is not null)
+                Log.Warning("Workspace page {Page} could not open: {Error}", page, error);
+        }
+
+        private static Task<WorkspaceModuleResolution> ResolveWorkspaceModuleAsync(
+            string target,
+            CancellationToken cancellationToken)
+        {
+            if (!WorkspaceModuleAddress.TryParse(target, out var address))
+            {
+                return Task.FromResult(
+                    new WorkspaceModuleResolution(
+                        default,
+                        null,
+                        WorkspaceModuleResolutionError.InvalidAddress));
+            }
+            return ServicesInitializer.WorkspaceModules.ResolveAsync(
+                address,
+                cancellationToken);
+        }
+
+        private async void WorkspaceShell_ModuleActivationRequested(
+            WorkspaceModuleKey key)
+        {
+            try
+            {
+                var module = ServicesInitializer.Workspace.State.Modules
+                    .FirstOrDefault(candidate => candidate.Key == key);
+                if (module is null)
+                    return;
+
+                var error = await OpenWorkspaceModuleAsync(
+                    module,
+                    CancellationToken.None);
+                if (error is not null)
+                {
+                    Log.Warning(
+                        "Workspace module {Module} could not activate: {Error}",
+                        key,
+                        error);
+                }
+                WorkspaceShell.FocusActiveModule();
+            }
+            catch (Exception exception)
+            {
+                Log.Error(
+                    exception,
+                    "Workspace module {Module} activation failed",
+                    key);
+            }
+        }
+
+        private async void WorkspaceShell_ModuleCloseRequested(
+            WorkspaceModuleKey key)
+        {
+            try
+            {
+                var before = ServicesInitializer.Workspace.State;
+                var wasActive = before.ActiveModuleKey == key;
+                var result = ServicesInitializer.Workspace.Close(key);
+                if (!result.Changed)
+                    return;
+
+                if (wasActive)
+                {
+                    var error = await ShowWorkspaceModuleViewAsync(
+                        result.State.ActiveModule,
+                        CancellationToken.None);
+                    if (error is not null)
+                    {
+                        Log.Warning(
+                            "Workspace fallback module {Module} could not display: {Error}",
+                            result.State.ActiveModuleKey,
+                            error);
+                    }
+                }
+                WorkspaceShell.FocusActiveModule();
+            }
+            catch (Exception exception)
+            {
+                Log.Error(
+                    exception,
+                    "Workspace module {Module} close failed",
+                    key);
+            }
+        }
+
+        private async void ToolCenter_PageNavigationRequested(string page)
+        {
+            try
+            {
+                await OpenLegacyWorkspacePageAsync(page);
+            }
+            catch (Exception exception)
+            {
+                Log.Error(
+                    exception,
+                    "Legacy workspace page {Page} navigation failed",
+                    page);
+            }
+        }
+
         private static void RollbackWorkspaceNavigation(
             WorkspaceNavigationResult navigation,
             WorkspaceModuleKey moduleKey,
@@ -243,6 +404,36 @@ namespace LongBetterWindows.Host
                 ServicesInitializer.Workspace.Close(moduleKey);
             else if (navigation.Kind == WorkspaceNavigationChangeKind.Activated)
                 ServicesInitializer.Workspace.Activate(previousActive);
+        }
+
+        private void I18n_LanguageChanged(string language)
+            => WorkspaceShell.Refresh();
+
+        private static string GetWorkspaceModuleTitle(
+            WorkspaceModuleDescriptor module)
+        {
+            var resourceKey = (module.Key.Kind, module.Key.ResourceId) switch
+            {
+                ("management", "root") => "page.overview.title",
+                ("management-page", "workflows") => "page.workflows.title",
+                ("management-page", "plugins") => "page.plugins.title",
+                ("management-page", "system") => "page.system.title",
+                ("marketplace", "catalog") => "page.market.title",
+                ("settings", "root") => "page.settings.title",
+                ("diagnostics", "root") => "page.diagnostics.title",
+                ("developer", "root") => "page.developer.title",
+                _ => null,
+            };
+            if (resourceKey is not null)
+                return I18n(resourceKey);
+            if (module.Key.Kind == "plugin-settings")
+            {
+                var plugin = HostProvider.Instance.PluginStore.Get(
+                    module.Key.ResourceId);
+                if (plugin is not null)
+                    return $"{plugin.DisplayName} - {I18n("plugins.settings")}";
+            }
+            return module.Title;
         }
 
         private void SetWorkflowLayoutAutomationStatus(

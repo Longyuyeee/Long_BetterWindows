@@ -118,7 +118,7 @@
             </Border>
 
             <Grid Grid.Row="1">
-                <views:ToolCenterControl x:Name="ToolCenter" />
+                <views:WorkspaceShellControl x:Name="WorkspaceShell" />
                 <Grid x:Name="EmbeddedPluginSurface" Visibility="Collapsed"
                       AutomationProperties.AutomationId="Long.Plugin.EmbeddedSurface"
                       Background="{DynamicResource Long.Brush.Background.Base}">

@@ -94,6 +94,7 @@ namespace LongBetterWindows.Host
             ServicesInitializer.Initialize(_startupOptions.QualityWorkflowsDirectory);
             _startupTrace?.Mark("services_initialize_end");
             ServicesInitializer.I18n.Initialize(_startupOptions.LanguageOverride);
+            ServicesInitializer.InitializeWorkspace();
             ServicesInitializer.I18n.ApplyTo(Resources);
             _startupTrace?.Mark("localization_applied");
             Log.Information("所有服务已初始化。");

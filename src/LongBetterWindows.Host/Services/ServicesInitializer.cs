@@ -126,14 +126,6 @@ namespace LongBetterWindows.Host.Services
                 provider.PluginStore,
                 Workflows,
                 key => I18n.T(key));
-            var management = WorkspaceModules.ResolveAsync(
-                new WorkspaceModuleAddress(
-                    WorkspaceModuleAddressKind.Management,
-                    "root")).GetAwaiter().GetResult();
-            Workspace = new WorkspaceSessionCoordinator(
-                management.Module
-                ?? throw new InvalidOperationException(
-                    "The management workspace root could not be created."));
             Search = new SearchCoordinator(
                 new ISearchProvider[]
                 {
@@ -213,6 +205,18 @@ namespace LongBetterWindows.Host.Services
             provider.RegisterService<INetworkMonitorService>(NetworkMonitor);
 
             Startup = new StartupService();
+        }
+
+        internal static void InitializeWorkspace()
+        {
+            var management = WorkspaceModules.ResolveAsync(
+                new WorkspaceModuleAddress(
+                    WorkspaceModuleAddressKind.Management,
+                    "root")).GetAwaiter().GetResult();
+            Workspace = new WorkspaceSessionCoordinator(
+                management.Module
+                ?? throw new InvalidOperationException(
+                    "The management workspace root could not be created."));
         }
 
         public static void DisposeAll()
