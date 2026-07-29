@@ -40,51 +40,44 @@ public sealed class WorkspaceShellProjectionTests
     }
 
     [Fact]
-    public void LegacyCatalog_MapsAllEightPagesToUniqueStableModules()
+    public void ManagementCatalog_MapsAllEightPagesToUniqueStableModules()
     {
-        var pages = new[]
-        {
-            "overview",
-            "workflows",
-            "plugins",
-            "market",
-            "system",
-            "diagnostics",
-            "developer",
-            "settings",
-        };
+        var pages = Enum.GetValues<WorkspaceManagementPage>();
 
-        var modules = pages.Select(page =>
-        {
-            Assert.True(WorkspaceLegacyModuleCatalog.TryCreate(
+        var modules = pages
+            .Select(page => WorkspaceManagementModuleCatalog.Create(
                 page,
-                key => $"localized:{key}",
-                out var module));
-            return module!;
-        }).ToArray();
+                key => $"localized:{key}"))
+            .ToArray();
 
         Assert.Equal(8, modules.Select(module => module.Key).Distinct().Count());
         Assert.False(modules[0].CanClose);
         Assert.All(modules.Skip(1), module => Assert.True(module.CanClose));
         Assert.All(modules, module => Assert.StartsWith("localized:", module.Title));
+        foreach (var (page, module) in pages.Zip(modules))
+        {
+            Assert.True(
+                WorkspaceManagementModuleCatalog.TryResolvePage(
+                    module.Key,
+                    out var resolved));
+            Assert.Equal(page, resolved);
+        }
     }
 
     [Fact]
-    public void LegacyCatalog_RejectsUnknownPage()
+    public void ManagementCatalog_RejectsUnsupportedModuleKey()
     {
-        Assert.False(WorkspaceLegacyModuleCatalog.TryCreate(
-            "unknown",
-            null,
-            out var module));
-        Assert.Null(module);
+        Assert.False(WorkspaceManagementModuleCatalog.TryResolvePage(
+            new WorkspaceModuleKey("unknown", "unknown"),
+            out _));
     }
 
     [Fact]
-    public void LegacyModules_ReopenWithoutDuplicationAndCloseToMostRecent()
+    public void ManagementModules_ReopenWithoutDuplicationAndCloseToMostRecent()
     {
-        var root = Legacy("overview");
-        var market = Legacy("market");
-        var settings = Legacy("settings");
+        var root = Management(WorkspaceManagementPage.Overview);
+        var market = Management(WorkspaceManagementPage.Market);
+        var settings = Management(WorkspaceManagementPage.Settings);
         var coordinator = new WorkspaceSessionCoordinator(root);
         coordinator.Open(market);
         coordinator.Open(settings);
@@ -124,14 +117,9 @@ public sealed class WorkspaceShellProjectionTests
             new WorkspaceModuleKey("workflow", "sample")));
     }
 
-    private static WorkspaceModuleDescriptor Legacy(string page)
-    {
-        Assert.True(WorkspaceLegacyModuleCatalog.TryCreate(
-            page,
-            null,
-            out var module));
-        return module!;
-    }
+    private static WorkspaceModuleDescriptor Management(
+        WorkspaceManagementPage page)
+        => WorkspaceManagementModuleCatalog.Create(page);
 
     private static WorkspaceModuleDescriptor Module(
         string kind,

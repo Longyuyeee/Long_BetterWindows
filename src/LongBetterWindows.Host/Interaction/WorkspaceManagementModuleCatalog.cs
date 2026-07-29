@@ -1,53 +1,81 @@
 namespace LongBetterWindows.Host.Interaction
 {
-    internal static class WorkspaceLegacyModuleCatalog
+    internal enum WorkspaceManagementPage
     {
-        public static bool TryCreate(
-            string page,
-            Func<string, string>? localize,
-            out WorkspaceModuleDescriptor? module)
-        {
-            module = page switch
+        Overview,
+        Workflows,
+        Plugins,
+        Market,
+        System,
+        Diagnostics,
+        Developer,
+        Settings,
+    }
+
+    internal static class WorkspaceManagementModuleCatalog
+    {
+        public static WorkspaceModuleDescriptor Create(
+            WorkspaceManagementPage page,
+            Func<string, string>? localize = null)
+            => page switch
             {
-                "overview" => Create(
+                WorkspaceManagementPage.Overview => Create(
                     "management",
                     "root",
                     Text(localize, "page.overview.title", "管理中心"),
                     canClose: false),
-                "workflows" => Create(
+                WorkspaceManagementPage.Workflows => Create(
                     "management-page",
                     "workflows",
                     Text(localize, "page.workflows.title", "工作流"),
                     searchScopeId: "workflow"),
-                "plugins" => Create(
+                WorkspaceManagementPage.Plugins => Create(
                     "management-page",
                     "plugins",
                     Text(localize, "page.plugins.title", "插件管理"),
                     searchScopeId: "plugins"),
-                "market" => Create(
+                WorkspaceManagementPage.Market => Create(
                     "marketplace",
                     "catalog",
                     Text(localize, "page.market.title", "插件应用市场"),
                     searchScopeId: "marketplace"),
-                "system" => Create(
+                WorkspaceManagementPage.System => Create(
                     "management-page",
                     "system",
                     Text(localize, "page.system.title", "系统集成")),
-                "diagnostics" => Create(
+                WorkspaceManagementPage.Diagnostics => Create(
                     "diagnostics",
                     "root",
                     Text(localize, "page.diagnostics.title", "诊断")),
-                "developer" => Create(
+                WorkspaceManagementPage.Developer => Create(
                     "developer",
                     "root",
                     Text(localize, "page.developer.title", "开发者")),
-                "settings" => Create(
+                WorkspaceManagementPage.Settings => Create(
                     "settings",
                     "root",
                     Text(localize, "page.settings.title", "设置")),
-                _ => null,
+                _ => throw new ArgumentOutOfRangeException(nameof(page), page, null),
             };
-            return module is not null;
+
+        public static bool TryResolvePage(
+            WorkspaceModuleKey key,
+            out WorkspaceManagementPage page)
+        {
+            var resolved = (key.Kind, key.ResourceId) switch
+            {
+                ("management", "root") => WorkspaceManagementPage.Overview,
+                ("management-page", "workflows") => WorkspaceManagementPage.Workflows,
+                ("management-page", "plugins") => WorkspaceManagementPage.Plugins,
+                ("marketplace", "catalog") => WorkspaceManagementPage.Market,
+                ("management-page", "system") => WorkspaceManagementPage.System,
+                ("diagnostics", "root") => WorkspaceManagementPage.Diagnostics,
+                ("developer", "root") => WorkspaceManagementPage.Developer,
+                ("settings", "root") => WorkspaceManagementPage.Settings,
+                _ => (WorkspaceManagementPage?)null,
+            };
+            page = resolved.GetValueOrDefault();
+            return resolved.HasValue;
         }
 
         private static WorkspaceModuleDescriptor Create(

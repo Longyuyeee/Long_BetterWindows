@@ -14,7 +14,7 @@ namespace LongBetterWindows.Host.Views
         internal event Action<bool>? WorkflowLayoutChanged;
         internal event Action<WorkflowExecutionResultState>? WorkflowExecutionResultChanged;
         internal event EventHandler? WorkflowTerminalOutputsCleared;
-        internal event Action<string>? PageNavigationRequested;
+        internal event Action<WorkspaceManagementPage>? PageNavigationRequested;
         internal event Action<string>? PluginSettingsNavigationRequested;
         internal event Action<string>? PluginRunRequested;
         internal event Action<string>? PluginToggleRequested;
@@ -55,7 +55,7 @@ namespace LongBetterWindows.Host.Views
                     settingsPage.Dispose();
                 }
             };
-            ShowPage("overview");
+            ShowManagementPage(WorkspaceManagementPage.Overview);
 
             // 首次运行显示欢迎横幅
             if (App.IsFirstRun())
@@ -142,28 +142,35 @@ namespace LongBetterWindows.Host.Views
 
         #region Navigation
 
-        private string _activePage = "overview";
+        private WorkspaceManagementPage _activePage =
+            WorkspaceManagementPage.Overview;
+        private string? _activePluginSettingsId;
+        private string _activeScrollKey =
+            WorkspaceManagementPage.Overview.ToString();
         private readonly Dictionary<string, double> _pageScrollOffsets =
             new(StringComparer.Ordinal);
         private bool _pageInitialized;
 
-        internal void OpenMarketForQuality() => ShowPage("market");
-        internal void OpenDiagnosticsForQuality() => ShowPage("diagnostics");
+        internal void OpenMarketForQuality()
+            => ShowManagementPage(WorkspaceManagementPage.Market);
+        internal void OpenDiagnosticsForQuality()
+            => ShowManagementPage(WorkspaceManagementPage.Diagnostics);
         internal void OpenPluginsForQuality()
         {
             App.MarkPluginPageStage("plugin_page_navigation_begin");
-            ShowPage("plugins");
+            ShowManagementPage(WorkspaceManagementPage.Plugins);
         }
         internal PluginPageVisualMetrics GetPluginPageVisualMetricsForQuality()
             => PluginManagementHost.Content is PluginManagementControl plugins
                 ? plugins.GetPerformanceMetricsForQuality()
                 : default;
-        internal void OpenDeveloperForQuality() => ShowPage("developer");
+        internal void OpenDeveloperForQuality()
+            => ShowManagementPage(WorkspaceManagementPage.Developer);
         internal WeakReference ReleasePluginsForQuality()
         {
-            ShowPage("plugins");
+            ShowManagementPage(WorkspaceManagementPage.Plugins);
             var reference = new WeakReference(PluginManagementHost.Content);
-            ShowPage("overview");
+            ShowManagementPage(WorkspaceManagementPage.Overview);
             ReleasePluginManagementPage();
             return reference;
         }
@@ -210,27 +217,17 @@ namespace LongBetterWindows.Host.Views
                     yield return descendant;
             }
         }
-        internal void OpenSystemForQuality() => ShowPage("system");
-        internal void OpenSettingsForQuality() => ShowPage("settings");
+        internal void OpenSystemForQuality()
+            => ShowManagementPage(WorkspaceManagementPage.System);
+        internal void OpenSettingsForQuality()
+            => ShowManagementPage(WorkspaceManagementPage.Settings);
         internal bool OpenWorkspaceModule(WorkspaceModuleKey key)
         {
-            var page = (key.Kind, key.ResourceId) switch
-            {
-                ("management", "root") => "overview",
-                ("marketplace", "catalog") => "market",
-                ("settings", "root") => "settings",
-                ("diagnostics", "root") => "diagnostics",
-                ("developer", "root") => "developer",
-                ("management-page", "workflows") => "workflows",
-                ("management-page", "plugins") => "plugins",
-                ("management-page", "system") => "system",
-                _ => null,
-            };
-            if (page is null)
+            if (!WorkspaceManagementModuleCatalog.TryResolvePage(key, out var page))
                 return false;
             if (key != new WorkspaceModuleKey("management", "root"))
                 FilterManagementNavigation(string.Empty);
-            ShowPage(page);
+            ShowManagementPage(page);
             return true;
         }
 
@@ -275,24 +272,25 @@ namespace LongBetterWindows.Host.Views
         private void FilterManagementNavigation(string query)
         {
             var normalized = query.Trim();
-            RadioButton[] destinations =
+            (RadioButton Navigation, WorkspaceManagementPage Page)[] destinations =
             [
-                NavOverview,
-                NavWorkflows,
-                NavPlugins,
-                NavMarket,
-                NavSystem,
-                NavDiagnostics,
-                NavDeveloper,
-                NavSettings,
+                (NavOverview, WorkspaceManagementPage.Overview),
+                (NavWorkflows, WorkspaceManagementPage.Workflows),
+                (NavPlugins, WorkspaceManagementPage.Plugins),
+                (NavMarket, WorkspaceManagementPage.Market),
+                (NavSystem, WorkspaceManagementPage.System),
+                (NavDiagnostics, WorkspaceManagementPage.Diagnostics),
+                (NavDeveloper, WorkspaceManagementPage.Developer),
+                (NavSettings, WorkspaceManagementPage.Settings),
             ];
-            foreach (var destination in destinations)
+            foreach (var (navigation, page) in destinations)
             {
-                var label = destination.Content?.ToString() ?? string.Empty;
-                var target = destination.Tag?.ToString() ?? string.Empty;
-                destination.Visibility = string.IsNullOrEmpty(normalized)
+                var label = navigation.Content?.ToString() ?? string.Empty;
+                navigation.Visibility = string.IsNullOrEmpty(normalized)
                     || label.Contains(normalized, StringComparison.OrdinalIgnoreCase)
-                    || target.Contains(normalized, StringComparison.OrdinalIgnoreCase)
+                    || page.ToString().Contains(
+                        normalized,
+                        StringComparison.OrdinalIgnoreCase)
                         ? Visibility.Visible
                         : Visibility.Collapsed;
             }
@@ -310,7 +308,8 @@ namespace LongBetterWindows.Host.Views
             var module = GetOrCreatePluginSettingsModule(pluginId);
             PluginSettingsModuleHost.Content = module;
             PanelPluginSettings.Visibility = Visibility.Visible;
-            _activePage = $"plugin-settings:{pluginId}";
+            _activePluginSettingsId = pluginId;
+            _activeScrollKey = $"plugin-settings:{pluginId}";
             _pageInitialized = true;
             PageTitle.Text = entry.DisplayName;
             PageSubtitle.Text = string.Format(
@@ -324,7 +323,7 @@ namespace LongBetterWindows.Host.Views
                 new Action(() =>
                     ContentScrollViewer.ScrollToVerticalOffset(
                         _pageScrollOffsets.TryGetValue(
-                            _activePage,
+                            _activeScrollKey,
                             out var offset)
                                 ? offset
                                 : 0)),
@@ -352,11 +351,9 @@ namespace LongBetterWindows.Host.Views
         {
             foreach (var module in _pluginSettingsModules.Values)
                 module.ApplyLanguage();
-            if (_activePage.StartsWith(
-                    "plugin-settings:",
-                    StringComparison.Ordinal))
+            if (_activePluginSettingsId is not null)
             {
-                var pluginId = _activePage["plugin-settings:".Length..];
+                var pluginId = _activePluginSettingsId;
                 if (HostProvider.Instance.PluginStore.Get(pluginId) is { } entry)
                 {
                     PageTitle.Text = entry.DisplayName;
@@ -366,12 +363,12 @@ namespace LongBetterWindows.Host.Views
                 }
                 return;
             }
-            ShowPage(_activePage, forceRefresh: true);
+            ShowManagementPage(_activePage, forceRefresh: true);
         }
 
         internal void ShowWelcomeForQuality()
         {
-            ShowPage("overview");
+            ShowManagementPage(WorkspaceManagementPage.Overview);
             WelcomeBanner.Visibility = Visibility.Visible;
         }
 
@@ -394,7 +391,7 @@ namespace LongBetterWindows.Host.Views
             string? expectedStateFingerprint = null,
             CancellationToken cancellationToken = default)
         {
-            ShowPage("workflows");
+            ShowManagementPage(WorkspaceManagementPage.Workflows);
             if (WorkflowEditorHost.Content is not WorkflowEditorControl editor)
                 return I18n("workflow.error.editorUnavailable");
             return await editor.OpenExecutionReviewAsync(
@@ -407,7 +404,7 @@ namespace LongBetterWindows.Host.Views
             string workflowId,
             CancellationToken cancellationToken = default)
         {
-            ShowPage("workflows");
+            ShowManagementPage(WorkspaceManagementPage.Workflows);
             if (WorkflowEditorHost.Content is not WorkflowEditorControl editor)
                 return I18n("workflow.error.editorUnavailable");
             return await editor.OpenEditorAsync(workflowId, cancellationToken);
@@ -448,14 +445,35 @@ namespace LongBetterWindows.Host.Views
 
         private void Navigation_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is RadioButton { Tag: string page })
+            if (TryGetNavigationPage(sender, out var page))
                 RequestPageNavigation(page);
         }
 
-        private void RequestPageNavigation(string page)
+        private bool TryGetNavigationPage(
+            object sender,
+            out WorkspaceManagementPage page)
+        {
+            var resolved = sender switch
+            {
+                _ when ReferenceEquals(sender, NavOverview) => WorkspaceManagementPage.Overview,
+                _ when ReferenceEquals(sender, NavWorkflows) => WorkspaceManagementPage.Workflows,
+                _ when ReferenceEquals(sender, NavPlugins) => WorkspaceManagementPage.Plugins,
+                _ when ReferenceEquals(sender, NavMarket) => WorkspaceManagementPage.Market,
+                _ when ReferenceEquals(sender, NavSystem) => WorkspaceManagementPage.System,
+                _ when ReferenceEquals(sender, NavDiagnostics) => WorkspaceManagementPage.Diagnostics,
+                _ when ReferenceEquals(sender, NavDeveloper) => WorkspaceManagementPage.Developer,
+                _ when ReferenceEquals(sender, NavSettings) => WorkspaceManagementPage.Settings,
+                _ => (WorkspaceManagementPage?)null,
+            };
+            page = resolved.GetValueOrDefault();
+            return resolved.HasValue;
+        }
+
+        private void RequestPageNavigation(WorkspaceManagementPage page)
         {
             if (_pageInitialized
-                && string.Equals(page, _activePage, StringComparison.Ordinal))
+                && _activePluginSettingsId is null
+                && page == _activePage)
             {
                 return;
             }
@@ -463,31 +481,35 @@ namespace LongBetterWindows.Host.Views
             if (PageNavigationRequested is not null)
                 PageNavigationRequested(page);
             else
-                ShowPage(page);
+                ShowManagementPage(page);
         }
 
-        private void ShowPage(string page, bool forceRefresh = false)
+        private void ShowManagementPage(
+            WorkspaceManagementPage page,
+            bool forceRefresh = false)
         {
             if (_pageInitialized
                 && !forceRefresh
-                && string.Equals(page, _activePage, StringComparison.Ordinal))
+                && _activePluginSettingsId is null
+                && page == _activePage)
             {
                 return;
             }
             RememberCurrentScrollOffset();
             PanelPluginSettings.Visibility = Visibility.Collapsed;
             PluginSettingsModuleHost.Content = null;
+            _activePluginSettingsId = null;
 
-            (string Key, FrameworkElement Panel, RadioButton Navigation, string Title, string Subtitle)[] pages =
+            (WorkspaceManagementPage Key, FrameworkElement Panel, RadioButton Navigation, string Title, string Subtitle)[] pages =
             {
-                ("overview", PanelOverview, NavOverview, I18n("page.overview.title"), I18n("page.overview.subtitle")),
-                ("workflows", PanelWorkflows, NavWorkflows, I18n("page.workflows.title"), I18n("page.workflows.subtitle")),
-                ("plugins", PanelPlugins, NavPlugins, I18n("page.plugins.title"), I18n("page.plugins.subtitle")),
-                ("market", PanelMarket, NavMarket, I18n("page.market.title"), I18n("page.market.subtitle")),
-                ("system", PanelSystem, NavSystem, I18n("page.system.title"), I18n("page.system.subtitle")),
-                ("diagnostics", PanelDiagnostics, NavDiagnostics, I18n("page.diagnostics.title"), I18n("page.diagnostics.subtitle")),
-                ("developer", PanelDev, NavDeveloper, I18n("page.developer.title"), I18n("page.developer.subtitle")),
-                ("settings", PanelSettings, NavSettings, I18n("page.settings.title"), I18n("page.settings.subtitle")),
+                (WorkspaceManagementPage.Overview, PanelOverview, NavOverview, I18n("page.overview.title"), I18n("page.overview.subtitle")),
+                (WorkspaceManagementPage.Workflows, PanelWorkflows, NavWorkflows, I18n("page.workflows.title"), I18n("page.workflows.subtitle")),
+                (WorkspaceManagementPage.Plugins, PanelPlugins, NavPlugins, I18n("page.plugins.title"), I18n("page.plugins.subtitle")),
+                (WorkspaceManagementPage.Market, PanelMarket, NavMarket, I18n("page.market.title"), I18n("page.market.subtitle")),
+                (WorkspaceManagementPage.System, PanelSystem, NavSystem, I18n("page.system.title"), I18n("page.system.subtitle")),
+                (WorkspaceManagementPage.Diagnostics, PanelDiagnostics, NavDiagnostics, I18n("page.diagnostics.title"), I18n("page.diagnostics.subtitle")),
+                (WorkspaceManagementPage.Developer, PanelDev, NavDeveloper, I18n("page.developer.title"), I18n("page.developer.subtitle")),
+                (WorkspaceManagementPage.Settings, PanelSettings, NavSettings, I18n("page.settings.title"), I18n("page.settings.subtitle")),
             };
 
             foreach (var (key, panel, navigation, title, subtitle) in pages)
@@ -498,10 +520,11 @@ namespace LongBetterWindows.Host.Views
                 if (!selected) continue;
 
                 _activePage = key;
+                _activeScrollKey = key.ToString();
                 _pageInitialized = true;
                 PageTitle.Text = title;
                 PageSubtitle.Text = subtitle;
-                if (key == "plugins")
+                if (key == WorkspaceManagementPage.Plugins)
                 {
                     if (PluginManagementHost.Content is not PluginManagementControl plugins)
                     {
@@ -512,7 +535,8 @@ namespace LongBetterWindows.Host.Views
                     }
                     plugins.Refresh();
                 }
-                else if (key == "workflows" && WorkflowEditorHost.Content == null)
+                else if (key == WorkspaceManagementPage.Workflows
+                    && WorkflowEditorHost.Content == null)
                 {
                     var editor = new WorkflowEditorControl();
                     editor.ExecutionReviewClosed += (_, _) =>
@@ -525,17 +549,19 @@ namespace LongBetterWindows.Host.Views
                         WorkflowTerminalOutputsCleared?.Invoke(this, EventArgs.Empty);
                     WorkflowEditorHost.Content = editor;
                 }
-                else if (key == "market" && MarketHost.Content == null)
+                else if (key == WorkspaceManagementPage.Market
+                    && MarketHost.Content == null)
                     MarketHost.Content = new MarketplaceControl();
-                else if (key == "diagnostics" && DiagnosticsHost.Content == null)
+                else if (key == WorkspaceManagementPage.Diagnostics
+                    && DiagnosticsHost.Content == null)
                     DiagnosticsHost.Content = new PerformancePanel();
-                else if (key == "system")
+                else if (key == WorkspaceManagementPage.System)
                     SystemHost.Content ??= new SystemIntegrationPageControl();
-                else if (key == "developer")
+                else if (key == WorkspaceManagementPage.Developer)
                 {
                     DeveloperHost.Content ??= new DeveloperPageControl();
                 }
-                else if (key == "settings")
+                else if (key == WorkspaceManagementPage.Settings)
                 {
                     if (SettingsHost.Content is null)
                     {
@@ -545,7 +571,9 @@ namespace LongBetterWindows.Host.Views
                     }
                 }
                 Helpers.AnimationHelper.FadeInElement(panel, durationMs: 160);
-                var offset = _pageScrollOffsets.TryGetValue(key, out var savedOffset)
+                var offset = _pageScrollOffsets.TryGetValue(
+                    _activeScrollKey,
+                    out var savedOffset)
                     ? savedOffset
                     : 0;
                 _ = Dispatcher.BeginInvoke(
@@ -577,8 +605,8 @@ namespace LongBetterWindows.Host.Views
             module.StateChanged += state =>
             {
                 if (string.Equals(
-                    _activePage,
-                    $"plugin-settings:{state.Id}",
+                    _activePluginSettingsId,
+                    state.Id,
                     StringComparison.OrdinalIgnoreCase))
                 {
                     PageTitle.Text = state.Name;
@@ -602,7 +630,7 @@ namespace LongBetterWindows.Host.Views
         private void RememberCurrentScrollOffset()
         {
             if (_pageInitialized)
-                _pageScrollOffsets[_activePage] =
+                _pageScrollOffsets[_activeScrollKey] =
                     ContentScrollViewer.VerticalOffset;
         }
 
@@ -642,8 +670,12 @@ namespace LongBetterWindows.Host.Views
             if (e.Key == Key.Tab && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
                 e.Handled = true;
-                var pages = new[] { "overview", "workflows", "plugins", "market", "system", "diagnostics", "developer", "settings" };
+                var pages = Enum.GetValues<WorkspaceManagementPage>();
                 var current = Array.IndexOf(pages, _activePage);
+                if (_activePluginSettingsId is not null)
+                    current = Array.IndexOf(
+                        pages,
+                        WorkspaceManagementPage.Plugins);
                 var direction = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1;
                 RequestPageNavigation(
                     pages[(current + direction + pages.Length) % pages.Length]);
@@ -656,7 +688,7 @@ namespace LongBetterWindows.Host.Views
             => CommandPaletteWindow.ShowPalette();
 
         private void SettingsPage_LanguageApplied(object? sender, EventArgs e)
-            => ShowPage(_activePage, forceRefresh: true);
+            => ShowManagementPage(_activePage, forceRefresh: true);
 
         private static string I18n(string key)
             => ServicesInitializer.I18n.T(key);

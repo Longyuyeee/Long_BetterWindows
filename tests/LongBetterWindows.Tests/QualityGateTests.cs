@@ -909,6 +909,10 @@ public class QualityGateTests
 
         var toolCenterXaml = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
         var toolCenterCode = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
+        var mainWindowCode = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "MainWindow.xaml.cs");
         Assert.Contains("x:Name=\"PluginManagementHost\"", toolCenterXaml);
         Assert.DoesNotContain("<local:PluginManagementControl", toolCenterXaml);
         Assert.Contains("plugins = new PluginManagementControl()", toolCenterCode);
@@ -926,7 +930,7 @@ public class QualityGateTests
         Assert.DoesNotContain("CreatePluginCard", toolCenterCode);
         Assert.DoesNotContain("PluginToggle_Click", toolCenterCode);
         var showPageStart = toolCenterCode.IndexOf(
-            "private void ShowPage",
+            "private void ShowManagementPage",
             StringComparison.Ordinal);
         var releaseMethodStart = toolCenterCode.IndexOf(
             "private void ReleasePluginManagementPage",
@@ -936,6 +940,15 @@ public class QualityGateTests
         Assert.DoesNotContain(
             "ReleasePluginManagementPage()",
             toolCenterCode[showPageStart..releaseMethodStart]);
+        Assert.DoesNotContain("ShowPage(", toolCenterCode);
+        Assert.DoesNotContain("WorkspaceLegacyModuleCatalog", toolCenterCode);
+        Assert.DoesNotContain("Tag=\"overview\"", toolCenterXaml);
+        Assert.Contains(
+            "Action<WorkspaceManagementPage>? PageNavigationRequested",
+            toolCenterCode);
+        Assert.DoesNotContain("OpenLegacyWorkspacePageAsync", mainWindowCode);
+        Assert.Contains("OpenManagementPageAsync", mainWindowCode);
+        Assert.Contains("WorkspaceManagementModuleCatalog.Create", mainWindowCode);
     }
 
     [Fact]

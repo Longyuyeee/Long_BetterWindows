@@ -142,20 +142,20 @@ namespace LongBetterWindows.Host
         {
             App.MarkStartupStage("main_window_loaded");
             if ((Application.Current as App)?.ShowMarketForQualityRequested == true)
-                await OpenLegacyWorkspacePageAsync("market");
+                await OpenManagementPageAsync(WorkspaceManagementPage.Market);
             if ((Application.Current as App)?.ShowDiagnosticsForQualityRequested == true)
-                await OpenLegacyWorkspacePageAsync("diagnostics");
+                await OpenManagementPageAsync(WorkspaceManagementPage.Diagnostics);
             if ((Application.Current as App)?.ShowPluginsForQualityRequested == true)
-                await OpenLegacyWorkspacePageAsync("plugins");
+                await OpenManagementPageAsync(WorkspaceManagementPage.Plugins);
             if ((Application.Current as App)?.ShowSystemForQualityRequested == true)
-                await OpenLegacyWorkspacePageAsync("system");
+                await OpenManagementPageAsync(WorkspaceManagementPage.System);
             if ((Application.Current as App)?.ShowSettingsForQualityRequested == true)
-                await OpenLegacyWorkspacePageAsync("settings");
+                await OpenManagementPageAsync(WorkspaceManagementPage.Settings);
             if ((Application.Current as App)?.ShowDeveloperForQualityRequested == true)
-                await OpenLegacyWorkspacePageAsync("developer");
+                await OpenManagementPageAsync(WorkspaceManagementPage.Developer);
             if ((Application.Current as App)?.ShowWelcomeForQualityRequested == true)
             {
-                await OpenLegacyWorkspacePageAsync("overview");
+                await OpenManagementPageAsync(WorkspaceManagementPage.Overview);
                 ToolCenter.ShowWelcomeForQuality();
             }
 
@@ -498,18 +498,11 @@ namespace LongBetterWindows.Host
                     pluginId,
                     StringComparison.OrdinalIgnoreCase));
 
-        private async Task OpenLegacyWorkspacePageAsync(string page)
+        private async Task OpenManagementPageAsync(WorkspaceManagementPage page)
         {
-            if (!WorkspaceLegacyModuleCatalog.TryCreate(
+            var module = WorkspaceManagementModuleCatalog.Create(
                 page,
-                key => ServicesInitializer.I18n.T(key),
-                out var module)
-                || module is null)
-            {
-                Log.Warning("Unknown legacy workspace page requested: {Page}", page);
-                return;
-            }
-
+                key => ServicesInitializer.I18n.T(key));
             var error = await OpenWorkspaceModuleAsync(
                 module,
                 CancellationToken.None);
@@ -746,17 +739,18 @@ namespace LongBetterWindows.Host
             }
         }
 
-        private async void ToolCenter_PageNavigationRequested(string page)
+        private async void ToolCenter_PageNavigationRequested(
+            WorkspaceManagementPage page)
         {
             try
             {
-                await OpenLegacyWorkspacePageAsync(page);
+                await OpenManagementPageAsync(page);
             }
             catch (Exception exception)
             {
                 Log.Error(
                     exception,
-                    "Legacy workspace page {Page} navigation failed",
+                    "Management page {Page} navigation failed",
                     page);
             }
         }

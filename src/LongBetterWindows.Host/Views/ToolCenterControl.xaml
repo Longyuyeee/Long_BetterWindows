@@ -36,21 +36,21 @@
 
                 <StackPanel Grid.Row="1">
                     <RadioButton x:Name="NavOverview" Content="{DynamicResource i18n.nav.overview}" GroupName="MainNav" IsChecked="True"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="overview" />
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
                     <RadioButton x:Name="NavWorkflows" Content="{DynamicResource i18n.nav.workflows}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="workflows" />
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
                     <RadioButton x:Name="NavPlugins" Content="{DynamicResource i18n.nav.plugins}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="plugins" />
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
                     <RadioButton x:Name="NavMarket" Content="{DynamicResource i18n.nav.market}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="market" />
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
                     <RadioButton x:Name="NavSystem" Content="{DynamicResource i18n.nav.system}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="system" />
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
                     <RadioButton x:Name="NavDiagnostics" Content="{DynamicResource i18n.nav.diagnostics}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="diagnostics" />
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
                     <RadioButton x:Name="NavDeveloper" Content="{DynamicResource i18n.nav.developer}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="developer" />
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
                     <RadioButton x:Name="NavSettings" Content="{DynamicResource i18n.nav.settings}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" Tag="settings" />
+                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
                 </StackPanel>
 
                 <Border Grid.Row="2" Style="{StaticResource ManagementCard}" Padding="12">
