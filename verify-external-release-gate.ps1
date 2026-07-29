@@ -250,11 +250,16 @@ function Assert-MarketplaceEvidenceContract($gate) {
     if ([int]$gate.document.schema_version -ne 2) {
         throw 'Marketplace rehearsal schema version 2 is required.'
     }
+    $startedAt = [DateTimeOffset]::MinValue
     $completedAt = [DateTimeOffset]::MinValue
     if (-not [bool]$gate.document.deployment_started `
         -or -not [DateTimeOffset]::TryParse(
+            [string]$gate.document.started_at,
+            [ref]$startedAt) `
+        -or -not [DateTimeOffset]::TryParse(
             [string]$gate.document.completed_at,
-            [ref]$completedAt)) {
+            [ref]$completedAt) `
+        -or $completedAt -lt $startedAt) {
         throw 'Marketplace rehearsal lifecycle metadata is incomplete.'
     }
     $requiredEvidence = [ordered]@{
@@ -268,7 +273,7 @@ function Assert-MarketplaceEvidenceContract($gate) {
     if ($null -eq $evidence) {
         throw 'Marketplace rehearsal evidence entries are missing.'
     }
-    $root = Split-Path -Parent $gate.path
+    $reports = [ordered]@{}
     foreach ($required in $requiredEvidence.GetEnumerator()) {
         $property = $evidence.psobject.Properties[$required.Key]
         $entry = if ($null -eq $property) { $null } else { $property.Value }
@@ -276,12 +281,107 @@ function Assert-MarketplaceEvidenceContract($gate) {
             -or [string]$entry.sha256 -notmatch '^[0-9a-f]{64}$') {
             throw "Marketplace rehearsal evidence entry is incomplete: $($required.Key)"
         }
-        $path = Join-Path $root ([string]$entry.file)
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf) `
-            -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).
-                Hash.ToLowerInvariant() -ne [string]$entry.sha256) {
-            throw "Marketplace rehearsal evidence hash mismatch: $($required.Key)"
+        $reports[$required.Key] = Read-HashLockedSource `
+            $gate $entry "Marketplace rehearsal evidence $($required.Key)"
+    }
+
+    $dryRun = $reports.preflight_dry_run
+    $deployment = $reports.deployment
+    $destination = [string]$gate.document.destination
+    if ([int]$dryRun.SchemaVersion -ne 1 `
+        -or [string]$dryRun.ReleaseId -ne [string]$gate.document.release_id `
+        -or [string]$dryRun.Mode -ne 'dry_run' `
+        -or [string]$dryRun.Target -ne 'Https' `
+        -or [string]$dryRun.Destination -ne $destination `
+        -or @($dryRun.Files).Count -eq 0 `
+        -or [string]$dryRun.Files[-1].Kind -ne 'RegistryCommit') {
+        throw 'Marketplace preflight report content does not match its summary.'
+    }
+    if ([int]$deployment.SchemaVersion -ne 1 `
+        -or [string]$deployment.ReleaseId -ne [string]$gate.document.release_id `
+        -or [string]$deployment.Mode -ne 'deployed' `
+        -or [string]$deployment.Target -ne 'Https' `
+        -or [string]$deployment.Destination -ne $destination) {
+        throw 'Marketplace deployment report content does not match its summary.'
+    }
+
+    $dryRunPlan = @($dryRun.Files | Sort-Object RemotePath |
+        Select-Object RemotePath,Sha256,Bytes,Kind) |
+        ConvertTo-Json -Compress -Depth 4
+    $deploymentPlan = @($deployment.Files | Sort-Object RemotePath |
+        Select-Object RemotePath,Sha256,Bytes,Kind) |
+        ConvertTo-Json -Compress -Depth 4
+    if ($dryRunPlan -ne $deploymentPlan) {
+        throw 'Marketplace deployment report differs from the approved preflight plan.'
+    }
+
+    $registryUri = [uri]::new([uri]$destination, 'registry.json').AbsoluteUri
+    $verificationReports = @(
+        $reports.baseline_verification,
+        $reports.deployed_verification,
+        $reports.rollback_verification)
+    foreach ($report in $verificationReports) {
+        if ([int]$report.SchemaVersion -ne 1 `
+            -or [string]$report.RegistryUri -ne $registryUri `
+            -or [int]$report.EntryCount -lt 0 `
+            -or [int]$report.PackageCount -ne @($report.Packages).Count `
+            -or [long]$report.TotalPackageBytes -lt 0 `
+            -or [int]$report.TrustedPublisherKeyCount -lt 1) {
+            throw 'Marketplace verification report content is incomplete.'
         }
+        $packageBytes = [long]0
+        $pluginIds = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::OrdinalIgnoreCase)
+        foreach ($package in @($report.Packages)) {
+            if ([string]::IsNullOrWhiteSpace([string]$package.PluginId) `
+                -or -not $pluginIds.Add([string]$package.PluginId) `
+                -or [string]::IsNullOrWhiteSpace([string]$package.Version) `
+                -or [string]$package.Sha256 -notmatch '^[0-9a-f]{64}$' `
+                -or [string]::IsNullOrWhiteSpace([string]$package.PublisherKeyId) `
+                -or [long]$package.Bytes -le 0) {
+                throw 'Marketplace verification package inventory is invalid.'
+            }
+            $packageBytes += [long]$package.Bytes
+        }
+        if ($packageBytes -ne [long]$report.TotalPackageBytes) {
+            throw 'Marketplace verification package bytes do not match the report total.'
+        }
+    }
+
+    $baselineState = $reports.baseline_verification |
+        Select-Object RegistryGeneratedAt,EntryCount,PackageCount,
+            TotalPackageBytes,TrustedPublisherKeyCount,Packages |
+        ConvertTo-Json -Compress -Depth 6
+    $rollbackState = $reports.rollback_verification |
+        Select-Object RegistryGeneratedAt,EntryCount,PackageCount,
+            TotalPackageBytes,TrustedPublisherKeyCount,Packages |
+        ConvertTo-Json -Compress -Depth 6
+    if ($baselineState -ne $rollbackState) {
+        throw 'Marketplace rollback verification did not restore the baseline Registry.'
+    }
+    $deployedState = $reports.deployed_verification |
+        Select-Object RegistryGeneratedAt,EntryCount,PackageCount,
+            TotalPackageBytes,TrustedPublisherKeyCount,Packages |
+        ConvertTo-Json -Compress -Depth 6
+    if ($deployedState -eq $baselineState) {
+        throw 'Marketplace deployed verification did not observe a Registry change.'
+    }
+
+    $reportTimes = @(
+        [string]$dryRun.ExecutedAt,
+        [string]$reports.baseline_verification.VerifiedAt,
+        [string]$deployment.ExecutedAt,
+        [string]$reports.deployed_verification.VerifiedAt,
+        [string]$reports.rollback_verification.VerifiedAt)
+    $previous = $startedAt
+    foreach ($value in $reportTimes) {
+        $timestamp = [DateTimeOffset]::MinValue
+        if (-not [DateTimeOffset]::TryParse($value, [ref]$timestamp) `
+            -or $timestamp -lt $previous `
+            -or $timestamp -gt $completedAt) {
+            throw 'Marketplace rehearsal report chronology is invalid.'
+        }
+        $previous = $timestamp
     }
 }
 

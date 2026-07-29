@@ -337,7 +337,37 @@ public sealed class ExternalReleaseGateTests : IDisposable
         var result = await RunVerifierAsync(paths, output);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Marketplace rehearsal evidence hash mismatch", result.Error);
+        Assert.Contains("Marketplace rehearsal evidence deployment source hash mismatch", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsHashLockedMarketplaceReleaseMismatch()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            marketplaceDeploymentReleaseMismatch: true);
+        var output = Path.Combine(_root, "marketplace-release-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("deployment report content does not match", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsHashLockedMarketplaceRollbackMismatch()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            marketplaceRollbackMismatch: true);
+        var output = Path.Combine(_root, "marketplace-rollback-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("did not restore the baseline Registry", result.Error);
         Assert.False(File.Exists(output));
     }
 
@@ -453,7 +483,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
         bool releaseSourceDirty = false,
         bool invalidPackageInventory = false,
         bool downloadSourcePackageMismatch = false,
-        bool cleanSourceReviewerMismatch = false)
+        bool cleanSourceReviewerMismatch = false,
+        bool marketplaceDeploymentReleaseMismatch = false,
+        bool marketplaceRollbackMismatch = false)
     {
         Directory.CreateDirectory(_root);
         var packagePath = Path.Combine(_root, "LongBetterWindows.zip");
@@ -667,10 +699,13 @@ public sealed class ExternalReleaseGateTests : IDisposable
             screen_reader_approval_count = screenReaderApprovalCount,
             evidence = accessibilityEvidence,
         });
-        var marketplaceEvidence = WriteMarketplaceEvidence();
+        var marketplaceEvidence = WriteMarketplaceEvidence(
+            marketplaceDeploymentReleaseMismatch,
+            marketplaceRollbackMismatch);
         var marketplace = WriteJson("marketplace.json", new
         {
             schema_version = marketplaceSchemaVersion,
+            started_at = "2026-07-29T00:00:00Z",
             classification = "marketplace_https_rehearsal",
             passed = true,
             destination = "https://registry.example.test/releases/",
@@ -686,7 +721,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
             failure = (string?)null,
             rollback_failure = (string?)null,
             rollback_verification_failure = (string?)null,
-            completed_at = "2026-07-29T00:00:00Z",
+            completed_at = "2026-07-29T00:00:06Z",
             evidence = new
             {
                 preflight_dry_run = EvidenceEntry("preflight-dry-run.json"),
@@ -740,20 +775,91 @@ public sealed class ExternalReleaseGateTests : IDisposable
     private static string Hash(byte[] content) =>
         Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
-    private string WriteMarketplaceEvidence()
+    private string WriteMarketplaceEvidence(
+        bool deploymentReleaseMismatch,
+        bool rollbackMismatch)
     {
-        foreach (var fileName in new[]
+        var deploymentFiles = new[]
         {
-            "preflight-dry-run.json",
+            new
+            {
+                RemotePath = "registry.json",
+                Sha256 = new string('a', 64),
+                Bytes = 512,
+                Kind = "RegistryCommit",
+            },
+        };
+        WriteJson("preflight-dry-run.json", new
+        {
+            SchemaVersion = 1,
+            ReleaseId = "release-20260723",
+            ExecutedAt = "2026-07-29T00:00:01Z",
+            Mode = "dry_run",
+            Target = "Https",
+            Destination = "https://registry.example.test/releases/",
+            Files = deploymentFiles,
+        });
+        WriteMarketplaceVerification(
             "baseline-verification.json",
-            "deployment.json",
-            "deployed-verification.json",
-            "rollback-verification.json",
-        })
+            "2026-07-29T00:00:02Z",
+            "2026-07-28T00:00:00Z",
+            "baseline.plugin");
+        WriteJson("deployment.json", new
         {
-            File.WriteAllText(Path.Combine(_root, fileName), $"fixture:{fileName}");
-        }
+            SchemaVersion = 1,
+            ReleaseId = deploymentReleaseMismatch
+                ? "release-different"
+                : "release-20260723",
+            ExecutedAt = "2026-07-29T00:00:03Z",
+            Mode = "deployed",
+            Target = "Https",
+            Destination = "https://registry.example.test/releases/",
+            Files = deploymentFiles,
+        });
+        WriteMarketplaceVerification(
+            "deployed-verification.json",
+            "2026-07-29T00:00:04Z",
+            "2026-07-29T00:00:00Z",
+            "deployed.plugin");
+        WriteMarketplaceVerification(
+            "rollback-verification.json",
+            "2026-07-29T00:00:05Z",
+            rollbackMismatch
+                ? "2026-07-27T00:00:00Z"
+                : "2026-07-28T00:00:00Z",
+            "baseline.plugin");
         return Path.Combine(_root, "deployment.json");
+    }
+
+    private void WriteMarketplaceVerification(
+        string fileName,
+        string verifiedAt,
+        string registryGeneratedAt,
+        string pluginId)
+    {
+        WriteJson(fileName, new
+        {
+            SchemaVersion = 1,
+            VerifiedAt = verifiedAt,
+            RegistryUri = "https://registry.example.test/releases/registry.json",
+            RegistryGeneratedAt = registryGeneratedAt,
+            EntryCount = 1,
+            PackageCount = 1,
+            TotalPackageBytes = 128,
+            TrustedPublisherKeyCount = 1,
+            DurationMilliseconds = 25,
+            Packages = new[]
+            {
+                new
+                {
+                    PluginId = pluginId,
+                    Version = "1.0.0",
+                    Sha256 = new string('b', 64),
+                    PublisherKeyId = "publisher",
+                    Bytes = 128,
+                },
+            },
+        });
     }
 
     private object EvidenceEntry(string fileName)

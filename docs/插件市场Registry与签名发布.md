@@ -237,6 +237,8 @@ $env:LONG_MARKETPLACE_DEPLOY_TOKEN = '<由受控凭据系统注入>'
 
 候选 Dry Run 或现网基线验收失败时不会开始部署。设置部署开始状态后的任一步骤失败，`finally` 安全路径都会尝试回滚并再次验收，同时把原始失败、回滚失败和回滚验收失败分别写入摘要。脚本不把 Bearer Token 作为参数传递给 .NET 工具，也不将其写入任何报告。只有摘要中的 `preflight_dry_run_verified`、`baseline_verified`、`deployment_completed`、`deployment_verified`、`rollback_completed` 和 `rollback_verified` 全部为 `true`，才可签核全链演练。
 
+最终外部门禁不会只信任这些布尔值和文件哈希。它会解析五份底层报告，要求 Dry Run 与部署使用相同 Release ID、HTTPS 目标和完整文件计划，三次公开验证指向同一 Registry，部署后状态区别于基线，回滚后状态恢复基线，并验证各报告时间按实际生命周期排序。手工替换报告并同步更新摘要 SHA-256 不能形成有效发布证据。
+
 ## 10. 客户端网络恢复策略
 
 - Registry 请求失败时只回退到最近一次通过结构校验的可信目录；没有可信缓存时明确显示离线状态，本地插件不受影响。

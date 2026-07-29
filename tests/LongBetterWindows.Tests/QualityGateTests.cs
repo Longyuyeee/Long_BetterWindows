@@ -197,7 +197,13 @@ public class QualityGateTests
         Assert.Contains("Release-download approval source content does not match", gate);
         Assert.Contains("Clean-environment evidence source content does not match", gate);
         Assert.Contains("Marketplace rehearsal schema version 2 is required", gate);
-        Assert.Contains("Marketplace rehearsal evidence hash mismatch", gate);
+        Assert.Contains("$reports[$required.Key] = Read-HashLockedSource", gate);
+        Assert.Contains("\"Marketplace rehearsal evidence $($required.Key)\"", gate);
+        Assert.Contains("Marketplace deployment report differs from the approved preflight plan", gate);
+        Assert.Contains("Marketplace verification package inventory is invalid", gate);
+        Assert.Contains("Marketplace rollback verification did not restore the baseline Registry", gate);
+        Assert.Contains("Marketplace deployed verification did not observe a Registry change", gate);
+        Assert.Contains("Marketplace rehearsal report chronology is invalid", gate);
         Assert.Contains("Release Manifest candidate identity contract is incomplete", gate);
         Assert.Contains("Release Manifest package inventory is invalid", gate);
         Assert.Contains("Release Manifest installer inventory is invalid", gate);
