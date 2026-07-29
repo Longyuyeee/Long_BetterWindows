@@ -165,6 +165,62 @@ function Assert-MarketplaceEvidenceContract($gate) {
     }
 }
 
+function Assert-ReleaseManifestContract(
+    $document,
+    [string] $sourceCommit,
+    [string] $distributionChannel) {
+    $createdAt = [DateTimeOffset]::MinValue
+    if ([int]$document.schema_version -ne 1 `
+        -or [string]$document.product -ne 'Long Assistant' `
+        -or [string]$document.version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$' `
+        -or [string]$document.runtime -ne 'win-x64' `
+        -or -not [DateTimeOffset]::TryParse([string]$document.created_at, [ref]$createdAt) `
+        -or [bool]$document.source_dirty) {
+        throw 'Release Manifest candidate identity contract is incomplete.'
+    }
+    if ($distributionChannel -eq 'unsigned') {
+        if ([string]$document.publisher_identity -ne 'unverified' `
+            -or [string]::IsNullOrWhiteSpace([string]$document.security_notice)) {
+            throw 'Unsigned Release Manifest publisher disclosure is incomplete.'
+        }
+    }
+    else {
+        if ([string]$document.publisher_identity -ne 'authenticode' `
+            -or [string]$document.signing.source_commit -ne $sourceCommit `
+            -or [string]$document.signing.certificate_thumbprint -notmatch '^[0-9a-fA-F]{40}$') {
+            throw 'Signed Release Manifest publisher identity is incomplete.'
+        }
+    }
+
+    $packages = @($document.packages)
+    if ($packages.Count -lt 1 -or $packages.Count -gt 2) {
+        throw 'Release Manifest must contain one or two package entries.'
+    }
+    $fileNames = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    $kinds = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    foreach ($package in $packages) {
+        $file = [string]$package.file
+        $kind = [string]$package.kind
+        if ([string]::IsNullOrWhiteSpace($file) `
+            -or [IO.Path]::GetFileName($file) -ne $file `
+            -or -not $fileNames.Add($file) `
+            -or $kind -notin @('self-contained','framework-dependent') `
+            -or -not $kinds.Add($kind) `
+            -or [string]$package.sha256 -notmatch '^[0-9a-f]{64}$' `
+            -or [long]$package.bytes -le 0 `
+            -or [int]$package.plugins -ne 25 `
+            -or [int]$package.manifests -ne 25 `
+            -or [int]$package.unique_plugin_ids -ne 25 `
+            -or [int]$package.commands -ne 42 `
+            -or [int]$package.command_smoke_exit_code -ne 0 `
+            -or [int]$package.added_webview_processes -ne 0) {
+            throw 'Release Manifest package inventory is invalid.'
+        }
+    }
+}
+
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -196,6 +252,10 @@ if ([string]$release.document.distribution_channel -ne $ExpectedDistributionChan
     -or ($ExpectedDistributionChannel -eq 'unsigned' -and [bool]$release.document.signed)) {
     throw 'Release Manifest does not match the eligible expected distribution channel.'
 }
+Assert-ReleaseManifestContract `
+    $release.document `
+    $expectedCommit `
+    $ExpectedDistributionChannel
 
 foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
     if ([string]$gate.document.source_commit -ne $expectedCommit) {
@@ -270,6 +330,13 @@ $decision = [ordered]@{
     package = [ordered]@{
         file = $packageFile
         sha256 = $packageSha256
+    }
+    candidate = [ordered]@{
+        manifest_schema_version = [int]$release.document.schema_version
+        version = [string]$release.document.version
+        runtime = [string]$release.document.runtime
+        source_dirty = [bool]$release.document.source_dirty
+        package_count = @($release.document.packages).Count
     }
     independent_review = [ordered]@{
         download_operator = $downloadOperator

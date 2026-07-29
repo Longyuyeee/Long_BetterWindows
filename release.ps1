@@ -278,6 +278,7 @@ try {
     # change the reproducible source tree used by this release.
     $sourceDirty = @((git status --porcelain --untracked-files=no 2>$null)).Count -gt 0
     $manifest = [ordered]@{
+        schema_version = 1
         product = 'Long Assistant'
         version = $Version
         runtime = 'win-x64'

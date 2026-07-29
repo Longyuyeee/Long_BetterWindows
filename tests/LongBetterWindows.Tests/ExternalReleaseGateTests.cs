@@ -33,6 +33,14 @@ public sealed class ExternalReleaseGateTests : IDisposable
             PackageHash,
             root.GetProperty("package").GetProperty("sha256").GetString());
         Assert.Equal(
+            "1.11.0",
+            root.GetProperty("candidate").GetProperty("version").GetString());
+        Assert.False(
+            root.GetProperty("candidate").GetProperty("source_dirty").GetBoolean());
+        Assert.Equal(
+            2,
+            root.GetProperty("candidate").GetProperty("package_count").GetInt32());
+        Assert.Equal(
             "registry.example.test",
             root.GetProperty("marketplace").GetProperty("destination_host").GetString());
         Assert.Equal(
@@ -197,6 +205,45 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.False(File.Exists(output));
     }
 
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsLegacyReleaseManifest()
+    {
+        var paths = WriteFixture(PackageHash, releaseSchemaVersion: 0);
+        var output = Path.Combine(_root, "release-schema-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("candidate identity contract is incomplete", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsDirtyReleaseManifest()
+    {
+        var paths = WriteFixture(PackageHash, releaseSourceDirty: true);
+        var output = Path.Combine(_root, "dirty-release-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("candidate identity contract is incomplete", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsInvalidPackageInventory()
+    {
+        var paths = WriteFixture(PackageHash, invalidPackageInventory: true);
+        var output = Path.Combine(_root, "package-inventory-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Release Manifest package inventory is invalid", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
     private FixturePaths WriteFixture(
         string cleanPackageHash,
         bool marketplacePreflightOnly = false,
@@ -206,16 +253,39 @@ public sealed class ExternalReleaseGateTests : IDisposable
         int screenReaderApprovalCount = 1,
         int downloadSchemaVersion = 1,
         int cleanSchemaVersion = 1,
-        int marketplaceSchemaVersion = 2)
+        int marketplaceSchemaVersion = 2,
+        int releaseSchemaVersion = 1,
+        bool releaseSourceDirty = false,
+        bool invalidPackageInventory = false)
     {
         Directory.CreateDirectory(_root);
         var release = WriteJson("release.json", new
         {
+            schema_version = releaseSchemaVersion,
+            product = "Long Assistant",
+            version = "1.11.0",
+            runtime = "win-x64",
+            created_at = "2026-07-29T00:00:00Z",
             commit = Commit,
+            source_dirty = releaseSourceDirty,
             distribution_channel = "unsigned",
+            publisher_identity = "unverified",
+            security_notice = "Publisher identity is unverified; validate SHA-256.",
             release_eligible = true,
             signed = false,
-            packages = new[] { new { file = "LongBetterWindows.zip", sha256 = PackageHash } },
+            packages = new[]
+            {
+                ReleasePackage(
+                    "LongBetterWindows.zip",
+                    "self-contained",
+                    PackageHash,
+                    commandCount: invalidPackageInventory ? 41 : 42),
+                ReleasePackage(
+                    "LongBetterWindows-framework-dependent.zip",
+                    "framework-dependent",
+                    new string('d', 64),
+                    commandCount: 42),
+            },
         });
         var download = WriteJson("download.json", new
         {
@@ -318,6 +388,25 @@ public sealed class ExternalReleaseGateTests : IDisposable
             marketplace,
             marketplaceEvidence);
     }
+
+    private static object ReleasePackage(
+        string file,
+        string kind,
+        string sha256,
+        int commandCount) =>
+        new
+        {
+            file,
+            kind,
+            sha256,
+            bytes = 1024,
+            plugins = 25,
+            manifests = 25,
+            unique_plugin_ids = 25,
+            commands = commandCount,
+            command_smoke_exit_code = 0,
+            added_webview_processes = 0,
+        };
 
     private string WriteMarketplaceEvidence()
     {

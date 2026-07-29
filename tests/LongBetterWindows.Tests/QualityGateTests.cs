@@ -187,7 +187,11 @@ public class QualityGateTests
         Assert.Contains("Clean-environment gate summary contract is incomplete", gate);
         Assert.Contains("Marketplace rehearsal schema version 2 is required", gate);
         Assert.Contains("Marketplace rehearsal evidence hash mismatch", gate);
+        Assert.Contains("Release Manifest candidate identity contract is incomplete", gate);
+        Assert.Contains("Release Manifest package inventory is invalid", gate);
+        Assert.Contains("Unsigned Release Manifest publisher disclosure is incomplete", gate);
         Assert.Contains("evidence_contract", gate);
+        Assert.Contains("candidate = [ordered]@", gate);
         Assert.Contains("Get-FileHash", gate);
         Assert.Contains("external_release_gate_decision", gate);
         Assert.Contains("decision already exists", gate);
@@ -860,6 +864,7 @@ public class QualityGateTests
         Assert.Contains("SHA256SUMS.txt", release);
         Assert.Contains("release-manifest.json", release);
         Assert.Contains("source_dirty", release);
+        Assert.Contains("schema_version = 1", release);
         Assert.Contains("release_eligible", release);
         Assert.Contains("distribution_channel = 'unsigned'", release);
         Assert.Contains("publisher_identity = 'unverified'", release);
