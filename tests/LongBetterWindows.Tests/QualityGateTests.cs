@@ -164,6 +164,7 @@ public class QualityGateTests
     public void ExternalReleaseGate_BindsEveryApprovedGateToOneCandidateAndFullRollback()
     {
         var gate = Read("verify-external-release-gate.ps1");
+        var evidenceIo = Read("release-evidence-io.ps1");
         var rehearsal = Read("rehearse-marketplace.ps1");
 
         Assert.Contains("ExpectedSourceCommit", gate);
@@ -225,8 +226,9 @@ public class QualityGateTests
         Assert.Contains("preflight_only = [bool]$PreflightOnly", gate);
         Assert.Contains("decision already exists", gate);
         Assert.Contains("Write-DecisionAtomically", gate);
-        Assert.Contains("[IO.File]::Move($temporaryOutput, $path)", gate);
-        Assert.Contains("Remove-Item -LiteralPath $temporaryOutput -Force", gate);
+        Assert.Contains("Write-NewJsonFileAtomically", gate);
+        Assert.Contains("[IO.File]::Move($temporaryPath, $resolvedPath)", evidenceIo);
+        Assert.Contains("Remove-Item -LiteralPath $temporaryPath -Force", evidenceIo);
         Assert.DoesNotContain(
             "Set-Content -LiteralPath $resolvedOutput",
             gate,
@@ -324,6 +326,9 @@ public class QualityGateTests
         Assert.Contains("source_manifest = [ordered]@", verify);
         Assert.Contains(".sources", verify);
         Assert.Contains("Copy-Item -LiteralPath $source.path", verify);
+        Assert.Contains("Write-NewJsonFileAtomically", verify);
+        Assert.Contains("[IO.Directory]::Move($temporarySourceDirectory, $sourceDirectory)", verify);
+        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutput", verify);
     }
 
     [Fact]
@@ -365,6 +370,9 @@ public class QualityGateTests
         Assert.Contains("source_manifest = [ordered]@", verify);
         Assert.Contains(".sources", verify);
         Assert.Contains("Copy-Item -LiteralPath $source.path", verify);
+        Assert.Contains("Write-NewJsonFileAtomically", verify);
+        Assert.Contains("[IO.Directory]::Move($temporarySourceDirectory, $sourceDirectory)", verify);
+        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutput", verify);
     }
 
     [Fact]
@@ -409,6 +417,8 @@ public class QualityGateTests
         Assert.Contains("schema_version = 2", verify);
         Assert.Contains("evidence_manifest = [ordered]@", verify);
         Assert.Contains("summary and evidence manifest must share one directory", verify);
+        Assert.Contains("Write-NewJsonFileAtomically", verify);
+        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutput", verify);
         Assert.Contains("ReleaseDirectory", desktopSmoke);
         Assert.Contains("Plugins directory was not found", desktopSmoke);
     }
@@ -448,6 +458,8 @@ public class QualityGateTests
         Assert.Contains("evidence = [ordered]@", verify);
         Assert.Contains("approval = [ordered]@", verify);
         Assert.Contains("summary and source files must share one directory", verify);
+        Assert.Contains("Write-NewJsonFileAtomically", verify);
+        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutputPath", verify);
     }
 
     [Fact]

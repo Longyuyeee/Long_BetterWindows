@@ -22,6 +22,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 
 function Read-GateJson([string] $path, [string] $label) {
     $resolved = [IO.Path]::GetFullPath($path)
@@ -510,32 +511,11 @@ function Assert-ReleaseArtifactFiles($releaseGate) {
 }
 
 function Write-DecisionAtomically($decision, [string] $path) {
-    $parent = Split-Path -Parent $path
-    if (-not [string]::IsNullOrWhiteSpace($parent)) {
-        [IO.Directory]::CreateDirectory($parent) | Out-Null
-    }
-    $fileName = [IO.Path]::GetFileName($path)
-    $temporaryOutput = Join-Path $parent (
-        ".$fileName.$([Guid]::NewGuid().ToString('N')).tmp")
-    try {
-        $json = $decision | ConvertTo-Json -Depth 7
-        [IO.File]::WriteAllText(
-            $temporaryOutput,
-            $json,
-            [Text.UTF8Encoding]::new($false))
-        [IO.File]::Move($temporaryOutput, $path)
-    }
-    catch {
-        if (Test-Path -LiteralPath $path) {
-            throw "External release decision already exists: $path"
-        }
-        throw
-    }
-    finally {
-        if (Test-Path -LiteralPath $temporaryOutput) {
-            Remove-Item -LiteralPath $temporaryOutput -Force
-        }
-    }
+    Write-NewJsonFileAtomically `
+        -Value $decision `
+        -Path $path `
+        -Depth 7 `
+        -Label 'External release decision'
 }
 
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()

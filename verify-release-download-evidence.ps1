@@ -10,6 +10,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -96,9 +97,6 @@ $summary = [ordered]@{
 }
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
     $resolvedOutputPath = [IO.Path]::GetFullPath($OutputPath)
-    if (Test-Path -LiteralPath $resolvedOutputPath) {
-        throw "Release-download gate summary already exists: $resolvedOutputPath"
-    }
     $outputParent = Split-Path -Parent $resolvedOutputPath
     foreach ($sourcePath in @($resolvedEvidencePath, $resolvedApprovalPath)) {
         if (-not [string]::Equals(
@@ -108,10 +106,11 @@ if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
             throw 'Release-download summary and source files must share one directory.'
         }
     }
-    if (-not [string]::IsNullOrWhiteSpace($outputParent)) {
-        [IO.Directory]::CreateDirectory($outputParent) | Out-Null
-    }
-    $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $resolvedOutputPath -Encoding UTF8
+    Write-NewJsonFileAtomically `
+        -Value $summary `
+        -Path $resolvedOutputPath `
+        -Depth 5 `
+        -Label 'Release-download gate summary'
     Write-Output "Release-download gate summary: $resolvedOutputPath"
 }
 Write-Output 'Approved release-download gate verified.'

@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -93,8 +94,11 @@ if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
         [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Clean-environment summary and evidence manifest must share one directory.'
     }
-    if (-not [string]::IsNullOrWhiteSpace($parent)) { [IO.Directory]::CreateDirectory($parent) | Out-Null }
-    $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $resolvedOutput -Encoding UTF8
+    Write-NewJsonFileAtomically `
+        -Value $summary `
+        -Path $resolvedOutput `
+        -Depth 5 `
+        -Label 'Clean-environment gate summary'
     Write-Output "Clean-environment gate summary: $resolvedOutput"
 }
 Write-Output 'Clean Windows release gate verified.'

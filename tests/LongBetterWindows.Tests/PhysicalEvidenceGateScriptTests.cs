@@ -38,6 +38,7 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
                 .GetProperty("screen_reader_approval_count")
                 .GetInt32());
         AssertPortableSources(summary.RootElement, output, expectedCount: 3);
+        AssertNoTemporaryOutputs(output);
     }
 
     [Fact]
@@ -97,6 +98,30 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
         Assert.Equal(3, summary.RootElement.GetProperty("schema_version").GetInt32());
         Assert.Equal(32, summary.RootElement.GetProperty("capture_count").GetInt32());
         AssertPortableSources(summary.RootElement, output, expectedCount: 4);
+        AssertNoTemporaryOutputs(output);
+    }
+
+    [Fact]
+    public async Task PhysicalDpiVerifier_AllowsOnlyOneConcurrentSummaryWriter()
+    {
+        var directories = WritePhysicalDpiMatrix("dpi-concurrent");
+        var output = Path.Combine(_root, "dpi-concurrent.json");
+
+        var results = await Task.WhenAll(
+            RunMatrixVerifierAsync(
+                "verify-physical-dpi-matrix.ps1",
+                directories,
+                output),
+            RunMatrixVerifierAsync(
+                "verify-physical-dpi-matrix.ps1",
+                directories,
+                output));
+
+        Assert.Single(results, result => result.ExitCode == 0);
+        Assert.Single(results, result => result.ExitCode != 0);
+        using var summary = JsonDocument.Parse(File.ReadAllText(output));
+        AssertPortableSources(summary.RootElement, output, expectedCount: 4);
+        AssertNoTemporaryOutputs(output);
     }
 
     [Fact]
@@ -349,6 +374,12 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             Assert.True(File.Exists(path), $"Portable source was not found: {path}");
             Assert.Equal(source.GetProperty("sha256").GetString(), Hash(path));
         }
+    }
+
+    private static void AssertNoTemporaryOutputs(string summaryPath)
+    {
+        var directory = Path.GetDirectoryName(summaryPath)!;
+        Assert.Empty(Directory.GetFileSystemEntries(directory, ".*.tmp"));
     }
 
     private static string QuoteForPowerShell(string value) =>

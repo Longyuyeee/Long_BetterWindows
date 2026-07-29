@@ -10,6 +10,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
 $outputParent = Split-Path -Parent $resolvedOutput
 $outputStem = [IO.Path]::GetFileNameWithoutExtension($resolvedOutput)
@@ -121,25 +122,36 @@ $summary = [ordered]@{
     passed = $true
     evidence = $results
 }
+$temporarySourceDirectory = Join-Path $outputParent (
+    ".$sourceDirectoryName.$([Guid]::NewGuid().ToString('N')).tmp")
+$sourceCommitted = $false
 try {
     if (-not [string]::IsNullOrWhiteSpace($outputParent)) {
         [IO.Directory]::CreateDirectory($outputParent) | Out-Null
     }
-    [IO.Directory]::CreateDirectory($sourceDirectory) | Out-Null
+    [IO.Directory]::CreateDirectory($temporarySourceDirectory) | Out-Null
     foreach ($source in $sourceManifests) {
         Copy-Item -LiteralPath $source.path `
-            -Destination (Join-Path $sourceDirectory $source.file)
+            -Destination (Join-Path $temporarySourceDirectory $source.file)
     }
-    $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $resolvedOutput -Encoding UTF8
-    Write-Output "Matrix summary: $resolvedOutput"
+    [IO.Directory]::Move($temporarySourceDirectory, $sourceDirectory)
+    $sourceCommitted = $true
+    Write-NewJsonFileAtomically `
+        -Value $summary `
+        -Path $resolvedOutput `
+        -Depth 6 `
+        -Label 'Physical DPI matrix summary'
 }
 catch {
-    if (Test-Path -LiteralPath $resolvedOutput) {
-        Remove-Item -LiteralPath $resolvedOutput -Force
-    }
-    if (Test-Path -LiteralPath $sourceDirectory) {
+    if ($sourceCommitted -and (Test-Path -LiteralPath $sourceDirectory)) {
         Remove-Item -LiteralPath $sourceDirectory -Recurse -Force
     }
     throw
 }
+finally {
+    if (Test-Path -LiteralPath $temporarySourceDirectory) {
+        Remove-Item -LiteralPath $temporarySourceDirectory -Recurse -Force
+    }
+}
+Write-Output "Matrix summary: $resolvedOutput"
 Write-Output 'Physical DPI release matrix verified: 32 captures, 4 approved scales.'
