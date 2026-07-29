@@ -22,10 +22,9 @@ public sealed class LocalFileSearchProviderTests : IDisposable
     {
         var provider = new LocalFileSearchProvider(new[] { _root });
 
-        var results = await provider.SearchAsync(new SearchRequest(
-            "needle", ContextSnapshot.Empty, MaxResults: 10));
-
-        var result = Assert.Single(results);
+        var result = await SearchUntilSingleAsync(
+            provider,
+            new SearchRequest("needle", ContextSnapshot.Empty, MaxResults: 10));
         Assert.Equal(SearchActionKind.OpenPath, result.PrimaryAction.Kind);
         Assert.Equal(
             new[] { SearchActionKind.OpenContainingFolder, SearchActionKind.CopyText },
@@ -59,8 +58,9 @@ public sealed class LocalFileSearchProviderTests : IDisposable
                 _ => key,
             });
 
-        var result = Assert.Single(await provider.SearchAsync(new SearchRequest(
-            "needle", ContextSnapshot.Empty, MaxResults: 10)));
+        var result = await SearchUntilSingleAsync(
+            provider,
+            new SearchRequest("needle", ContextSnapshot.Empty, MaxResults: 10));
 
         Assert.Equal("Local file", result.Source);
         Assert.Equal("Open", result.PrimaryAction.Label);
@@ -125,6 +125,20 @@ public sealed class LocalFileSearchProviderTests : IDisposable
         Assert.Contains("\"Sent \\u0027safely\\u0027\"", html);
         Assert.DoesNotContain(">开始创作<", html);
         Assert.DoesNotContain("Toast 已发送", html);
+    }
+
+    private static async Task<SearchResultItem> SearchUntilSingleAsync(
+        LocalFileSearchProvider provider,
+        SearchRequest request)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (true)
+        {
+            var results = await provider.SearchAsync(request, timeout.Token);
+            if (results.Count > 0)
+                return Assert.Single(results);
+            await Task.Delay(100, timeout.Token);
+        }
     }
 
     public void Dispose()

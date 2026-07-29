@@ -16,6 +16,12 @@ public sealed class PluginManualApprovalScriptTests
         Assert.Contains("subject_executable_sha256", source);
         Assert.Contains("source_commit", source);
         Assert.Contains("evidence_files", source);
+        Assert.Contains("release-evidence-io.ps1", source);
+        Assert.Contains("Write-NewJsonFileAtomically", source);
+        Assert.Contains("Update-JsonFileAtomically", source);
+        Assert.Contains("existingReceiptHash", source);
+        Assert.Contains("Omit -Replace for the first complete review", source);
+        Assert.DoesNotContain("[IO.File]::WriteAllText(", source);
         Assert.Contains("do not commit the original captures", source);
     }
 

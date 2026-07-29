@@ -18,6 +18,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot "release-evidence-io.ps1")
 
 function Resolve-RepositoryPath([string]$PathValue) {
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
@@ -106,8 +107,18 @@ $safeName = ($PluginId + "--" + $ManualCheckId) `
     -replace "[^A-Za-z0-9._-]", "_"
 $receiptDirectory = Join-Path $PSScriptRoot "docs\plugin-manual-approvals"
 $receiptPath = Join-Path $receiptDirectory ($safeName + ".json")
-if ((Test-Path -LiteralPath $receiptPath) -and -not $Replace) {
+$receiptExists = Test-Path -LiteralPath $receiptPath -PathType Leaf
+if ($receiptExists -and -not $Replace) {
     throw "Approval receipt already exists. Use -Replace only after a new complete review: $receiptPath"
+}
+if ($Replace -and -not $receiptExists) {
+    throw "Approval receipt does not exist. Omit -Replace for the first complete review: $receiptPath"
+}
+$existingReceiptHash = if ($Replace) {
+    (Get-FileHash -LiteralPath $receiptPath -Algorithm SHA256).
+        Hash.ToLowerInvariant()
+} else {
+    $null
 }
 New-Item -ItemType Directory -Path $receiptDirectory -Force | Out-Null
 $receipt = [ordered]@{
@@ -130,10 +141,20 @@ $receipt = [ordered]@{
     commands = @($manualCheck[0].commands)
     evidence_files = $evidence
 }
-[IO.File]::WriteAllText(
-    $receiptPath,
-    ($receipt | ConvertTo-Json -Depth 8),
-    [Text.UTF8Encoding]::new($false))
+if ($Replace) {
+    Update-JsonFileAtomically `
+        -Value $receipt `
+        -Path $receiptPath `
+        -ExpectedSha256 $existingReceiptHash `
+        -Depth 8 `
+        -Label "Plugin manual approval receipt"
+} else {
+    Write-NewJsonFileAtomically `
+        -Value $receipt `
+        -Path $receiptPath `
+        -Depth 8 `
+        -Label "Plugin manual approval receipt"
+}
 
 Write-Host "Manual approval receipt created: $receiptPath"
 Write-Host "Original evidence remains local under artifacts/quality."
