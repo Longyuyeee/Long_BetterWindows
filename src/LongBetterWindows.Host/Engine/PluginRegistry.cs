@@ -44,6 +44,9 @@ namespace LongBetterWindows.Host.Engine
             => _hostResourceReleaser = releaser
                 ?? throw new ArgumentNullException(nameof(releaser));
 
+        internal Task ReleaseHostResourcesAsync(string pluginId)
+            => _hostResourceReleaser?.Invoke(pluginId) ?? Task.CompletedTask;
+
         public int Count
         {
             get { lock (_lock) return _entries.Count; }
@@ -355,8 +358,7 @@ namespace LongBetterWindows.Host.Engine
                     if (entry.Instance is IPluginResourceLifecycle resources)
                         await resources.ReleaseResourcesAsync();
                 }
-                if (_hostResourceReleaser is not null)
-                    await _hostResourceReleaser(pluginId);
+                await ReleaseHostResourcesAsync(pluginId);
                 SetState(pluginId, PluginState.Stopped);
                 if (persistAutoStart)
                     entry.SetAutoStart(false);

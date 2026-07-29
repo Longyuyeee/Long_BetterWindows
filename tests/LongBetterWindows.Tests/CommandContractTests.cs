@@ -1150,6 +1150,22 @@ public class CommandContractTests
     }
 
     [Fact]
+    public async Task PluginRegistry_ExplicitUnloadReleasesHostOwnedResources()
+    {
+        var releasedPluginId = string.Empty;
+        var registry = new PluginRegistry();
+        registry.AttachHostResourceReleaser(pluginId =>
+        {
+            releasedPluginId = pluginId;
+            return Task.CompletedTask;
+        });
+
+        await registry.ReleaseHostResourcesAsync("unloaded-plugin");
+
+        Assert.Equal("unloaded-plugin", releasedPluginId);
+    }
+
+    [Fact]
     public async Task CommandExecutor_CommandHandler_ReceivesNormalizedInvocation()
     {
         var registry = new PluginRegistry();

@@ -232,6 +232,32 @@ namespace LongBetterWindows.Host.Engine
                     }
                 }
 
+                if (entry?.Instance is IPluginResourceLifecycle resources)
+                {
+                    try
+                    {
+                        using (PluginAccessContext.Enter(loaded.Id))
+                            await resources.ReleaseResourcesAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(
+                            ex,
+                            "Plugin {PluginId} resource release failed during unload",
+                            loaded.Id);
+                    }
+                }
+                try
+                {
+                    await registry.ReleaseHostResourcesAsync(loaded.Id);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(
+                        ex,
+                        "Plugin {PluginId} host resource release failed during unload",
+                        loaded.Id);
+                }
                 registry.Unregister(loaded.Id);
                 if (loaded.Runtime is not null)
                     _runtimeLoader.Release(loaded.Runtime, loaded.Id);

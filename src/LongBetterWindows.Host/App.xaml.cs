@@ -165,6 +165,18 @@ namespace LongBetterWindows.Host
                 app._qualityManagementCardShadowCount = count;
         }
 
+        internal Task ReloadPluginDirectoryForQualityAsync(string pluginDirectory)
+            => (_pluginRuntime
+                ?? throw new InvalidOperationException(
+                    "Plugin runtime is not initialized."))
+                .ReloadPluginDirectoryForQualityAsync(pluginDirectory);
+
+        internal Task<bool> UnloadPluginForQualityAsync(string pluginId)
+            => (_pluginRuntime
+                ?? throw new InvalidOperationException(
+                    "Plugin runtime is not initialized."))
+                .UnloadPluginForQualityAsync(pluginId);
+
         internal void StartPluginRuntime()
         {
             if (_startupOptions.IsDirectNoteMode ||

@@ -371,11 +371,24 @@ namespace LongBetterWindows.Host.Engine
                         if (await Task.WhenAny(stopTask, Task.Delay(1000)) != stopTask)
                             Log.Warning("插件 {PluginId} 停止超时", pluginId);
                     }
+                    if (entry.Instance is IPluginResourceLifecycle resources)
+                        await resources.ReleaseResourcesAsync();
                 }
                 catch (Exception ex)
                 {
                     Log.Warning(ex, "插件 {PluginId} 停止异常", pluginId);
                 }
+            }
+            try
+            {
+                await registry.ReleaseHostResourcesAsync(pluginId);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(
+                    ex,
+                    "Plugin {PluginId} host resource release failed during unload",
+                    pluginId);
             }
             registry.Unregister(pluginId);
         }

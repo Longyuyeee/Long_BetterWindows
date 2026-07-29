@@ -45,6 +45,12 @@ namespace LongBetterWindows.Host.Services
 
         public LpakInstaller PackageInstaller { get; }
 
+        internal Task ReloadPluginDirectoryForQualityAsync(string pluginDirectory)
+            => _scanner.ReloadPluginDirectoryAsync(pluginDirectory);
+
+        internal Task<bool> UnloadPluginForQualityAsync(string pluginId)
+            => _scanner.UnloadPluginAsync(pluginId);
+
         public async Task<PluginRuntimeStartResult> StartAsync(
             PluginRuntimeStartRequest request)
         {

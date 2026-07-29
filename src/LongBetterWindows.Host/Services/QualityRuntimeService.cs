@@ -484,6 +484,127 @@ namespace LongBetterWindows.Host.Services
                 && ServicesInitializer.PluginSessions.GetBySessionId(
                     backgroundInitial.SessionId) is null;
 
+            var settingsOpenError =
+                await mainWindow.OpenWorkspaceModuleForQualityAsync(
+                    "settings:root");
+            var fallbackModule =
+                mainWindow.GetActiveWorkspaceModuleKeyForQuality();
+
+            async Task OpenCurrentPluginAsync()
+            {
+                var currentEntry = registry.Get(pluginId)
+                    ?? throw new InvalidOperationException(
+                        $"Quality runtime plugin was not registered: {pluginId}");
+                if (currentEntry.State is not
+                    (PluginState.Running or PluginState.Background)
+                    && !await registry.StartPluginAsync(
+                        pluginId,
+                        persistAutoStart: false))
+                {
+                    throw new InvalidOperationException(
+                        "Quality runtime plugin could not start.");
+                }
+                if (currentEntry.Instance is not IHasMainUI mainUi)
+                {
+                    throw new InvalidOperationException(
+                        "Quality runtime plugin does not expose a main UI.");
+                }
+                mainUi.ShowMainUI();
+            }
+
+            await OpenCurrentPluginAsync();
+            var upgradeEmbeddedReady = await WaitUntilAsync(
+                () =>
+                {
+                    var state = mainWindow.GetPluginRuntimeQualityState();
+                    return state.IsVisible
+                        && !state.IsDetached
+                        && state.SessionId is not null;
+                },
+                15_000);
+            var upgradeInitial =
+                mainWindow.GetPluginRuntimeQualityState();
+            var upgradePreviousRevision =
+                registry.Get(pluginId)?.RegistrationRevision ?? 0;
+            var pluginDirectory = registry.Get(pluginId)?.Directory
+                ?? throw new InvalidOperationException(
+                    "Quality runtime plugin directory is unavailable.");
+            var app = _application as App
+                ?? throw new InvalidOperationException(
+                    "Quality runtime probe requires the Long application.");
+
+            await app.ReloadPluginDirectoryForQualityAsync(pluginDirectory);
+            var upgradeCleaned = await WaitUntilAsync(
+                () =>
+                {
+                    var currentEntry = registry.Get(pluginId);
+                    return currentEntry is not null
+                        && currentEntry.RegistrationRevision
+                            != upgradePreviousRevision
+                        && upgradeInitial.SessionId is not null
+                        && ServicesInitializer.PluginSessions.GetBySessionId(
+                            upgradeInitial.SessionId) is null
+                        && !mainWindow.HasPluginRuntimeModuleForQuality(
+                            upgradeInitial.SessionId)
+                        && mainWindow.GetActiveWorkspaceModuleKeyForQuality()
+                            == fallbackModule;
+                },
+                15_000);
+            var upgradeRegistrationRestored =
+                registry.Get(pluginId) is not null
+                && registry.Get(pluginId)!.RegistrationRevision
+                    != upgradePreviousRevision;
+            var upgradeSessionEnded =
+                upgradeInitial.SessionId is not null
+                && ServicesInitializer.PluginSessions.GetBySessionId(
+                    upgradeInitial.SessionId) is null;
+            var upgradeModuleRemoved =
+                upgradeInitial.SessionId is not null
+                && !mainWindow.HasPluginRuntimeModuleForQuality(
+                    upgradeInitial.SessionId);
+            var upgradeMruRestored =
+                mainWindow.GetActiveWorkspaceModuleKeyForQuality()
+                == fallbackModule;
+
+            await OpenCurrentPluginAsync();
+            var upgradeReopenedReady = await WaitUntilAsync(
+                () =>
+                {
+                    var state = mainWindow.GetPluginRuntimeQualityState();
+                    return state.IsVisible
+                        && !state.IsDetached
+                        && state.SessionId is not null
+                        && state.SessionId != upgradeInitial.SessionId;
+                },
+                15_000);
+            var uninstallInitial =
+                mainWindow.GetPluginRuntimeQualityState();
+            var uninstallRequested =
+                await app.UnloadPluginForQualityAsync(pluginId);
+            var uninstallCleaned = await WaitUntilAsync(
+                () =>
+                    registry.Get(pluginId) is null
+                    && uninstallInitial.SessionId is not null
+                    && ServicesInitializer.PluginSessions.GetBySessionId(
+                        uninstallInitial.SessionId) is null
+                    && !mainWindow.HasPluginRuntimeModuleForQuality(
+                        uninstallInitial.SessionId)
+                    && mainWindow.GetActiveWorkspaceModuleKeyForQuality()
+                        == fallbackModule,
+                15_000);
+            var uninstallRegistryRemoved = registry.Get(pluginId) is null;
+            var uninstallSessionEnded =
+                uninstallInitial.SessionId is not null
+                && ServicesInitializer.PluginSessions.GetBySessionId(
+                    uninstallInitial.SessionId) is null;
+            var uninstallModuleRemoved =
+                uninstallInitial.SessionId is not null
+                && !mainWindow.HasPluginRuntimeModuleForQuality(
+                    uninstallInitial.SessionId);
+            var uninstallMruRestored =
+                mainWindow.GetActiveWorkspaceModuleKeyForQuality()
+                == fallbackModule;
+
             var sameSessionAcrossMove =
                 initial.SessionId is not null
                 && initial.SessionId == detached.SessionId
@@ -527,7 +648,21 @@ namespace LongBetterWindows.Host.Services
                 && backgroundResumedReady
                 && backgroundEndRequested
                 && backgroundEndStopped
-                && backgroundSessionEnded;
+                && backgroundSessionEnded
+                && settingsOpenError is null
+                && upgradeEmbeddedReady
+                && upgradeCleaned
+                && upgradeRegistrationRestored
+                && upgradeSessionEnded
+                && upgradeModuleRemoved
+                && upgradeMruRestored
+                && upgradeReopenedReady
+                && uninstallRequested
+                && uninstallCleaned
+                && uninstallRegistryRemoved
+                && uninstallSessionEnded
+                && uninstallModuleRemoved
+                && uninstallMruRestored;
 
             var fullPath = Path.GetFullPath(reportPath);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -603,6 +738,25 @@ namespace LongBetterWindows.Host.Services
                         background_end_stopped = backgroundEndStopped,
                         background_session_ended =
                             backgroundSessionEnded,
+                        fallback_module = fallbackModule.ToString(),
+                        settings_open_error = settingsOpenError,
+                        upgrade_embedded_ready = upgradeEmbeddedReady,
+                        upgrade_cleaned = upgradeCleaned,
+                        upgrade_registration_restored =
+                            upgradeRegistrationRestored,
+                        upgrade_session_ended = upgradeSessionEnded,
+                        upgrade_module_removed = upgradeModuleRemoved,
+                        upgrade_mru_restored = upgradeMruRestored,
+                        upgrade_reopened_ready = upgradeReopenedReady,
+                        upgrade_old_session_id = upgradeInitial.SessionId,
+                        uninstall_requested = uninstallRequested,
+                        uninstall_cleaned = uninstallCleaned,
+                        uninstall_registry_removed =
+                            uninstallRegistryRemoved,
+                        uninstall_session_ended = uninstallSessionEnded,
+                        uninstall_module_removed = uninstallModuleRemoved,
+                        uninstall_mru_restored = uninstallMruRestored,
+                        uninstall_session_id = uninstallInitial.SessionId,
                     },
                     new JsonSerializerOptions { WriteIndented = true }));
             _application.Shutdown(passed ? 0 : 3);

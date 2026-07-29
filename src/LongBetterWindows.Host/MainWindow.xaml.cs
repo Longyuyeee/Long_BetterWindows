@@ -466,6 +466,30 @@ namespace LongBetterWindows.Host
             return true;
         }
 
+        internal async Task<string?> OpenWorkspaceModuleForQualityAsync(
+            string target)
+        {
+            var resolution = await ResolveWorkspaceModuleAsync(
+                target,
+                CancellationToken.None);
+            if (!resolution.IsSuccess || resolution.Module is null)
+                return resolution.Error.ToString();
+            return await OpenWorkspaceModuleAsync(
+                resolution.Module,
+                CancellationToken.None);
+        }
+
+        internal WorkspaceModuleKey GetActiveWorkspaceModuleKeyForQuality()
+            => ServicesInitializer.Workspace.State.ActiveModuleKey;
+
+        internal bool HasPluginRuntimeModuleForQuality(string sessionId)
+            => ServicesInitializer.Workspace.State.Modules.Any(module =>
+                module.Key.Kind == "plugin-runtime"
+                && string.Equals(
+                    module.Key.InstanceId,
+                    sessionId,
+                    StringComparison.OrdinalIgnoreCase));
+
         private async Task OpenLegacyWorkspacePageAsync(string page)
         {
             if (!WorkspaceLegacyModuleCatalog.TryCreate(
