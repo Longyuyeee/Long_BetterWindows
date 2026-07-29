@@ -343,7 +343,6 @@ namespace LongBetterWindows.Host
                 return null;
             }
             WorkspaceShell.HidePluginRuntime(notifyHidden: true);
-            ToolCenter.Visibility = Visibility.Visible;
 
             return module.Key.Kind switch
             {
@@ -604,19 +603,16 @@ namespace LongBetterWindows.Host
         {
             try
             {
-                var entry = HostProvider.Instance.PluginStore.Get(pluginId);
-                if (entry is null)
-                    return;
-                if (entry.State != PluginState.Running
-                    && !await HostProvider.Instance.PluginStore.StartPluginAsync(
-                        pluginId,
-                        persistAutoStart: false))
+                var result = await PluginMainUiLauncher.OpenAsync(
+                    HostProvider.Instance.PluginStore,
+                    pluginId);
+                if (result != PluginMainUiOpenStatus.Opened)
                 {
-                    return;
+                    Log.Warning(
+                        "Plugin {PluginId} main UI open returned {OpenStatus}",
+                        pluginId,
+                        result);
                 }
-
-                if (entry.Instance is IHasMainUI mainUi)
-                    mainUi.ShowMainUI();
             }
             catch (Exception exception)
             {

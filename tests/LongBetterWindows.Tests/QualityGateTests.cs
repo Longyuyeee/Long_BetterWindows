@@ -884,8 +884,17 @@ public class QualityGateTests
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
 
         var code = Read("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs");
+        var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
         Assert.Contains("PluginActions_Click", code);
         Assert.Contains("OpenPluginAsync", code);
+        Assert.Contains("PluginMainUiLauncher.OpenAsync", code);
+        Assert.Contains("PluginMainUiLauncher.OpenAsync", main);
+        Assert.DoesNotContain(
+            "entry.State != PluginState.Running",
+            code);
+        Assert.DoesNotContain("mainUi.ShowMainUI()", code);
+        Assert.DoesNotContain("mainUi.ShowMainUI()", main);
+        Assert.DoesNotContain("ToolCenter.Visibility", main);
         Assert.Contains("PluginSettingsRequested?.Invoke", code);
         Assert.DoesNotContain("OpenCapabilityDetails", code);
         Assert.Contains("TogglePluginAsync", code);
@@ -1247,8 +1256,9 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Engine", "PluginRegistry.cs");
         var scanner = Read(
             "src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");
-        var management = Read(
-            "src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs");
+        var launcher = Read(
+            "src", "LongBetterWindows.Host", "Interaction",
+            "PluginMainUiLauncher.cs");
 
         Assert.Contains("EnsureActivatedAsync", entry);
         Assert.Contains("_activationGate.WaitAsync", entry);
@@ -1258,7 +1268,7 @@ public class QualityGateTests
         Assert.Contains("BeginChangeBatch", scanner);
         Assert.Contains("ActivatePluginAsync", scanner);
         Assert.Contains("运行时等待按需激活", scanner);
-        Assert.Contains("persistAutoStart: false", management);
+        Assert.Contains("persistAutoStart: false", launcher);
     }
 
     [Fact]
@@ -1736,6 +1746,9 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Services", "AppStartupOptions.cs");
         var mainWindow = Read(
             "src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
+        var launcher = Read(
+            "src", "LongBetterWindows.Host", "Interaction",
+            "PluginMainUiLauncher.cs");
         var inputProbe = Read(
             "src", "LongBetterWindows.Host", "Services",
             "PluginRuntimeInputProbe.cs");
@@ -1767,8 +1780,9 @@ public class QualityGateTests
         Assert.Contains("AttachThreadInput", keyboardInput);
         Assert.Contains("Size = 32", keyboardInput);
         Assert.Contains(
-            "entry.State != PluginState.Running",
-            mainWindow);
+            "PluginState.Running or PluginState.Background",
+            launcher);
+        Assert.Contains("PluginMainUiLauncher.OpenAsync", mainWindow);
         Assert.Contains("--quality-plugin-runtime-session-report", options);
         Assert.DoesNotContain("PluginWindowHost", adapter);
         Assert.DoesNotContain("ShowEmbeddedPlugin", presentation);

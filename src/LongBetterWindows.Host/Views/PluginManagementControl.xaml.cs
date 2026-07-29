@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Host.Views
@@ -282,20 +283,9 @@ namespace LongBetterWindows.Host.Views
         {
             try
             {
-                var registry = HostProvider.Instance.PluginStore;
-                var entry = registry.Get(item.Entry.Id);
-                if (entry is null)
-                    return;
-                if (entry.State != PluginState.Running
-                    && !await registry.StartPluginAsync(
-                        entry.Id,
-                        persistAutoStart: false))
-                {
-                    return;
-                }
-
-                if (entry.Instance is IHasMainUI mainUi)
-                    mainUi.ShowMainUI();
+                await PluginMainUiLauncher.OpenAsync(
+                    HostProvider.Instance.PluginStore,
+                    item.Entry.Id);
             }
             catch (Exception exception)
             {

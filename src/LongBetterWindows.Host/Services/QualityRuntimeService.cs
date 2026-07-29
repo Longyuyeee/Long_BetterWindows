@@ -853,24 +853,12 @@ namespace LongBetterWindows.Host.Services
             string pluginId)
         {
             ArgumentNullException.ThrowIfNull(mainWindow);
-            var registry = HostProvider.Instance.PluginStore;
-            var entry = registry.Get(pluginId)
-                ?? throw new InvalidOperationException(
-                    $"Quality runtime plugin was not found: {pluginId}");
-            if (entry.State is not (PluginState.Running or PluginState.Background)
-                && !await registry.StartPluginAsync(
-                    pluginId,
-                    persistAutoStart: false))
-            {
+            var result = await PluginMainUiLauncher.OpenAsync(
+                HostProvider.Instance.PluginStore,
+                pluginId);
+            if (result != PluginMainUiOpenStatus.Opened)
                 throw new InvalidOperationException(
-                    $"Quality runtime plugin could not start: {pluginId}");
-            }
-            if (entry.Instance is not IHasMainUI mainUi)
-            {
-                throw new InvalidOperationException(
-                    $"Quality runtime plugin has no main UI: {pluginId}");
-            }
-            mainUi.ShowMainUI();
+                    $"Quality runtime plugin could not open: {pluginId} ({result})");
         }
 
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
