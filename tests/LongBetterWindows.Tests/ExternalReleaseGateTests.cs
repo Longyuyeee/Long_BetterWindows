@@ -94,6 +94,36 @@ public sealed class ExternalReleaseGateTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyExternalReleaseGate_PreflightValidatesWithoutWritingDecision()
+    {
+        var paths = WriteFixture(PackageHash);
+
+        var result = await RunVerifierAsync(paths, output: null, preflightOnly: true);
+
+        Assert.True(result.ExitCode == 0, result.Error);
+        using var preflight = JsonDocument.Parse(result.Output);
+        Assert.Equal(
+            "external_release_gate_preflight",
+            preflight.RootElement.GetProperty("classification").GetString());
+        Assert.True(preflight.RootElement.GetProperty("passed").GetBoolean());
+        Assert.True(preflight.RootElement.GetProperty("preflight_only").GetBoolean());
+        Assert.Empty(Directory.GetFiles(_root, "*decision*.json"));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_PreflightRejectsOutputPath()
+    {
+        var paths = WriteFixture(PackageHash);
+        var output = Path.Combine(_root, "preflight-must-not-write.json");
+
+        var result = await RunVerifierAsync(paths, output, preflightOnly: true);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("does not accept OutputPath", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
     public async Task VerifyExternalReleaseGate_RejectsPackageIdentityMismatch()
     {
         var paths = WriteFixture(
@@ -668,7 +698,10 @@ public sealed class ExternalReleaseGateTests : IDisposable
         return path;
     }
 
-    private async Task<ProcessResult> RunVerifierAsync(FixturePaths paths, string output)
+    private async Task<ProcessResult> RunVerifierAsync(
+        FixturePaths paths,
+        string? output,
+        bool preflightOnly = false)
     {
         var start = new ProcessStartInfo
         {
@@ -690,10 +723,16 @@ public sealed class ExternalReleaseGateTests : IDisposable
             "-MarketplaceRehearsalPath", paths.Marketplace,
             "-ExpectedSourceCommit", Commit,
             "-ExpectedDistributionChannel", "unsigned",
-            "-OutputPath", output,
         })
         {
             start.ArgumentList.Add(argument);
+        }
+        if (preflightOnly)
+            start.ArgumentList.Add("-PreflightOnly");
+        if (output is not null)
+        {
+            start.ArgumentList.Add("-OutputPath");
+            start.ArgumentList.Add(output);
         }
 
         using var process = Process.Start(start)!;

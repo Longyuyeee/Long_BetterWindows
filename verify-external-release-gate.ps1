@@ -17,7 +17,8 @@ param(
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)]
     [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
-    [Parameter(Mandatory=$true)] [string] $OutputPath
+    [string] $OutputPath,
+    [switch] $PreflightOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -370,9 +371,20 @@ $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
 }
-$resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
-if (Test-Path -LiteralPath $resolvedOutput) {
-    throw "External release decision already exists: $resolvedOutput"
+$resolvedOutput = $null
+if ($PreflightOnly) {
+    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+        throw 'PreflightOnly does not accept OutputPath and never writes a decision.'
+    }
+}
+else {
+    if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+        throw 'OutputPath is required unless PreflightOnly is specified.'
+    }
+    $resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
+    if (Test-Path -LiteralPath $resolvedOutput) {
+        throw "External release decision already exists: $resolvedOutput"
+    }
 }
 
 $release = Read-GateJson $ReleaseManifestPath 'Release Manifest'
@@ -468,8 +480,13 @@ Assert-MarketplaceEvidenceContract $marketplace
 $decision = [ordered]@{
     schema_version = 1
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
-    classification = 'external_release_gate_decision'
+    classification = if ($PreflightOnly) {
+        'external_release_gate_preflight'
+    } else {
+        'external_release_gate_decision'
+    }
     passed = $true
+    preflight_only = [bool]$PreflightOnly
     source_commit = $expectedCommit
     distribution_channel = $ExpectedDistributionChannel
     signed = [bool]$release.document.signed
@@ -519,6 +536,10 @@ $decision = [ordered]@{
     }
 }
 
+if ($PreflightOnly) {
+    $decision | ConvertTo-Json -Depth 7
+    return
+}
 $parent = Split-Path -Parent $resolvedOutput
 if (-not [string]::IsNullOrWhiteSpace($parent)) {
     [IO.Directory]::CreateDirectory($parent) | Out-Null

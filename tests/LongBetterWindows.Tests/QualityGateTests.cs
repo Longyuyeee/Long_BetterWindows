@@ -210,6 +210,10 @@ public class QualityGateTests
         Assert.Contains("checksum_file_verified = $true", gate);
         Assert.Contains("Get-FileHash", gate);
         Assert.Contains("external_release_gate_decision", gate);
+        Assert.Contains("external_release_gate_preflight", gate);
+        Assert.Contains("PreflightOnly does not accept OutputPath", gate);
+        Assert.Contains("OutputPath is required unless PreflightOnly", gate);
+        Assert.Contains("preflight_only = [bool]$PreflightOnly", gate);
         Assert.Contains("decision already exists", gate);
         Assert.Contains("classification = 'marketplace_https_rehearsal'", rehearsal);
         Assert.Contains("schema_version = 2", rehearsal);
