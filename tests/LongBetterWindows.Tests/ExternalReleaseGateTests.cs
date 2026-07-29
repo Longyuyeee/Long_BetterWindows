@@ -8,7 +8,9 @@ namespace LongBetterWindows.Tests;
 public sealed class ExternalReleaseGateTests : IDisposable
 {
     private const string Commit = "1111111111111111111111111111111111111111";
-    private const string PackageHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    private static readonly byte[] PackageContent = "self-contained fixture"u8.ToArray();
+    private static readonly byte[] FrameworkPackageContent = "framework-dependent fixture"u8.ToArray();
+    private static readonly string PackageHash = Hash(PackageContent);
     private readonly string _root = Path.Combine(
         Path.GetTempPath(),
         "long-external-release-gate-tests",
@@ -40,6 +42,8 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.Equal(
             2,
             root.GetProperty("candidate").GetProperty("package_count").GetInt32());
+        Assert.True(
+            root.GetProperty("candidate").GetProperty("package_files_verified").GetBoolean());
         Assert.Equal(
             "registry.example.test",
             root.GetProperty("marketplace").GetProperty("destination_host").GetString());
@@ -244,6 +248,34 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.False(File.Exists(output));
     }
 
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsTamperedReleasePackage()
+    {
+        var paths = WriteFixture(PackageHash);
+        await File.AppendAllTextAsync(paths.Package, "tampered");
+        var output = Path.Combine(_root, "package-tamper-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("file size does not match the Manifest", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsMissingReleasePackage()
+    {
+        var paths = WriteFixture(PackageHash);
+        File.Delete(paths.FrameworkPackage);
+        var output = Path.Combine(_root, "package-missing-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Release package file was not found", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
     private FixturePaths WriteFixture(
         string cleanPackageHash,
         bool marketplacePreflightOnly = false,
@@ -259,6 +291,13 @@ public sealed class ExternalReleaseGateTests : IDisposable
         bool invalidPackageInventory = false)
     {
         Directory.CreateDirectory(_root);
+        var packagePath = Path.Combine(_root, "LongBetterWindows.zip");
+        var frameworkPackagePath = Path.Combine(
+            _root,
+            "LongBetterWindows-framework-dependent.zip");
+        File.WriteAllBytes(packagePath, PackageContent);
+        File.WriteAllBytes(frameworkPackagePath, FrameworkPackageContent);
+        var frameworkPackageHash = Hash(FrameworkPackageContent);
         var release = WriteJson("release.json", new
         {
             schema_version = releaseSchemaVersion,
@@ -279,11 +318,13 @@ public sealed class ExternalReleaseGateTests : IDisposable
                     "LongBetterWindows.zip",
                     "self-contained",
                     PackageHash,
+                    PackageContent.LongLength,
                     commandCount: invalidPackageInventory ? 41 : 42),
                 ReleasePackage(
                     "LongBetterWindows-framework-dependent.zip",
                     "framework-dependent",
-                    new string('d', 64),
+                    frameworkPackageHash,
+                    FrameworkPackageContent.LongLength,
                     commandCount: 42),
             },
         });
@@ -386,20 +427,23 @@ public sealed class ExternalReleaseGateTests : IDisposable
             dpi,
             accessibility,
             marketplace,
-            marketplaceEvidence);
+            marketplaceEvidence,
+            packagePath,
+            frameworkPackagePath);
     }
 
     private static object ReleasePackage(
         string file,
         string kind,
         string sha256,
+        long bytes,
         int commandCount) =>
         new
         {
             file,
             kind,
             sha256,
-            bytes = 1024,
+            bytes,
             plugins = 25,
             manifests = 25,
             unique_plugin_ids = 25,
@@ -407,6 +451,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
             command_smoke_exit_code = 0,
             added_webview_processes = 0,
         };
+
+    private static string Hash(byte[] content) =>
+        Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
     private string WriteMarketplaceEvidence()
     {
@@ -504,7 +551,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
         string Dpi,
         string Accessibility,
         string Marketplace,
-        string MarketplaceDeploymentEvidence);
+        string MarketplaceDeploymentEvidence,
+        string Package,
+        string FrameworkPackage);
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

@@ -221,6 +221,26 @@ function Assert-ReleaseManifestContract(
     }
 }
 
+function Assert-ReleasePackageFiles($releaseGate) {
+    $root = Split-Path -Parent $releaseGate.path
+    foreach ($package in @($releaseGate.document.packages)) {
+        $file = [string]$package.file
+        $path = Join-Path $root $file
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Release package file was not found: $file"
+        }
+        $item = Get-Item -LiteralPath $path
+        if ([long]$item.Length -ne [long]$package.bytes) {
+            throw "Release package file size does not match the Manifest: $file"
+        }
+        $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).
+            Hash.ToLowerInvariant()
+        if ($actualHash -ne ([string]$package.sha256).ToLowerInvariant()) {
+            throw "Release package file hash does not match the Manifest: $file"
+        }
+    }
+}
+
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -256,6 +276,7 @@ Assert-ReleaseManifestContract `
     $release.document `
     $expectedCommit `
     $ExpectedDistributionChannel
+Assert-ReleasePackageFiles $release
 
 foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
     if ([string]$gate.document.source_commit -ne $expectedCommit) {
@@ -337,6 +358,7 @@ $decision = [ordered]@{
         runtime = [string]$release.document.runtime
         source_dirty = [bool]$release.document.source_dirty
         package_count = @($release.document.packages).Count
+        package_files_verified = $true
     }
     independent_review = [ordered]@{
         download_operator = $downloadOperator

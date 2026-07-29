@@ -189,9 +189,13 @@ public class QualityGateTests
         Assert.Contains("Marketplace rehearsal evidence hash mismatch", gate);
         Assert.Contains("Release Manifest candidate identity contract is incomplete", gate);
         Assert.Contains("Release Manifest package inventory is invalid", gate);
+        Assert.Contains("Release package file was not found", gate);
+        Assert.Contains("file size does not match the Manifest", gate);
+        Assert.Contains("file hash does not match the Manifest", gate);
         Assert.Contains("Unsigned Release Manifest publisher disclosure is incomplete", gate);
         Assert.Contains("evidence_contract", gate);
         Assert.Contains("candidate = [ordered]@", gate);
+        Assert.Contains("package_files_verified = $true", gate);
         Assert.Contains("Get-FileHash", gate);
         Assert.Contains("external_release_gate_decision", gate);
         Assert.Contains("decision already exists", gate);
