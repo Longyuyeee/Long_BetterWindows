@@ -95,6 +95,16 @@ function Get-ProductSigningTargets([string] $packageRoot) {
     return @($targets | Sort-Object -Unique)
 }
 
+function Invoke-CodeSign([string] $target) {
+    $arguments = @('sign','/sha1',$thumbprint,'/s','My','/fd','SHA256','/tr',$TimestampUrl.AbsoluteUri,'/td','SHA256','/d','Long助手')
+    if ($CertificateStoreLocation -eq 'LocalMachine') { $arguments += '/sm' }
+    $arguments += $target
+    & $signToolResolver @arguments
+    if ($LASTEXITCODE -ne 0) { throw "SignTool signing failed with exit code $LASTEXITCODE`: $target" }
+    & $signToolResolver verify /pa /all /tw /q $target
+    if ($LASTEXITCODE -ne 0) { throw "SignTool post-sign verification failed with exit code $LASTEXITCODE`: $target" }
+}
+
 $parent = Split-Path -Parent $outputRoot
 if ([string]::IsNullOrWhiteSpace($parent)) { throw 'OutputDirectory must have a parent directory.' }
 [IO.Directory]::CreateDirectory($parent) | Out-Null
@@ -109,13 +119,7 @@ try {
         }
         $targets = @(Get-ProductSigningTargets $packageRoot)
         foreach ($target in $targets) {
-            $arguments = @('sign','/sha1',$thumbprint,'/s','My','/fd','SHA256','/tr',$TimestampUrl.AbsoluteUri,'/td','SHA256','/d','Long助手')
-            if ($CertificateStoreLocation -eq 'LocalMachine') { $arguments += '/sm' }
-            $arguments += $target
-            & $signToolResolver @arguments
-            if ($LASTEXITCODE -ne 0) { throw "SignTool signing failed with exit code $LASTEXITCODE`: $target" }
-            & $signToolResolver verify /pa /all /tw /q $target
-            if ($LASTEXITCODE -ne 0) { throw "SignTool post-sign verification failed with exit code $LASTEXITCODE`: $target" }
+            Invoke-CodeSign $target
         }
         $zipPath = Resolve-Within $stagingRoot ([string]$package.file) 'Package ZIP'
         if ([IO.Path]::GetExtension($zipPath) -ne '.zip') { throw 'Package file must use the .zip extension.' }
@@ -127,6 +131,20 @@ try {
         $signedPackages += $package
     }
     $manifest.packages = $signedPackages
+    $signedInstallers = @()
+    foreach ($installer in @($manifest.installers)) {
+        $installerPath = Resolve-Within $stagingRoot ([string]$installer.file) 'Installer'
+        if ([IO.Path]::GetExtension($installerPath) -ne '.exe' `
+            -or -not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
+            throw "Installer is missing or does not use the .exe extension: $installerPath"
+        }
+        Invoke-CodeSign $installerPath
+        $installer.sha256 = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        $installer.bytes = (Get-Item -LiteralPath $installerPath).Length
+        $installer.signed = $true
+        $signedInstallers += $installer
+    }
+    $manifest.installers = $signedInstallers
     $manifest.distribution_channel = 'signed'
     $manifest.publisher_identity = 'authenticode'
     $manifest.security_notice = $null
@@ -145,7 +163,8 @@ try {
         signtool_version = [Diagnostics.FileVersionInfo]::GetVersionInfo($signToolResolver).FileVersion
     }) -Force
     $manifest | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $stagingRoot 'release-manifest.json') -Encoding UTF8
-    @($signedPackages | ForEach-Object { "$($_.sha256)  $($_.file)" }) |
+    @(@($signedPackages) + @($signedInstallers) |
+        ForEach-Object { "$($_.sha256)  $($_.file)" }) |
         Set-Content -LiteralPath (Join-Path $stagingRoot 'SHA256SUMS.txt') -Encoding UTF8
 
     & $verifyScript `

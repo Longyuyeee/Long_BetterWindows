@@ -122,6 +122,36 @@ try {
             signed_files = $targets.Count
         }
     }
+    foreach ($installer in @($manifest.installers)) {
+        $installerPath = Resolve-Within $releaseRoot ([string]$installer.file) 'Installer'
+        if ([IO.Path]::GetExtension($installerPath) -ne '.exe' `
+            -or -not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
+            throw "Signed installer is missing or invalid: $installerPath"
+        }
+        $installerHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($installerHash -ne ([string]$installer.sha256).ToLowerInvariant() `
+            -or [long](Get-Item -LiteralPath $installerPath).Length -ne [long]$installer.bytes `
+            -or -not [bool]$installer.signed) {
+            throw "Signed installer identity mismatch: $($installer.file)"
+        }
+        $signature = Get-AuthenticodeSignature -LiteralPath $installerPath
+        $installerThumbprint = if ($null -eq $signature.SignerCertificate) {
+            ''
+        } else { $signature.SignerCertificate.Thumbprint.Replace(' ','').ToUpperInvariant() }
+        if ($signature.Status -ne 'Valid' -or $installerThumbprint -ne $expectedThumbprint) {
+            throw "Installer Authenticode signature is invalid or has the wrong signer: $installerPath"
+        }
+        & $signTool verify /pa /all /tw /q $installerPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Installer SignTool verification failed with exit code $LASTEXITCODE`: $installerPath"
+        }
+        $results += [ordered]@{
+            file = [string]$installer.file
+            kind = 'installer'
+            sha256 = $installerHash
+            signed_files = 1
+        }
+    }
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }

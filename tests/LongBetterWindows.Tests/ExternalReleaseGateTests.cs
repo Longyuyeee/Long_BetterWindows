@@ -10,6 +10,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
     private const string Commit = "1111111111111111111111111111111111111111";
     private static readonly byte[] PackageContent = "self-contained fixture"u8.ToArray();
     private static readonly byte[] FrameworkPackageContent = "framework-dependent fixture"u8.ToArray();
+    private static readonly byte[] InstallerContent = "installer fixture"u8.ToArray();
     private static readonly string PackageHash = Hash(PackageContent);
     private readonly string _root = Path.Combine(
         Path.GetTempPath(),
@@ -24,7 +25,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
 
         var result = await RunVerifierAsync(paths, output);
 
-        Assert.Equal(0, result.ExitCode);
+        Assert.True(result.ExitCode == 0, result.Error);
         using var decision = JsonDocument.Parse(await File.ReadAllTextAsync(output));
         var root = decision.RootElement;
         Assert.True(root.GetProperty("passed").GetBoolean());
@@ -42,8 +43,13 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.Equal(
             2,
             root.GetProperty("candidate").GetProperty("package_count").GetInt32());
+        Assert.Equal(
+            1,
+            root.GetProperty("candidate").GetProperty("installer_count").GetInt32());
         Assert.True(
-            root.GetProperty("candidate").GetProperty("package_files_verified").GetBoolean());
+            root.GetProperty("candidate").GetProperty("artifact_files_verified").GetBoolean());
+        Assert.True(
+            root.GetProperty("candidate").GetProperty("checksum_file_verified").GetBoolean());
         Assert.Equal(
             "registry.example.test",
             root.GetProperty("marketplace").GetProperty("destination_host").GetString());
@@ -258,7 +264,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
         var result = await RunVerifierAsync(paths, output);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("file size does not match the Manifest", result.Error);
+        Assert.Contains("artifact file size does not match the Manifest", result.Error);
         Assert.False(File.Exists(output));
     }
 
@@ -272,7 +278,38 @@ public sealed class ExternalReleaseGateTests : IDisposable
         var result = await RunVerifierAsync(paths, output);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Release package file was not found", result.Error);
+        Assert.Contains("Release artifact file was not found", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsTamperedInstaller()
+    {
+        var paths = WriteFixture(PackageHash);
+        await File.AppendAllTextAsync(paths.Installer, "tampered");
+        var output = Path.Combine(_root, "installer-tamper-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("artifact file size does not match the Manifest", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsIncompleteChecksumFile()
+    {
+        var paths = WriteFixture(PackageHash);
+        File.WriteAllLines(paths.Checksums, new[]
+        {
+            $"{PackageHash}  LongBetterWindows.zip",
+        });
+        var output = Path.Combine(_root, "checksums-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("exact Manifest artifact set", result.Error);
         Assert.False(File.Exists(output));
     }
 
@@ -297,7 +334,10 @@ public sealed class ExternalReleaseGateTests : IDisposable
             "LongBetterWindows-framework-dependent.zip");
         File.WriteAllBytes(packagePath, PackageContent);
         File.WriteAllBytes(frameworkPackagePath, FrameworkPackageContent);
+        var installerPath = Path.Combine(_root, "LongAssistant-Setup.exe");
+        File.WriteAllBytes(installerPath, InstallerContent);
         var frameworkPackageHash = Hash(FrameworkPackageContent);
+        var installerHash = Hash(InstallerContent);
         var release = WriteJson("release.json", new
         {
             schema_version = releaseSchemaVersion,
@@ -327,6 +367,29 @@ public sealed class ExternalReleaseGateTests : IDisposable
                     FrameworkPackageContent.LongLength,
                     commandCount: 42),
             },
+            installers = new[]
+            {
+                new
+                {
+                    file = "LongAssistant-Setup.exe",
+                    kind = "installer",
+                    format = "inno-setup-exe",
+                    install_scope = "current-user",
+                    requires_elevation = false,
+                    sha256 = installerHash,
+                    bytes = InstallerContent.LongLength,
+                    plugins = 25,
+                    commands = 42,
+                    signed = false,
+                },
+            },
+        });
+        var checksumsPath = Path.Combine(_root, "SHA256SUMS.txt");
+        File.WriteAllLines(checksumsPath, new[]
+        {
+            $"{PackageHash}  LongBetterWindows.zip",
+            $"{frameworkPackageHash}  LongBetterWindows-framework-dependent.zip",
+            $"{installerHash}  LongAssistant-Setup.exe",
         });
         var download = WriteJson("download.json", new
         {
@@ -429,7 +492,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
             marketplace,
             marketplaceEvidence,
             packagePath,
-            frameworkPackagePath);
+            frameworkPackagePath,
+            installerPath,
+            checksumsPath);
     }
 
     private static object ReleasePackage(
@@ -553,7 +618,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
         string Marketplace,
         string MarketplaceDeploymentEvidence,
         string Package,
-        string FrameworkPackage);
+        string FrameworkPackage,
+        string Installer,
+        string Checksums);
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

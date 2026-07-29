@@ -219,24 +219,72 @@ function Assert-ReleaseManifestContract(
             throw 'Release Manifest package inventory is invalid.'
         }
     }
+
+    $installers = @($document.installers)
+    if ($installers.Count -gt 1) {
+        throw 'Release Manifest must contain at most one installer entry.'
+    }
+    foreach ($installer in $installers) {
+        $file = [string]$installer.file
+        if ([string]::IsNullOrWhiteSpace($file) `
+            -or [IO.Path]::GetFileName($file) -ne $file `
+            -or -not $fileNames.Add($file) `
+            -or [string]$installer.kind -ne 'installer' `
+            -or [string]$installer.format -ne 'inno-setup-exe' `
+            -or [string]$installer.install_scope -ne 'current-user' `
+            -or [bool]$installer.requires_elevation `
+            -or [string]$installer.sha256 -notmatch '^[0-9a-f]{64}$' `
+            -or [long]$installer.bytes -le 0 `
+            -or [int]$installer.plugins -ne 25 `
+            -or [int]$installer.commands -ne 42 `
+            -or [bool]$installer.signed -ne ($distributionChannel -eq 'signed')) {
+            throw 'Release Manifest installer inventory is invalid.'
+        }
+    }
 }
 
-function Assert-ReleasePackageFiles($releaseGate) {
+function Assert-ReleaseArtifactFiles($releaseGate) {
     $root = Split-Path -Parent $releaseGate.path
-    foreach ($package in @($releaseGate.document.packages)) {
-        $file = [string]$package.file
+    $artifacts = @($releaseGate.document.packages) +
+        @($releaseGate.document.installers)
+    foreach ($artifact in $artifacts) {
+        $file = [string]$artifact.file
         $path = Join-Path $root $file
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-            throw "Release package file was not found: $file"
+            throw "Release artifact file was not found: $file"
         }
         $item = Get-Item -LiteralPath $path
-        if ([long]$item.Length -ne [long]$package.bytes) {
-            throw "Release package file size does not match the Manifest: $file"
+        if ([long]$item.Length -ne [long]$artifact.bytes) {
+            throw "Release artifact file size does not match the Manifest: $file"
         }
         $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).
             Hash.ToLowerInvariant()
-        if ($actualHash -ne ([string]$package.sha256).ToLowerInvariant()) {
-            throw "Release package file hash does not match the Manifest: $file"
+        if ($actualHash -ne ([string]$artifact.sha256).ToLowerInvariant()) {
+            throw "Release artifact file hash does not match the Manifest: $file"
+        }
+    }
+
+    $checksumPath = Join-Path $root 'SHA256SUMS.txt'
+    if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
+        throw 'Release checksum file was not found: SHA256SUMS.txt'
+    }
+    $checksums = [Collections.Generic.Dictionary[string,string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
+    foreach ($line in @(Get-Content -LiteralPath $checksumPath -Encoding UTF8)) {
+        if ($line -notmatch '^([0-9a-f]{64})  ([^\\/]+)$' `
+            -or $checksums.ContainsKey($Matches[2])) {
+            throw 'Release checksum file contains an invalid or duplicate entry.'
+        }
+        $checksums.Add($Matches[2], $Matches[1])
+    }
+    if ($checksums.Count -ne $artifacts.Count) {
+        throw 'Release checksum file does not contain the exact Manifest artifact set.'
+    }
+    foreach ($artifact in $artifacts) {
+        $checksum = ''
+        if (-not $checksums.TryGetValue([string]$artifact.file, [ref]$checksum) `
+            -or $checksum -ne ([string]$artifact.sha256).ToLowerInvariant()) {
+            throw 'Release checksum file does not match the Manifest artifacts.'
         }
     }
 }
@@ -276,7 +324,7 @@ Assert-ReleaseManifestContract `
     $release.document `
     $expectedCommit `
     $ExpectedDistributionChannel
-Assert-ReleasePackageFiles $release
+Assert-ReleaseArtifactFiles $release
 
 foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
     if ([string]$gate.document.source_commit -ne $expectedCommit) {
@@ -358,7 +406,9 @@ $decision = [ordered]@{
         runtime = [string]$release.document.runtime
         source_dirty = [bool]$release.document.source_dirty
         package_count = @($release.document.packages).Count
-        package_files_verified = $true
+        installer_count = @($release.document.installers).Count
+        artifact_files_verified = $true
+        checksum_file_verified = $true
     }
     independent_review = [ordered]@{
         download_operator = $downloadOperator
