@@ -1510,6 +1510,22 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void TaskbarIdentityEvidence_AtomicallyAnnotatesHostReport()
+    {
+        var script = Read("verify-taskbar-identity.ps1");
+
+        Assert.Contains("--quality-taskbar-identity-report", script);
+        Assert.Contains("Taskbar identity evidence requires a clean", script);
+        Assert.Contains("Taskbar identity evidence output already exists", script);
+        Assert.Contains("source_commit", script);
+        Assert.Contains("host_executable_sha256", script);
+        Assert.Contains("release-evidence-io.ps1", script);
+        Assert.Contains("originalReportHash", script);
+        Assert.Contains("Update-JsonFileAtomically", script);
+        Assert.DoesNotContain("Set-Content -LiteralPath $outputFile", script);
+    }
+
+    [Fact]
     public void PluginScanner_DelegatesStandalonePackagingAndLifecycleToLoader()
     {
         var scanner = Read("src", "LongBetterWindows.Host", "Engine", "PluginScanner.cs");

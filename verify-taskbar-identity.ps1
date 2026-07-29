@@ -9,6 +9,12 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+$evidenceIo = Join-Path $PSScriptRoot "release-evidence-io.ps1"
+if (-not (Test-Path -LiteralPath $evidenceIo -PathType Leaf)) {
+    throw "Release evidence writer was not found: $evidenceIo"
+}
+. $evidenceIo
+
 function Resolve-RepositoryPath([string]$PathValue) {
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
         return [System.IO.Path]::GetFullPath($PathValue)
@@ -43,6 +49,9 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 $outputFile = Resolve-RepositoryPath $OutputPath
 $outputDirectory = [System.IO.Path]::GetDirectoryName($outputFile)
+if (Test-Path -LiteralPath $outputFile) {
+    throw "Taskbar identity evidence output already exists: $outputFile"
+}
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
 $process = Start-Process `
@@ -61,6 +70,8 @@ if ($process.ExitCode -ne 0) {
 if (-not (Test-Path -LiteralPath $outputFile -PathType Leaf)) {
     throw "Taskbar identity report was not generated: $outputFile"
 }
+$originalReportHash = (Get-FileHash -LiteralPath $outputFile -Algorithm SHA256).
+    Hash.ToLowerInvariant()
 
 $report = Get-Content -LiteralPath $outputFile -Raw -Encoding UTF8 |
     ConvertFrom-Json
@@ -72,8 +83,12 @@ $report | Add-Member -NotePropertyName host_executable_sha256 `
     -NotePropertyValue (
         (Get-FileHash -LiteralPath $hostExecutable -Algorithm SHA256).
             Hash.ToLowerInvariant()) -Force
-$report | ConvertTo-Json -Depth 8 |
-    Set-Content -LiteralPath $outputFile -Encoding UTF8
+Update-JsonFileAtomically `
+    -Value $report `
+    -Path $outputFile `
+    -ExpectedSha256 $originalReportHash `
+    -Depth 8 `
+    -Label "Taskbar identity evidence"
 $windows = @($report.windows)
 $actualIdentities = @($windows |
     ForEach-Object { [string]$_.actual_app_user_model_id } |
