@@ -75,7 +75,7 @@ if (-not [bool]$report.passed -or @($report.accessibility_modes).Count -ne 3 `
 
 $logPath = Join-Path $smokeRoot 'desktop-ui-smoke.log'
 $manifest = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'physical_accessibility_evidence'
     source_commit = $expectedCommit
@@ -111,7 +111,11 @@ $manifest = [ordered]@{
             keyboard_navigation = $false
             focus_visibility = $false
             motion_behavior = $false
+            management_destination_tab_order = $false
+            management_destination_activation = $false
+            management_module_close_mru = $false
             screen_reader_announcements = $null
+            management_close_announcements = $null
         }
     }
     environment = [ordered]@{

@@ -13,7 +13,11 @@ param(
     [Parameter(Mandatory=$true)] [switch] $ConfirmKeyboardNavigation,
     [Parameter(Mandatory=$true)] [switch] $ConfirmFocusVisibility,
     [Parameter(Mandatory=$true)] [switch] $ConfirmMotionBehavior,
-    [switch] $ConfirmScreenReaderAnnouncements
+    [Parameter(Mandatory=$true)] [switch] $ConfirmManagementTabOrder,
+    [Parameter(Mandatory=$true)] [switch] $ConfirmManagementActivation,
+    [Parameter(Mandatory=$true)] [switch] $ConfirmManagementModuleCloseMru,
+    [switch] $ConfirmScreenReaderAnnouncements,
+    [switch] $ConfirmManagementCloseAnnouncements
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +27,10 @@ if ([string]::IsNullOrWhiteSpace($ReviewNotes) -or $ReviewNotes.Trim().Length -l
 }
 if (-not $ConfirmKeyboardNavigation -or -not $ConfirmFocusVisibility -or -not $ConfirmMotionBehavior) {
     throw 'Keyboard navigation, focus visibility and motion behavior confirmations are required.'
+}
+if (-not $ConfirmManagementTabOrder -or -not $ConfirmManagementActivation `
+    -or -not $ConfirmManagementModuleCloseMru) {
+    throw 'Management destination order, activation and module close/MRU confirmations are required.'
 }
 
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
@@ -35,6 +43,9 @@ if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Evidence manifest was 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.classification -ne 'physical_accessibility_evidence') {
     throw "Unexpected evidence classification: $($manifest.classification)"
+}
+if ([int]$manifest.schema_version -ne 2) {
+    throw 'Accessibility evidence schema version 2 is required. Recapture this candidate.'
 }
 if ([string]$manifest.source_commit -ne $expectedCommit) {
     throw 'Accessibility evidence source commit does not match ExpectedSourceCommit.'
@@ -64,6 +75,9 @@ if ($readerName -ne 'None') {
     if (-not $ConfirmScreenReaderAnnouncements) {
         throw 'ConfirmScreenReaderAnnouncements is required for screen-reader evidence.'
     }
+    if (-not $ConfirmManagementCloseAnnouncements) {
+        throw 'ConfirmManagementCloseAnnouncements is required for screen-reader evidence.'
+    }
 }
 
 $manifest.human_review.status = 'approved'
@@ -73,7 +87,12 @@ $manifest.human_review.notes = $ReviewNotes.Trim()
 $manifest.human_review.checklist.keyboard_navigation = $true
 $manifest.human_review.checklist.focus_visibility = $true
 $manifest.human_review.checklist.motion_behavior = $true
+$manifest.human_review.checklist.management_destination_tab_order = $true
+$manifest.human_review.checklist.management_destination_activation = $true
+$manifest.human_review.checklist.management_module_close_mru = $true
 $manifest.human_review.checklist.screen_reader_announcements = `
+    if ($readerName -eq 'None') { $null } else { $true }
+$manifest.human_review.checklist.management_close_announcements = `
     if ($readerName -eq 'None') { $null } else { $true }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 Write-Output "Accessibility evidence approved for $ConfirmProfile by $($Reviewer.Trim())."

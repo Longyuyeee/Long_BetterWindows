@@ -31,6 +31,9 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | Convert
 if ($manifest.classification -ne 'physical_device_dpi_evidence') {
     throw "Unexpected evidence classification: $($manifest.classification)"
 }
+if ([int]$manifest.schema_version -ne 2) {
+    throw 'Physical DPI evidence schema version 2 is required. Recapture this candidate.'
+}
 if ([string]$manifest.source_commit -ne $expectedCommit) {
     throw 'Physical DPI evidence source commit does not match ExpectedSourceCommit.'
 }
@@ -41,6 +44,9 @@ if ([int]$manifest.expected_scale_percent -ne $ConfirmScalePercent) {
 
 $captures = @($manifest.captures)
 if ($captures.Count -ne 8) { throw "Expected 8 captures, found $($captures.Count)." }
+if ('main' -notin @($captures | ForEach-Object { [string]$_.view })) {
+    throw 'Physical DPI evidence does not include the main management-center view.'
+}
 foreach ($capture in $captures) {
     $imagePath = Join-Path $root $capture.file
     $metadataPath = Join-Path $root $capture.metadata_file
@@ -63,6 +69,8 @@ $manifest.human_review.checklist.text_and_icons_are_sharp = $true
 $manifest.human_review.checklist.keyboard_focus_is_visible = $true
 $manifest.human_review.checklist.light_and_dark_themes_are_consistent = $true
 $manifest.human_review.checklist.web_plugin_content_is_visible = $true
+$manifest.human_review.checklist.management_center_layout_is_stable = $true
+$manifest.human_review.checklist.management_module_tabs_are_readable = $true
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
 Write-Output "Physical DPI evidence approved at $ConfirmScalePercent% by $($Reviewer.Trim())."

@@ -37,6 +37,9 @@ if ($LASTEXITCODE -ne 0 -or $actualCommit -ne $expectedCommit) {
 & git -C $repoRoot diff --quiet HEAD --
 if ($LASTEXITCODE -ne 0) { throw 'Physical DPI evidence requires a clean tracked source tree.' }
 if ($NoBuild) { throw 'Formal physical DPI evidence must rebuild the expected source commit.' }
+if ('main' -notin $Views) {
+    throw 'Physical DPI evidence must include the main management-center view.'
+}
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $outputRoot) {
     throw "Physical DPI evidence output directory already exists: $outputRoot"
@@ -126,7 +129,7 @@ foreach ($theme in $Themes) {
 
 $approved = [bool]$ApproveAfterVisualReview
 $manifest = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'physical_device_dpi_evidence'
     source_commit = $expectedCommit
@@ -145,6 +148,8 @@ $manifest = [ordered]@{
             keyboard_focus_is_visible = $approved
             light_and_dark_themes_are_consistent = $approved
             web_plugin_content_is_visible = $approved
+            management_center_layout_is_stable = $approved
+            management_module_tabs_are_readable = $approved
         }
     }
     environment = [ordered]@{

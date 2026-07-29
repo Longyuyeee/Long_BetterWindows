@@ -29,6 +29,8 @@ powershell.exe -ExecutionPolicy Bypass -File .\capture-physical-dpi-evidence.ps1
 3. 键盘焦点可见，主要操作不依赖鼠标悬停。
 4. 亮色与暗色的信息层级一致。
 5. Web 插件内容真实可见，不是空白 HWND 截图。
+6. 主界面截图必须处于管理中心首页，八个入口无裁切、重叠或异常换行。
+7. 打开管理模块后，模块标签标题、活动态、焦点环和关闭按钮在当前缩放下清晰可辨。
 
 采集器为每个视图保留 90 秒进程预算，以覆盖高 DPI 下 WebView2 冷启动和连续视图采集；如设备性能较慢，可显式传入 `-ProcessTimeoutSeconds 120`，但不得使用 `-NoBuild` 绕过候选重建。
 
@@ -61,7 +63,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\verify-physical-dpi-matrix.ps1 `
   -OutputPath .\artifacts\quality\physical-dpi-release-matrix.json
 ```
 
-采集要求仓库 `HEAD` 等于指定的完整提交 SHA、受跟踪文件无改动，并重新构建该提交；`-NoBuild` 不能用于正式物理证据。汇总门禁要求四个唯一档位来自同一个指定提交、每档 8 张图片、人工状态为 `approved`、文件哈希未变化、实际显示器缩放与档位一致。任一条件不满足即失败。
+采集要求仓库 `HEAD` 等于指定的完整提交 SHA、受跟踪文件无改动，并重新构建该提交；`-NoBuild` 不能用于正式物理证据。采集视图不能移除 `main`。汇总只接受 v2 证据，要求四个唯一档位来自同一个指定提交、每档 8 张图片、管理中心首页与模块标签已人工确认、人工状态为 `approved`、文件哈希未变化、实际显示器缩放与档位一致。任一条件不满足即失败。
 
 ## 当前证据
 

@@ -26,6 +26,9 @@ foreach ($directory in $EvidenceDirectories) {
     if ($manifest.classification -ne 'physical_device_dpi_evidence') {
         throw "Unexpected evidence classification: $manifestPath"
     }
+    if ([int]$manifest.schema_version -ne 2) {
+        throw "Physical DPI evidence schema version 2 is required: $manifestPath"
+    }
     if ([string]$manifest.source_commit -ne $expectedCommit) {
         throw "Physical DPI evidence source commit does not match ExpectedSourceCommit: $manifestPath"
     }
@@ -38,6 +41,19 @@ foreach ($directory in $EvidenceDirectories) {
     }
     $captures = @($manifest.captures)
     if ($captures.Count -ne 8) { throw "Expected 8 captures at $scale%, found $($captures.Count)." }
+    if ('main' -notin @($captures | ForEach-Object { [string]$_.view })) {
+        throw "Physical DPI evidence does not include the main management-center view at $scale%."
+    }
+    $checks = $manifest.human_review.checklist
+    if (-not [bool]$checks.no_clipping_or_overflow `
+        -or -not [bool]$checks.text_and_icons_are_sharp `
+        -or -not [bool]$checks.keyboard_focus_is_visible `
+        -or -not [bool]$checks.light_and_dark_themes_are_consistent `
+        -or -not [bool]$checks.web_plugin_content_is_visible `
+        -or -not [bool]$checks.management_center_layout_is_stable `
+        -or -not [bool]$checks.management_module_tabs_are_readable) {
+        throw "Manual physical DPI checklist is incomplete: $scale%"
+    }
     foreach ($capture in $captures) {
         $imagePath = Join-Path $root $capture.file
         $metadataPath = Join-Path $root $capture.metadata_file
@@ -71,7 +87,7 @@ if ($actualScales.Count -ne $requiredScales.Count -or
 }
 
 $summary = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_physical_device_dpi_matrix'
     source_commit = $expectedCommit

@@ -25,6 +25,9 @@ foreach ($directory in $EvidenceDirectories) {
     if ($manifest.classification -ne 'physical_accessibility_evidence') {
         throw "Unexpected evidence classification: $manifestPath"
     }
+    if ([int]$manifest.schema_version -ne 2) {
+        throw "Accessibility evidence schema version 2 is required: $manifestPath"
+    }
     if ([string]$manifest.source_commit -ne $expectedCommit) {
         throw "Accessibility evidence source commit does not match ExpectedSourceCommit: $manifestPath"
     }
@@ -38,7 +41,10 @@ foreach ($directory in $EvidenceDirectories) {
     }
     $checks = $manifest.human_review.checklist
     if (-not [bool]$checks.keyboard_navigation -or -not [bool]$checks.focus_visibility `
-        -or -not [bool]$checks.motion_behavior) {
+        -or -not [bool]$checks.motion_behavior `
+        -or -not [bool]$checks.management_destination_tab_order `
+        -or -not [bool]$checks.management_destination_activation `
+        -or -not [bool]$checks.management_module_close_mru) {
         throw "Manual accessibility checklist is incomplete: $profile"
     }
     $settings = $manifest.windows_settings
@@ -60,7 +66,8 @@ foreach ($directory in $EvidenceDirectories) {
     }
     $readerName = [string]$manifest.screen_reader.name
     if ($readerName -ne 'None' -and [bool]$manifest.screen_reader.process_detected `
-        -and [bool]$checks.screen_reader_announcements) {
+        -and [bool]$checks.screen_reader_announcements `
+        -and [bool]$checks.management_close_announcements) {
         $screenReaderApprovalCount++
     }
     $results += [ordered]@{
@@ -83,7 +90,7 @@ if ($screenReaderApprovalCount -lt 1) {
 }
 
 $summary = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_physical_accessibility_matrix'
     source_commit = $expectedCommit

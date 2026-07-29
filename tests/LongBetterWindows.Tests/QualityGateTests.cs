@@ -242,6 +242,9 @@ public class QualityGateTests
         Assert.Contains("ProcessTimeoutSeconds = 90", capture);
         Assert.Contains("WaitForExit($ProcessTimeoutSeconds * 1000)", capture);
         Assert.Contains("no_clipping_or_overflow", capture);
+        Assert.Contains("management_center_layout_is_stable", capture);
+        Assert.Contains("management_module_tabs_are_readable", capture);
+        Assert.Contains("must include the main management-center view", capture);
         Assert.Contains("webview_preview", capture);
         Assert.Contains("wpf_render_target", capture);
         Assert.Contains("'--command-text', $PluginCommandText", capture);
@@ -251,10 +254,16 @@ public class QualityGateTests
         Assert.Contains("Scale confirmation mismatch", approve);
         Assert.Contains("Evidence changed after capture", approve);
         Assert.Contains("Get-FileHash", approve);
+        Assert.Contains("schema version 2 is required", approve);
+        Assert.Contains("management_center_layout_is_stable", approve);
+        Assert.Contains("management_module_tabs_are_readable", approve);
         Assert.Contains("100,125,150,200", verify);
         Assert.Contains("human_review.status -ne 'approved'", verify);
         Assert.Contains("Get-FileHash", verify);
         Assert.Contains("Expected 8 captures", verify);
+        Assert.Contains("schema version 2 is required", verify);
+        Assert.Contains("management-center view", verify);
+        Assert.Contains("Manual physical DPI checklist is incomplete", verify);
         Assert.Contains("approved_physical_device_dpi_matrix", verify);
         Assert.Contains("ExpectedSourceCommit", verify);
         Assert.Contains("Physical DPI evidence source commit does not match ExpectedSourceCommit", verify);
@@ -276,12 +285,25 @@ public class QualityGateTests
         Assert.Contains("ConfirmKeyboardNavigation", approve);
         Assert.Contains("ConfirmFocusVisibility", approve);
         Assert.Contains("ConfirmMotionBehavior", approve);
+        Assert.Contains("ConfirmManagementTabOrder", approve);
+        Assert.Contains("ConfirmManagementActivation", approve);
+        Assert.Contains("ConfirmManagementModuleCloseMru", approve);
         Assert.Contains("ConfirmScreenReaderAnnouncements", approve);
+        Assert.Contains("ConfirmManagementCloseAnnouncements", approve);
         Assert.Contains("evidence changed after capture", approve, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("management_destination_tab_order", capture);
+        Assert.Contains("management_destination_activation", capture);
+        Assert.Contains("management_module_close_mru", capture);
+        Assert.Contains("management_close_announcements", capture);
         Assert.Contains("high_contrast", verify);
         Assert.Contains("reduced_motion", verify);
         Assert.Contains("combined", verify);
         Assert.Contains("at least one approved Narrator or NVDA", verify);
+        Assert.Contains("schema version 2 is required", verify);
+        Assert.Contains("management_destination_tab_order", verify);
+        Assert.Contains("management_destination_activation", verify);
+        Assert.Contains("management_module_close_mru", verify);
+        Assert.Contains("management_close_announcements", verify);
         Assert.Contains("approved_physical_accessibility_matrix", verify);
     }
 
