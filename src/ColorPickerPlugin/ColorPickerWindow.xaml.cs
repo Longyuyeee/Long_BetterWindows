@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media;
-using LongBetterWindows.Host.Services;
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
@@ -16,6 +16,7 @@ public sealed record ColorPickerWindowLocalization(
 
 public partial class ColorPickerWindow : Window
 {
+    private readonly IScreenColorSampler _screenColorSampler;
     private readonly Func<string, Task> _onPicked;
     private readonly CancellationTokenSource _captureLifetime = new();
     private bool _capturing;
@@ -28,9 +29,11 @@ public partial class ColorPickerWindow : Window
     private struct PointNative { public int X; public int Y; }
 
     public ColorPickerWindow(
+        IScreenColorSampler screenColorSampler,
         Func<string, Task> onPicked,
         ColorPickerWindowLocalization localization)
     {
+        _screenColorSampler = screenColorSampler;
         _onPicked = onPicked;
         InitializeComponent();
         Cursor = Cursors.Cross;
@@ -98,10 +101,21 @@ public partial class ColorPickerWindow : Window
     {
         try
         {
-            var color = ScreenColorSampler.Sample(point.X, point.Y);
-            ColorBox.Background = new SolidColorBrush(color);
-            HexText.Text = $"#{color.R:X2}{color.G:X2}{color.B:X2}";
-            RgbText.Text = $"rgb({color.R}, {color.G}, {color.B})";
+            var result = _screenColorSampler.Sample(point.X, point.Y);
+            if (!result.IsSuccess || result.Data is null)
+            {
+                Log.Warning(
+                    "[ColorPicker] Screen pixel sampling failed: {Error}",
+                    result.ErrorMessage ?? result.ErrorCode.ToString());
+                return false;
+            }
+            var color = result.Data;
+            ColorBox.Background = new SolidColorBrush(Color.FromRgb(
+                color.Red,
+                color.Green,
+                color.Blue));
+            HexText.Text = color.Hex;
+            RgbText.Text = $"rgb({color.Red}, {color.Green}, {color.Blue})";
             return true;
         }
         catch (Exception ex)

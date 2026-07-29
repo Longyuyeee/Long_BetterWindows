@@ -2,6 +2,9 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using ClipboardHistoryBackground;
+using ColorPickerPlugin;
+using FolderNotePlugin;
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
@@ -68,6 +71,8 @@ public sealed class PluginSdkBoundaryTests
     {
         var assemblies = new[]
         {
+            typeof(ColorPickerPluginImpl).Assembly,
+            typeof(FolderNotePluginImpl).Assembly,
             typeof(MacroPluginImpl).Assembly,
             typeof(ScreenshotPluginImpl).Assembly,
             typeof(WindowManagerPluginImpl).Assembly,
@@ -82,6 +87,15 @@ public sealed class PluginSdkBoundaryTests
                 assembly.GetReferencedAssemblies(),
                 reference => reference.Name == "LongBetterWindows.Host");
         });
+    }
+
+    [Fact]
+    public void ScreenColorSamplerContract_IsOwnedBySdkAndUsesScreenshotCapability()
+    {
+        Assert.Same(typeof(ILongPlugin).Assembly, typeof(IScreenColorSampler).Assembly);
+        Assert.Equal(
+            "system.screenshot",
+            HostCapabilityCatalog.ForService<IScreenColorSampler>());
     }
 
     [Fact]

@@ -539,6 +539,7 @@ public sealed class WindowInfoServiceTests
         public IFileOpsService FileOps => null!;
         public IWindowInfoService WindowInfo { get; }
         public IScreenCaptureService ScreenCapture => null!;
+        public IScreenColorSampler ScreenColorSampler => null!;
         public IInputService Input => null!;
         public IProcessService Process => null!;
         public IHttpService Http => null!;

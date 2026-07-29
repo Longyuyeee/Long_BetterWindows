@@ -1,27 +1,28 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using System.Windows.Media;
+using LongBetterWindows.Host.Capabilities;
+using LongBetterWindows.Host.Contracts;
 
 namespace LongBetterWindows.Host.Services;
 
-public static class ScreenColorSampler
+public sealed class ScreenColorSampler : IScreenColorSampler
 {
-    public static Color Sample(int x, int y)
+    public HostApiResponse<ScreenColorSample> Sample(int physicalX, int physicalY)
     {
         var screenDc = GetDC(IntPtr.Zero);
         if (screenDc == IntPtr.Zero)
-            throw LastWin32Error("GetDC");
+            return Failure("GetDC");
 
         try
         {
-            var pixel = GetPixel(screenDc, x, y);
+            var pixel = GetPixel(screenDc, physicalX, physicalY);
             if (pixel == uint.MaxValue)
-                throw LastWin32Error("GetPixel");
+                return Failure("GetPixel");
 
-            return Color.FromRgb(
+            return HostApiResponse<ScreenColorSample>.Success(new(
                 (byte)(pixel & 0xFF),
                 (byte)((pixel >> 8) & 0xFF),
-                (byte)((pixel >> 16) & 0xFF));
+                (byte)((pixel >> 16) & 0xFF)));
         }
         finally
         {
@@ -29,10 +30,13 @@ public static class ScreenColorSampler
         }
     }
 
-    private static Win32Exception LastWin32Error(string operation)
+    private static HostApiResponse<ScreenColorSample> Failure(string operation)
     {
         var error = Marshal.GetLastWin32Error();
-        return new Win32Exception(error, $"{operation} failed.");
+        var exception = new Win32Exception(error, $"{operation} failed.");
+        return HostApiResponse<ScreenColorSample>.Failure(
+            ApiErrorCode.Win32Error,
+            exception.Message);
     }
 
     [DllImport("user32.dll", SetLastError = true)]

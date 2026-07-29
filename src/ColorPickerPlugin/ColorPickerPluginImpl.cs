@@ -2,8 +2,6 @@ using System.Windows;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
-using LongBetterWindows.Host.Services;
-using LongBetterWindows.Host.Views;
 using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
@@ -18,6 +16,8 @@ public class ColorPickerPluginImpl :
 {
     private IHostApi? _host;
     private IPluginSettingsService _pluginSettings = null!;
+    private INotificationService _notification = null!;
+    private IScreenColorSampler _screenColorSampler = null!;
     private string _configuredHotkey = "Ctrl+Shift+P";
     private string? _registeredHotkey;
     private ColorPickerWindow? _window;
@@ -35,6 +35,8 @@ public class ColorPickerPluginImpl :
     {
         _host = host;
         _pluginSettings = host.Settings;
+        _notification = host.Notification;
+        _screenColorSampler = host.ScreenColorSampler;
         var configured = await _pluginSettings.GetAsync("hotkey");
         if (configured.IsSuccess && !string.IsNullOrWhiteSpace(configured.Data))
             _configuredHotkey = configured.Data;
@@ -98,6 +100,7 @@ public class ColorPickerPluginImpl :
 
             var operationToken = _operationLifetime.Token;
             _window = new ColorPickerWindow(
+                _screenColorSampler,
                 async hex =>
                 {
                     try
@@ -116,7 +119,7 @@ public class ColorPickerPluginImpl :
                                 }
                             },
                             operationToken);
-                        FloatingHudWindow.ShowToast(string.Format(
+                        _ = _notification.ShowAsync(Name, string.Format(
                             Text("toast.copied", "已复制颜色 {0}"),
                             hex));
                     }
@@ -129,7 +132,7 @@ public class ColorPickerPluginImpl :
                     catch (Exception ex)
                     {
                         Log.Warning(ex, "[ColorPicker] 颜色复制失败");
-                        FloatingHudWindow.ShowToast(Text(
+                        _ = _notification.ShowAsync(Name, Text(
                             "toast.copyFailed",
                             "拾取成功，但写入剪贴板失败"));
                     }

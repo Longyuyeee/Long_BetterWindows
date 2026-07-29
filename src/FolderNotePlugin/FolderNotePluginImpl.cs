@@ -2,11 +2,9 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
-using LongBetterWindows.Host.Views;
 using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
@@ -22,9 +20,10 @@ public class FolderNotePluginImpl :
     private IHostApi _host = null!;
     private IHotKeyService _hotKey = null!;
     private IPluginSettingsService _pluginSettings = null!;
+    private INotificationService _notification = null!;
     private string _configuredHotkey = "Alt+M";
     private string? _registeredHotkey;
-    private FloatingHudWindow? _activeHud;
+    private AnchoredTextEditorWindow? _activeHud;
     private readonly List<WeakReference<HotkeySettingsControl>> _settings = [];
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
@@ -39,6 +38,7 @@ public class FolderNotePluginImpl :
         _host = host;
         _hotKey = host.HotKey; // 若无 system.hotkey 能力会抛出 UnauthorizedAccessException
         _pluginSettings = host.Settings;
+        _notification = host.Notification;
         var configured = await _pluginSettings.GetAsync("hotkey");
         if (configured.IsSuccess && !string.IsNullOrWhiteSpace(configured.Data))
             _configuredHotkey = configured.Data;
@@ -126,7 +126,7 @@ public class FolderNotePluginImpl :
             var folderResult = await shell.GetActiveExplorerFolderPathAsync();
             if (!folderResult.IsSuccess || folderResult.Data == null)
             {
-                FloatingHudWindow.ShowToast(Text(
+                _ = _notification.ShowAsync(Name, Text(
                     "error.selectFolder",
                     "请先打开资源管理器并选中文件夹。"));
                 return PluginCommandResult.Failure(Text(
@@ -139,7 +139,7 @@ public class FolderNotePluginImpl :
 
         if (!Directory.Exists(folderPath))
         {
-            FloatingHudWindow.ShowToast(Text(
+            _ = _notification.ShowAsync(Name, Text(
                 "error.folderMissing",
                 "目标文件夹不存在。"));
             return PluginCommandResult.Failure(Text(
@@ -163,7 +163,7 @@ public class FolderNotePluginImpl :
             var message = Text(
                 "error.loadFailed",
                 "文件夹备注读取失败，请检查权限后重试。");
-            FloatingHudWindow.ShowToast(message);
+            _ = _notification.ShowAsync(Name, message);
             return PluginCommandResult.Failure(message);
         }
 
@@ -184,11 +184,11 @@ public class FolderNotePluginImpl :
 
         Application.Current.Dispatcher.Invoke(() =>
         {
-            var window = FloatingHudWindow.ShowAt(
+            var window = AnchoredTextEditorWindow.ShowAt(
                 hudX,
                 hudY,
                 existingNote,
-                folderPath,
+                Path.GetFileName(folderPath),
                 async (text) =>
                 {
                     var result = string.IsNullOrEmpty(text)
@@ -297,7 +297,7 @@ public class FolderNotePluginImpl :
         return Task.CompletedTask;
     }
 
-    private FloatingHudLocalization CreateHudLocalization()
+    private AnchoredTextEditorLocalization CreateHudLocalization()
         => new(
             Text("hud.title", "备注"),
             Text("hud.inputAutomationName", "文件夹备注内容"),

@@ -379,7 +379,7 @@ public sealed class ReleaseBlockingRegressionTests
             "await Dispatcher.Yield(DispatcherPriority.ApplicationIdle)",
             selector);
         Assert.Contains("MonitorHelper.GetCursorPlacement(this)", colorPicker);
-        Assert.Contains("ScreenColorSampler.Sample(", colorPicker);
+        Assert.Contains("_screenColorSampler.Sample(", colorPicker);
         Assert.Contains("finally", colorPicker);
         Assert.Contains("GetSystemMetrics(SmXvirtualscreen)", captureService);
         Assert.Contains("if (!BitBlt(", captureService);
@@ -393,17 +393,16 @@ public sealed class ReleaseBlockingRegressionTests
         var hud = File.ReadAllText(Path.Combine(
             root,
             "src",
-            "LongBetterWindows.Host",
-            "Views",
-            "FloatingHudWindow.xaml.cs"));
+            "LongBetterWindows.PluginSdk.Wpf",
+            "AnchoredTextEditorWindow.xaml.cs"));
         var folderNote = File.ReadAllText(Path.Combine(
             root,
             "src",
             "FolderNotePlugin",
             "FolderNotePluginImpl.cs"));
 
-        Assert.Contains("Func<string, Task>? _onSave", hud);
-        Assert.Contains("await _onSave(text)", hud);
+        Assert.Contains("Func<string, Task> _onSave", hud);
+        Assert.Contains("await _onSave(Editor.Text.Trim())", hud);
         Assert.Contains("catch (Exception exception)", hud);
         Assert.Contains("if (!result.IsSuccess)", folderNote);
         Assert.Contains(

@@ -21,6 +21,7 @@ namespace LongBetterWindows.Host.Core
         IFileOpsService FileOps { get; }
         IWindowInfoService WindowInfo { get; }
         IScreenCaptureService ScreenCapture { get; }
+        IScreenColorSampler ScreenColorSampler { get; }
         IInputService Input { get; }
         IProcessService Process { get; }
         IHttpService Http { get; }

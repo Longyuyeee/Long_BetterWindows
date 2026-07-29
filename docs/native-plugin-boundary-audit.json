@@ -4,27 +4,14 @@
   "sdk_version": "1.0.0",
   "sdk_only_projects": [
     "ClipboardHistoryBackground",
+    "ColorPickerPlugin",
+    "FolderNotePlugin",
     "MacroPlugin",
     "SamplePlugin",
     "ScreenshotPlugin",
     "WindowManagerPlugin"
   ],
   "host_coupled_projects": [
-    {
-      "project": "ColorPickerPlugin",
-      "dependencies": [
-        "FloatingHudWindow",
-        "ScreenColorSampler"
-      ],
-      "target_boundary": "screen-color-sampling"
-    },
-    {
-      "project": "FolderNotePlugin",
-      "dependencies": [
-        "FloatingHudWindow"
-      ],
-      "target_boundary": "anchored-editor-surface"
-    },
     {
       "project": "QuickLaunchPlugin",
       "dependencies": [

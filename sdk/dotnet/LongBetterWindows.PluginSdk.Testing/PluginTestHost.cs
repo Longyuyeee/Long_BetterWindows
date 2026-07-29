@@ -59,6 +59,7 @@ public sealed class PluginTestHost : IHostApi
     public IFileOpsService FileOps => Get<IFileOpsService>();
     public IWindowInfoService WindowInfo => Get<IWindowInfoService>();
     public IScreenCaptureService ScreenCapture => Get<IScreenCaptureService>();
+    public IScreenColorSampler ScreenColorSampler => Get<IScreenColorSampler>();
     public IInputService Input => Get<IInputService>();
     public IProcessService Process => Get<IProcessService>();
     public IHttpService Http => Get<IHttpService>();

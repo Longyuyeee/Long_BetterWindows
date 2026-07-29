@@ -104,6 +104,19 @@ public sealed class PluginTestingSdkTests
     }
 
     [Fact]
+    public void TestHost_GrantsScreenColorSamplerWithScreenshotCapability()
+    {
+        var host = new PluginTestHost()
+            .Grant<IScreenColorSampler>(new ScreenColorSamplerStub());
+
+        var result = host.ScreenColorSampler.Sample(10, 20);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("#0A141E", result.Data?.Hex);
+        Assert.True(host.HasCapability("system.screenshot"));
+    }
+
+    [Fact]
     public async Task Harness_CoversCommandLanguageAndRepeatableRelease()
     {
         var plugin = new ContractFixturePlugin();
@@ -245,6 +258,17 @@ public sealed class PluginTestingSdkTests
         Version = "1.0.0",
         EntryPoint = "ContractFixture.dll",
     };
+
+    private sealed class ScreenColorSamplerStub : IScreenColorSampler
+    {
+        public HostApiResponse<ScreenColorSample> Sample(
+            int physicalX,
+            int physicalY)
+            => HostApiResponse<ScreenColorSample>.Success(new(
+                (byte)physicalX,
+                (byte)physicalY,
+                30));
+    }
 
     private static string FindRepositoryRoot()
     {

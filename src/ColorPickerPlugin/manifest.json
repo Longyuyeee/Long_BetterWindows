@@ -4,7 +4,12 @@
   "name": "颜色拾取器",
   "author": "Long",
   "entry_point": "ColorPickerPlugin.dll",
-  "capabilities": ["system.hotkey", "system.clipboard"],
+  "capabilities": [
+    "system.hotkey",
+    "system.clipboard",
+    "system.notification",
+    "system.screenshot"
+  ],
   "commands": [
     {
       "id": "color.pick",

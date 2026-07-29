@@ -101,6 +101,7 @@ namespace LongBetterWindows.Host.Engine
         public IFileOpsService FileOps => GetService<IFileOpsService>();
         public IWindowInfoService WindowInfo => GetService<IWindowInfoService>();
         public IScreenCaptureService ScreenCapture => GetService<IScreenCaptureService>();
+        public IScreenColorSampler ScreenColorSampler => GetService<IScreenColorSampler>();
         public IInputService Input => GetService<IInputService>();
         public IProcessService Process => GetService<IProcessService>();
         public IHttpService Http => GetService<IHttpService>();

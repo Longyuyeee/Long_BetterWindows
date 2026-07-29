@@ -34,6 +34,7 @@ namespace LongBetterWindows.Host.Services
         public static FileOpsService FileOps { get; private set; } = null!;
         public static WindowInfoService WindowInfo { get; private set; } = null!;
         public static ScreenCaptureService ScreenCapture { get; private set; } = null!;
+        public static ScreenColorSampler ScreenColorSampler { get; private set; } = null!;
         public static InputService Input { get; private set; } = null!;
         public static ProcessService Process { get; private set; } = null!;
         public static HttpService Http { get; private set; } = null!;
@@ -164,6 +165,9 @@ namespace LongBetterWindows.Host.Services
 
             ScreenCapture = new ScreenCaptureService(Clipboard);
             provider.RegisterService<IScreenCaptureService>(ScreenCapture);
+
+            ScreenColorSampler = new ScreenColorSampler();
+            provider.RegisterService<IScreenColorSampler>(ScreenColorSampler);
 
             Input = new InputService();
             provider.RegisterService<IInputService>(Input);

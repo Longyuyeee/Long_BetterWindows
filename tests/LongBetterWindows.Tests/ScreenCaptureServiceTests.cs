@@ -66,11 +66,14 @@ public sealed class ScreenCaptureServiceTests
     {
         var bounds = ScreenCaptureService.GetVirtualScreenBounds();
 
-        var color = ScreenColorSampler.Sample(
+        var sampler = new ScreenColorSampler();
+        var result = sampler.Sample(
             bounds.X + (bounds.Width / 2),
             bounds.Y + (bounds.Height / 2));
 
-        Assert.Equal(byte.MaxValue, color.A);
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.NotNull(result.Data);
+        Assert.Matches("^#[0-9A-F]{6}$", result.Data.Hex);
     }
 
     private sealed class RecordingClipboardService : IClipboardService

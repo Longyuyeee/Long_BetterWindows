@@ -18,6 +18,7 @@ public static class HostCapabilityCatalog
             [typeof(IFileOpsService)] = "file.ops",
             [typeof(IWindowInfoService)] = "window.info",
             [typeof(IScreenCaptureService)] = "system.screenshot",
+            [typeof(IScreenColorSampler)] = "system.screenshot",
             [typeof(IInputService)] = "system.input",
             [typeof(IProcessService)] = "system.process",
             [typeof(IHttpService)] = "network.http",
