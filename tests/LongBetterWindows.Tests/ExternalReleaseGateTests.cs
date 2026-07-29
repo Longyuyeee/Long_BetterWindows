@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace LongBetterWindows.Tests;
@@ -43,6 +44,21 @@ public sealed class ExternalReleaseGateTests : IDisposable
             1,
             root.GetProperty("evidence_contract")
                 .GetProperty("screen_reader_approval_count")
+                .GetInt32());
+        Assert.Equal(
+            1,
+            root.GetProperty("evidence_contract")
+                .GetProperty("download_schema_version")
+                .GetInt32());
+        Assert.Equal(
+            1,
+            root.GetProperty("evidence_contract")
+                .GetProperty("clean_environment_schema_version")
+                .GetInt32());
+        Assert.Equal(
+            2,
+            root.GetProperty("evidence_contract")
+                .GetProperty("marketplace_rehearsal_schema_version")
                 .GetInt32());
         Assert.All(
             root.GetProperty("inputs").EnumerateObject(),
@@ -128,13 +144,69 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.False(File.Exists(output));
     }
 
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsIncompleteDownloadSummary()
+    {
+        var paths = WriteFixture(PackageHash, downloadSchemaVersion: 0);
+        var output = Path.Combine(_root, "download-contract-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Release-download gate summary contract is incomplete", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsIncompleteCleanEnvironmentSummary()
+    {
+        var paths = WriteFixture(PackageHash, cleanSchemaVersion: 0);
+        var output = Path.Combine(_root, "clean-contract-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Clean-environment gate summary contract is incomplete", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsLegacyMarketplaceSummary()
+    {
+        var paths = WriteFixture(PackageHash, marketplaceSchemaVersion: 1);
+        var output = Path.Combine(_root, "marketplace-schema-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Marketplace rehearsal schema version 2 is required", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsTamperedMarketplaceEvidence()
+    {
+        var paths = WriteFixture(PackageHash);
+        File.AppendAllText(paths.MarketplaceDeploymentEvidence, "tampered");
+        var output = Path.Combine(_root, "marketplace-tamper-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Marketplace rehearsal evidence hash mismatch", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
     private FixturePaths WriteFixture(
         string cleanPackageHash,
         bool marketplacePreflightOnly = false,
         int physicalDpiSchemaVersion = 2,
         int physicalDpiCaptureCount = 32,
         int accessibilitySchemaVersion = 2,
-        int screenReaderApprovalCount = 1)
+        int screenReaderApprovalCount = 1,
+        int downloadSchemaVersion = 1,
+        int cleanSchemaVersion = 1,
+        int marketplaceSchemaVersion = 2)
     {
         Directory.CreateDirectory(_root);
         var release = WriteJson("release.json", new
@@ -147,23 +219,31 @@ public sealed class ExternalReleaseGateTests : IDisposable
         });
         var download = WriteJson("download.json", new
         {
+            schema_version = downloadSchemaVersion,
             classification = "approved_release_download_gate",
             passed = true,
             source_commit = Commit,
             distribution_channel = "unsigned",
             package_file = "LongBetterWindows.zip",
             package_sha256 = PackageHash,
+            download_host = "github.com",
             @operator = "capture-user",
             reviewer = "review-user",
+            evidence_sha256 = new string('a', 64),
+            approval_sha256 = new string('b', 64),
         });
         var clean = WriteJson("clean.json", new
         {
+            schema_version = cleanSchemaVersion,
             classification = "approved_clean_windows_release_gate",
             passed = true,
             source_commit = Commit,
             distribution_channel = "unsigned",
+            signed = false,
             package_sha256 = cleanPackageHash,
+            environment_label = "clean-vm",
             reviewer = "clean-reviewer",
+            evidence_manifest_sha256 = new string('c', 64),
         });
         var dpi = WriteJson("dpi.json", new
         {
@@ -200,8 +280,10 @@ public sealed class ExternalReleaseGateTests : IDisposable
                 new { profile = "combined", source_commit = Commit },
             },
         });
+        var marketplaceEvidence = WriteMarketplaceEvidence();
         var marketplace = WriteJson("marketplace.json", new
         {
+            schema_version = marketplaceSchemaVersion,
             classification = "marketplace_https_rehearsal",
             passed = true,
             destination = "https://registry.example.test/releases/",
@@ -209,6 +291,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
             release_id = "release-20260723",
             preflight_dry_run_verified = true,
             baseline_verified = true,
+            deployment_started = true,
             deployment_completed = true,
             deployment_verified = true,
             rollback_completed = true,
@@ -216,8 +299,51 @@ public sealed class ExternalReleaseGateTests : IDisposable
             failure = (string?)null,
             rollback_failure = (string?)null,
             rollback_verification_failure = (string?)null,
+            completed_at = "2026-07-29T00:00:00Z",
+            evidence = new
+            {
+                preflight_dry_run = EvidenceEntry("preflight-dry-run.json"),
+                baseline_verification = EvidenceEntry("baseline-verification.json"),
+                deployment = EvidenceEntry("deployment.json"),
+                deployed_verification = EvidenceEntry("deployed-verification.json"),
+                rollback_verification = EvidenceEntry("rollback-verification.json"),
+            },
         });
-        return new FixturePaths(release, download, clean, dpi, accessibility, marketplace);
+        return new FixturePaths(
+            release,
+            download,
+            clean,
+            dpi,
+            accessibility,
+            marketplace,
+            marketplaceEvidence);
+    }
+
+    private string WriteMarketplaceEvidence()
+    {
+        foreach (var fileName in new[]
+        {
+            "preflight-dry-run.json",
+            "baseline-verification.json",
+            "deployment.json",
+            "deployed-verification.json",
+            "rollback-verification.json",
+        })
+        {
+            File.WriteAllText(Path.Combine(_root, fileName), $"fixture:{fileName}");
+        }
+        return Path.Combine(_root, "deployment.json");
+    }
+
+    private object EvidenceEntry(string fileName)
+    {
+        var path = Path.Combine(_root, fileName);
+        return new
+        {
+            file = fileName,
+            sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))
+                .ToLowerInvariant(),
+        };
     }
 
     private string WriteJson(string fileName, object value)
@@ -288,7 +414,8 @@ public sealed class ExternalReleaseGateTests : IDisposable
         string Clean,
         string Dpi,
         string Accessibility,
-        string Marketplace);
+        string Marketplace,
+        string MarketplaceDeploymentEvidence);
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

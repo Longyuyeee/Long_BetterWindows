@@ -183,11 +183,18 @@ public class QualityGateTests
         Assert.Contains("Physical DPI gate must contain exactly 32 captures", gate);
         Assert.Contains("Accessibility gate schema version 2 is required", gate);
         Assert.Contains("requires at least one screen-reader approval", gate);
+        Assert.Contains("Release-download gate summary contract is incomplete", gate);
+        Assert.Contains("Clean-environment gate summary contract is incomplete", gate);
+        Assert.Contains("Marketplace rehearsal schema version 2 is required", gate);
+        Assert.Contains("Marketplace rehearsal evidence hash mismatch", gate);
         Assert.Contains("evidence_contract", gate);
         Assert.Contains("Get-FileHash", gate);
         Assert.Contains("external_release_gate_decision", gate);
         Assert.Contains("decision already exists", gate);
         Assert.Contains("classification = 'marketplace_https_rehearsal'", rehearsal);
+        Assert.Contains("schema_version = 2", rehearsal);
+        Assert.Contains("preflight_dry_run = $dryRunReport", rehearsal);
+        Assert.Contains("rollback_verification = $rollbackVerification", rehearsal);
         Assert.Contains("$summary.passed = -not $summary.preflight_only", rehearsal);
     }
 

@@ -54,7 +54,7 @@ $deployedVerification = Join-Path $evidenceRoot 'deployed-verification.json'
 $rollbackVerification = Join-Path $evidenceRoot 'rollback-verification.json'
 $summaryPath = Join-Path $evidenceRoot 'rehearsal-summary.json'
 $summary = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     started_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'marketplace_https_rehearsal'
     passed = $false
@@ -72,6 +72,7 @@ $summary = [ordered]@{
     rollback_failure = $null
     rollback_verification_failure = $null
     completed_at = $null
+    evidence = $null
 }
 
 try {
@@ -166,6 +167,27 @@ finally {
         -and [string]::IsNullOrWhiteSpace([string]$summary.failure) `
         -and [string]::IsNullOrWhiteSpace([string]$summary.rollback_failure) `
         -and [string]::IsNullOrWhiteSpace([string]$summary.rollback_verification_failure)
+    if ($summary.passed) {
+        $evidenceFiles = [ordered]@{
+            preflight_dry_run = $dryRunReport
+            baseline_verification = $baselineVerification
+            deployment = $deploymentReport
+            deployed_verification = $deployedVerification
+            rollback_verification = $rollbackVerification
+        }
+        $lockedEvidence = [ordered]@{}
+        foreach ($entry in $evidenceFiles.GetEnumerator()) {
+            if (-not (Test-Path -LiteralPath $entry.Value -PathType Leaf)) {
+                throw "Marketplace rehearsal evidence file is missing: $($entry.Value)"
+            }
+            $lockedEvidence[$entry.Key] = [ordered]@{
+                file = [IO.Path]::GetFileName($entry.Value)
+                sha256 = (Get-FileHash -LiteralPath $entry.Value -Algorithm SHA256).
+                    Hash.ToLowerInvariant()
+            }
+        }
+        $summary.evidence = $lockedEvidence
+    }
     $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
 }
 

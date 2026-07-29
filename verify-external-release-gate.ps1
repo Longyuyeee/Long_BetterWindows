@@ -106,6 +106,65 @@ function Assert-AccessibilityContract($document, [string] $sourceCommit) {
     }
 }
 
+function Assert-DownloadContract($document) {
+    if ([int]$document.schema_version -ne 1 `
+        -or [string]::IsNullOrWhiteSpace([string]$document.download_host) `
+        -or [string]$document.evidence_sha256 -notmatch '^[0-9a-f]{64}$' `
+        -or [string]$document.approval_sha256 -notmatch '^[0-9a-f]{64}$') {
+        throw 'Release-download gate summary contract is incomplete.'
+    }
+}
+
+function Assert-CleanEnvironmentContract(
+    $document,
+    [string] $distributionChannel) {
+    if ([int]$document.schema_version -ne 1 `
+        -or [string]::IsNullOrWhiteSpace([string]$document.environment_label) `
+        -or [string]$document.evidence_manifest_sha256 -notmatch '^[0-9a-f]{64}$' `
+        -or [bool]$document.signed -ne ($distributionChannel -eq 'signed')) {
+        throw 'Clean-environment gate summary contract is incomplete.'
+    }
+}
+
+function Assert-MarketplaceEvidenceContract($gate) {
+    if ([int]$gate.document.schema_version -ne 2) {
+        throw 'Marketplace rehearsal schema version 2 is required.'
+    }
+    $completedAt = [DateTimeOffset]::MinValue
+    if (-not [bool]$gate.document.deployment_started `
+        -or -not [DateTimeOffset]::TryParse(
+            [string]$gate.document.completed_at,
+            [ref]$completedAt)) {
+        throw 'Marketplace rehearsal lifecycle metadata is incomplete.'
+    }
+    $requiredEvidence = [ordered]@{
+        preflight_dry_run = 'preflight-dry-run.json'
+        baseline_verification = 'baseline-verification.json'
+        deployment = 'deployment.json'
+        deployed_verification = 'deployed-verification.json'
+        rollback_verification = 'rollback-verification.json'
+    }
+    $evidence = $gate.document.evidence
+    if ($null -eq $evidence) {
+        throw 'Marketplace rehearsal evidence entries are missing.'
+    }
+    $root = Split-Path -Parent $gate.path
+    foreach ($required in $requiredEvidence.GetEnumerator()) {
+        $property = $evidence.psobject.Properties[$required.Key]
+        $entry = if ($null -eq $property) { $null } else { $property.Value }
+        if ($null -eq $entry -or [string]$entry.file -ne $required.Value `
+            -or [string]$entry.sha256 -notmatch '^[0-9a-f]{64}$') {
+            throw "Marketplace rehearsal evidence entry is incomplete: $($required.Key)"
+        }
+        $path = Join-Path $root ([string]$entry.file)
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf) `
+            -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).
+                Hash.ToLowerInvariant() -ne [string]$entry.sha256) {
+            throw "Marketplace rehearsal evidence hash mismatch: $($required.Key)"
+        }
+    }
+}
+
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -143,6 +202,8 @@ foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
         throw "External gate source commit mismatch: $($gate.document.classification)"
     }
 }
+Assert-DownloadContract $download.document
+Assert-CleanEnvironmentContract $clean.document $ExpectedDistributionChannel
 Assert-PhysicalDpiContract $dpi.document $expectedCommit
 Assert-AccessibilityContract $accessibility.document $expectedCommit
 foreach ($gate in @($download, $clean)) {
@@ -196,6 +257,7 @@ if ([bool]$rehearsal.preflight_only `
     -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.rollback_verification_failure)) {
     throw 'Marketplace rehearsal is not a complete passing deploy and rollback cycle.'
 }
+Assert-MarketplaceEvidenceContract $marketplace
 
 $decision = [ordered]@{
     schema_version = 1
@@ -227,6 +289,9 @@ $decision = [ordered]@{
         accessibility_schema_version = [int]$accessibility.document.schema_version
         screen_reader_approval_count =
             [int]$accessibility.document.screen_reader_approval_count
+        download_schema_version = [int]$download.document.schema_version
+        clean_environment_schema_version = [int]$clean.document.schema_version
+        marketplace_rehearsal_schema_version = [int]$marketplace.document.schema_version
     }
     inputs = [ordered]@{
         release_manifest_sha256 = $release.sha256
