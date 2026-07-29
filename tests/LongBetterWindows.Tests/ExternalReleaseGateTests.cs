@@ -91,6 +91,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.All(
             root.GetProperty("inputs").EnumerateObject(),
             input => Assert.Matches("^[0-9a-f]{64}$", input.Value.GetString()));
+        Assert.Empty(Directory.GetFiles(_root, ".*.tmp"));
     }
 
     [Fact]
@@ -121,6 +122,40 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains("does not accept OutputPath", result.Error);
         Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_PreservesExistingDecision()
+    {
+        var paths = WriteFixture(PackageHash);
+        var output = Path.Combine(_root, "existing-decision.json");
+        const string existingContent = "previous immutable decision";
+        await File.WriteAllTextAsync(output, existingContent);
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("decision already exists", result.Error);
+        Assert.Equal(existingContent, await File.ReadAllTextAsync(output));
+        Assert.Empty(Directory.GetFiles(_root, ".*.tmp"));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_AllowsOnlyOneConcurrentDecisionWriter()
+    {
+        var paths = WriteFixture(PackageHash);
+        var output = Path.Combine(_root, "contended-decision.json");
+
+        var results = await Task.WhenAll(
+            RunVerifierAsync(paths, output),
+            RunVerifierAsync(paths, output));
+
+        Assert.Single(results, result => result.ExitCode == 0);
+        var rejected = Assert.Single(results, result => result.ExitCode != 0);
+        Assert.Contains("decision already exists", rejected.Error);
+        using var decision = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        Assert.True(decision.RootElement.GetProperty("passed").GetBoolean());
+        Assert.Empty(Directory.GetFiles(_root, ".*.tmp"));
     }
 
     [Fact]

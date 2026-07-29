@@ -224,6 +224,13 @@ public class QualityGateTests
         Assert.Contains("OutputPath is required unless PreflightOnly", gate);
         Assert.Contains("preflight_only = [bool]$PreflightOnly", gate);
         Assert.Contains("decision already exists", gate);
+        Assert.Contains("Write-DecisionAtomically", gate);
+        Assert.Contains("[IO.File]::Move($temporaryOutput, $path)", gate);
+        Assert.Contains("Remove-Item -LiteralPath $temporaryOutput -Force", gate);
+        Assert.DoesNotContain(
+            "Set-Content -LiteralPath $resolvedOutput",
+            gate,
+            StringComparison.Ordinal);
         Assert.Contains("classification = 'marketplace_https_rehearsal'", rehearsal);
         Assert.Contains("schema_version = 2", rehearsal);
         Assert.Contains("preflight_dry_run = $dryRunReport", rehearsal);

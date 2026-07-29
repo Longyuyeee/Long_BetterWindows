@@ -509,6 +509,35 @@ function Assert-ReleaseArtifactFiles($releaseGate) {
     }
 }
 
+function Write-DecisionAtomically($decision, [string] $path) {
+    $parent = Split-Path -Parent $path
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        [IO.Directory]::CreateDirectory($parent) | Out-Null
+    }
+    $fileName = [IO.Path]::GetFileName($path)
+    $temporaryOutput = Join-Path $parent (
+        ".$fileName.$([Guid]::NewGuid().ToString('N')).tmp")
+    try {
+        $json = $decision | ConvertTo-Json -Depth 7
+        [IO.File]::WriteAllText(
+            $temporaryOutput,
+            $json,
+            [Text.UTF8Encoding]::new($false))
+        [IO.File]::Move($temporaryOutput, $path)
+    }
+    catch {
+        if (Test-Path -LiteralPath $path) {
+            throw "External release decision already exists: $path"
+        }
+        throw
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryOutput) {
+            Remove-Item -LiteralPath $temporaryOutput -Force
+        }
+    }
+}
+
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -682,10 +711,6 @@ if ($PreflightOnly) {
     $decision | ConvertTo-Json -Depth 7
     return
 }
-$parent = Split-Path -Parent $resolvedOutput
-if (-not [string]::IsNullOrWhiteSpace($parent)) {
-    [IO.Directory]::CreateDirectory($parent) | Out-Null
-}
-$decision | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath $resolvedOutput -Encoding UTF8
+Write-DecisionAtomically $decision $resolvedOutput
 Write-Output 'External release gate verified.'
 Write-Output "Decision: $resolvedOutput"
