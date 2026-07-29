@@ -341,6 +341,17 @@ function Find-DescendantByName(
         $condition)
 }
 
+function Find-DescendantByControlType(
+    [Windows.Automation.AutomationElement] $root,
+    [Windows.Automation.ControlType] $controlType) {
+    $condition = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::ControlTypeProperty,
+        $controlType)
+    return $root.FindFirst(
+        [Windows.Automation.TreeScope]::Descendants,
+        $condition)
+}
+
 function Find-ProcessElementByAutomationId([int] $processId, [string] $automationId) {
     $windows = [LongDesktopInput]::TopLevelWindows($processId)
     foreach ($window in $windows) {
@@ -1136,6 +1147,15 @@ try {
             $marketProcess.Id 'Long.Marketplace.ResultCount'
         if ($null -ne $element -and $element.Current.Name -notmatch ' 0 ') { $element }
     } 'The trusted Marketplace catalog did not populate.'
+    $marketListItem = Wait-Until {
+        Find-DescendantByControlType `
+            $marketResults ([Windows.Automation.ControlType]::ListItem)
+    } 'The Marketplace list item was not exposed to UI Automation.'
+    $report.automation_semantics.marketplace['result_item'] = `
+        Get-AutomationSemantics $marketListItem 'ControlType.ListItem' `
+            'Marketplace result item semantics failed.'
+    $report.automation_semantics.marketplace.result_item['item_status'] = `
+        [string]$marketListItem.Current.ItemStatus
     $detailName = Wait-Until {
         Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Marketplace.DetailName'
     } 'The selected Marketplace plugin detail did not appear.'
@@ -1161,6 +1181,10 @@ try {
         Get-AutomationSemantics $uninstall 'ControlType.Button' `
             'Marketplace uninstall semantics failed.'
     Write-Stage 'Opening and cancelling the Marketplace uninstall confirmation.'
+    $uninstall.SetFocus()
+    Wait-Until {
+        Get-FocusedElementByAutomationId 'Long.Marketplace.Uninstall'
+    } 'Marketplace uninstall did not accept keyboard focus.' | Out-Null
     Invoke-AutomationElement $uninstall `
         'The Marketplace uninstall-preview button did not support InvokePattern.'
     $confirmTitle = Wait-Until {
@@ -1174,6 +1198,13 @@ try {
     $report.automation_semantics.marketplace['confirm_cancel'] = `
         Get-AutomationSemantics $confirmCancel 'ControlType.Button' `
             'Marketplace confirmation semantics failed.'
+    $confirmAction = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $marketProcess.Id 'Long.Marketplace.ConfirmAction'
+    } 'The Marketplace confirmation action was not discoverable.'
+    $report.automation_semantics.marketplace['confirm_action'] = `
+        Get-AutomationSemantics $confirmAction 'ControlType.Button' `
+            'Marketplace confirmation action semantics failed.'
     Invoke-AutomationElement $confirmCancel `
         'The Marketplace confirmation cancel button did not support InvokePattern.'
     Wait-Until {
@@ -1183,6 +1214,9 @@ try {
     $uninstallStillAvailable = Wait-Until {
         Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Marketplace.Uninstall'
     } 'Cancelling uninstall changed the installed plugin state.'
+    $uninstallFocusRestored = Wait-Until {
+        Get-FocusedElementByAutomationId 'Long.Marketplace.Uninstall'
+    } 'Cancelling uninstall did not restore focus to its trigger.'
     $report.marketplace = [ordered]@{
         main_window_discovered = $null -ne $marketMain
         search_discovered = $null -ne $marketSearch
@@ -1194,6 +1228,7 @@ try {
         uninstall_confirmation_opened = $null -ne $confirmTitle
         uninstall_confirmation_cancelled = $true
         installed_state_preserved = $null -ne $uninstallStillAvailable
+        uninstall_focus_restored = $null -ne $uninstallFocusRestored
     }
     Stop-QualityHost $marketProcess
     $marketProcess = $null

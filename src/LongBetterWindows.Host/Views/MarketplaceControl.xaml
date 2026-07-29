@@ -131,6 +131,8 @@
                             <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
                                 <Setter Property="Padding" Value="10" />
                                 <Setter Property="Margin" Value="0,2" />
+                                <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                                <Setter Property="AutomationProperties.ItemStatus" Value="{Binding State}" />
                             </Style>
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
@@ -226,6 +228,7 @@
                         </Grid.RowDefinitions>
                         <Button x:Name="MarketBackButton"
                                 Content="{DynamicResource i18n.market.backToResults}"
+                                AutomationProperties.AutomationId="Long.Marketplace.Back"
                                 AutomationProperties.Name="{DynamicResource i18n.market.backToResults}"
                                 HorizontalAlignment="Left" Margin="0,0,0,14"
                                 Visibility="Collapsed" Style="{StaticResource LongButton}"

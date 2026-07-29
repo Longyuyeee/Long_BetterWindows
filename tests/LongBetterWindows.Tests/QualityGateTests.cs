@@ -1548,10 +1548,15 @@ public class QualityGateTests
         Assert.DoesNotContain("Long.Marketplace.Search", market);
         Assert.Contains("Long.Marketplace.Results", market);
         Assert.Contains("Long.Marketplace.ConfirmCancel", market);
+        Assert.Contains("Long.Marketplace.Back", market);
+        Assert.Contains("AutomationProperties.ItemStatus", market);
         Assert.Contains("x:Name=\"MarketHeroTitle\"", market);
         Assert.Contains("TextWrapping=\"Wrap\"", market);
         Assert.Contains("Long.Marketplace.Uninstall", script);
         Assert.Contains("Long.Marketplace.ConfirmCancel", script);
+        Assert.Contains("ControlType.ListItem", script);
+        Assert.Contains("Long.Marketplace.ConfirmAction", script);
+        Assert.Contains("uninstall_focus_restored", script);
         Assert.DoesNotContain("Invoke-AutomationElement $confirmAction", script);
         Assert.Contains("installed_state_preserved", script);
         Assert.Contains("--quality-high-contrast", script);

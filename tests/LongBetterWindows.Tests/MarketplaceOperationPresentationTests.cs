@@ -84,6 +84,7 @@ public sealed class MarketplaceOperationPresentationTests
 
         Assert.Contains("ConfirmCancelButton.IsEnabled = !busy", view);
         Assert.Contains("ConfirmCloseButton.IsEnabled = !busy", view);
+        Assert.Contains("AutomationProperties.SetName", view);
         Assert.Contains("preferredFocus", view);
         Assert.Contains("element.IsVisible", view);
         var successBlock = view[view.IndexOf(

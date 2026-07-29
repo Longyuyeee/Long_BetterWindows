@@ -338,6 +338,9 @@ namespace LongBetterWindows.Host.Views
                 ? card.Entry.Summary
                 : card.Entry.Description;
             DetailState.Text = StateLabel(card.State);
+            AutomationProperties.SetItemStatus(
+                DetailState,
+                card.State.ToString());
             _displayedVersions = card.Entry.Versions
                 .OrderByDescending(x => MarketplacePresentation.ParseVersion(x.Version))
                 .ToArray();
@@ -393,6 +396,9 @@ namespace LongBetterWindows.Host.Views
                 : version.PackageUri?.IsFile == true
                     ? I18n(operation.LocalActionResourceKey)
                     : I18n("market.choosePackage");
+            AutomationProperties.SetName(
+                InstallButton,
+                InstallButton.Content?.ToString() ?? I18n("market.choosePackage"));
             if (_operationStatus == null)
             {
                 DetailHint.Text = version.PackageUri == null
@@ -440,6 +446,9 @@ namespace LongBetterWindows.Host.Views
             ConfirmOperationStatusText.Text = string.Empty;
             ConfirmActionButton.Content = I18n(
                 _pendingOperationPresentation.ConfirmActionResourceKey);
+            AutomationProperties.SetName(
+                ConfirmActionButton,
+                ConfirmActionButton.Content.ToString()!);
             ConfirmActionButton.IsEnabled = true;
             ConfirmActionButton.SetResourceReference(StyleProperty, "LongButton.Primary");
             ConfirmOverlay.Visibility = Visibility.Visible;
@@ -480,6 +489,9 @@ namespace LongBetterWindows.Host.Views
             ConfirmOperationStatusText.Text = string.Empty;
             ConfirmActionButton.Content = I18n(
                 _pendingOperationPresentation.ConfirmActionResourceKey);
+            AutomationProperties.SetName(
+                ConfirmActionButton,
+                ConfirmActionButton.Content.ToString()!);
             ConfirmActionButton.IsEnabled = true;
             ConfirmActionButton.SetResourceReference(StyleProperty, "LongButton.Danger");
             ConfirmOverlay.Visibility = Visibility.Visible;
@@ -809,6 +821,9 @@ namespace LongBetterWindows.Host.Views
             ConfirmOperationStatusText.Text = string.Empty;
             ConfirmActionButton.Content = I18n(
                 operation.ConfirmActionResourceKey);
+            AutomationProperties.SetName(
+                ConfirmActionButton,
+                ConfirmActionButton.Content.ToString()!);
             ConfirmActionButton.IsEnabled = true;
             ConfirmActionButton.SetResourceReference(
                 StyleProperty,
@@ -820,18 +835,36 @@ namespace LongBetterWindows.Host.Views
 
         private void MarketplaceControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (_isCompactLayout
-                && ConfirmOverlay.Visibility != Visibility.Visible
-                && e.Key is Key.Enter or Key.Space
-                && MarketList.IsKeyboardFocusWithin
+            var key = MarketplaceKeyboardRouter.NormalizeKey(e.Key, e.SystemKey);
+            var action = MarketplaceKeyboardRouter.Resolve(
+                key,
+                Keyboard.Modifiers,
+                _isCompactLayout,
+                MarketList.IsKeyboardFocusWithin,
+                MarketList.SelectedItem is MarketCardModel,
+                ConfirmOverlay.Visibility == Visibility.Visible,
+                InstallProgress.Visibility == Visibility.Visible,
+                _moduleRouter.Route.Kind == MarketplaceModuleRouteKind.Detail);
+            if (action == MarketplaceKeyboardAction.OpenSelectedDetail
                 && MarketList.SelectedItem is MarketCardModel selected)
             {
                 ShowEntry(selected);
+                _ = Dispatcher.BeginInvoke(
+                    () =>
+                    {
+                        MarketBackButton.Focus();
+                        Keyboard.Focus(MarketBackButton);
+                    },
+                    DispatcherPriority.Input);
                 e.Handled = true;
                 return;
             }
-            if (e.Key == Key.Escape && ConfirmOverlay.Visibility == Visibility.Visible
-                && InstallProgress.Visibility != Visibility.Visible)
+            if (action == MarketplaceKeyboardAction.NavigateBack)
+            {
+                e.Handled = NavigateBackInModule();
+                return;
+            }
+            if (action == MarketplaceKeyboardAction.DismissConfirmation)
             {
                 e.Handled = DismissConfirmation();
             }
