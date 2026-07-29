@@ -17,6 +17,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 if ([string]::IsNullOrWhiteSpace($Reviewer)) { throw 'Reviewer must not be empty.' }
 if ([string]::IsNullOrWhiteSpace($ReviewNotes) -or $ReviewNotes.Trim().Length -lt 12) {
     throw 'ReviewNotes must contain at least 12 characters.'
@@ -35,8 +36,13 @@ if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
 $root = [IO.Path]::GetFullPath($EvidenceDirectory)
 $manifestPath = Join-Path $root 'clean-environment-evidence.json'
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "Evidence manifest was not found: $manifestPath" }
+$manifestHashBeforeReview = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).
+    Hash.ToLowerInvariant()
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.classification -ne 'clean_windows_release_evidence') { throw 'Unexpected evidence classification.' }
+if ([string]$manifest.human_review.status -ne 'pending') {
+    throw 'Clean-environment evidence is not pending review.'
+}
 if ([string]$manifest.release.source_commit -ne $expectedCommit) {
     throw 'Clean-environment evidence source commit does not match ExpectedSourceCommit.'
 }
@@ -66,6 +72,11 @@ $manifest.human_review.reviewer = $Reviewer.Trim()
 $manifest.human_review.reviewed_at = [DateTimeOffset]::UtcNow.ToString('O')
 $manifest.human_review.notes = $ReviewNotes.Trim()
 foreach ($property in $manifest.human_review.checklist.psobject.Properties) { $property.Value = $true }
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Update-JsonFileAtomically `
+    -Value $manifest `
+    -Path $manifestPath `
+    -ExpectedSha256 $manifestHashBeforeReview `
+    -Depth 8 `
+    -Label 'Clean-environment evidence manifest'
 Write-Output "Clean-environment lifecycle evidence approved by $($Reviewer.Trim())."
 Write-Output "Manifest: $manifestPath"

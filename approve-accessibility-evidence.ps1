@@ -21,6 +21,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 if ([string]::IsNullOrWhiteSpace($Reviewer)) { throw 'Reviewer must not be empty.' }
 if ([string]::IsNullOrWhiteSpace($ReviewNotes) -or $ReviewNotes.Trim().Length -lt 12) {
     throw 'ReviewNotes must contain at least 12 characters.'
@@ -40,12 +41,17 @@ if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
 $root = [IO.Path]::GetFullPath($EvidenceDirectory)
 $manifestPath = Join-Path $root 'accessibility-evidence.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Evidence manifest was not found: $manifestPath" }
+$manifestHashBeforeReview = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).
+    Hash.ToLowerInvariant()
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.classification -ne 'physical_accessibility_evidence') {
     throw "Unexpected evidence classification: $($manifest.classification)"
 }
 if ([int]$manifest.schema_version -ne 2) {
     throw 'Accessibility evidence schema version 2 is required. Recapture this candidate.'
+}
+if ([string]$manifest.human_review.status -ne 'pending') {
+    throw 'Accessibility evidence is not pending review.'
 }
 if ([string]$manifest.source_commit -ne $expectedCommit) {
     throw 'Accessibility evidence source commit does not match ExpectedSourceCommit.'
@@ -94,6 +100,11 @@ $manifest.human_review.checklist.screen_reader_announcements = `
     if ($readerName -eq 'None') { $null } else { $true }
 $manifest.human_review.checklist.management_close_announcements = `
     if ($readerName -eq 'None') { $null } else { $true }
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Update-JsonFileAtomically `
+    -Value $manifest `
+    -Path $manifestPath `
+    -ExpectedSha256 $manifestHashBeforeReview `
+    -Depth 8 `
+    -Label 'Accessibility evidence manifest'
 Write-Output "Accessibility evidence approved for $ConfirmProfile by $($Reviewer.Trim())."
 Write-Output "Manifest: $manifestPath"

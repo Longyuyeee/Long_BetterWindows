@@ -13,6 +13,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 $expectedThumbprint = $ExpectedCertificateThumbprint.Replace(' ', '').ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
@@ -41,6 +42,8 @@ $evidencePath = Join-Path $root 'sparse-package-explorer-evidence.json'
 if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
     throw "Sparse Package Explorer evidence was not found: $evidencePath"
 }
+$evidenceHashBeforeReview = (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).
+    Hash.ToLowerInvariant()
 $evidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 |
     ConvertFrom-Json
 if ($evidence.classification -ne 'sparse_package_explorer_evidence') {
@@ -80,7 +83,11 @@ $evidence.human_review.notes = $ReviewNotes.Trim()
 foreach ($property in $evidence.human_review.checklist.psobject.Properties) {
     $property.Value = $true
 }
-$evidence | ConvertTo-Json -Depth 8 |
-    Set-Content -LiteralPath $evidencePath -Encoding UTF8
+Update-JsonFileAtomically `
+    -Value $evidence `
+    -Path $evidencePath `
+    -ExpectedSha256 $evidenceHashBeforeReview `
+    -Depth 8 `
+    -Label 'Sparse Explorer evidence manifest'
 Write-Output "Sparse Package Explorer evidence approved by $($Reviewer.Trim())."
 Write-Output "Evidence: $evidencePath"

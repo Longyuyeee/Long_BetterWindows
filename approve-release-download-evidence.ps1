@@ -21,6 +21,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 
 function Assert-MeaningfulText([string] $value, [string] $name, [int] $minimumLength) {
     if ([string]::IsNullOrWhiteSpace($value) -or $value.Trim().Length -lt $minimumLength) {
@@ -61,6 +62,8 @@ if (Test-Path -LiteralPath $resolvedOutputPath) {
     throw "Download approval output already exists: $resolvedOutputPath"
 }
 
+$evidenceHashBeforeReview = (Get-FileHash -LiteralPath $resolvedEvidencePath -Algorithm SHA256).
+    Hash.ToLowerInvariant()
 $evidence = Get-Content -LiteralPath $resolvedEvidencePath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($evidence.classification -ne 'verified_release_download_provenance' -or -not [bool]$evidence.passed) {
     throw 'Release-download evidence is not a passing provenance capture.'
@@ -87,7 +90,7 @@ $approval = [ordered]@{
     }
     evidence = [ordered]@{
         file = [IO.Path]::GetFileName($resolvedEvidencePath)
-        sha256 = (Get-FileHash -LiteralPath $resolvedEvidencePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        sha256 = $evidenceHashBeforeReview
     }
     operator = $Operator.Trim()
     reviewer = $Reviewer.Trim()
@@ -107,10 +110,14 @@ $approval = [ordered]@{
     }
 }
 
-$outputParent = Split-Path -Parent $resolvedOutputPath
-if (-not [string]::IsNullOrWhiteSpace($outputParent)) {
-    [IO.Directory]::CreateDirectory($outputParent) | Out-Null
+if ((Get-FileHash -LiteralPath $resolvedEvidencePath -Algorithm SHA256).
+    Hash.ToLowerInvariant() -ne $evidenceHashBeforeReview) {
+    throw 'Release-download evidence changed during human approval.'
 }
-$approval | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath $resolvedOutputPath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $approval `
+    -Path $resolvedOutputPath `
+    -Depth 7 `
+    -Label 'Download approval output'
 Write-Output "Interactive release-download evidence approved by $($Reviewer.Trim())."
 Write-Output "Approval: $resolvedOutputPath"

@@ -14,6 +14,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -27,12 +28,17 @@ if ([string]::IsNullOrWhiteSpace($ReviewNotes) -or $ReviewNotes.Trim().Length -l
 $root = [IO.Path]::GetFullPath($EvidenceDirectory)
 $manifestPath = Join-Path $root 'physical-dpi-evidence.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Evidence manifest was not found: $manifestPath" }
+$manifestHashBeforeReview = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).
+    Hash.ToLowerInvariant()
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.classification -ne 'physical_device_dpi_evidence') {
     throw "Unexpected evidence classification: $($manifest.classification)"
 }
 if ([int]$manifest.schema_version -ne 2) {
     throw 'Physical DPI evidence schema version 2 is required. Recapture this candidate.'
+}
+if ([string]$manifest.human_review.status -ne 'pending') {
+    throw 'Physical DPI evidence is not pending review.'
 }
 if ([string]$manifest.source_commit -ne $expectedCommit) {
     throw 'Physical DPI evidence source commit does not match ExpectedSourceCommit.'
@@ -71,7 +77,12 @@ $manifest.human_review.checklist.light_and_dark_themes_are_consistent = $true
 $manifest.human_review.checklist.web_plugin_content_is_visible = $true
 $manifest.human_review.checklist.management_center_layout_is_stable = $true
 $manifest.human_review.checklist.management_module_tabs_are_readable = $true
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Update-JsonFileAtomically `
+    -Value $manifest `
+    -Path $manifestPath `
+    -ExpectedSha256 $manifestHashBeforeReview `
+    -Depth 8 `
+    -Label 'Physical DPI evidence manifest'
 
 Write-Output "Physical DPI evidence approved at $ConfirmScalePercent% by $($Reviewer.Trim())."
 Write-Output "Manifest: $manifestPath"

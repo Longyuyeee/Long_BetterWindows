@@ -229,6 +229,10 @@ public class QualityGateTests
         Assert.Contains("Write-NewJsonFileAtomically", gate);
         Assert.Contains("[IO.File]::Move($temporaryPath, $resolvedPath)", evidenceIo);
         Assert.Contains("Remove-Item -LiteralPath $temporaryPath -Force", evidenceIo);
+        Assert.Contains("[IO.FileMode]::CreateNew", evidenceIo);
+        Assert.Contains("[IO.FileOptions]::DeleteOnClose", evidenceIo);
+        Assert.Contains("changed after validation", evidenceIo);
+        Assert.Contains("[IO.File]::Replace($temporaryPath, $resolvedPath, $backupPath)", evidenceIo);
         Assert.DoesNotContain(
             "Set-Content -LiteralPath $resolvedOutput",
             gate,
@@ -307,6 +311,9 @@ public class QualityGateTests
         Assert.Contains("Physical DPI evidence source commit does not match ExpectedSourceCommit", approve);
         Assert.Contains("Scale confirmation mismatch", approve);
         Assert.Contains("Evidence changed after capture", approve);
+        Assert.Contains("is not pending review", approve);
+        Assert.Contains("Update-JsonFileAtomically", approve);
+        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", approve);
         Assert.Contains("Get-FileHash", approve);
         Assert.Contains("schema version 2 is required", approve);
         Assert.Contains("management_center_layout_is_stable", approve);
@@ -352,6 +359,9 @@ public class QualityGateTests
         Assert.Contains("ConfirmScreenReaderAnnouncements", approve);
         Assert.Contains("ConfirmManagementCloseAnnouncements", approve);
         Assert.Contains("evidence changed after capture", approve, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("is not pending review", approve);
+        Assert.Contains("Update-JsonFileAtomically", approve);
+        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", approve);
         Assert.Contains("management_destination_tab_order", capture);
         Assert.Contains("management_destination_activation", capture);
         Assert.Contains("management_module_close_mru", capture);
@@ -404,6 +414,9 @@ public class QualityGateTests
         Assert.Contains("ConfirmUninstallIntegrationsRemoved", approve);
         Assert.Contains("Reviewer must differ", approve);
         Assert.Contains("evidence changed after capture", approve, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("is not pending review", approve);
+        Assert.Contains("Update-JsonFileAtomically", approve);
+        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", approve);
         Assert.Contains("human_review.status -ne 'approved'", verify);
         Assert.Contains("ExpectedDistributionChannel", verify);
         Assert.Contains("expected eligible distribution channel", verify);
@@ -450,6 +463,9 @@ public class QualityGateTests
         Assert.Contains("ConfirmFirstLaunchObserved", approve);
         Assert.Contains("Get-FileHash", approve);
         Assert.Contains("release_download_human_approval", approve);
+        Assert.Contains("changed during human approval", approve);
+        Assert.Contains("Write-NewJsonFileAtomically", approve);
+        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutputPath", approve);
         Assert.Contains("Release-download evidence changed after human approval", verify);
         Assert.Contains("distinct operator and reviewer identities", verify);
         Assert.Contains("Interactive release-download checklist is incomplete", verify);
