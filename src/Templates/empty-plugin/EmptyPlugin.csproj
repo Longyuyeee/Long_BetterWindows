@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LongBetterWindows.Host\LongBetterWindows.Host.csproj">
+    <ProjectReference Include="..\LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj">
       <Private>false</Private>
       <ExcludeAssets>runtime</ExcludeAssets>
     </ProjectReference>

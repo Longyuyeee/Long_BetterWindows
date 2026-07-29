@@ -51,11 +51,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.8.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
     <PackageReference Include="WPF-UI" Version="3.0.4" />
     <PackageReference Include="Serilog" Version="4.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Contracts\**\*.cs" />
+    <Compile Remove="Core\**\*.cs" />
+    <Compile Remove="Capabilities\**\*.cs" />
   </ItemGroup>
 
   <!-- 仓库根目录（兼容 SolutionDir 不存在的情况） -->

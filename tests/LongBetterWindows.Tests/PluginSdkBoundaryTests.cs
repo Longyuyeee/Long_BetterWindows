@@ -1,0 +1,155 @@
+using System.IO;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using ClipboardHistoryBackground;
+using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Core;
+using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Services;
+
+namespace LongBetterWindows.Tests;
+
+public sealed class PluginSdkBoundaryTests
+{
+    [Fact]
+    public void StableContracts_AreOwnedByPluginSdkAssembly()
+    {
+        var sdkAssembly = typeof(ILongPlugin).Assembly;
+
+        Assert.Equal("LongBetterWindows.PluginSdk", sdkAssembly.GetName().Name);
+        Assert.Same(sdkAssembly, typeof(PluginManifest).Assembly);
+        Assert.Equal(
+            ApiVersion.Current.ToString().TrimStart('v'),
+            sdkAssembly.GetName().Version?.ToString(3));
+        Assert.DoesNotContain(
+            sdkAssembly.GetReferencedAssemblies(),
+            reference => reference.Name == "LongBetterWindows.Host");
+    }
+
+    [Fact]
+    public void Host_DependsOnSdk_InOneDirection()
+    {
+        var hostReferences = typeof(ServicesInitializer)
+            .Assembly
+            .GetReferencedAssemblies();
+
+        Assert.Contains(
+            hostReferences,
+            reference => reference.Name == "LongBetterWindows.PluginSdk");
+    }
+
+    [Fact]
+    public void MigratedBackgroundPlugin_DoesNotReferenceHostAssembly()
+    {
+        var references = typeof(ClipboardHistoryBackgroundPlugin)
+            .Assembly
+            .GetReferencedAssemblies();
+
+        Assert.Contains(
+            references,
+            reference => reference.Name == "LongBetterWindows.PluginSdk");
+        Assert.DoesNotContain(
+            references,
+            reference => reference.Name == "LongBetterWindows.Host");
+    }
+
+    [Fact]
+    public async Task NativeLoader_ReusesHostSdkWhenPluginDirectoryContainsPrivateCopy()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"long-sdk-boundary-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var pluginAssembly = typeof(ClipboardHistoryBackgroundPlugin).Assembly;
+            var pluginPath = Path.Combine(
+                directory,
+                Path.GetFileName(pluginAssembly.Location));
+            File.Copy(pluginAssembly.Location, pluginPath);
+            File.Copy(
+                typeof(ILongPlugin).Assembly.Location,
+                Path.Combine(directory, "LongBetterWindows.PluginSdk.dll"));
+
+            await LoadAndUnloadAsync(directory, Path.GetFileName(pluginPath));
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // A collectible AssemblyLoadContext can release its Windows file
+                // handles after the assertion scope; delayed temp cleanup is benign.
+            }
+            catch (IOException)
+            {
+                // See above. The operating-system temp directory owns final cleanup.
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static async Task LoadAndUnloadAsync(
+        string directory,
+        string entryPoint)
+    {
+        var loader = new PluginLoader();
+        var result = await loader.LoadAsync(
+            directory,
+            new PluginManifest
+            {
+                Id = "com.long.clipboardhistory",
+                Name = "Clipboard History",
+                Version = "1.1.0",
+                EntryPoint = entryPoint,
+            });
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.IsAssignableFrom<ILongPlugin>(result.Instance);
+        loader.Unload(result.Context!);
+    }
+
+    [Fact]
+    public void NativeTemplates_ReferenceSdkInsteadOfHost()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var template in new[] { "empty-plugin", "hotkey-plugin", "full-plugin" })
+        {
+            var project = Directory
+                .EnumerateFiles(
+                    Path.Combine(root, "src", "Templates", template),
+                    "*.csproj")
+                .Single();
+            var content = File.ReadAllText(project);
+
+            Assert.Contains(
+                @"LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj",
+                content,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                @"LongBetterWindows.Host\LongBetterWindows.Host.csproj",
+                content,
+                StringComparison.Ordinal);
+        }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
+             directory is not null;
+             directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "LongBetterWindows.sln")))
+                return directory.FullName;
+        }
+
+        throw new DirectoryNotFoundException("Repository root was not found.");
+    }
+}

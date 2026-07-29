@@ -31,6 +31,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.PluginVal
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClipboardHistoryBackground", "src\ClipboardHistoryBackground\ClipboardHistoryBackground.csproj", "{5963EB81-3174-4980-8CFC-A4DAAA161A7B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.PluginSdk", "src\LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj", "{23462FAD-DD30-4D69-8D34-B67694622C16}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -88,6 +90,10 @@ Global
 		{5963EB81-3174-4980-8CFC-A4DAAA161A7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5963EB81-3174-4980-8CFC-A4DAAA161A7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5963EB81-3174-4980-8CFC-A4DAAA161A7B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23462FAD-DD30-4D69-8D34-B67694622C16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23462FAD-DD30-4D69-8D34-B67694622C16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23462FAD-DD30-4D69-8D34-B67694622C16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23462FAD-DD30-4D69-8D34-B67694622C16}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{2377FE67-6DE4-4E5E-B1A4-B031780E4ED1} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
@@ -100,5 +106,6 @@ Global
 		{574B4EB8-E87A-4FD8-B6A1-A2F478280858} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
 		{6F36325A-F326-4814-BBAE-F3D7C274E7B4} = {2F570B66-3D14-455D-8B3C-7270332BE3D7}
 		{5963EB81-3174-4980-8CFC-A4DAAA161A7B} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
+		{23462FAD-DD30-4D69-8D34-B67694622C16} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
 	EndGlobalSection
 EndGlobal

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>LongBetterWindows.PluginSdk</AssemblyName>
+    <RootNamespace>LongBetterWindows</RootNamespace>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <PackageId>LongBetterWindows.PluginSdk</PackageId>
+    <Title>Long Assistant .NET Plugin SDK</Title>
+    <Description>Stable contracts, lifecycle interfaces, and capability abstractions for Long Assistant native plugins.</Description>
+    <Authors>Long</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\LongBetterWindows.Host\Contracts\**\*.cs"
+             LinkBase="Contracts" />
+    <Compile Include="..\LongBetterWindows.Host\Core\**\*.cs"
+             LinkBase="Core" />
+    <Compile Include="..\LongBetterWindows.Host\Capabilities\**\*.cs"
+             LinkBase="Capabilities" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

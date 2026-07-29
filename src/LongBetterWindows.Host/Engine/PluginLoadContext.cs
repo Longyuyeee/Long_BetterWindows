@@ -1,10 +1,13 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using LongBetterWindows.Host.Core;
 
 namespace LongBetterWindows.Host.Engine
 {
     public class PluginLoadContext : AssemblyLoadContext
     {
+        private static readonly Assembly SharedPluginSdkAssembly =
+            typeof(ILongPlugin).Assembly;
         private readonly AssemblyDependencyResolver _resolver;
         private readonly string _pluginDir;
 
@@ -17,6 +20,14 @@ namespace LongBetterWindows.Host.Engine
 
         protected override Assembly? Load(AssemblyName assemblyName)
         {
+            if (string.Equals(
+                    assemblyName.Name,
+                    SharedPluginSdkAssembly.GetName().Name,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return SharedPluginSdkAssembly;
+            }
+
             var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);
             if (assemblyPath != null)
             {
