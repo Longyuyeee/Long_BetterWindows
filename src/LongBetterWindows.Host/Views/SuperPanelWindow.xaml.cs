@@ -4,6 +4,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
@@ -21,6 +22,7 @@ namespace LongBetterWindows.Host.Views
         private readonly SuperPanelSearchSession _searchSession;
         private readonly SuperPanelDragSession _dragSession = new();
         private readonly SuperPanelWindowLifecycle _windowLifecycle;
+        private readonly QualityWindowAutomation? _qualityAutomation;
 
         private SuperPanelWindow()
         {
@@ -47,6 +49,9 @@ namespace LongBetterWindows.Host.Views
             _searchSession.ResultsUpdated += SearchSession_ResultsUpdated;
             RenderActiveGroup();
             _plugins.PluginsChanged += OnPluginsChanged;
+            _qualityAutomation = QualityWindowAutomation.Attach(
+                this,
+                ExecuteQualityWindowAction);
             Closed += (_, _) =>
             {
                 _plugins.PluginsChanged -= OnPluginsChanged;
@@ -54,6 +59,7 @@ namespace LongBetterWindows.Host.Views
                 _searchSession.ResultsUpdated -= SearchSession_ResultsUpdated;
                 _searchSession.Dispose();
                 _windowLifecycle.Dispose();
+                _qualityAutomation?.Dispose();
                 _instance = null;
             };
         }
@@ -485,6 +491,28 @@ namespace LongBetterWindows.Host.Views
                     return;
             }
             e.Handled = true;
+        }
+
+        private bool ExecuteQualityWindowAction(QualityWindowAction action)
+        {
+            var selected = ResultsList.SelectedItem as SearchResultItem;
+            switch (action)
+            {
+                case QualityWindowAction.ExecutePrimary when selected is not null:
+                    _ = ExecuteAsync(selected);
+                    return true;
+                case QualityWindowAction.ExecuteSecondary
+                    when selected?.SecondaryActions.Count > 0:
+                    _ = ExecuteSecondaryActionAsync(
+                        selected,
+                        selected.SecondaryActions[0]);
+                    return true;
+                case QualityWindowAction.Dismiss:
+                    _windowLifecycle.Dismiss(restoreFocus: true);
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private async Task RemoveFromActiveGroupAsync(string resultId)

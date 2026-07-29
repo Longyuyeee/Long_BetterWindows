@@ -18,6 +18,11 @@ namespace LongBetterWindows.Host
             => Current is App { _startupOptions.OpenPaletteForQuality: true };
         internal static bool KeepSuperPanelVisibleForQuality
             => Current is App { _startupOptions.OpenSuperPanelForQuality: true };
+        internal static bool EnableWindowAutomationForQuality
+            => Current is App
+            {
+                _startupOptions.EnableWindowAutomationForQuality: true,
+            };
         internal static LpakInstaller? PackageInstaller
             => (Current as App)?._pluginRuntime?.PackageInstaller;
 

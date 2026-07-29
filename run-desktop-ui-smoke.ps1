@@ -124,7 +124,7 @@ public static class LongDesktopInput {
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
     [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr window);
-    [DllImport("user32.dll")] static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+    [DllImport("user32.dll")] static extern IntPtr SetActiveWindow(IntPtr window);
     [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
@@ -140,7 +140,6 @@ public static class LongDesktopInput {
         uint flags,
         uint timeout,
         out UIntPtr result);
-    const uint KeyUp = 0x0002;
     delegate bool EnumWindowsCallback(IntPtr window, IntPtr state);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr state);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
@@ -158,53 +157,28 @@ public static class LongDesktopInput {
     public static bool Activate(IntPtr window) {
         uint ignored;
         uint callerThread = GetCurrentThreadId();
-        uint foregroundThread = GetWindowThreadProcessId(GetForegroundWindow(), out ignored);
-        bool attached = foregroundThread != 0 && foregroundThread != callerThread &&
+        uint targetThread = GetWindowThreadProcessId(window, out ignored);
+        uint foregroundThread = GetWindowThreadProcessId(
+            GetForegroundWindow(), out ignored);
+        bool attachedToForeground = foregroundThread != 0 &&
+            foregroundThread != callerThread &&
             AttachThreadInput(callerThread, foregroundThread, true);
+        bool attachedToTarget = targetThread != 0 &&
+            targetThread != callerThread &&
+            targetThread != foregroundThread &&
+            AttachThreadInput(callerThread, targetThread, true);
         try {
             BringWindowToTop(window);
-            return SetForegroundWindow(window);
+            SetForegroundWindow(window);
+            SetActiveWindow(window);
+            return GetForegroundWindow() == window;
         }
         finally {
-            if (attached) AttachThreadInput(callerThread, foregroundThread, false);
+            if (attachedToTarget)
+                AttachThreadInput(callerThread, targetThread, false);
+            if (attachedToForeground)
+                AttachThreadInput(callerThread, foregroundThread, false);
         }
-    }
-    public static void ShiftEnter(IntPtr window) {
-        Activate(window);
-        System.Threading.Thread.Sleep(120);
-        keybd_event(0x10, 0, 0, UIntPtr.Zero);
-        keybd_event(0x0D, 0, 0, UIntPtr.Zero);
-        keybd_event(0x0D, 0, KeyUp, UIntPtr.Zero);
-        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
-    }
-    public static void Escape(IntPtr window) {
-        Activate(window);
-        System.Threading.Thread.Sleep(80);
-        keybd_event(0x1B, 0, 0, UIntPtr.Zero);
-        keybd_event(0x1B, 0, KeyUp, UIntPtr.Zero);
-    }
-    public static void Enter(IntPtr window) {
-        Activate(window);
-        System.Threading.Thread.Sleep(80);
-        keybd_event(0x0D, 0, 0, UIntPtr.Zero);
-        keybd_event(0x0D, 0, KeyUp, UIntPtr.Zero);
-    }
-    public static void Tab(IntPtr window) {
-        Activate(window);
-        keybd_event(0x09, 0, 0, UIntPtr.Zero);
-        keybd_event(0x09, 0, KeyUp, UIntPtr.Zero);
-    }
-    public static void ShiftTab(IntPtr window) {
-        Activate(window);
-        keybd_event(0x10, 0, 0, UIntPtr.Zero);
-        keybd_event(0x09, 0, 0, UIntPtr.Zero);
-        keybd_event(0x09, 0, KeyUp, UIntPtr.Zero);
-        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
-    }
-    public static void Space(IntPtr window) {
-        Activate(window);
-        keybd_event(0x20, 0, 0, UIntPtr.Zero);
-        keybd_event(0x20, 0, KeyUp, UIntPtr.Zero);
     }
     public static void Click(IntPtr window, int x, int y) {
         Activate(window);
@@ -228,45 +202,15 @@ public static class LongDesktopInput {
             if (previousContext != IntPtr.Zero) SetThreadDpiAwarenessContext(previousContext);
         }
     }
-    public static void CtrlShiftT(IntPtr window) {
-        Activate(window);
-        keybd_event(0x11, 0, 0, UIntPtr.Zero);
-        keybd_event(0x10, 0, 0, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(120);
-        keybd_event(0x54, 0, 0, UIntPtr.Zero);
-        keybd_event(0x54, 0, KeyUp, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(120);
-        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
-        keybd_event(0x11, 0, KeyUp, UIntPtr.Zero);
-    }
-    public static void CtrlShiftEnter(IntPtr window) {
-        Activate(window);
-        keybd_event(0x11, 0, 0, UIntPtr.Zero);
-        keybd_event(0x10, 0, 0, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(120);
-        keybd_event(0x0D, 0, 0, UIntPtr.Zero);
-        keybd_event(0x0D, 0, KeyUp, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(120);
-        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
-        keybd_event(0x11, 0, KeyUp, UIntPtr.Zero);
-    }
-    public static void CtrlShiftDelete(IntPtr window) {
-        Activate(window);
-        keybd_event(0x11, 0, 0, UIntPtr.Zero);
-        keybd_event(0x10, 0, 0, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(120);
-        keybd_event(0x2E, 0, 0, UIntPtr.Zero);
-        keybd_event(0x2E, 0, KeyUp, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(120);
-        keybd_event(0x10, 0, KeyUp, UIntPtr.Zero);
-        keybd_event(0x11, 0, KeyUp, UIntPtr.Zero);
-    }
-    public static void TypeSearchText(IntPtr window) {
-        SetForegroundWindow(window);
-        foreach (byte key in new byte[] { 0x57, 0x49, 0x46, 0x49 }) {
-            keybd_event(key, 0, 0, UIntPtr.Zero);
-            keybd_event(key, 0, KeyUp, UIntPtr.Zero);
-        }
+    public static int WindowAction(IntPtr window, int action) {
+        uint message = RegisterWindowMessage(
+            "LongBetterWindows.Quality.WindowAction.v1");
+        if (message == 0) return -1;
+        UIntPtr result;
+        IntPtr sent = SendMessageTimeout(
+            window, message, new IntPtr(action), IntPtr.Zero, 0x0002, 5000,
+            out result);
+        return sent == IntPtr.Zero ? -1 : unchecked((int)result.ToUInt64());
     }
     public static int WorkflowMessage(IntPtr window, int action) {
         uint message = RegisterWindowMessage("LongBetterWindows.Quality.WorkflowAction.v1");
@@ -288,8 +232,16 @@ function Write-Stage([string] $message) {
 
 function Wait-Until([scriptblock] $Probe, [string] $FailureMessage) {
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $lastProbeError = $null
     do {
-        $value = & $Probe
+        try {
+            $value = & $Probe
+            $lastProbeError = $null
+        }
+        catch {
+            $lastProbeError = $_.Exception.Message
+            $value = $null
+        }
         if ($value -is [bool]) {
             if ($value) { return $true }
         }
@@ -298,6 +250,9 @@ function Wait-Until([scriptblock] $Probe, [string] $FailureMessage) {
         }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
+    if (-not [string]::IsNullOrWhiteSpace($lastProbeError)) {
+        throw "$FailureMessage Last probe error: $lastProbeError"
+    }
     throw $FailureMessage
 }
 
@@ -423,6 +378,33 @@ function Invoke-AutomationElement(
     ([Windows.Automation.InvokePattern]$pattern).Invoke()
 }
 
+function Find-AncestorByControlType(
+    [Windows.Automation.AutomationElement] $element,
+    [Windows.Automation.ControlType] $controlType) {
+    $walker = [Windows.Automation.TreeWalker]::ControlViewWalker
+    $candidate = $element
+    for ($index = 0; $index -lt 8; $index++) {
+        if ($candidate.Current.ControlType -eq $controlType) {
+            return $candidate
+        }
+        $candidate = $walker.GetParent($candidate)
+        if ($null -eq $candidate) { return $null }
+    }
+    return $null
+}
+
+function Select-AutomationElement(
+    [Windows.Automation.AutomationElement] $element,
+    [string] $failureMessage) {
+    $pattern = $null
+    if (-not $element.TryGetCurrentPattern(
+        [Windows.Automation.SelectionItemPattern]::Pattern,
+        [ref]$pattern)) {
+        throw $failureMessage
+    }
+    ([Windows.Automation.SelectionItemPattern]$pattern).Select()
+}
+
 function Click-AutomationElement(
     [Windows.Automation.AutomationElement] $element,
     [IntPtr] $windowHandle,
@@ -497,7 +479,8 @@ function Start-QualityHost([string[]] $viewArguments) {
     $arguments = @(
         '--theme', 'dark',
         '--plugins-dir', $pluginsDirectory,
-        '--quality-workflows-dir', $workflowRoot
+        '--quality-workflows-dir', $workflowRoot,
+        '--quality-window-automation'
     )
     $arguments += $viewArguments
     $process = Start-Process -FilePath $executable -ArgumentList $arguments `
@@ -577,20 +560,26 @@ try {
     $focusConfirmed = Wait-Until { $search.Current.HasKeyboardFocus } `
         'The Command Palette search box did not receive keyboard focus.'
 
-    Write-Stage 'Executing the first secondary result action with Shift+Enter.'
-    [LongDesktopInput]::ShiftEnter([IntPtr]$palette.Current.NativeWindowHandle)
+    Write-Stage 'Executing the selected secondary command through the quality window channel.'
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$palette.Current.NativeWindowHandle, 2) -ne 1) {
+        throw 'The Command Palette rejected the selected secondary quality action.'
+    }
     $clipboardConfirmed = Wait-Until {
         (Get-Clipboard -Raw).Trim() -eq 'ms-settings:network-wifi'
-    } 'Shift+Enter did not execute the Wi-Fi secondary copy action.'
+    } 'The secondary quality action did not copy the Wi-Fi URI.'
     Start-Sleep -Milliseconds 600
     $paletteStillVisible = $null -ne (Wait-Until {
         Find-WindowByAutomationId $paletteProcess.Id 'Long.CommandPalette'
-    } 'Shift+Enter closed the Command Palette after a keep-open copy action.')
-    Write-Stage 'Closing keyboard-action Command Palette with Escape.'
-    [LongDesktopInput]::Escape([IntPtr]$palette.Current.NativeWindowHandle)
+    } 'The secondary quality action closed a keep-open Command Palette.')
+    Write-Stage 'Dismissing the action Command Palette through the quality window channel.'
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$palette.Current.NativeWindowHandle, 3) -ne 1) {
+        throw 'The Command Palette rejected the quality dismiss action.'
+    }
     Wait-Until {
         $null -eq (Find-WindowByAutomationId $paletteProcess.Id 'Long.CommandPalette')
-    } 'Escape did not hide the keyboard-action Command Palette.' | Out-Null
+    } 'The quality dismiss action did not hide the Command Palette.' | Out-Null
     Stop-QualityHost $paletteProcess
     $paletteProcess = $null
 
@@ -638,8 +627,9 @@ try {
     $menuKeptPaletteOpen = $null -ne (Wait-Until {
         Find-WindowByAutomationId $paletteMenuProcess.Id 'Long.CommandPalette'
     } 'The secondary-action menu closed the Command Palette after a keep-open copy action.')
-    Write-Stage 'Closing menu-workflow Command Palette with Escape.'
-    [LongDesktopInput]::Escape([IntPtr]$menuPalette.Current.NativeWindowHandle)
+    Write-Stage 'Dismissing the menu-workflow Command Palette.'
+    [LongDesktopInput]::WindowAction(
+        [IntPtr]$menuPalette.Current.NativeWindowHandle, 3) | Out-Null
     Wait-Until {
         $null -eq (Find-WindowByAutomationId $paletteMenuProcess.Id 'Long.CommandPalette')
     } 'Escape did not hide the menu-workflow Command Palette.' | Out-Null
@@ -656,6 +646,8 @@ try {
         secondary_menu_copied_uri = [bool]$menuCopyConfirmed
         secondary_menu_kept_palette_open = $menuKeptPaletteOpen
         escape_closed_palette = $true
+        automation_transport = 'quality_window_message'
+        physical_keyboard_validated = $false
     }
     Stop-QualityHost $paletteMenuProcess
     $paletteMenuProcess = $null
@@ -673,8 +665,9 @@ try {
         results = Get-AutomationSemantics $panelResults 'ControlType.List' 'Super Panel results semantics failed.'
     }
     $superPanel.SetFocus()
-    Write-Stage 'Closing Super Panel with Escape.'
-    [LongDesktopInput]::Escape([IntPtr]$superPanel.Current.NativeWindowHandle)
+    Write-Stage 'Dismissing Super Panel through the quality window channel.'
+    [LongDesktopInput]::WindowAction(
+        [IntPtr]$superPanel.Current.NativeWindowHandle, 3) | Out-Null
     Wait-Until {
         $null -eq (Find-WindowByAutomationId $superPanelProcess.Id 'Long.SuperPanel')
     } 'Escape did not hide the Super Panel.' | Out-Null
@@ -716,7 +709,8 @@ try {
         Find-WindowByAutomationId `
             $superPanelTransitionProcess.Id 'Long.CommandPalette'
     } 'Opening Command Center did not show the Command Palette.'
-    [LongDesktopInput]::Escape([IntPtr]$transitionPalette.Current.NativeWindowHandle)
+    [LongDesktopInput]::WindowAction(
+        [IntPtr]$transitionPalette.Current.NativeWindowHandle, 3) | Out-Null
     Wait-Until {
         $null -eq (Find-WindowByAutomationId `
             $superPanelTransitionProcess.Id 'Long.CommandPalette')
@@ -731,7 +725,10 @@ try {
 
     if (-not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting managed workflow review from Command Palette.'
-    $workflowPaletteProcess = Start-QualityHost '--quality-open-palette'
+    $workflowPaletteProcess = Start-QualityHost @(
+        '--quality-open-palette',
+        '--quality-width', '1440',
+        '--quality-height', '800')
     $workflowPalette = Wait-Until {
         Find-WindowByAutomationId $workflowPaletteProcess.Id 'Long.CommandPalette'
     } 'Command Palette did not appear for the managed workflow review.'
@@ -747,11 +744,20 @@ try {
     $paletteWorkflowResult = Wait-Until {
         Find-DescendantByName $workflowResults 'Quality Workflow Review'
     } 'The managed workflow did not appear in Command Palette search.'
+    $paletteWorkflowItem = Wait-Until {
+        Find-AncestorByControlType $paletteWorkflowResult `
+            ([Windows.Automation.ControlType]::ListItem)
+    } 'The managed workflow Command Palette item was not selectable.'
+    Select-AutomationElement $paletteWorkflowItem `
+        'The managed workflow Command Palette item did not support selection.'
     $workflowSearch.SetFocus()
     Wait-Until { $workflowSearch.Current.HasKeyboardFocus } `
         'Workflow review search did not receive keyboard focus.' | Out-Null
     Write-Stage 'Opening the managed workflow review with Enter.'
-    [LongDesktopInput]::Enter([IntPtr]$workflowPalette.Current.NativeWindowHandle)
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$workflowPalette.Current.NativeWindowHandle, 1) -ne 1) {
+        throw 'The Command Palette rejected the selected workflow action.'
+    }
     $paletteWorkflowMain = Wait-Until {
         Find-WindowByAutomationId $workflowPaletteProcess.Id 'Long.MainWindow'
     } 'The main window did not appear after opening a workflow from Command Palette.'
@@ -826,9 +832,18 @@ try {
     $panelWorkflowResult = Wait-Until {
         Find-DescendantByName $workflowPanelResults 'Quality Workflow Review'
     } 'The managed workflow did not appear in Super Panel.'
+    $panelWorkflowItem = Wait-Until {
+        Find-AncestorByControlType $panelWorkflowResult `
+            ([Windows.Automation.ControlType]::ListItem)
+    } 'The managed workflow Super Panel item was not selectable.'
+    Select-AutomationElement $panelWorkflowItem `
+        'The managed workflow Super Panel item did not support selection.'
     $workflowPanelResults.SetFocus()
     Write-Stage 'Opening the managed workflow review from Super Panel with Enter.'
-    [LongDesktopInput]::Enter([IntPtr]$workflowPanel.Current.NativeWindowHandle)
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$workflowPanel.Current.NativeWindowHandle, 1) -ne 1) {
+        throw 'Super Panel rejected the selected workflow action.'
+    }
     $panelWorkflowMain = Wait-Until {
         Find-WindowByAutomationId $workflowPanelProcess.Id 'Long.MainWindow'
     } 'The main window did not appear after opening a workflow from Super Panel.'
@@ -1107,8 +1122,8 @@ try {
         Get-AutomationSemantics $detachedBack 'ControlType.Button' `
             'Detached plugin Back semantics failed.'
     Write-Stage 'Returning from the detached plugin with Escape.'
-    [LongDesktopInput]::Activate([IntPtr]$detachedWindow.Current.NativeWindowHandle) | Out-Null
-    [LongDesktopInput]::Escape([IntPtr]$detachedWindow.Current.NativeWindowHandle)
+    [LongDesktopInput]::WindowAction(
+        [IntPtr]$detachedWindow.Current.NativeWindowHandle, 3) | Out-Null
     Wait-Until {
         $null -eq (Find-WindowByAutomationId `
             $pluginProcess.Id 'Long.Plugin.DetachedWindow')
@@ -1158,6 +1173,12 @@ try {
             'Marketplace result item semantics failed.'
     $report.automation_semantics.marketplace.result_item['item_status'] = `
         [string]$marketListItem.Current.ItemStatus
+    Select-AutomationElement $marketListItem `
+        'The Marketplace result item did not support SelectionItemPattern.'
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$marketMain.Current.NativeWindowHandle, 1) -ne 1) {
+        throw 'The Marketplace rejected the selected-detail quality action.'
+    }
     $detailName = Wait-Until {
         Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Marketplace.DetailName'
     } 'The selected Marketplace plugin detail did not appear.'
@@ -1176,6 +1197,16 @@ try {
             $marketProcess.Id 'Long.Marketplace.ResultCount'
         if ($null -ne $element -and $element.Current.Name -notmatch ' 0 ') { $element }
     } 'Clearing Marketplace search did not restore the trusted catalog.'
+    $restoredMarketItem = Wait-Until {
+        Find-DescendantByControlType `
+            $marketResults ([Windows.Automation.ControlType]::ListItem)
+    } 'The restored Marketplace catalog did not expose an installed item.'
+    Select-AutomationElement $restoredMarketItem `
+        'The restored Marketplace item did not support selection.'
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$marketMain.Current.NativeWindowHandle, 1) -ne 1) {
+        throw 'The Marketplace rejected the restored selected-detail action.'
+    }
     $uninstall = Wait-Until {
         Find-ProcessElementByAutomationId $marketProcess.Id 'Long.Marketplace.Uninstall'
     } 'The installed plugin uninstall-preview button was not discoverable.'
@@ -1260,7 +1291,8 @@ try {
         if ($mode.reduced -and $modeLog -notmatch 'ReducedMotion=true') {
             throw "Reduced motion was not active for mode $($mode.name): $modeLog"
         }
-        [LongDesktopInput]::Escape([IntPtr]$modePalette.Current.NativeWindowHandle)
+        [LongDesktopInput]::WindowAction(
+            [IntPtr]$modePalette.Current.NativeWindowHandle, 3) | Out-Null
         Wait-Until {
             $null -eq (Find-WindowByAutomationId `
                 $accessibilityProcess.Id 'Long.CommandPalette')

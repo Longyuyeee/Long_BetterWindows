@@ -269,6 +269,10 @@ namespace LongBetterWindows.Host.Views
             => MarketHost.Content is MarketplaceControl marketplace
                 && marketplace.NavigateBackInModule();
 
+        internal bool ExecuteQualityPrimaryAction()
+            => MarketHost.Content is MarketplaceControl marketplace
+                && marketplace.OpenSelectedDetailForQuality();
+
         private void FilterManagementNavigation(string query)
         {
             var normalized = query.Trim();

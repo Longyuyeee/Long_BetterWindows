@@ -6,6 +6,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
@@ -24,6 +25,7 @@ namespace LongBetterWindows.Host.Views
         private nint _originWindowHandle;
         private CancellationTokenSource? _contextCts;
         private CancellationTokenSource? _searchCts;
+        private readonly QualityWindowAutomation? _qualityAutomation;
 
         private CommandPaletteWindow()
         {
@@ -36,6 +38,9 @@ namespace LongBetterWindows.Host.Views
                 key => ServicesInitializer.I18n.T(key),
                 WorkspaceModuleNavigation.OpenAsync);
             _plugins.PluginsChanged += OnPluginsChanged;
+            _qualityAutomation = QualityWindowAutomation.Attach(
+                this,
+                ExecuteQualityWindowAction);
             Closed += (_, _) =>
             {
                 _plugins.PluginsChanged -= OnPluginsChanged;
@@ -43,6 +48,7 @@ namespace LongBetterWindows.Host.Views
                 _searchCts?.Dispose();
                 _contextCts?.Cancel();
                 _contextCts?.Dispose();
+                _qualityAutomation?.Dispose();
                 _instance = null;
             };
         }
@@ -498,6 +504,32 @@ namespace LongBetterWindows.Host.Views
             if (e.Key != Key.Escape) return;
             DismissAndRestoreOrigin();
             e.Handled = true;
+        }
+
+        private bool ExecuteQualityWindowAction(QualityWindowAction action)
+        {
+            switch (action)
+            {
+                case QualityWindowAction.ExecutePrimary:
+                    _ = ExecuteSelectedAsync();
+                    return ResultsList.SelectedItem is LauncherResultViewItem;
+                case QualityWindowAction.ExecuteSecondary
+                    when ResultsList.SelectedItem is
+                        LauncherResultViewItem
+                        {
+                            Result: var selected,
+                        }
+                        && selected.SecondaryActions.Count > 0:
+                    _ = ExecuteHostActionAsync(
+                        selected,
+                        selected.SecondaryActions[0]);
+                    return true;
+                case QualityWindowAction.Dismiss:
+                    DismissAndRestoreOrigin();
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private void DismissAndRestoreOrigin()

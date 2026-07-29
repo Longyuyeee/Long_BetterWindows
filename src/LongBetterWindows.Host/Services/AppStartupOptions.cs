@@ -17,6 +17,7 @@ namespace LongBetterWindows.Host.Services
         public string? QualityCommandFixturePath { get; private init; }
         public bool OpenPaletteForQuality { get; private init; }
         public bool OpenSuperPanelForQuality { get; private init; }
+        public bool EnableWindowAutomationForQuality { get; private init; }
         public bool OpenMarketForQuality { get; private init; }
         public bool OpenDiagnosticsForQuality { get; private init; }
         public bool OpenPluginsForQuality { get; private init; }
@@ -103,6 +104,9 @@ namespace LongBetterWindows.Host.Services
                     "--quality-command-fixture"),
                 OpenPaletteForQuality = HasSwitch(arguments, "--quality-open-palette"),
                 OpenSuperPanelForQuality = HasSwitch(arguments, "--quality-open-super-panel"),
+                EnableWindowAutomationForQuality = HasSwitch(
+                    arguments,
+                    "--quality-window-automation"),
                 OpenMarketForQuality = HasSwitch(arguments, "--quality-open-market") || captureView == "market",
                 OpenDiagnosticsForQuality = HasSwitch(arguments, "--quality-open-diagnostics") || captureView == "diagnostics",
                 OpenPluginsForQuality = HasSwitch(arguments, "--quality-open-plugins")

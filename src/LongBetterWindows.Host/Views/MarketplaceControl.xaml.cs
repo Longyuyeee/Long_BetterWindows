@@ -715,6 +715,14 @@ namespace LongBetterWindows.Host.Views
                 ShowEntry(card);
         }
 
+        internal bool OpenSelectedDetailForQuality()
+        {
+            if (MarketList.SelectedItem is not MarketCardModel selected)
+                return false;
+            ShowEntry(selected);
+            return true;
+        }
+
         private void MarketBackButton_Click(object sender, RoutedEventArgs e)
             => NavigateBackInModule();
 

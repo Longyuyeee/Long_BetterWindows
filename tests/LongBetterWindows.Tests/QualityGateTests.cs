@@ -1486,8 +1486,13 @@ public class QualityGateTests
         Assert.Contains("Long.Workspace.PluginRuntime.Detach", workspace);
         Assert.Contains("Long.Plugin.DetachedWindow", plugin);
         Assert.Contains("[LongDesktopInput]::TopLevelWindows", script);
+        Assert.Contains("[LongDesktopInput]::WindowAction", script);
+        Assert.Contains("--quality-window-automation", script);
+        Assert.DoesNotContain("keybd_event", script);
         Assert.Contains("$valuePattern.SetValue('wifi')", script);
-        Assert.Contains("[LongDesktopInput]::ShiftEnter", script);
+        Assert.Contains("automation_transport = 'quality_window_message'", script);
+        Assert.Contains("physical_keyboard_validated = $false", script);
+        Assert.Contains("$lastProbeError = $_.Exception.Message", script);
         Assert.Contains("shift_enter_copied_uri", script);
         Assert.Contains("secondary_menu_copied_uri", script);
         Assert.Contains("palette_shown_on_transition", script);
@@ -1511,9 +1516,9 @@ public class QualityGateTests
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", workflow);
         Assert.Contains("isolated_report_written", script);
         Assert.Contains("[switch] $WorkflowOutputOnly", script);
-        Assert.Contains("CtrlShiftT", script);
-        Assert.Contains("CtrlShiftEnter", script);
-        Assert.Contains("CtrlShiftDelete", script);
+        Assert.Contains(
+            "LongBetterWindows.Quality.WindowAction.v1",
+            script);
         Assert.Contains("Long.Workflow.TerminalOutput.ApproveTopLevel", main);
         Assert.Contains("Long.Workflow.ReviewConfirmTopLevel", main);
         Assert.Contains("Long.Workflow.TerminalOutput.ClearTopLevel", main);

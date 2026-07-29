@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Input;
+using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Contracts;
 using Serilog;
 
@@ -10,6 +11,7 @@ namespace LongBetterWindows.Host.Views
     {
         private Window? _returnTarget;
         private readonly Func<Task>? _endRequested;
+        private readonly QualityWindowAutomation? _qualityAutomation;
 
         public PluginWindowHost(
             string pluginId,
@@ -41,6 +43,10 @@ namespace LongBetterWindows.Host.Views
                         "Could not apply detached taskbar identity for plugin {PluginId}",
                         pluginId);
             };
+            _qualityAutomation = QualityWindowAutomation.Attach(
+                this,
+                ExecuteQualityWindowAction);
+            Closed += (_, _) => _qualityAutomation?.Dispose();
             ApplyWindowPreference(preference);
         }
 
@@ -113,6 +119,14 @@ namespace LongBetterWindows.Host.Views
             if (e.Key != Key.Escape) return;
             ReturnToOwner();
             e.Handled = true;
+        }
+
+        private bool ExecuteQualityWindowAction(QualityWindowAction action)
+        {
+            if (action != QualityWindowAction.Dismiss)
+                return false;
+            ReturnToOwner();
+            return true;
         }
 
         private void ReturnToOwner()

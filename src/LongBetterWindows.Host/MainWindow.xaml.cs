@@ -27,6 +27,7 @@ namespace LongBetterWindows.Host
         private int _qualityWorkflowDuplicateStatus;
         private bool _workflowExecutionRejected;
         private readonly WorkspaceFocusBookmarkStore _workspaceFocusBookmarks = new();
+        private readonly QualityWindowAutomation? _qualityWindowAutomation;
         private readonly Dictionary<WorkspaceModuleKey, PluginRuntimePresentation>
             _pluginRuntimePresentations = [];
         private ToolCenterControl ToolCenter => WorkspaceShell.ToolCenter;
@@ -45,6 +46,9 @@ namespace LongBetterWindows.Host
         {
             App.MarkStartupStage("main_window_constructor_begin");
             InitializeComponent();
+            _qualityWindowAutomation = QualityWindowAutomation.Attach(
+                this,
+                ExecuteQualityWindowAction);
             EventHandler? firstLayout = null;
             firstLayout = (_, _) =>
             {
@@ -89,6 +93,7 @@ namespace LongBetterWindows.Host
                 ServicesInitializer.I18n.LanguageChanged -= I18n_LanguageChanged;
                 HostProvider.Instance.PluginStore.PluginsChanged -=
                     PluginStore_PluginsChanged;
+                _qualityWindowAutomation?.Dispose();
             };
             ToolCenter.PageNavigationRequested +=
                 ToolCenter_PageNavigationRequested;
@@ -939,6 +944,10 @@ namespace LongBetterWindows.Host
                     break;
             }
         }
+
+        private bool ExecuteQualityWindowAction(QualityWindowAction action)
+            => action == QualityWindowAction.ExecutePrimary
+                && ToolCenter.ExecuteQualityPrimaryAction();
 
         private static void RestoreLauncherIfPending(string workspaceTarget)
         {
