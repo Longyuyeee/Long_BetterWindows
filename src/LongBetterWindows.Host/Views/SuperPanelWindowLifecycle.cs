@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
+using LongBetterWindows.PluginSdk.Wpf;
 
 namespace LongBetterWindows.Host.Views
 {

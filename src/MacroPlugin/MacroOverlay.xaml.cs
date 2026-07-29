@@ -31,7 +31,7 @@ public partial class MacroOverlay : Window
 
     public static MacroOverlay ShowOverlay(MacroOverlayLocalization localization)
     {
-        var area = LongBetterWindows.Host.Services.MonitorHelper.GetCursorWorkArea();
+        var area = LongBetterWindows.PluginSdk.Wpf.MonitorHelper.GetCursorWorkArea();
         var window = new MacroOverlay
         {
             Left = area.Right - 120,

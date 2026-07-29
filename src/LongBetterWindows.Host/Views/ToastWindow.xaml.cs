@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using LongBetterWindows.PluginSdk.Wpf;
 
 namespace LongBetterWindows.Host.Views
 {
@@ -24,7 +25,7 @@ namespace LongBetterWindows.Host.Views
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                var workArea = Services.MonitorHelper.GetCursorWorkArea();
+                var workArea = MonitorHelper.GetCursorWorkArea();
 
                 var window = new ToastWindow
                 {

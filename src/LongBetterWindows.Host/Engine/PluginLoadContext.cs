@@ -1,13 +1,17 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using LongBetterWindows.Host.Core;
+using LongBetterWindows.PluginSdk.Wpf;
 
 namespace LongBetterWindows.Host.Engine
 {
     public class PluginLoadContext : AssemblyLoadContext
     {
-        private static readonly Assembly SharedPluginSdkAssembly =
-            typeof(ILongPlugin).Assembly;
+        private static readonly Assembly[] SharedSdkAssemblies =
+        [
+            typeof(ILongPlugin).Assembly,
+            typeof(HotkeySettingsControl).Assembly,
+        ];
         private readonly AssemblyDependencyResolver _resolver;
         private readonly string _pluginDir;
 
@@ -20,12 +24,14 @@ namespace LongBetterWindows.Host.Engine
 
         protected override Assembly? Load(AssemblyName assemblyName)
         {
-            if (string.Equals(
+            var sharedAssembly = SharedSdkAssemblies.FirstOrDefault(candidate =>
+                string.Equals(
                     assemblyName.Name,
-                    SharedPluginSdkAssembly.GetName().Name,
-                    StringComparison.OrdinalIgnoreCase))
+                    candidate.GetName().Name,
+                    StringComparison.OrdinalIgnoreCase));
+            if (sharedAssembly is not null)
             {
-                return SharedPluginSdkAssembly;
+                return sharedAssembly;
             }
 
             var assemblyPath = _resolver.ResolveAssemblyToPath(assemblyName);

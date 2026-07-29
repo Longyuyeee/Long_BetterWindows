@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>LongBetterWindows.PluginSdk.Wpf</AssemblyName>
+    <RootNamespace>LongBetterWindows.PluginSdk.Wpf</RootNamespace>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <PackageId>LongBetterWindows.PluginSdk.Wpf</PackageId>
+    <Title>Long Assistant .NET Plugin WPF UI Kit</Title>
+    <Description>Theme-aware WPF controls and multi-monitor helpers for Long Assistant native plugins.</Description>
+    <Authors>Long</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

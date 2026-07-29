@@ -3,8 +3,7 @@ using System.Windows.Controls;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
-using LongBetterWindows.Host.Services;
-using LongBetterWindows.Host.Views;
+using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
 namespace ScreenshotPlugin;
@@ -18,6 +17,7 @@ public class ScreenshotPluginImpl :
 {
     private IHostApi _host = null!;
     private IPluginSettingsService _pluginSettings = null!;
+    private INotificationService _notification = null!;
     private readonly List<string> _registeredHotkeys = new();
     private readonly List<WeakReference<HotkeySettingsControl>> _fullSettings = [];
     private readonly List<WeakReference<HotkeySettingsControl>> _regionSettings = [];
@@ -39,6 +39,7 @@ public class ScreenshotPluginImpl :
     {
         _host = host;
         _pluginSettings = host.Settings;
+        _notification = host.Notification;
         var full = await _pluginSettings.GetAsync("full_hotkey");
         if (full.IsSuccess && !string.IsNullOrWhiteSpace(full.Data))
             _configuredFullHotkey = full.Data;
@@ -181,9 +182,8 @@ public class ScreenshotPluginImpl :
         }
     }
 
-    private static void ShowToast(string message)
-        => Application.Current.Dispatcher.Invoke(
-            () => FloatingHudWindow.ShowToast(message));
+    private void ShowToast(string message)
+        => _ = _notification.ShowAsync(Name, message);
 
     private void CaptureRegion()
     {
@@ -214,7 +214,7 @@ public class ScreenshotPluginImpl :
                             bounds.Width,
                             bounds.Height),
                         operationToken);
-                    FloatingHudWindow.ShowToast(string.Format(
+                    ShowToast(string.Format(
                         Text(
                             "toast.regionCopied",
                             "区域截图已复制 · {0} × {1}"),
@@ -230,7 +230,7 @@ public class ScreenshotPluginImpl :
                 catch (Exception ex)
                 {
                     Log.Error(ex, "[Screenshot] 区域截图写入剪贴板失败");
-                    FloatingHudWindow.ShowToast(Text(
+                    ShowToast(Text(
                         "toast.clipboardFailed",
                         "截图完成，但写入剪贴板失败"));
                 }
@@ -238,7 +238,7 @@ public class ScreenshotPluginImpl :
             selector.CaptureFailed += ex =>
             {
                 Log.Error(ex, "[Screenshot] 区域截图失败");
-                FloatingHudWindow.ShowToast(Text(
+                ShowToast(Text(
                     "toast.captureFailed",
                     "截图失败，请稍后重试"));
             };
@@ -284,6 +284,7 @@ public class ScreenshotPluginImpl :
     {
         var panel = new StackPanel();
         var full = new HotkeySettingsControl(
+            _host.HotKey,
             Text("settings.fullTitle", "全屏截图"),
             Id,
             _registeredFullHotkey
@@ -303,6 +304,7 @@ public class ScreenshotPluginImpl :
             CreateSettingsLocalization(),
             CaptureFullScreen);
         var region = new HotkeySettingsControl(
+            _host.HotKey,
             Text("settings.regionTitle", "区域截图"),
             Id,
             _registeredRegionHotkey

@@ -4,34 +4,26 @@
   "sdk_version": "1.0.0",
   "sdk_only_projects": [
     "ClipboardHistoryBackground",
-    "SamplePlugin"
+    "MacroPlugin",
+    "SamplePlugin",
+    "ScreenshotPlugin",
+    "WindowManagerPlugin"
   ],
   "host_coupled_projects": [
     {
       "project": "ColorPickerPlugin",
       "dependencies": [
-        "AsyncDeliveryBoundary",
         "FloatingHudWindow",
-        "HotkeySettingsControl",
         "ScreenColorSampler"
       ],
-      "target_boundary": "capture-and-wpf-ui-kit"
+      "target_boundary": "screen-color-sampling"
     },
     {
       "project": "FolderNotePlugin",
       "dependencies": [
-        "FloatingHudWindow",
-        "HotkeySettingsControl"
+        "FloatingHudWindow"
       ],
-      "target_boundary": "wpf-ui-kit"
-    },
-    {
-      "project": "MacroPlugin",
-      "dependencies": [
-        "FloatingHudWindow",
-        "HotkeySettingsControl"
-      ],
-      "target_boundary": "wpf-ui-kit"
+      "target_boundary": "anchored-editor-surface"
     },
     {
       "project": "QuickLaunchPlugin",
@@ -40,23 +32,6 @@
         "SearchModels"
       ],
       "target_boundary": "search-contracts"
-    },
-    {
-      "project": "ScreenshotPlugin",
-      "dependencies": [
-        "AsyncDeliveryBoundary",
-        "FloatingHudWindow",
-        "HotkeySettingsControl"
-      ],
-      "target_boundary": "capture-and-wpf-ui-kit"
-    },
-    {
-      "project": "WindowManagerPlugin",
-      "dependencies": [
-        "FloatingHudWindow",
-        "HotkeySettingsControl"
-      ],
-      "target_boundary": "wpf-ui-kit"
     }
   ]
 }

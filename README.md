@@ -212,6 +212,7 @@ dotnet run --project src/LongBetterWindows.Host
 - [Plugin Manifest JSON Schema](schemas/plugin-manifest.schema.json)
 - [Web Plugin SDK v1.0.0](sdk/web/README.md)
 - [.NET Plugin SDK v1.0.0](src/LongBetterWindows.PluginSdk/README.md)
+- [.NET Plugin WPF UI Kit v1.0.0](src/LongBetterWindows.PluginSdk.Wpf/README.md)
 - [.NET Plugin SDK Testing v1.0.0](sdk/dotnet/LongBetterWindows.PluginSdk.Testing/README.md)
 - [Plugin CI templates](sdk/ci/README.md)
 - [宿主能力 API 手册](docs/基础能力_API_手册.md)

@@ -7,6 +7,7 @@ using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Views;
+using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
 namespace FolderNotePlugin;
@@ -251,6 +252,7 @@ public class FolderNotePluginImpl :
     public FrameworkElement CreateSettingsUI()
     {
         var control = new HotkeySettingsControl(
+            _hotKey,
             Name,
             Id,
             _registeredHotkey ?? Text("settings.commandCenter", "命令中心"),

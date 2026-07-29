@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
 
-namespace LongBetterWindows.Host.Services
+namespace LongBetterWindows.PluginSdk.Wpf
 {
     /// <summary>
     /// 多显示器辅助——获取鼠标/窗口所在屏幕的工作区域。

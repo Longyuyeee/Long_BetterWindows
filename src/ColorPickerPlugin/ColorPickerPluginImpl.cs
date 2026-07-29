@@ -4,6 +4,7 @@ using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
+using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
 namespace ColorPickerPlugin;
@@ -143,6 +144,7 @@ public class ColorPickerPluginImpl :
     public FrameworkElement CreateSettingsUI()
     {
         var control = new HotkeySettingsControl(
+            _host!.HotKey,
             Name,
             Id,
             _registeredHotkey

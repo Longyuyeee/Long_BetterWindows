@@ -1,4 +1,4 @@
-namespace LongBetterWindows.Host.Services;
+namespace LongBetterWindows.Host.Core;
 
 /// <summary>
 /// Prevents an asynchronously produced payload from being delivered after its

@@ -11,6 +11,7 @@ using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Views;
+using LongBetterWindows.PluginSdk.Wpf;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using Serilog;

@@ -525,9 +525,8 @@ public sealed class BuiltInPluginLocalizationTests
         var source = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "src",
-            "LongBetterWindows.Host",
-            "Views",
-            "HotkeySettingsControl.xaml.cs"));
+            "LongBetterWindows.PluginSdk.Wpf",
+            "HotkeySettingsControl.cs"));
 
         Assert.Contains("HotkeySettingsLocalization", source);
         Assert.Contains("ApplyLocalization(", source);

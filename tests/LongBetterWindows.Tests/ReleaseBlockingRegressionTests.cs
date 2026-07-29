@@ -295,9 +295,8 @@ public sealed class ReleaseBlockingRegressionTests
         var hotkeyControl = File.ReadAllText(Path.Combine(
             root,
             "src",
-            "LongBetterWindows.Host",
-            "Views",
-            "HotkeySettingsControl.xaml.cs"));
+            "LongBetterWindows.PluginSdk.Wpf",
+            "HotkeySettingsControl.cs"));
 
         Assert.All(pluginSources, source =>
         {

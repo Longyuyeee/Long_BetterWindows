@@ -4,6 +4,7 @@ using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media;
 using LongBetterWindows.Host.Services;
+using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
 namespace ColorPickerPlugin;

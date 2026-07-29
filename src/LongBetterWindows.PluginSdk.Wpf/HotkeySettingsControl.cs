@@ -2,9 +2,8 @@ using System.Windows;
 using System.Windows.Controls;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
-using LongBetterWindows.Host.Services;
 
-namespace LongBetterWindows.Host.Views
+namespace LongBetterWindows.PluginSdk.Wpf
 {
     public sealed record HotkeySettingsLocalization(
         string CurrentHotkeyLabel,
@@ -46,6 +45,7 @@ namespace LongBetterWindows.Host.Views
         private string? _statusDetail;
 
         public HotkeySettingsControl(
+            IHotKeyService hotKey,
             string pluginName,
             string pluginId,
             string currentHotkey,
@@ -53,11 +53,11 @@ namespace LongBetterWindows.Host.Views
             HotkeySettingsLocalization? localization = null,
             Action? hotkeyCallback = null)
         {
+            _hotKey = hotKey ?? throw new ArgumentNullException(nameof(hotKey));
             _pluginId = pluginId;
             _currentHotkey = currentHotkey;
             _onHotkeyChanged = onHotkeyChanged;
             _hotkeyCallback = hotkeyCallback ?? (() => { });
-            _hotKey = ServicesInitializer.HotKey;
             _localization = localization ?? HotkeySettingsLocalization.Chinese;
             SetResourceReference(
                 ForegroundProperty,

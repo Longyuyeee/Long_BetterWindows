@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using LongBetterWindows.PluginSdk.Wpf;
 
 namespace QuickLaunchPlugin;
 
@@ -59,7 +60,7 @@ public partial class LaunchWindow : Window
         LaunchWindowLocalization localization,
         string? initialQuery = null)
     {
-        var area = LongBetterWindows.Host.Services.MonitorHelper.GetCursorWorkArea();
+        var area = MonitorHelper.GetCursorWorkArea();
         var window = new LaunchWindow(localization)
         {
             _onSelect = onSelect,

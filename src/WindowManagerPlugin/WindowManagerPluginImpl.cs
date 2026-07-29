@@ -2,7 +2,7 @@ using System.Windows;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
-using LongBetterWindows.Host.Views;
+using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
 namespace WindowManagerPlugin;
@@ -16,6 +16,7 @@ public class WindowManagerPluginImpl :
 {
     private IHostApi _host = null!;
     private IPluginSettingsService _pluginSettings = null!;
+    private INotificationService _notification = null!;
     private readonly List<string> _registeredHotkeys = new();
     private readonly List<WeakReference<HotkeySettingsControl>> _settings = [];
     private WindowManagerGuide? _guide;
@@ -33,6 +34,7 @@ public class WindowManagerPluginImpl :
     {
         _host = host;
         _pluginSettings = host.Settings;
+        _notification = host.Notification;
         var configured = await _pluginSettings.GetAsync("topmost_hotkey");
         if (configured.IsSuccess && !string.IsNullOrWhiteSpace(configured.Data))
             _configuredTopmostHotkey = configured.Data;
@@ -136,6 +138,7 @@ public class WindowManagerPluginImpl :
     public FrameworkElement CreateSettingsUI()
     {
         var control = new HotkeySettingsControl(
+            _host.HotKey,
             Text("settings.topmostTitle", "窗口置顶"),
             Id,
             _registeredTopmostHotkey
@@ -206,11 +209,11 @@ public class WindowManagerPluginImpl :
         var result = _host.WindowInfo.ToggleForegroundTopmost();
         if (!result.IsSuccess)
         {
-            FloatingHudWindow.ShowToast(FormatOperationFailure(result));
+            _ = _notification.ShowAsync(Name, FormatOperationFailure(result));
             return;
         }
 
-        FloatingHudWindow.ShowToast(result.Data?.After?.IsTopmost == true
+        _ = _notification.ShowAsync(Name, result.Data?.After?.IsTopmost == true
             ? Text("toast.topmostEnabled", "窗口已置顶")
             : Text("toast.topmostDisabled", "已取消窗口置顶"));
     }
@@ -218,7 +221,7 @@ public class WindowManagerPluginImpl :
     private void ApplyLayout(WindowLayout layout, string localizationKey)
     {
         var result = _host.WindowInfo.ApplyForegroundLayout(layout);
-        FloatingHudWindow.ShowToast(result.IsSuccess
+        _ = _notification.ShowAsync(Name, result.IsSuccess
             ? LayoutName(localizationKey)
             : FormatOperationFailure(result));
     }

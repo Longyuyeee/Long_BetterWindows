@@ -1,4 +1,4 @@
-using LongBetterWindows.Host.Services;
+using LongBetterWindows.Host.Core;
 
 namespace LongBetterWindows.Tests;
 

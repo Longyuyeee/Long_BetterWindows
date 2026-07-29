@@ -16,9 +16,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sdk\dotnet\LongBetterWindows.PluginSdk.Testing\LongBetterWindows.PluginSdk.Testing.csproj" />
     <ProjectReference Include="..\..\src\LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj" />
+    <ProjectReference Include="..\..\src\LongBetterWindows.PluginSdk.Wpf\LongBetterWindows.PluginSdk.Wpf.csproj" />
     <ProjectReference Include="..\..\src\ClipboardHistoryBackground\ClipboardHistoryBackground.csproj" />
     <ProjectReference Include="..\..\src\LongBetterWindows.Host\LongBetterWindows.Host.csproj" />
     <ProjectReference Include="..\..\src\MacroPlugin\MacroPlugin.csproj" />
+    <ProjectReference Include="..\..\src\ScreenshotPlugin\ScreenshotPlugin.csproj" />
     <ProjectReference Include="..\..\src\QuickLaunchPlugin\QuickLaunchPlugin.csproj" />
     <ProjectReference Include="..\..\src\WindowManagerPlugin\WindowManagerPlugin.csproj" />
     <ProjectReference Include="..\..\tools\LongBetterWindows.MarketplacePublisher\LongBetterWindows.MarketplacePublisher.csproj" />

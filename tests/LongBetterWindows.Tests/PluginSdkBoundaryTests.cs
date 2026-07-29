@@ -6,6 +6,10 @@ using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
+using LongBetterWindows.PluginSdk.Wpf;
+using MacroPlugin;
+using ScreenshotPlugin;
+using WindowManagerPlugin;
 
 namespace LongBetterWindows.Tests;
 
@@ -36,6 +40,48 @@ public sealed class PluginSdkBoundaryTests
         Assert.Contains(
             hostReferences,
             reference => reference.Name == "LongBetterWindows.PluginSdk");
+    }
+
+    [Fact]
+    public void WpfUiKit_DependsOnSdkButNotHost()
+    {
+        var assembly = typeof(HotkeySettingsControl).Assembly;
+        var references = assembly.GetReferencedAssemblies();
+
+        Assert.Equal("LongBetterWindows.PluginSdk.Wpf", assembly.GetName().Name);
+        Assert.Contains(
+            references,
+            reference => reference.Name == "LongBetterWindows.PluginSdk");
+        Assert.DoesNotContain(
+            references,
+            reference => reference.Name == "LongBetterWindows.Host");
+    }
+
+    [Fact]
+    public void AsyncDeliveryBoundary_IsOwnedByStableSdk()
+    {
+        Assert.Same(typeof(ILongPlugin).Assembly, typeof(AsyncDeliveryBoundary).Assembly);
+    }
+
+    [Fact]
+    public void MigratedInteractivePlugins_DoNotReferenceHostAssembly()
+    {
+        var assemblies = new[]
+        {
+            typeof(MacroPluginImpl).Assembly,
+            typeof(ScreenshotPluginImpl).Assembly,
+            typeof(WindowManagerPluginImpl).Assembly,
+        };
+
+        Assert.All(assemblies, assembly =>
+        {
+            Assert.Contains(
+                assembly.GetReferencedAssemblies(),
+                reference => reference.Name == "LongBetterWindows.PluginSdk");
+            Assert.DoesNotContain(
+                assembly.GetReferencedAssemblies(),
+                reference => reference.Name == "LongBetterWindows.Host");
+        });
     }
 
     [Fact]
@@ -91,6 +137,52 @@ public sealed class PluginSdkBoundaryTests
             catch (IOException)
             {
                 // See above. The operating-system temp directory owns final cleanup.
+            }
+        }
+    }
+
+    [Fact]
+    public async Task NativeLoader_ReusesHostWpfUiKitWithoutPluginPrivateCopy()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"long-wpf-sdk-boundary-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var pluginAssembly = typeof(MacroPluginImpl).Assembly;
+            var pluginPath = Path.Combine(
+                directory,
+                Path.GetFileName(pluginAssembly.Location));
+            File.Copy(pluginAssembly.Location, pluginPath);
+
+            var loader = new PluginLoader();
+            var result = await loader.LoadAsync(
+                directory,
+                new PluginManifest
+                {
+                    Id = "com.long.macro",
+                    Name = "Macro",
+                    Version = "1.1.2",
+                    EntryPoint = Path.GetFileName(pluginPath),
+                });
+
+            Assert.True(result.IsSuccess, result.Error);
+            Assert.IsAssignableFrom<ILongPlugin>(result.Instance);
+            loader.Unload(result.Context!);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+            catch (IOException)
+            {
             }
         }
     }

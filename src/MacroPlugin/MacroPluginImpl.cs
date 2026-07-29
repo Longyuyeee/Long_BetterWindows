@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
-using LongBetterWindows.Host.Views;
+using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
 namespace MacroPlugin;
@@ -17,6 +17,7 @@ public class MacroPluginImpl :
 {
     private IHostApi? _host;
     private IPluginSettingsService _pluginSettings = null!;
+    private INotificationService _notification = null!;
     private MacroEngine? _engine;
     private MacroOverlay? _overlay;
     private readonly List<string> _registeredHotkeys = new();
@@ -41,6 +42,7 @@ public class MacroPluginImpl :
     {
         _host = host;
         _pluginSettings = host.Settings;
+        _notification = host.Notification;
 
         if (!host.HasCapability("system.hotkey"))
         {
@@ -403,6 +405,7 @@ public class MacroPluginImpl :
         Action<string> commit)
     {
         var control = new HotkeySettingsControl(
+            _host!.HotKey,
             Text(labelKey, fallback),
             Id,
             registeredHotkey
@@ -546,7 +549,7 @@ public class MacroPluginImpl :
         application.Dispatcher.BeginInvoke(() =>
         {
             _overlay?.SetIdle();
-            FloatingHudWindow.ShowToast(string.Format(
+            _ = _notification.ShowAsync(Name, string.Format(
                 Text("error.playFailed", "宏播放失败：{0}"),
                 message));
         });
