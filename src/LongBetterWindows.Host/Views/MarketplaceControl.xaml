@@ -303,7 +303,8 @@
                         <Grid Grid.Row="5" Margin="0,18,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <TextBlock x:Name="DetailHint" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"
-                                       FontSize="10" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                       FontSize="10" Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                       AutomationProperties.LiveSetting="Polite" />
                             <Button x:Name="UninstallButton" Grid.Column="1" Content="{DynamicResource i18n.action.uninstall}" Margin="0,0,8,0"
                                     AutomationProperties.AutomationId="Long.Marketplace.Uninstall"
                                     AutomationProperties.Name="{DynamicResource i18n.market.uninstallSelected}"
@@ -320,14 +321,16 @@
 
         <Grid x:Name="ConfirmOverlay" Grid.RowSpan="3" Visibility="Collapsed"
               Background="{DynamicResource OverlayDarkBrush}">
-            <Border Width="520" MaxHeight="590" VerticalAlignment="Center" HorizontalAlignment="Center"
+            <Border x:Name="ConfirmCard" MaxWidth="520" MaxHeight="590" Margin="16"
+                    VerticalAlignment="Center" HorizontalAlignment="Stretch"
                     Style="{StaticResource LongCard}" Padding="26" Effect="{DynamicResource Long.Shadow.Level3}"
                     KeyboardNavigation.TabNavigation="Cycle">
                 <StackPanel>
                     <Grid>
                         <TextBlock x:Name="ConfirmTitle" Text="{DynamicResource i18n.market.confirm.installTitle}" FontSize="20" FontWeight="SemiBold"
                                    AutomationProperties.AutomationId="Long.Marketplace.ConfirmTitle" />
-                        <Button HorizontalAlignment="Right" Style="{StaticResource LongIconButton}"
+                        <Button x:Name="ConfirmCloseButton"
+                                HorizontalAlignment="Right" Style="{StaticResource LongIconButton}"
                                 AutomationProperties.AutomationId="Long.Marketplace.ConfirmClose"
                                 AutomationProperties.Name="{DynamicResource i18n.market.confirm.close}"
                                 Click="CancelConfirmation_Click">
@@ -367,6 +370,11 @@
                                AutomationProperties.AutomationId="Long.Marketplace.ConfirmError"
                                AutomationProperties.LiveSetting="Assertive"
                                Foreground="{DynamicResource Long.Brush.State.Danger}" />
+                    <TextBlock x:Name="ConfirmOperationStatusText" Margin="0,12,0,0"
+                               TextWrapping="Wrap"
+                               AutomationProperties.AutomationId="Long.Marketplace.OperationStatus"
+                               AutomationProperties.LiveSetting="Polite"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                     <Grid Margin="0,22,0,0">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <ProgressBar x:Name="InstallProgress" Width="120" Height="4" Visibility="Collapsed" IsIndeterminate="True"

@@ -78,6 +78,19 @@ namespace LongBetterWindows.Host.Services
                     () => { },
                     DispatcherPriority.Render);
             }
+            if (options.ShowMarketUpdateReviewForQuality
+                && target is MainWindow marketplaceUpdateWindow)
+            {
+                if (!marketplaceUpdateWindow.ShowMarketplaceUpdateReviewForQuality())
+                {
+                    throw new InvalidOperationException(
+                        "Marketplace update review could not open.");
+                }
+                target.UpdateLayout();
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.Render);
+            }
 
             var logicalWidth = Math.Max(1, target.ActualWidth);
             var logicalHeight = Math.Max(1, target.ActualHeight);

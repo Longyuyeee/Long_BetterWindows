@@ -24,6 +24,8 @@ namespace LongBetterWindows.Host.Views
         private string _workspaceQuery = string.Empty;
         private readonly MarketplaceModuleRouter _moduleRouter = new();
         private IInputElement? _confirmationFocusOrigin;
+        private MarketplaceOperationPresentation? _pendingOperationPresentation;
+        private string? _operationStatus;
         private MarketplaceEntry? _selectedEntry;
         private MarketplacePackageVersion? _selectedVersion;
         private IReadOnlyList<MarketplacePackageVersion> _displayedVersions =
@@ -118,6 +120,8 @@ namespace LongBetterWindows.Host.Views
                 CompactImportLocalPackageButton.Visibility = Visibility.Visible;
                 CatalogStatePanel.VerticalAlignment = VerticalAlignment.Top;
                 CatalogStatePanel.Margin = new Thickness(20, 56, 20, 20);
+                ConfirmCard.Padding = new Thickness(20);
+                ConfirmCard.VerticalAlignment = VerticalAlignment.Top;
                 MarketHeroTextColumn.Width = new GridLength(1, GridUnitType.Star);
                 MarketHeroActionColumn.Width = new GridLength(0);
                 Grid.SetRow(ImportLocalPackageButton, 1);
@@ -157,6 +161,8 @@ namespace LongBetterWindows.Host.Views
                 CompactImportLocalPackageButton.Visibility = Visibility.Collapsed;
                 CatalogStatePanel.VerticalAlignment = VerticalAlignment.Center;
                 CatalogStatePanel.Margin = new Thickness(20);
+                ConfirmCard.Padding = new Thickness(26);
+                ConfirmCard.VerticalAlignment = VerticalAlignment.Center;
                 MarketHeroTextColumn.Width = new GridLength(1, GridUnitType.Star);
                 MarketHeroActionColumn.Width = GridLength.Auto;
                 Grid.SetRow(ImportLocalPackageButton, 0);
@@ -309,6 +315,13 @@ namespace LongBetterWindows.Host.Views
 
         private void ShowEntry(MarketCardModel card)
         {
+            if (!string.Equals(
+                    _selectedEntry?.Id,
+                    card.Entry.Id,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _operationStatus = null;
+            }
             _selectedEntry = card.Entry;
             _moduleRouter.OpenDetail(card.Entry.Id);
             MarketEmptyDetail.Visibility = Visibility.Collapsed;
@@ -371,18 +384,25 @@ namespace LongBetterWindows.Host.Views
                 ? I18n("market.compat.default")
                 : string.Join(" · ", compatibility.Requirements);
             InstallButton.IsEnabled = compatibility.IsCompatible;
+            var operation = MarketplaceOperationPresenter.ForInstall(
+                HostProvider.Instance.PluginStore.Get(_selectedEntry?.Id ?? string.Empty)
+                    ?.Manifest.Version,
+                version.Version);
             InstallButton.Content = version.PackageUri?.Scheme == Uri.UriSchemeHttps
-                ? I18n("market.action.downloadReview")
+                ? I18n(operation.RemoteActionResourceKey)
                 : version.PackageUri?.IsFile == true
-                    ? I18n("market.action.reviewInstall")
+                    ? I18n(operation.LocalActionResourceKey)
                     : I18n("market.choosePackage");
-            DetailHint.Text = version.PackageUri == null
-                ? I18n("market.hint.chooseLocal")
-                : version.PackageUri.IsFile
-                    ? I18n("market.hint.verifyBeforeInstall")
-                    : !_marketplace.CanDownload
-                        ? I18n("market.hint.downloadUnavailable")
-                        : I18n("market.hint.secureDownload");
+            if (_operationStatus == null)
+            {
+                DetailHint.Text = version.PackageUri == null
+                    ? I18n("market.hint.chooseLocal")
+                    : version.PackageUri.IsFile
+                        ? I18n("market.hint.verifyBeforeInstall")
+                        : !_marketplace.CanDownload
+                            ? I18n("market.hint.downloadUnavailable")
+                            : I18n("market.hint.secureDownload");
+            }
         }
 
         private async Task PreviewPackageAsync(
@@ -398,7 +418,11 @@ namespace LongBetterWindows.Host.Views
             RememberConfirmationFocus();
             var validation = pending.Validation!;
             var manifest = validation.Manifest!;
-            ConfirmTitle.Text = I18n("market.confirm.installTitle");
+            _pendingOperationPresentation = MarketplaceOperationPresenter.ForInstall(
+                HostProvider.Instance.PluginStore.Get(manifest.Id)?.Manifest.Version,
+                manifest.Version);
+            ConfirmTitle.Text = I18n(
+                _pendingOperationPresentation.ReviewTitleResourceKey);
             ConfirmSubtitle.Text = $"{manifest.Name} · v{manifest.Version}";
             ConfirmTrustText.Text = validation.TrustLevel == PackageTrustLevel.PublisherSigned
                 ? I18n("market.confirm.publisherVerified")
@@ -413,7 +437,9 @@ namespace LongBetterWindows.Host.Views
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             ConfirmErrorText.Text = string.Empty;
-            ConfirmActionButton.Content = I18n("market.confirm.installAction");
+            ConfirmOperationStatusText.Text = string.Empty;
+            ConfirmActionButton.Content = I18n(
+                _pendingOperationPresentation.ConfirmActionResourceKey);
             ConfirmActionButton.IsEnabled = true;
             ConfirmActionButton.SetResourceReference(StyleProperty, "LongButton.Primary");
             ConfirmOverlay.Visibility = Visibility.Visible;
@@ -423,6 +449,7 @@ namespace LongBetterWindows.Host.Views
         private void PreviewUninstall()
         {
             if (_selectedEntry == null) return;
+            _operationStatus = null;
             var installed = HostProvider.Instance.PluginStore.Get(_selectedEntry.Id)?.Manifest;
             if (installed == null) return;
             var preparation = _session.PrepareUninstall(installed);
@@ -433,7 +460,9 @@ namespace LongBetterWindows.Host.Views
                 return;
             }
             RememberConfirmationFocus();
-            ConfirmTitle.Text = I18n("market.confirm.uninstallTitle");
+            _pendingOperationPresentation = MarketplaceOperationPresenter.ForUninstall();
+            ConfirmTitle.Text = I18n(
+                _pendingOperationPresentation.ReviewTitleResourceKey);
             ConfirmSubtitle.Text = $"{installed.Name} · v{installed.Version}";
             ConfirmTrustText.Text = I18n("market.confirm.rollbackRemoval");
             ConfirmHashText.Text = installed.Id;
@@ -448,7 +477,9 @@ namespace LongBetterWindows.Host.Views
                     .ToArray();
             HighTrustWarning.Visibility = Visibility.Collapsed;
             ConfirmErrorText.Text = string.Empty;
-            ConfirmActionButton.Content = I18n("market.confirm.uninstallAction");
+            ConfirmOperationStatusText.Text = string.Empty;
+            ConfirmActionButton.Content = I18n(
+                _pendingOperationPresentation.ConfirmActionResourceKey);
             ConfirmActionButton.IsEnabled = true;
             ConfirmActionButton.SetResourceReference(StyleProperty, "LongButton.Danger");
             ConfirmOverlay.Visibility = Visibility.Visible;
@@ -473,6 +504,8 @@ namespace LongBetterWindows.Host.Views
             PermissionDiffItems.ItemsSource = Array.Empty<string>();
             HighTrustWarning.Visibility = Visibility.Collapsed;
             ConfirmErrorText.Text = message;
+            ConfirmOperationStatusText.Text = string.Empty;
+            _pendingOperationPresentation = null;
             ConfirmActionButton.IsEnabled = false;
             ConfirmOverlay.Visibility = Visibility.Visible;
             _ = Dispatcher.BeginInvoke(
@@ -489,7 +522,9 @@ namespace LongBetterWindows.Host.Views
                 return;
             }
 
-            SetBusy(true);
+            var operation = _pendingOperationPresentation
+                ?? MarketplaceOperationPresenter.ForInstall(null, "0.0.0");
+            SetBusy(true, operation);
             try
             {
                 var execution = await _session.ExecutePendingAsync(async (pending, _) =>
@@ -515,32 +550,44 @@ namespace LongBetterWindows.Host.Views
 
                 if (!result.IsSuccess)
                 {
+                    ConfirmOperationStatusText.Text = string.Empty;
                     ConfirmErrorText.Text = I18n(
                         MarketplacePresentation.GetInstallErrorResourceKey(result.ErrorCode));
                     return;
                 }
 
-                DismissConfirmation(cancelPending: false);
-                CatalogStatusText.Text = result.Action == InstallAction.Uninstall
-                    ? string.Format(
-                        I18n("market.status.uninstalled"),
-                        result.PluginName)
-                    : string.Format(
-                        I18n("market.status.installed"),
-                        result.PluginName,
-                        result.PluginVersion);
+                var preferredFocus = operation.Intent == MarketplaceOperationIntent.Uninstall
+                    ? InstallButton
+                    : UninstallButton;
+                DismissConfirmation(
+                    cancelPending: false,
+                    preferredFocus: preferredFocus);
+                var status = FormatOperationSuccess(operation, result);
+                CatalogStatusText.Text = status;
                 await ApplyFiltersAsync();
+                _operationStatus = status;
+                DetailHint.Text = status;
+                AutomationProperties.SetItemStatus(
+                    DetailHint,
+                    operation.Intent.ToString());
             }
             finally
             {
-                SetBusy(false);
+                SetBusy(false, operation);
             }
         }
 
-        private void SetBusy(bool busy)
+        private void SetBusy(
+            bool busy,
+            MarketplaceOperationPresentation operation)
         {
             InstallProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
             ConfirmActionButton.IsEnabled = !busy;
+            ConfirmCancelButton.IsEnabled = !busy;
+            ConfirmCloseButton.IsEnabled = !busy;
+            ConfirmOperationStatusText.Text = busy
+                ? I18n(operation.ProgressResourceKey)
+                : string.Empty;
         }
 
         private async void ImportLocalPackage_Click(object sender, RoutedEventArgs e)
@@ -553,6 +600,7 @@ namespace LongBetterWindows.Host.Views
         private async void InstallButton_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedEntry == null || _selectedVersion == null) return;
+            _operationStatus = null;
             var entry = _selectedEntry;
             var version = _selectedVersion;
             string? path = null;
@@ -690,11 +738,14 @@ namespace LongBetterWindows.Host.Views
         }
 
         private void VersionBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-            => ShowVersion(
+        {
+            _operationStatus = null;
+            ShowVersion(
                 VersionBox.SelectedIndex >= 0
                 && VersionBox.SelectedIndex < _displayedVersions.Count
                     ? _displayedVersions[VersionBox.SelectedIndex]
                     : null);
+        }
 
         internal void ShowListForQuality()
         {
@@ -716,6 +767,55 @@ namespace LongBetterWindows.Host.Views
             ShowEntry(first);
             return _moduleRouter.Route.Kind
                 == MarketplaceModuleRouteKind.Detail;
+        }
+
+        internal bool ShowUpdateReviewForQuality()
+        {
+            if (MarketList.ItemsSource is not IEnumerable<MarketCardModel> cards
+                || cards.FirstOrDefault() is not { } first
+                || first.Entry.Versions
+                    .OrderByDescending(version =>
+                        MarketplacePresentation.ParseVersion(version.Version))
+                    .FirstOrDefault() is not { } version)
+            {
+                return false;
+            }
+
+            _forceListForQuality = false;
+            MarketList.SelectedItem = first;
+            ShowEntry(first);
+            RememberConfirmationFocus();
+            var operation = MarketplaceOperationPresenter.ForInstall(
+                "0.0.0",
+                version.Version);
+            _pendingOperationPresentation = operation;
+            ConfirmTitle.Text = I18n(operation.ReviewTitleResourceKey);
+            ConfirmSubtitle.Text = $"{first.Name} · v{version.Version}";
+            ConfirmTrustText.Text = !string.IsNullOrWhiteSpace(version.PublisherKeyId)
+                ? I18n("market.confirm.publisherVerified")
+                : I18n("market.confirm.localUnsigned");
+            ConfirmHashText.Text = string.IsNullOrWhiteSpace(version.Sha256)
+                ? "SHA-256"
+                : $"SHA-256  {version.Sha256}";
+            ConfirmCompatibilityText.Text = I18n(
+                "market.confirm.compatibilityPassed");
+            PermissionDiffItems.ItemsSource = version.Capabilities.Count == 0
+                ? new[] { I18n("market.permission.none") }
+                : version.Capabilities.Select(capability => string.Format(
+                    I18n("market.permission.added"),
+                    capability));
+            HighTrustWarning.Visibility = Visibility.Collapsed;
+            ConfirmErrorText.Text = string.Empty;
+            ConfirmOperationStatusText.Text = string.Empty;
+            ConfirmActionButton.Content = I18n(
+                operation.ConfirmActionResourceKey);
+            ConfirmActionButton.IsEnabled = true;
+            ConfirmActionButton.SetResourceReference(
+                StyleProperty,
+                "LongButton.Primary");
+            ConfirmOverlay.Visibility = Visibility.Visible;
+            FocusConfirmationAction();
+            return true;
         }
 
         private void MarketplaceControl_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -754,7 +854,9 @@ namespace LongBetterWindows.Host.Views
                 DispatcherPriority.Input);
         }
 
-        private bool DismissConfirmation(bool cancelPending = true)
+        private bool DismissConfirmation(
+            bool cancelPending = true,
+            IInputElement? preferredFocus = null)
         {
             if (ConfirmOverlay.Visibility != Visibility.Visible
                 || (cancelPending
@@ -764,28 +866,48 @@ namespace LongBetterWindows.Host.Views
                 _session.CancelPending();
             ConfirmOverlay.Visibility = Visibility.Collapsed;
             ConfirmActionButton.IsEnabled = true;
+            ConfirmCancelButton.IsEnabled = true;
+            ConfirmCloseButton.IsEnabled = true;
             var focusOrigin = _confirmationFocusOrigin;
             _confirmationFocusOrigin = null;
+            _pendingOperationPresentation = null;
             _ = Dispatcher.BeginInvoke(
                 () =>
                 {
-                    if (focusOrigin is UIElement
-                        {
-                            IsVisible: true,
-                            IsEnabled: true,
-                            Focusable: true,
-                        } element)
+                    var focusTarget = new[] {
+                            preferredFocus,
+                            focusOrigin,
+                            InstallButton,
+                            UninstallButton,
+                            VersionBox,
+                            MarketList,
+                        }
+                        .OfType<UIElement>()
+                        .FirstOrDefault(element =>
+                            element.IsVisible
+                            && element.IsEnabled
+                            && element.Focusable);
+                    if (focusTarget != null)
                     {
-                        element.Focus();
-                    }
-                    else
-                    {
-                        MarketList.Focus();
+                        focusTarget.Focus();
+                        Keyboard.Focus(focusTarget);
                     }
                 },
                 DispatcherPriority.Input);
             return true;
         }
+
+        private static string FormatOperationSuccess(
+            MarketplaceOperationPresentation operation,
+            InstallResult result)
+            => operation.Intent == MarketplaceOperationIntent.Uninstall
+                ? string.Format(
+                    I18n(operation.SuccessResourceKey),
+                    result.PluginName)
+                : string.Format(
+                    I18n(operation.SuccessResourceKey),
+                    result.PluginName,
+                    result.PluginVersion);
 
         private void OnPluginsChanged()
         {

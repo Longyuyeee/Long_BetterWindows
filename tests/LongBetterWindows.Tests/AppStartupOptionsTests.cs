@@ -49,6 +49,7 @@ public class AppStartupOptionsTests
             "--quality-show-welcome",
             "--quality-market-list",
             "--quality-market-detail",
+            "--quality-market-update-review",
         ]);
 
         Assert.Equal("dark", options.ThemeOverride);
@@ -118,6 +119,7 @@ public class AppStartupOptionsTests
         Assert.True(options.ShowWelcomeForQuality);
         Assert.True(options.ShowMarketListForQuality);
         Assert.True(options.ShowMarketDetailForQuality);
+        Assert.True(options.ShowMarketUpdateReviewForQuality);
     }
 
     [Fact]

@@ -40,6 +40,7 @@ namespace LongBetterWindows.Host.Services
         public bool ShowWelcomeForQuality { get; private init; }
         public bool ShowMarketListForQuality { get; private init; }
         public bool ShowMarketDetailForQuality { get; private init; }
+        public bool ShowMarketUpdateReviewForQuality { get; private init; }
         public string? MarketplaceCatalogPath { get; private init; }
         public string? MarketplaceTrustStorePath { get; private init; }
         public bool UseLiveContextForQuality { get; private init; }
@@ -151,6 +152,9 @@ namespace LongBetterWindows.Host.Services
                 ShowMarketDetailForQuality = HasSwitch(
                     arguments,
                     "--quality-market-detail"),
+                ShowMarketUpdateReviewForQuality = HasSwitch(
+                    arguments,
+                    "--quality-market-update-review"),
                 MarketplaceCatalogPath = ReadArgument(arguments, "--quality-market-catalog"),
                 MarketplaceTrustStorePath = ReadArgument(arguments, "--quality-market-trust-store"),
                 UseLiveContextForQuality = HasSwitch(arguments, "--quality-live-context"),
