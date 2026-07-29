@@ -206,6 +206,7 @@ dotnet run --project src/LongBetterWindows.Host
 
 ## 文档导航
 
+- [最新开发现状审计与后续收口计划](docs/开发现状审计与后续收口计划_2026-07-30.md)
 - [用户指南](docs/USER_GUIDE.md)
 - [插件开发指南](docs/插件开发指南.md)
 - [插件开发体系审计与优化计划](docs/插件开发体系审计与优化计划_2026-07-30.md)
