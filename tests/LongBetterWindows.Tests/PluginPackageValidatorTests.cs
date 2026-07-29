@@ -150,7 +150,63 @@ public sealed class PluginPackageValidatorTests : IDisposable
             .ValidateAsync(package, metadata);
 
         Assert.False(result.IsSuccess);
-        Assert.Contains("只允许 Web 插件", result.Error);
+        Assert.Contains("只允许纯 Web 插件", result.Error);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_RemoteSignedHybridPackage_IsRejected()
+    {
+        var manifest = JsonSerializer.Serialize(new
+        {
+            id = "dev.long.test",
+            version = "1.0.0",
+            name = "Hybrid Plugin",
+            runtime = "webview",
+            entry_point = "index.html",
+            background = new { entry_point = "Hybrid.Background.dll" },
+            capabilities = Array.Empty<string>(),
+        });
+        var package = CreatePackage(
+            extraEntryName: "Hybrid.Background.dll",
+            runtime: "webview",
+            entryPoint: "index.html",
+            manifestJson: manifest);
+        var hash = SHA256.HashData(await File.ReadAllBytesAsync(package));
+        using var rsa = RSA.Create(2048);
+        var metadata = new MarketplacePackageMetadata
+        {
+            Source = MarketplaceSourceKind.RemoteRegistry,
+            ExpectedSha256 = Convert.ToHexString(hash),
+            Signature = Convert.ToBase64String(rsa.SignHash(
+                hash, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1)),
+            PublisherPublicKeyPem = rsa.ExportSubjectPublicKeyInfoPem(),
+            PublisherKeyId = "test-key",
+        };
+        var trustStore = new PublisherTrustStore(new Dictionary<string, string>
+        {
+            ["test-key"] = rsa.ExportSubjectPublicKeyInfoPem(),
+        });
+
+        var result = await new PluginPackageValidator(trustStore: trustStore)
+            .ValidateAsync(package, metadata);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Hybrid", result.Error);
+    }
+
+    [Fact]
+    public async Task DistributionPolicy_UnsignedWebPackageIsEligibleAfterSignature()
+    {
+        var package = CreatePackage(runtime: "webview", entryPoint: "index.html");
+        var result = await new PluginPackageValidator().ValidateAsync(package);
+
+        var distribution = PluginDistributionPolicy.Assess(result);
+
+        Assert.True(distribution.LocalImportEligible);
+        Assert.True(distribution.RemoteMarketplacePackageEligible);
+        Assert.False(distribution.RemoteMarketplaceCurrentlyTrusted);
+        Assert.True(distribution.RemoteMarketplaceRequiresPublisherSignature);
+        Assert.Null(distribution.RemoteMarketplaceBlockReason);
     }
 
     [Fact]
@@ -178,6 +234,39 @@ public sealed class PluginPackageValidatorTests : IDisposable
         Assert.Equal(PackageTrustLevel.LocalUnsigned, result.TrustLevel);
         Assert.False(result.RequiresHighTrustWarning);
         Assert.Null(result.Sha256);
+    }
+
+    [Fact]
+    public async Task ValidateDirectoryAsync_ScriptRequiresHighTrust()
+    {
+        var directory = Path.Combine(_tempDir, $"script-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "manifest.json"),
+            JsonSerializer.Serialize(new
+            {
+                id = "dev.long.script",
+                version = "1.0.0",
+                name = "Script Plugin",
+                runtime = "csharp-script",
+                entry_point = "plugin.csx",
+                capabilities = Array.Empty<string>(),
+            }));
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "plugin.csx"),
+            "Start = async () => await Task.CompletedTask;");
+
+        var result = await new PluginPackageValidator()
+            .ValidateDirectoryAsync(directory);
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.True(result.RequiresHighTrustWarning);
+        var distribution = PluginDistributionPolicy.Assess(result);
+        Assert.True(distribution.LocalImportEligible);
+        Assert.False(distribution.RemoteMarketplacePackageEligible);
+        Assert.Equal(
+            PluginDistributionPolicy.HighTrustRuntimeNotSupported,
+            distribution.RemoteMarketplaceBlockReason);
     }
 
     [Fact]

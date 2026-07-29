@@ -247,6 +247,28 @@ try {
 
 $postflight = Invoke-ProductionValidation -Target $outputFile -NoBuild
 $size = (Get-Item -LiteralPath $outputFile).Length
+$requestedPermissions = @($postflight.permission_summary.requested)
+$permissionText = if ($requestedPermissions.Count -eq 0) {
+    "无"
+} else {
+    $requestedPermissions -join ", "
+}
+$localImport = $postflight.distribution_eligibility.local_import
+$remoteMarketplace = $postflight.distribution_eligibility.remote_marketplace
+$localText = if ($localImport.requires_high_trust_warning) {
+    "可导入（需要完全信任确认）"
+} else {
+    "可导入"
+}
+$remoteText = if ($remoteMarketplace.package_eligible) {
+    if ($remoteMarketplace.currently_trusted) {
+        "可发布（发布者签名已验证）"
+    } else {
+        "包形态合格（仍需发布者签名）"
+    }
+} else {
+    "不可发布（$($remoteMarketplace.block_reason)）"
+}
 
 Write-Host ""
 Write-Host "  Long助手插件包已完成" -ForegroundColor Green
@@ -257,5 +279,8 @@ Write-Host "  文件     : $outputFile"
 Write-Host "  大小     : $([math]::Round($size / 1KB, 1)) KB"
 Write-Host "  源文件   : $($sourceFiles.Count)"
 Write-Host "  SHA-256  : $($postflight.sha256)"
+Write-Host "  请求权限 : $permissionText"
+Write-Host "  本地导入 : $localText"
+Write-Host "  远程市场 : $remoteText"
 Write-Host "  验证状态 : passed"
 Write-Host ""

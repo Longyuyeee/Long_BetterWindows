@@ -119,9 +119,9 @@ namespace LongBetterWindows.Host.Engine
                 }
 
                 if (metadata.Source == MarketplaceSourceKind.RemoteRegistry
-                    && !string.Equals(manifest.Runtime, "webview", StringComparison.OrdinalIgnoreCase))
+                    && RequiresHighTrust(manifest))
                     return PackageValidationResult.Fail(
-                        "远程插件市场当前只允许 Web 插件；原生或脚本插件必须通过本地导入并接受完全信任提示。",
+                        "远程插件市场当前只允许纯 Web 插件；原生、脚本或带原生后台的 Hybrid 插件必须通过本地导入并接受完全信任提示。",
                         sha256,
                         manifest);
 
@@ -138,7 +138,7 @@ namespace LongBetterWindows.Host.Engine
                     sha256,
                     trust,
                     CreatePermissionDiff(installedManifest?.Capabilities, manifest.Capabilities),
-                    IsNativePlugin(manifest));
+                    RequiresHighTrust(manifest));
             }
             catch (InvalidDataException ex)
             {
@@ -196,7 +196,7 @@ namespace LongBetterWindows.Host.Engine
                 permissionDiff: CreatePermissionDiff(
                     installedManifest?.Capabilities,
                     manifest.Capabilities),
-                highTrust: IsNativePlugin(manifest));
+                highTrust: RequiresHighTrust(manifest));
         }
 
         public static PermissionDiff CreatePermissionDiff(
@@ -479,10 +479,12 @@ namespace LongBetterWindows.Host.Engine
         private static bool TryVersion(string? value, out Version version)
             => Version.TryParse(value?.TrimStart('v', 'V'), out version!);
 
-        private static bool IsNativePlugin(PluginManifest manifest)
-            => !string.Equals(manifest.Runtime, "webview", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(manifest.Runtime, "script", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(manifest.Runtime, "csharp-script", StringComparison.OrdinalIgnoreCase);
+        private static bool RequiresHighTrust(PluginManifest manifest)
+            => !string.Equals(
+                    manifest.Runtime,
+                    "webview",
+                    StringComparison.OrdinalIgnoreCase)
+                || manifest.Background is not null;
     }
 
     public interface IPublisherTrustStore

@@ -2092,11 +2092,41 @@ public class QualityGateTests
         Assert.Contains("ZipArchive", packer);
         Assert.Contains("$postflight", packer);
         Assert.Contains("-NoBuild", packer);
+        Assert.Contains("permission_summary", packer);
+        Assert.Contains("distribution_eligibility", packer);
+        Assert.Contains("仍需发布者签名", packer);
         Assert.Contains(".env", packer);
         Assert.Contains("pfx|p12|snk", packer);
         Assert.DoesNotContain("Compress-Archive", packer);
         Assert.Contains("ValidateFileManifest", validator);
         Assert.Contains("CryptographicOperations.FixedTimeEquals", validator);
+    }
+
+    [Fact]
+    public void PluginRuntimeMatrix_CoversAllTrustAndDistributionCases()
+    {
+        var matrix = Read("verify-plugin-runtime-matrix.ps1");
+        var program = Read(
+            "tools", "LongBetterWindows.PluginValidator", "Program.cs");
+        var policy = Read(
+            "src", "LongBetterWindows.Host", "Engine",
+            "PluginDistributionPolicy.cs");
+
+        Assert.Contains("long_plugin_runtime_matrix", matrix);
+        Assert.Contains("-RuntimeKind \"web\"", matrix);
+        Assert.Contains("-RuntimeKind \"script\"", matrix);
+        Assert.Contains("-RuntimeKind \"native\"", matrix);
+        Assert.Contains("-RuntimeKind \"hybrid\"", matrix);
+        Assert.Contains("src\\Base64Tool", matrix);
+        Assert.Contains("src\\Templates\\script-plugin", matrix);
+        Assert.Contains("SamplePlugin", matrix);
+        Assert.Contains("ClipboardHistory", matrix);
+        Assert.Contains("Invoke-Package", matrix);
+        Assert.Contains("Invoke-Validation", matrix);
+        Assert.Contains("requires_publisher_signature", program);
+        Assert.Contains("permission_summary", program);
+        Assert.Contains("distribution_eligibility", program);
+        Assert.Contains("high_trust_runtime_not_supported", policy);
     }
 
     private static string Read(params string[] parts)

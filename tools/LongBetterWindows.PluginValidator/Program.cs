@@ -55,6 +55,7 @@ try
         : await validator.ValidateAsync(
             target,
             installedManifest: installedManifest);
+    var distribution = PluginDistributionPolicy.Assess(result);
 
     Write(new
     {
@@ -81,6 +82,38 @@ try
                 command_count = result.Manifest.Commands.Count,
             },
         permission_diff = result.PermissionDiff,
+        permission_summary = new
+        {
+            requested = result.Manifest?.Capabilities
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+                ?? Array.Empty<string>(),
+            added = result.PermissionDiff.Added,
+            removed = result.PermissionDiff.Removed,
+            unchanged = result.PermissionDiff.Unchanged,
+            has_elevated_changes = result.PermissionDiff.HasElevatedChanges,
+        },
+        distribution_eligibility = new
+        {
+            local_import = new
+            {
+                eligible = distribution.LocalImportEligible,
+                trust_level = result.TrustLevel,
+                requires_high_trust_warning =
+                    result.RequiresHighTrustWarning,
+            },
+            remote_marketplace = new
+            {
+                package_eligible =
+                    distribution.RemoteMarketplacePackageEligible,
+                currently_trusted =
+                    distribution.RemoteMarketplaceCurrentlyTrusted,
+                requires_publisher_signature =
+                    distribution.RemoteMarketplaceRequiresPublisherSignature,
+                block_reason =
+                    distribution.RemoteMarketplaceBlockReason,
+            },
+        },
         manifest_failure_code = result.ManifestFailureCode,
         manifest_issues = result.ManifestIssues,
     });
