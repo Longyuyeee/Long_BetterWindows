@@ -234,6 +234,9 @@ public class SparsePackageTests
         Assert.Contains("package_removed_after_capture", verification);
         Assert.Contains("legacy_menu_state_unchanged", verification);
         Assert.Contains("passed = $true", verification);
+        Assert.Contains("release-evidence-io.ps1", verification);
+        Assert.Contains("Write-NewJsonFileAtomically", verification);
+        Assert.DoesNotContain("Set-Content -LiteralPath $summaryPath", verification);
     }
 
     private static string FindRepositoryRoot()

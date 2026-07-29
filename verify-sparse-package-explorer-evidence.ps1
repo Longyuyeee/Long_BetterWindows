@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 $expectedThumbprint = $ExpectedCertificateThumbprint.Replace(' ', '').ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
@@ -72,7 +73,10 @@ $summary = [ordered]@{
     legacy_menu_state_unchanged = $true
     passed = $true
 }
-$summary | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath $summaryPath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $summary `
+    -Path $summaryPath `
+    -Depth 5 `
+    -Label 'Sparse Package Explorer verification output'
 Write-Output 'Sparse Package Explorer evidence verification passed.'
 Write-Output "Summary: $summaryPath"
