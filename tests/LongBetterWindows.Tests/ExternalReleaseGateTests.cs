@@ -64,6 +64,16 @@ public sealed class ExternalReleaseGateTests : IDisposable
                 .GetProperty("screen_reader_approval_count")
                 .GetInt32());
         Assert.Equal(
+            3,
+            root.GetProperty("evidence_contract")
+                .GetProperty("physical_dpi_schema_version")
+                .GetInt32());
+        Assert.Equal(
+            3,
+            root.GetProperty("evidence_contract")
+                .GetProperty("accessibility_schema_version")
+                .GetInt32());
+        Assert.Equal(
             2,
             root.GetProperty("evidence_contract")
                 .GetProperty("download_schema_version")
@@ -113,13 +123,13 @@ public sealed class ExternalReleaseGateTests : IDisposable
     [Fact]
     public async Task VerifyExternalReleaseGate_RejectsLegacyPhysicalDpiSummary()
     {
-        var paths = WriteFixture(PackageHash, physicalDpiSchemaVersion: 1);
+        var paths = WriteFixture(PackageHash, physicalDpiSchemaVersion: 2);
         var output = Path.Combine(_root, "legacy-dpi-rejected.json");
 
         var result = await RunVerifierAsync(paths, output);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Physical DPI gate schema version 2 is required", result.Error);
+        Assert.Contains("Physical DPI gate schema version 3 is required", result.Error);
         Assert.False(File.Exists(output));
     }
 
@@ -139,13 +149,13 @@ public sealed class ExternalReleaseGateTests : IDisposable
     [Fact]
     public async Task VerifyExternalReleaseGate_RejectsLegacyAccessibilitySummary()
     {
-        var paths = WriteFixture(PackageHash, accessibilitySchemaVersion: 1);
+        var paths = WriteFixture(PackageHash, accessibilitySchemaVersion: 2);
         var output = Path.Combine(_root, "legacy-accessibility-rejected.json");
 
         var result = await RunVerifierAsync(paths, output);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Accessibility gate schema version 2 is required", result.Error);
+        Assert.Contains("Accessibility gate schema version 3 is required", result.Error);
         Assert.False(File.Exists(output));
     }
 
@@ -159,6 +169,34 @@ public sealed class ExternalReleaseGateTests : IDisposable
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains("requires at least one screen-reader approval", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsTamperedPhysicalDpiPortableSource()
+    {
+        var paths = WriteFixture(PackageHash);
+        await File.AppendAllTextAsync(paths.DpiSource, "tampered");
+        var output = Path.Combine(_root, "dpi-source-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Physical DPI evidence portable source hash mismatch", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsMissingAccessibilityPortableSource()
+    {
+        var paths = WriteFixture(PackageHash);
+        File.Delete(paths.AccessibilitySource);
+        var output = Path.Combine(_root, "accessibility-source-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Accessibility evidence portable source hash mismatch", result.Error);
         Assert.False(File.Exists(output));
     }
 
@@ -344,9 +382,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
     private FixturePaths WriteFixture(
         string cleanPackageHash,
         bool marketplacePreflightOnly = false,
-        int physicalDpiSchemaVersion = 2,
+        int physicalDpiSchemaVersion = 3,
         int physicalDpiCaptureCount = 32,
-        int accessibilitySchemaVersion = 2,
+        int accessibilitySchemaVersion = 3,
         int screenReaderApprovalCount = 1,
         int downloadSchemaVersion = 2,
         int cleanSchemaVersion = 2,
@@ -453,6 +491,25 @@ public sealed class ExternalReleaseGateTests : IDisposable
             reviewer = "clean-reviewer",
             evidence_manifest = EvidenceEntry("clean-environment-evidence.json"),
         });
+        var dpiEvidence = new[] { 100, 125, 150, 200 }.Select(scale =>
+        {
+            var relativePath = $"dpi.sources/physical-dpi-{scale}.json";
+            WritePortableSource(relativePath, new
+            {
+                schema_version = 2,
+                classification = "physical_device_dpi_evidence",
+                source_commit = Commit,
+                expected_scale_percent = scale,
+                human_review = new { status = "approved" },
+            });
+            return new
+            {
+                scale_percent = scale,
+                source_commit = Commit,
+                capture_count = 8,
+                source_manifest = EvidenceEntry(relativePath),
+            };
+        }).ToArray();
         var dpi = WriteJson("dpi.json", new
         {
             schema_version = physicalDpiSchemaVersion,
@@ -461,32 +518,41 @@ public sealed class ExternalReleaseGateTests : IDisposable
             source_commit = Commit,
             required_scales = new[] { 100, 125, 150, 200 },
             capture_count = physicalDpiCaptureCount,
-            evidence = new[] { 100, 125, 150, 200 }.Select(scale => new
-            {
-                scale_percent = scale,
-                source_commit = Commit,
-                capture_count = 8,
-            }),
+            evidence = dpiEvidence,
         });
+        var accessibilityProfiles = new[]
+        {
+            "high_contrast",
+            "reduced_motion",
+            "combined",
+        };
+        var accessibilityEvidence = accessibilityProfiles.Select(profile =>
+        {
+            var relativePath = $"accessibility.sources/accessibility-{profile}.json";
+            WritePortableSource(relativePath, new
+            {
+                schema_version = 2,
+                classification = "physical_accessibility_evidence",
+                source_commit = Commit,
+                expected_profile = profile,
+                human_review = new { status = "approved" },
+            });
+            return new
+            {
+                profile,
+                source_commit = Commit,
+                source_manifest = EvidenceEntry(relativePath),
+            };
+        }).ToArray();
         var accessibility = WriteJson("accessibility.json", new
         {
             schema_version = accessibilitySchemaVersion,
             classification = "approved_physical_accessibility_matrix",
             passed = true,
             source_commit = Commit,
-            required_profiles = new[]
-            {
-                "high_contrast",
-                "reduced_motion",
-                "combined",
-            },
+            required_profiles = accessibilityProfiles,
             screen_reader_approval_count = screenReaderApprovalCount,
-            evidence = new[]
-            {
-                new { profile = "high_contrast", source_commit = Commit },
-                new { profile = "reduced_motion", source_commit = Commit },
-                new { profile = "combined", source_commit = Commit },
-            },
+            evidence = accessibilityEvidence,
         });
         var marketplaceEvidence = WriteMarketplaceEvidence();
         var marketplace = WriteJson("marketplace.json", new
@@ -530,7 +596,12 @@ public sealed class ExternalReleaseGateTests : IDisposable
             installerPath,
             checksumsPath,
             downloadEvidencePath,
-            cleanEvidencePath);
+            cleanEvidencePath,
+            Path.Combine(_root, "dpi.sources", "physical-dpi-100.json"),
+            Path.Combine(
+                _root,
+                "accessibility.sources",
+                "accessibility-high_contrast.json"));
     }
 
     private static object ReleasePackage(
@@ -581,6 +652,13 @@ public sealed class ExternalReleaseGateTests : IDisposable
             sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))
                 .ToLowerInvariant(),
         };
+    }
+
+    private void WritePortableSource(string relativePath, object value)
+    {
+        var path = Path.Combine(_root, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, JsonSerializer.Serialize(value));
     }
 
     private string WriteJson(string fileName, object value)
@@ -658,7 +736,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
         string Installer,
         string Checksums,
         string DownloadEvidence,
-        string CleanEvidence);
+        string CleanEvidence,
+        string DpiSource,
+        string AccessibilitySource);
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

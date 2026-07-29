@@ -63,7 +63,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\verify-physical-dpi-matrix.ps1 `
   -OutputPath .\artifacts\quality\physical-dpi-release-matrix.json
 ```
 
-采集要求仓库 `HEAD` 等于指定的完整提交 SHA、受跟踪文件无改动，并重新构建该提交；`-NoBuild` 不能用于正式物理证据。采集视图不能移除 `main`。汇总只接受 v2 证据，要求四个唯一档位来自同一个指定提交、每档 8 张图片、管理中心首页与模块标签已人工确认、人工状态为 `approved`、文件哈希未变化、实际显示器缩放与档位一致。任一条件不满足即失败。
+采集要求仓库 `HEAD` 等于指定的完整提交 SHA、受跟踪文件无改动，并重新构建该提交；`-NoBuild` 不能用于正式物理证据。采集视图不能移除 `main`。汇总只接受 v2 原始证据，要求四个唯一档位来自同一个指定提交、每档 8 张图片、管理中心首页与模块标签已人工确认、人工状态为 `approved`、文件哈希未变化、实际显示器缩放与档位一致。汇总输出为 v3，并在摘要旁生成同名 `.sources` 目录；跨电脑复核必须同时携带两者。任一条件不满足即失败。
 
 ## 当前证据
 

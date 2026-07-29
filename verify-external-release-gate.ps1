@@ -59,10 +59,38 @@ function Assert-ExactSet(
     }
 }
 
-function Assert-PhysicalDpiContract($document, [string] $sourceCommit) {
+function Read-PortableMatrixSource($gate, $entry, [string] $label) {
+    $file = [string]$entry.file
+    $expectedDirectory = [IO.Path]::GetFileNameWithoutExtension(
+        $gate.path) + '.sources/'
+    if ($file -notmatch '^[A-Za-z0-9._-]+\.sources/[A-Za-z0-9._-]+\.json$' `
+        -or -not $file.StartsWith(
+            $expectedDirectory,
+            [StringComparison]::OrdinalIgnoreCase) `
+        -or [string]$entry.sha256 -notmatch '^[0-9a-f]{64}$') {
+        throw "$label portable source identity is incomplete."
+    }
+    $relativePath = $file.Replace('/', [IO.Path]::DirectorySeparatorChar)
+    $path = Join-Path (Split-Path -Parent $gate.path) $relativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf) `
+        -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).
+            Hash.ToLowerInvariant() -ne [string]$entry.sha256) {
+        throw "$label portable source hash mismatch: $file"
+    }
+    try {
+        return Get-Content -LiteralPath $path -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+    }
+    catch {
+        throw "$label portable source is not valid JSON: $file"
+    }
+}
+
+function Assert-PhysicalDpiContract($gate, [string] $sourceCommit) {
+    $document = $gate.document
     $requiredScales = @(100,125,150,200)
-    if ([int]$document.schema_version -ne 2) {
-        throw 'Physical DPI gate schema version 2 is required.'
+    if ([int]$document.schema_version -ne 3) {
+        throw 'Physical DPI gate schema version 3 is required.'
     }
     if ([int]$document.capture_count -ne 32) {
         throw 'Physical DPI gate must contain exactly 32 captures.'
@@ -75,18 +103,33 @@ function Assert-PhysicalDpiContract($document, [string] $sourceCommit) {
     }
     Assert-ExactSet @($evidence | ForEach-Object { [int]$_.scale_percent }) `
         $requiredScales 'Physical DPI evidence scales'
+    $sourceFiles = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in $evidence) {
         if ([string]$entry.source_commit -ne $sourceCommit `
             -or [int]$entry.capture_count -ne 8) {
             throw 'Physical DPI evidence entry does not match the candidate or eight-capture contract.'
         }
+        if (-not $sourceFiles.Add([string]$entry.source_manifest.file)) {
+            throw 'Physical DPI portable source is duplicated.'
+        }
+        $source = Read-PortableMatrixSource `
+            $gate $entry.source_manifest 'Physical DPI evidence'
+        if ([int]$source.schema_version -ne 2 `
+            -or [string]$source.classification -ne 'physical_device_dpi_evidence' `
+            -or [string]$source.source_commit -ne $sourceCommit `
+            -or [int]$source.expected_scale_percent -ne [int]$entry.scale_percent `
+            -or [string]$source.human_review.status -ne 'approved') {
+            throw 'Physical DPI portable source content does not match its summary.'
+        }
     }
 }
 
-function Assert-AccessibilityContract($document, [string] $sourceCommit) {
+function Assert-AccessibilityContract($gate, [string] $sourceCommit) {
+    $document = $gate.document
     $requiredProfiles = @('high_contrast','reduced_motion','combined')
-    if ([int]$document.schema_version -ne 2) {
-        throw 'Accessibility gate schema version 2 is required.'
+    if ([int]$document.schema_version -ne 3) {
+        throw 'Accessibility gate schema version 3 is required.'
     }
     if ([int]$document.screen_reader_approval_count -lt 1) {
         throw 'Accessibility gate requires at least one screen-reader approval.'
@@ -99,9 +142,23 @@ function Assert-AccessibilityContract($document, [string] $sourceCommit) {
     }
     Assert-ExactSet @($evidence | ForEach-Object { [string]$_.profile }) `
         $requiredProfiles 'Accessibility evidence profiles'
+    $sourceFiles = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in $evidence) {
         if ([string]$entry.source_commit -ne $sourceCommit) {
             throw 'Accessibility evidence entry does not match the candidate.'
+        }
+        if (-not $sourceFiles.Add([string]$entry.source_manifest.file)) {
+            throw 'Accessibility portable source is duplicated.'
+        }
+        $source = Read-PortableMatrixSource `
+            $gate $entry.source_manifest 'Accessibility evidence'
+        if ([int]$source.schema_version -ne 2 `
+            -or [string]$source.classification -ne 'physical_accessibility_evidence' `
+            -or [string]$source.source_commit -ne $sourceCommit `
+            -or [string]$source.expected_profile -ne [string]$entry.profile `
+            -or [string]$source.human_review.status -ne 'approved') {
+            throw 'Accessibility portable source content does not match its summary.'
         }
     }
 }
@@ -353,8 +410,8 @@ foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
 }
 Assert-DownloadContract $download
 Assert-CleanEnvironmentContract $clean $ExpectedDistributionChannel
-Assert-PhysicalDpiContract $dpi.document $expectedCommit
-Assert-AccessibilityContract $accessibility.document $expectedCommit
+Assert-PhysicalDpiContract $dpi $expectedCommit
+Assert-AccessibilityContract $accessibility $expectedCommit
 foreach ($gate in @($download, $clean)) {
     if ([string]$gate.document.distribution_channel -ne $ExpectedDistributionChannel) {
         throw "External gate distribution channel mismatch: $($gate.document.classification)"

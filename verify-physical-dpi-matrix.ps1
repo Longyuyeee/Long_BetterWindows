@@ -6,16 +6,29 @@
 param(
     [Parameter(Mandatory=$true)] [string[]] $EvidenceDirectories,
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
-    [string] $OutputPath
+    [Parameter(Mandatory=$true)] [string] $OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
+$resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
+$outputParent = Split-Path -Parent $resolvedOutput
+$outputStem = [IO.Path]::GetFileNameWithoutExtension($resolvedOutput)
+if ($outputStem -notmatch '^[A-Za-z0-9._-]+$') {
+    throw 'Physical DPI matrix output name must use portable ASCII characters.'
+}
+$sourceDirectoryName = "$outputStem.sources"
+$sourceDirectory = Join-Path $outputParent $sourceDirectoryName
+if ((Test-Path -LiteralPath $resolvedOutput) `
+    -or (Test-Path -LiteralPath $sourceDirectory)) {
+    throw 'Physical DPI matrix output or source bundle already exists.'
+}
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
 }
 $requiredScales = @(100,125,150,200)
 $results = @()
+$sourceManifests = @()
 foreach ($directory in $EvidenceDirectories) {
     $root = [IO.Path]::GetFullPath($directory)
     $manifestPath = Join-Path $root 'physical-dpi-evidence.json'
@@ -70,13 +83,23 @@ foreach ($directory in $EvidenceDirectories) {
             throw "Captured physical scale does not match manifest at $scale%: $actualScale%."
         }
     }
+    $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).
+        Hash.ToLowerInvariant()
+    $sourceFile = "physical-dpi-$scale.json"
+    $sourceManifests += [ordered]@{
+        path = $manifestPath
+        file = $sourceFile
+    }
     $results += [ordered]@{
         scale_percent = $scale
         source_commit = $expectedCommit
         reviewer = $manifest.human_review.reviewer
         reviewed_at = $manifest.human_review.reviewed_at
         capture_count = $captures.Count
-        manifest_sha256 = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        source_manifest = [ordered]@{
+            file = "$sourceDirectoryName/$sourceFile"
+            sha256 = $manifestHash
+        }
     }
 }
 
@@ -87,7 +110,7 @@ if ($actualScales.Count -ne $requiredScales.Count -or
 }
 
 $summary = [ordered]@{
-    schema_version = 2
+    schema_version = 3
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_physical_device_dpi_matrix'
     source_commit = $expectedCommit
@@ -98,11 +121,25 @@ $summary = [ordered]@{
     passed = $true
     evidence = $results
 }
-if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
-    $resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
-    $parent = Split-Path -Parent $resolvedOutput
-    if (-not [string]::IsNullOrWhiteSpace($parent)) { [IO.Directory]::CreateDirectory($parent) | Out-Null }
+try {
+    if (-not [string]::IsNullOrWhiteSpace($outputParent)) {
+        [IO.Directory]::CreateDirectory($outputParent) | Out-Null
+    }
+    [IO.Directory]::CreateDirectory($sourceDirectory) | Out-Null
+    foreach ($source in $sourceManifests) {
+        Copy-Item -LiteralPath $source.path `
+            -Destination (Join-Path $sourceDirectory $source.file)
+    }
     $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $resolvedOutput -Encoding UTF8
     Write-Output "Matrix summary: $resolvedOutput"
+}
+catch {
+    if (Test-Path -LiteralPath $resolvedOutput) {
+        Remove-Item -LiteralPath $resolvedOutput -Force
+    }
+    if (Test-Path -LiteralPath $sourceDirectory) {
+        Remove-Item -LiteralPath $sourceDirectory -Recurse -Force
+    }
+    throw
 }
 Write-Output 'Physical DPI release matrix verified: 32 captures, 4 approved scales.'

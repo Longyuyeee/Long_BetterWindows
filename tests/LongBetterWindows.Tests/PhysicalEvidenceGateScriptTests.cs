@@ -31,12 +31,13 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             $"Exit={result.ExitCode}{Environment.NewLine}{result.StandardError}");
         using var summary = JsonDocument.Parse(File.ReadAllText(output));
         Assert.True(summary.RootElement.GetProperty("passed").GetBoolean());
-        Assert.Equal(2, summary.RootElement.GetProperty("schema_version").GetInt32());
+        Assert.Equal(3, summary.RootElement.GetProperty("schema_version").GetInt32());
         Assert.Equal(
             1,
             summary.RootElement
                 .GetProperty("screen_reader_approval_count")
                 .GetInt32());
+        AssertPortableSources(summary.RootElement, output, expectedCount: 3);
     }
 
     [Fact]
@@ -93,8 +94,9 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             $"Exit={result.ExitCode}{Environment.NewLine}{result.StandardError}");
         using var summary = JsonDocument.Parse(File.ReadAllText(output));
         Assert.True(summary.RootElement.GetProperty("passed").GetBoolean());
-        Assert.Equal(2, summary.RootElement.GetProperty("schema_version").GetInt32());
+        Assert.Equal(3, summary.RootElement.GetProperty("schema_version").GetInt32());
         Assert.Equal(32, summary.RootElement.GetProperty("capture_count").GetInt32());
+        AssertPortableSources(summary.RootElement, output, expectedCount: 4);
     }
 
     [Fact]
@@ -328,6 +330,26 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
     private static string Hash(string path) =>
         Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))
             .ToLowerInvariant();
+
+    private static void AssertPortableSources(
+        JsonElement summary,
+        string summaryPath,
+        int expectedCount)
+    {
+        var evidence = summary.GetProperty("evidence").EnumerateArray().ToArray();
+        Assert.Equal(expectedCount, evidence.Length);
+        foreach (var entry in evidence)
+        {
+            var source = entry.GetProperty("source_manifest");
+            var relativePath = source.GetProperty("file").GetString()!;
+            Assert.DoesNotContain("..", relativePath, StringComparison.Ordinal);
+            var path = Path.Combine(
+                Path.GetDirectoryName(summaryPath)!,
+                relativePath.Replace('/', Path.DirectorySeparatorChar));
+            Assert.True(File.Exists(path), $"Portable source was not found: {path}");
+            Assert.Equal(source.GetProperty("sha256").GetString(), Hash(path));
+        }
+    }
 
     private static string QuoteForPowerShell(string value) =>
         $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";

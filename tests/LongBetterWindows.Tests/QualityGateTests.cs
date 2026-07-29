@@ -179,10 +179,13 @@ public class QualityGateTests
         Assert.Contains("preflight_only", gate);
         Assert.Contains("deployment_verified", gate);
         Assert.Contains("rollback_verified", gate);
-        Assert.Contains("Physical DPI gate schema version 2 is required", gate);
+        Assert.Contains("Physical DPI gate schema version 3 is required", gate);
         Assert.Contains("Physical DPI gate must contain exactly 32 captures", gate);
-        Assert.Contains("Accessibility gate schema version 2 is required", gate);
+        Assert.Contains("Accessibility gate schema version 3 is required", gate);
         Assert.Contains("requires at least one screen-reader approval", gate);
+        Assert.Contains("Read-PortableMatrixSource", gate);
+        Assert.Contains("portable source hash mismatch", gate);
+        Assert.Contains("portable source content does not match its summary", gate);
         Assert.Contains("Release-download gate summary contract is incomplete", gate);
         Assert.Contains("Clean-environment gate summary contract is incomplete", gate);
         Assert.Contains("Assert-HashLockedSource", gate);
@@ -297,6 +300,10 @@ public class QualityGateTests
         Assert.Contains("ExpectedSourceCommit", verify);
         Assert.Contains("Physical DPI evidence source commit does not match ExpectedSourceCommit", verify);
         Assert.Contains("source_commit = $expectedCommit", verify);
+        Assert.Contains("schema_version = 3", verify);
+        Assert.Contains("source_manifest = [ordered]@", verify);
+        Assert.Contains(".sources", verify);
+        Assert.Contains("Copy-Item -LiteralPath $source.path", verify);
     }
 
     [Fact]
@@ -334,6 +341,10 @@ public class QualityGateTests
         Assert.Contains("management_module_close_mru", verify);
         Assert.Contains("management_close_announcements", verify);
         Assert.Contains("approved_physical_accessibility_matrix", verify);
+        Assert.Contains("schema_version = 3", verify);
+        Assert.Contains("source_manifest = [ordered]@", verify);
+        Assert.Contains(".sources", verify);
+        Assert.Contains("Copy-Item -LiteralPath $source.path", verify);
     }
 
     [Fact]
