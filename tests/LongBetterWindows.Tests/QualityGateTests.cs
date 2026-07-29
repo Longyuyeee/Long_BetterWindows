@@ -1710,6 +1710,12 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Services", "AppStartupOptions.cs");
         var mainWindow = Read(
             "src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
+        var inputProbe = Read(
+            "src", "LongBetterWindows.Host", "Services",
+            "PluginRuntimeInputProbe.cs");
+        var keyboardInput = Read(
+            "src", "LongBetterWindows.Host", "Services",
+            "QualityKeyboardInput.cs");
 
         Assert.Contains("_presentation.EnsureVisible()", adapter);
         Assert.Contains("_presentation.CloseVisibleSurface()", adapter);
@@ -1726,6 +1732,14 @@ public class QualityGateTests
         Assert.Contains("same_session_across_move", quality);
         Assert.Contains("background_state_ready", quality);
         Assert.Contains("background_resumed_ready", quality);
+        Assert.Contains("webview_input_preserved", quality);
+        Assert.Contains("webview_scroll_preserved", quality);
+        Assert.Contains("physical_ctrl_d_sent", quality);
+        Assert.Contains("Input.insertText", inputProbe);
+        Assert.Contains("Input.dispatchKeyEvent", inputProbe);
+        Assert.Contains("SendControlD", inputProbe);
+        Assert.Contains("AttachThreadInput", keyboardInput);
+        Assert.Contains("Size = 32", keyboardInput);
         Assert.Contains(
             "entry.State != PluginState.Running",
             mainWindow);

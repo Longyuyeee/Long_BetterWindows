@@ -214,6 +214,9 @@ namespace LongBetterWindows.Host.Views
                 isVisible && !isAttached);
         }
 
+        internal FrameworkElement? GetPluginRuntimeContentForQuality()
+            => _runtimeContent;
+
         private void ClearPluginRuntimeState()
         {
             _runtimeModuleKey = null;

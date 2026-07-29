@@ -448,6 +448,9 @@ namespace LongBetterWindows.Host
             bool IsDetached) GetPluginRuntimeQualityState()
             => WorkspaceShell.GetPluginRuntimeQualityState();
 
+        internal FrameworkElement? GetPluginRuntimeContentForQuality()
+            => WorkspaceShell.GetPluginRuntimeContentForQuality();
+
         internal bool DetachPluginRuntimeForQuality()
             => WorkspaceShell.DetachActivePluginRuntime();
 

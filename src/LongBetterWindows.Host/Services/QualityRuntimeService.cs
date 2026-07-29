@@ -338,7 +338,18 @@ namespace LongBetterWindows.Host.Services
                 15_000);
             var initial = mainWindow.GetPluginRuntimeQualityState();
 
-            var detachRequested = mainWindow.DetachPluginRuntimeForQuality();
+            var webView = mainWindow.GetPluginRuntimeContentForQuality()
+                as WebView2;
+            var webViewReady = await WaitUntilAsync(
+                () => webView?.CoreWebView2 is not null,
+                15_000);
+            PluginRuntimeInputProbeResult? inputProbe = null;
+            if (webViewReady && webView?.CoreWebView2 is not null)
+                inputProbe = await PluginRuntimeInputProbe.RunAsync(
+                    mainWindow,
+                    webView);
+
+            var detachRequested = inputProbe?.ControlDSent == true;
             var detachedReady = await WaitUntilAsync(
                 () =>
                     mainWindow.GetPluginRuntimeQualityState().IsDetached
@@ -346,6 +357,9 @@ namespace LongBetterWindows.Host.Services
                         .Any(window => window.IsVisible),
                 10_000);
             var detached = mainWindow.GetPluginRuntimeQualityState();
+            var detachedDom = webView?.CoreWebView2 is null
+                ? new PluginRuntimeDomSnapshot(string.Empty, 0)
+                : await PluginRuntimeInputProbe.CaptureAsync(webView);
             var detachedWindow = _application.Windows
                 .OfType<PluginWindowHost>()
                 .FirstOrDefault(window => window.IsVisible);
@@ -361,6 +375,9 @@ namespace LongBetterWindows.Host.Services
                 },
                 10_000);
             var returned = mainWindow.GetPluginRuntimeQualityState();
+            var returnedDom = webView?.CoreWebView2 is null
+                ? new PluginRuntimeDomSnapshot(string.Empty, 0)
+                : await PluginRuntimeInputProbe.CaptureAsync(webView);
 
             var closeRequested =
                 await mainWindow.ClosePluginRuntimeForQualityAsync();
@@ -475,7 +492,22 @@ namespace LongBetterWindows.Host.Services
                 initial.ContentIdentity != 0
                 && initial.ContentIdentity == detached.ContentIdentity
                 && initial.ContentIdentity == returned.ContentIdentity;
+            var physicalInputPreserved =
+                inputProbe?.InputReceived == true
+                && detachedDom.Input == PluginRuntimeInputProbe.InputValue
+                && returnedDom.Input == PluginRuntimeInputProbe.InputValue;
+            var physicalScrollPreserved =
+                inputProbe?.PageDownDispatched == true
+                && inputProbe.ScrollBeforeDetach > 0
+                && detachedDom.Scroll > 0
+                && returnedDom.Scroll > 0
+                && Math.Abs(detachedDom.Scroll - returnedDom.Scroll) < 1;
             var passed = embeddedReady
+                && webViewReady
+                && inputProbe?.ActiveElement == "input"
+                && inputProbe.InputDispatched
+                && physicalInputPreserved
+                && physicalScrollPreserved
                 && detachRequested
                 && detachedReady
                 && returnedReady
@@ -514,6 +546,27 @@ namespace LongBetterWindows.Host.Services
                         returned_ready = returnedReady,
                         same_session_across_move = sameSessionAcrossMove,
                         same_view_across_move = sameViewAcrossMove,
+                        foreground_requested =
+                            inputProbe?.ForegroundRequested == true,
+                        active_element_before_input =
+                            inputProbe?.ActiveElement ?? string.Empty,
+                        webview_input_dispatched =
+                            inputProbe?.InputDispatched == true,
+                        webview_input_received =
+                            inputProbe?.InputReceived == true,
+                        webview_input_observed =
+                            inputProbe?.InputObserved ?? string.Empty,
+                        webview_input_preserved =
+                            physicalInputPreserved,
+                        webview_page_down_dispatched =
+                            inputProbe?.PageDownDispatched == true,
+                        webview_scroll_preserved =
+                            physicalScrollPreserved,
+                        physical_ctrl_d_sent = detachRequested,
+                        scroll_before_detach =
+                            inputProbe?.ScrollBeforeDetach ?? 0,
+                        scroll_after_detach = detachedDom.Scroll,
+                        scroll_after_return = returnedDom.Scroll,
                         close_requested = closeRequested,
                         close_stopped = closeStopped,
                         first_session_ended = firstSessionEnded,
