@@ -1,0 +1,23 @@
+name: CSharp Script plugin CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  PLUGIN_DIR: src/MyScriptPlugin
+
+jobs:
+  validate-and-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Production validation
+        shell: pwsh
+        run: ./validate-plugin.ps1 -Path $env:PLUGIN_DIR
+      - name: Deterministic package
+        shell: pwsh
+        run: ./pack-plugin.ps1 -PluginDir $env:PLUGIN_DIR

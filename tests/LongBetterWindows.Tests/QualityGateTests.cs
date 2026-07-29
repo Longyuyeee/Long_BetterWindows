@@ -2040,7 +2040,10 @@ public class QualityGateTests
         Assert.Contains("$csprojNew = \"$pluginDir/$typeName.csproj\"", scaffold);
         Assert.DoesNotContain("$csprojNew = \"$pluginDir/$dirName.csproj\"", scaffold);
         Assert.Contains(@"C:\Program Files\dotnet\dotnet.exe", scaffold);
-        Assert.Contains("& $dotnet build $csprojNew", scaffold);
+        Assert.Contains("& $dotnet test $testProjectNew", scaffold);
+        Assert.Contains(
+            "sln $slnFile add $csprojNew $testProjectNew",
+            scaffold);
         Assert.Contains("\"-p:SolutionDir=$solutionDir\"", scaffold);
         Assert.Contains("$manifest.runtime -eq \"csharp-script\"", scaffold);
         Assert.Contains("Test-Path -LiteralPath $entryPath -PathType Leaf", scaffold);

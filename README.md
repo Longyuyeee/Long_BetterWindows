@@ -146,6 +146,7 @@ async function saveNote() {
 插件 Manifest 的机器可读权威契约见 [JSON Schema](schemas/plugin-manifest.schema.json)。
 Web 插件可以直接使用 [`@long-assistant/plugin-sdk`](sdk/web/README.md) 的 API v1.0.0 TypeScript 声明和 Mock Host，在不启动 WPF/WebView2 的情况下完成严格类型检查与单元测试。
 原生插件使用 [`LongBetterWindows.PluginSdk`](src/LongBetterWindows.PluginSdk/README.md) v1.0.0 编译，生命周期、命令合同和 27 项宿主能力已经从 WPF 宿主程序集拆出；新建原生模板不再引用整个宿主项目。
+原生脚手架会同时生成 xUnit 合同测试项目，并使用 [`LongBetterWindows.PluginSdk.Testing`](sdk/dotnet/LongBetterWindows.PluginSdk.Testing/README.md) 在不启动 WPF 宿主的情况下验证身份、生命周期、能力拒绝、命令、语言和资源释放。Native、C# Script、Web 三类 CI 样板位于 [`sdk/ci`](sdk/ci/README.md)。
 
 ## 架构
 
@@ -167,6 +168,8 @@ Web 插件可以直接使用 [`@long-assistant/plugin-sdk`](sdk/web/README.md) �
 ```text
 src/LongBetterWindows.Host/   WPF 宿主、交互平台与能力实现
 src/LongBetterWindows.PluginSdk/ 原生插件稳定合同 SDK
+sdk/dotnet/                  原生插件无宿主测试工具
+sdk/ci/                      三运行时 CI 样板
 src/*Plugin/                  内置原生与 Web 插件
 src/Templates/                插件脚手架模板
 tests/LongBetterWindows.Tests 自动化测试与质量门禁
@@ -209,6 +212,8 @@ dotnet run --project src/LongBetterWindows.Host
 - [Plugin Manifest JSON Schema](schemas/plugin-manifest.schema.json)
 - [Web Plugin SDK v1.0.0](sdk/web/README.md)
 - [.NET Plugin SDK v1.0.0](src/LongBetterWindows.PluginSdk/README.md)
+- [.NET Plugin SDK Testing v1.0.0](sdk/dotnet/LongBetterWindows.PluginSdk.Testing/README.md)
+- [Plugin CI templates](sdk/ci/README.md)
 - [宿主能力 API 手册](docs/基础能力_API_手册.md)
 - [API Reference](docs/API_REFERENCE.md)
 - [UI / UX 设计与开发规范](docs/UI_UX_设计与开发规范_v1.0.md)

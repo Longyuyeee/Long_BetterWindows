@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{D4EA538B-BEFC-4AC4-885D-7B291607E8D6}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sdk", "sdk", "{6B6BD141-1A0A-4926-8C72-B6EDBD14E0E5}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.Host", "src\LongBetterWindows.Host\LongBetterWindows.Host.csproj", "{2377FE67-6DE4-4E5E-B1A4-B031780E4ED1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SamplePlugin", "src\SamplePlugin\SamplePlugin.csproj", "{1D2BE32C-9103-45A5-BD27-127F2535FC43}"
@@ -32,6 +34,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClipboardHistoryBackground", "src\ClipboardHistoryBackground\ClipboardHistoryBackground.csproj", "{5963EB81-3174-4980-8CFC-A4DAAA161A7B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.PluginSdk", "src\LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj", "{23462FAD-DD30-4D69-8D34-B67694622C16}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.PluginSdk.Testing", "sdk\dotnet\LongBetterWindows.PluginSdk.Testing\LongBetterWindows.PluginSdk.Testing.csproj", "{5D63AC19-F680-423E-8041-5F94D2BF3E04}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -94,6 +98,10 @@ Global
 		{23462FAD-DD30-4D69-8D34-B67694622C16}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{23462FAD-DD30-4D69-8D34-B67694622C16}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{23462FAD-DD30-4D69-8D34-B67694622C16}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D63AC19-F680-423E-8041-5F94D2BF3E04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D63AC19-F680-423E-8041-5F94D2BF3E04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D63AC19-F680-423E-8041-5F94D2BF3E04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D63AC19-F680-423E-8041-5F94D2BF3E04}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{2377FE67-6DE4-4E5E-B1A4-B031780E4ED1} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
@@ -107,5 +115,6 @@ Global
 		{6F36325A-F326-4814-BBAE-F3D7C274E7B4} = {2F570B66-3D14-455D-8B3C-7270332BE3D7}
 		{5963EB81-3174-4980-8CFC-A4DAAA161A7B} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
 		{23462FAD-DD30-4D69-8D34-B67694622C16} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
+		{5D63AC19-F680-423E-8041-5F94D2BF3E04} = {6B6BD141-1A0A-4926-8C72-B6EDBD14E0E5}
 	EndGlobalSection
 EndGlobal

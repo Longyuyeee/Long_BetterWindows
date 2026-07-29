@@ -4,5 +4,6 @@
   "commands.sample.hello.description": "验证插件生命周期、统一命令协议与状态反馈",
   "toast.ready": "示例插件运行正常",
   "result.success": "示例命令执行成功",
-  "error.unknownCommand": "未知示例命令: {0}"
+  "error.unknownCommand": "未知示例命令: {0}",
+  "error.notification": "无法显示示例通知"
 }

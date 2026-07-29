@@ -95,6 +95,7 @@ if ($typeName[0] -match '\d') {
 }
 
 $csprojNew = $null
+$testProjectNew = $null
 if ($Template -ne "script") {
     $csprojOld = "$pluginDir/${templatePrefix}Plugin.csproj"
     $csprojNew = "$pluginDir/$typeName.csproj"
@@ -106,6 +107,12 @@ if ($Template -ne "script") {
     }
     if (Test-Path $csOld) {
         Move-Item $csOld $csNew
+    }
+
+    $testProjectOld = "$pluginDir/tests/${templatePrefix}Plugin.Tests.csproj"
+    $testProjectNew = "$pluginDir/tests/$typeName.Tests.csproj"
+    if (Test-Path $testProjectOld) {
+        Move-Item $testProjectOld $testProjectNew
     }
 }
 
@@ -144,11 +151,11 @@ if ($Template -eq "script") {
 } else {
     Write-Host "[3/4] 加入解决方案..." -ForegroundColor Yellow
     $slnFile = (Get-ChildItem *.sln | Select-Object -First 1).Name
-    & $dotnet sln $slnFile add $csprojNew 2>&1 | Out-Null
+    & $dotnet sln $slnFile add $csprojNew $testProjectNew 2>&1 | Out-Null
 
-    Write-Host "[4/4] 构建验证..." -ForegroundColor Yellow
+    Write-Host "[4/4] 构建并执行合同测试..." -ForegroundColor Yellow
     $solutionDir = $root.TrimEnd('\') + '\'
-    $buildResult = & $dotnet build $csprojNew "-p:SolutionDir=$solutionDir" 2>&1
+    $buildResult = & $dotnet test $testProjectNew "-p:SolutionDir=$solutionDir" 2>&1
     $validationPassed = $LASTEXITCODE -eq 0
 }
 
@@ -161,6 +168,7 @@ if ($validationPassed) {
         Write-Host "  入口 : $entryPath"
     } else {
         Write-Host "  项目 : $csprojNew"
+        Write-Host "  测试 : $testProjectNew"
     }
     Write-Host ""
     Write-Host "  下一步:" -ForegroundColor Cyan
@@ -170,7 +178,7 @@ if ($validationPassed) {
         Write-Host "  3. 启动宿主，在 ToolCenter 中启用插件" -ForegroundColor White
     } else {
         Write-Host "  2. 编辑 $($typeName)Impl.cs 实现你的逻辑" -ForegroundColor White
-        Write-Host "  3. dotnet build  # 构建并自动复制到 Plugins/" -ForegroundColor White
+        Write-Host "  3. dotnet test $testProjectNew  # 合同测试 + 构建" -ForegroundColor White
         Write-Host "  4. 启动宿主，在 ToolCenter 中启用插件" -ForegroundColor White
     }
     Write-Host ""

@@ -1,0 +1,25 @@
+name: Native plugin CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  PLUGIN_TEST_PROJECT: src/MyPlugin/tests/MyPlugin.Tests.csproj
+  PLUGIN_RELEASE_DIR: src/LongBetterWindows.Host/bin/Release/net8.0-windows/Plugins/MyPlugin
+
+jobs:
+  contract-and-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore $env:PLUGIN_TEST_PROJECT
+      - name: Run headless contract tests
+        run: dotnet test $env:PLUGIN_TEST_PROJECT --configuration Release --no-restore
+      - name: Validate staged plugin
+        shell: pwsh
+        run: ./validate-plugin.ps1 -Path $env:PLUGIN_RELEASE_DIR

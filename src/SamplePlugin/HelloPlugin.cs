@@ -1,6 +1,6 @@
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Contracts;
-using LongBetterWindows.Host.Views;
 using Serilog;
 
 namespace SamplePlugin;
@@ -29,6 +29,7 @@ public class HelloPlugin :
     IPluginCommandHandler,
     IPluginLanguageLifecycle
 {
+    private INotificationService _notification = null!;
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -49,6 +50,7 @@ public class HelloPlugin :
     // ═══════════════════════════════════════════════
     public Task<bool> InitializeAsync(IHostApi host)
     {
+        _notification = host.Notification;
         // host.HotKey  — 热键服务（需要 system.hotkey 能力）
         // host.ShellSelection — Explorer 感知（需要 shell.selection 能力）
         // host.ADS     — NTFS 备用数据流（需要 fs.ads.access 能力）
@@ -95,27 +97,35 @@ public class HelloPlugin :
 
     // 统一主入口：插件卡片和命令中心最终复用同一个行为。
     public void ShowMainUI()
-        => FloatingHudWindow.ShowToast(
-            Text("toast.ready", "示例插件运行正常"));
+        => _ = ShowReadyAsync();
 
     // 声明式命令处理器：command_id 来自 manifest.json。
-    public Task<PluginCommandResult> ExecuteCommandAsync(
+    public async Task<PluginCommandResult> ExecuteCommandAsync(
         PluginCommandInvocation invocation,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (invocation.CommandId != "sample.hello")
         {
-            return Task.FromResult(PluginCommandResult.Failure(
+            return PluginCommandResult.Failure(
                 string.Format(
                     Text("error.unknownCommand", "未知示例命令: {0}"),
-                    invocation.CommandId)));
+                    invocation.CommandId));
         }
 
-        ShowMainUI();
-        return Task.FromResult(PluginCommandResult.Success(
-            Text("result.success", "示例命令执行成功")));
+        var notification = await ShowReadyAsync();
+        return notification.IsSuccess
+            ? PluginCommandResult.Success(
+                Text("result.success", "示例命令执行成功"))
+            : PluginCommandResult.Failure(
+                notification.ErrorMessage
+                ?? Text("error.notification", "无法显示示例通知"));
     }
+
+    private Task<HostApiResponse> ShowReadyAsync() =>
+        _notification.ShowAsync(
+            Name,
+            Text("toast.ready", "示例插件运行正常"));
 
     // 语言切换只更新展示资源，不重复启动插件或执行示例命令。
     public Task OnLanguageChangedAsync(

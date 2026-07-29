@@ -4,5 +4,6 @@
   "commands.sample.hello.description": "Verify the plugin lifecycle, unified command protocol, and status feedback",
   "toast.ready": "The sample plugin is working",
   "result.success": "Sample command completed successfully",
-  "error.unknownCommand": "Unknown sample command: {0}"
+  "error.unknownCommand": "Unknown sample command: {0}",
+  "error.notification": "Unable to show the sample notification"
 }

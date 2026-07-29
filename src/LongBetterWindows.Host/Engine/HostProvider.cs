@@ -61,7 +61,7 @@ namespace LongBetterWindows.Host.Engine
             }
 
             // 外部插件：校验 manifest.capabilities 权限
-            var capability = GetCapabilityForService<T>();
+            var capability = HostCapabilityCatalog.ForService<T>();
             if (capability != null && !_registry.HasCapability(pluginId, capability))
             {
                 var msg = $"插件 '{pluginId}' 未声明能力 '{capability}'，" +
@@ -79,65 +79,6 @@ namespace LongBetterWindows.Host.Engine
 
             throw new InvalidOperationException(
                 $"服务 {typeof(T).Name} 未注册，请检查 ServicesInitializer。");
-        }
-
-        private static string? GetCapabilityForService<T>() where T : class
-        {
-            if (typeof(T) == typeof(IHotKeyService))
-                return "system.hotkey";
-            if (typeof(T) == typeof(IShellSelectionService))
-                return "shell.selection";
-            if (typeof(T) == typeof(IADSService))
-                return "fs.ads.access";
-            if (typeof(T) == typeof(IRegistryService))
-                return "system.registry.write";
-            if (typeof(T) == typeof(IStorageService))
-                return "storage.local";
-            if (typeof(T) == typeof(IClipboardService))
-                return "system.clipboard";
-            if (typeof(T) == typeof(INotificationService))
-                return "system.notification";
-            if (typeof(T) == typeof(IFileOpsService))
-                return "file.ops";
-            if (typeof(T) == typeof(IWindowInfoService))
-                return "window.info";
-            if (typeof(T) == typeof(IScreenCaptureService))
-                return "system.screenshot";
-            if (typeof(T) == typeof(IInputService))
-                return "system.input";
-            if (typeof(T) == typeof(IProcessService))
-                return "system.process";
-            if (typeof(T) == typeof(IHttpService))
-                return "network.http";
-            if (typeof(T) == typeof(IShellExecuteService))
-                return "shell.execute";
-            if (typeof(T) == typeof(IUICapability))
-                return "ui.window";
-            if (typeof(T) == typeof(INetworkPortService))
-                return "network.ports";
-            if (typeof(T) == typeof(IPerformanceService))
-                return "system.performance";
-            if (typeof(T) == typeof(IFileSystemService))
-                return "filesystem.advanced";
-            if (typeof(T) == typeof(IPinyinService))
-                return "text.pinyin";
-            if (typeof(T) == typeof(ICacheService))
-                return "system.cache";
-            if (typeof(T) == typeof(IScheduleService))
-                return "system.schedule";
-            if (typeof(T) == typeof(IAudioService))
-                return "system.audio";
-            if (typeof(T) == typeof(IPowerService))
-                return "system.power";
-            if (typeof(T) == typeof(IThemeService))
-                return "system.theme";
-            if (typeof(T) == typeof(IWallpaperService))
-                return "system.wallpaper";
-            if (typeof(T) == typeof(IBrightnessService))
-                return "display.brightness";
-            if (typeof(T) == typeof(INetworkMonitorService))
-                return "network.monitor";
-            return null;
         }
 
         public IHotKeyService HotKey => GetService<IHotKeyService>();
