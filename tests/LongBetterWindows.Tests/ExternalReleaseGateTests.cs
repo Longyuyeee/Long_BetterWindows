@@ -285,6 +285,36 @@ public sealed class ExternalReleaseGateTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsHashLockedDownloadContentMismatch()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            downloadSourcePackageMismatch: true);
+        var output = Path.Combine(_root, "download-content-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("evidence source content does not match its summary", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsHashLockedCleanReviewerMismatch()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            cleanSourceReviewerMismatch: true);
+        var output = Path.Combine(_root, "clean-content-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Clean-environment evidence source content", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
     public async Task VerifyExternalReleaseGate_RejectsLegacyMarketplaceSummary()
     {
         var paths = WriteFixture(PackageHash, marketplaceSchemaVersion: 1);
@@ -421,7 +451,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
         int marketplaceSchemaVersion = 2,
         int releaseSchemaVersion = 1,
         bool releaseSourceDirty = false,
-        bool invalidPackageInventory = false)
+        bool invalidPackageInventory = false,
+        bool downloadSourcePackageMismatch = false,
+        bool cleanSourceReviewerMismatch = false)
     {
         Directory.CreateDirectory(_root);
         var packagePath = Path.Combine(_root, "LongBetterWindows.zip");
@@ -490,9 +522,59 @@ public sealed class ExternalReleaseGateTests : IDisposable
         var downloadEvidencePath = Path.Combine(_root, "download-evidence.json");
         var downloadApprovalPath = Path.Combine(_root, "download-approval.json");
         var cleanEvidencePath = Path.Combine(_root, "clean-environment-evidence.json");
-        File.WriteAllText(downloadEvidencePath, "download evidence fixture");
-        File.WriteAllText(downloadApprovalPath, "download approval fixture");
-        File.WriteAllText(cleanEvidencePath, "clean environment fixture");
+        WritePortableSource("download-evidence.json", new
+        {
+            classification = "verified_release_download_provenance",
+            passed = true,
+            release = new
+            {
+                source_commit = Commit,
+                distribution_channel = "unsigned",
+            },
+            package = new
+            {
+                file = "LongBetterWindows.zip",
+                sha256 = downloadSourcePackageMismatch
+                    ? new string('f', 64)
+                    : PackageHash,
+            },
+            windows_origin = new { host = new { host = "github.com" } },
+        });
+        WritePortableSource("download-approval.json", new
+        {
+            classification = "release_download_human_approval",
+            source_commit = Commit,
+            distribution_channel = "unsigned",
+            package = new
+            {
+                file = "LongBetterWindows.zip",
+                sha256 = PackageHash,
+            },
+            evidence = EvidenceEntry("download-evidence.json"),
+            @operator = "capture-user",
+            reviewer = "review-user",
+        });
+        WritePortableSource("clean-environment-evidence.json", new
+        {
+            classification = "clean_windows_release_evidence",
+            release = new
+            {
+                version = "1.11.0",
+                source_commit = Commit,
+                distribution_channel = "unsigned",
+                package_sha256 = cleanPackageHash,
+                signed = false,
+            },
+            environment = new { label = "clean-vm" },
+            automated_checks = new { passed = true },
+            human_review = new
+            {
+                status = "approved",
+                reviewer = cleanSourceReviewerMismatch
+                    ? "different-reviewer"
+                    : "clean-reviewer",
+            },
+        });
         var download = WriteJson("download.json", new
         {
             schema_version = downloadSchemaVersion,
@@ -513,6 +595,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
             schema_version = cleanSchemaVersion,
             classification = "approved_clean_windows_release_gate",
             passed = true,
+            version = "1.11.0",
             source_commit = Commit,
             distribution_channel = "unsigned",
             signed = false,

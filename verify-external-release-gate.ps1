@@ -164,7 +164,7 @@ function Assert-AccessibilityContract($gate, [string] $sourceCommit) {
     }
 }
 
-function Assert-HashLockedSource($gate, $entry, [string] $label) {
+function Read-HashLockedSource($gate, $entry, [string] $label) {
     $file = [string]$entry.file
     if ([string]::IsNullOrWhiteSpace($file) `
         -or [IO.Path]::GetFileName($file) -ne $file `
@@ -177,6 +177,13 @@ function Assert-HashLockedSource($gate, $entry, [string] $label) {
             Hash.ToLowerInvariant() -ne [string]$entry.sha256) {
         throw "$label source hash mismatch: $file"
     }
+    try {
+        return Get-Content -LiteralPath $path -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+    }
+    catch {
+        throw "$label source is not valid JSON: $file"
+    }
 }
 
 function Assert-DownloadContract($gate) {
@@ -185,8 +192,30 @@ function Assert-DownloadContract($gate) {
         -or [string]::IsNullOrWhiteSpace([string]$document.download_host)) {
         throw 'Release-download gate summary contract is incomplete.'
     }
-    Assert-HashLockedSource $gate $document.evidence 'Release-download evidence'
-    Assert-HashLockedSource $gate $document.approval 'Release-download approval'
+    $evidence = Read-HashLockedSource `
+        $gate $document.evidence 'Release-download evidence'
+    $approval = Read-HashLockedSource `
+        $gate $document.approval 'Release-download approval'
+    if ([string]$evidence.classification -ne 'verified_release_download_provenance' `
+        -or -not [bool]$evidence.passed `
+        -or [string]$evidence.release.source_commit -ne [string]$document.source_commit `
+        -or [string]$evidence.release.distribution_channel -ne [string]$document.distribution_channel `
+        -or [string]$evidence.package.file -ne [string]$document.package_file `
+        -or [string]$evidence.package.sha256 -ne [string]$document.package_sha256 `
+        -or [string]$evidence.windows_origin.host.host -ne [string]$document.download_host) {
+        throw 'Release-download evidence source content does not match its summary.'
+    }
+    if ([string]$approval.classification -ne 'release_download_human_approval' `
+        -or [string]$approval.source_commit -ne [string]$document.source_commit `
+        -or [string]$approval.distribution_channel -ne [string]$document.distribution_channel `
+        -or [string]$approval.package.file -ne [string]$document.package_file `
+        -or [string]$approval.package.sha256 -ne [string]$document.package_sha256 `
+        -or [string]$approval.operator -ne [string]$document.operator `
+        -or [string]$approval.reviewer -ne [string]$document.reviewer `
+        -or [string]$approval.evidence.file -ne [string]$document.evidence.file `
+        -or [string]$approval.evidence.sha256 -ne [string]$document.evidence.sha256) {
+        throw 'Release-download approval source content does not match its summary.'
+    }
 }
 
 function Assert-CleanEnvironmentContract(
@@ -201,7 +230,20 @@ function Assert-CleanEnvironmentContract(
     if ([string]$document.evidence_manifest.file -ne 'clean-environment-evidence.json') {
         throw 'Clean-environment evidence source identity is incomplete.'
     }
-    Assert-HashLockedSource $gate $document.evidence_manifest 'Clean-environment evidence'
+    $evidence = Read-HashLockedSource `
+        $gate $document.evidence_manifest 'Clean-environment evidence'
+    if ([string]$evidence.classification -ne 'clean_windows_release_evidence' `
+        -or [string]$evidence.release.source_commit -ne [string]$document.source_commit `
+        -or [string]$evidence.release.distribution_channel -ne [string]$document.distribution_channel `
+        -or [string]$evidence.release.version -ne [string]$document.version `
+        -or [string]$evidence.release.package_sha256 -ne [string]$document.package_sha256 `
+        -or [bool]$evidence.release.signed -ne [bool]$document.signed `
+        -or -not [bool]$evidence.automated_checks.passed `
+        -or [string]$evidence.environment.label -ne [string]$document.environment_label `
+        -or [string]$evidence.human_review.status -ne 'approved' `
+        -or [string]$evidence.human_review.reviewer -ne [string]$document.reviewer) {
+        throw 'Clean-environment evidence source content does not match its summary.'
+    }
 }
 
 function Assert-MarketplaceEvidenceContract($gate) {

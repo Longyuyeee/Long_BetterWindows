@@ -188,11 +188,14 @@ public class QualityGateTests
         Assert.Contains("portable source content does not match its summary", gate);
         Assert.Contains("Release-download gate summary contract is incomplete", gate);
         Assert.Contains("Clean-environment gate summary contract is incomplete", gate);
-        Assert.Contains("Assert-HashLockedSource", gate);
+        Assert.Contains("Read-HashLockedSource", gate);
         Assert.Contains("'Release-download evidence'", gate);
         Assert.Contains("'Release-download approval'", gate);
         Assert.Contains("'Clean-environment evidence'", gate);
         Assert.Contains("source hash mismatch", gate);
+        Assert.Contains("Release-download evidence source content does not match", gate);
+        Assert.Contains("Release-download approval source content does not match", gate);
+        Assert.Contains("Clean-environment evidence source content does not match", gate);
         Assert.Contains("Marketplace rehearsal schema version 2 is required", gate);
         Assert.Contains("Marketplace rehearsal evidence hash mismatch", gate);
         Assert.Contains("Release Manifest candidate identity contract is incomplete", gate);
