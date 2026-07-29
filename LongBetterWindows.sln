@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.MarketplacePublisher", "tools\LongBetterWindows.MarketplacePublisher\LongBetterWindows.MarketplacePublisher.csproj", "{A8D57D03-9EAB-43D8-B512-0F2BC9839071}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.PluginValidator", "tools\LongBetterWindows.PluginValidator\LongBetterWindows.PluginValidator.csproj", "{3CBFB0F0-6442-4141-A5B8-79280D9C829A}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClipboardHistoryBackground", "src\ClipboardHistoryBackground\ClipboardHistoryBackground.csproj", "{5963EB81-3174-4980-8CFC-A4DAAA161A7B}"
 EndProject
 Global
@@ -78,6 +80,10 @@ Global
 		{A8D57D03-9EAB-43D8-B512-0F2BC9839071}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A8D57D03-9EAB-43D8-B512-0F2BC9839071}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A8D57D03-9EAB-43D8-B512-0F2BC9839071}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3CBFB0F0-6442-4141-A5B8-79280D9C829A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3CBFB0F0-6442-4141-A5B8-79280D9C829A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3CBFB0F0-6442-4141-A5B8-79280D9C829A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3CBFB0F0-6442-4141-A5B8-79280D9C829A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5963EB81-3174-4980-8CFC-A4DAAA161A7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5963EB81-3174-4980-8CFC-A4DAAA161A7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5963EB81-3174-4980-8CFC-A4DAAA161A7B}.Release|Any CPU.ActiveCfg = Release|Any CPU

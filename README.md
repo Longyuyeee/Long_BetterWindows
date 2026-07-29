@@ -134,6 +134,7 @@ async function saveNote() {
 
 ```powershell
 .\new-plugin.ps1
+.\validate-plugin.ps1 -Path "src/MyPlugin"
 .\pack-plugin.ps1 -PluginDir "src/MyPlugin"
 ```
 

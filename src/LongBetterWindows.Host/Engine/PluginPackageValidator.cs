@@ -109,9 +109,9 @@ namespace LongBetterWindows.Host.Engine
                         sha256,
                         manifest);
 
-                var entryPoint = Path.GetFullPath(Path.Combine(stagingDir, manifest.EntryPoint));
-                if (!IsWithin(stagingDir, entryPoint) || !File.Exists(entryPoint))
-                    return PackageValidationResult.Fail("插件入口文件不存在或越出包根目录。", sha256);
+                var contentError = ValidateDirectoryContents(stagingDir, manifest);
+                if (contentError != null)
+                    return PackageValidationResult.Fail(contentError, sha256, manifest);
 
                 var compatibilityError = ValidateCompatibility(manifest);
                 if (compatibilityError != null)
@@ -136,6 +136,51 @@ namespace LongBetterWindows.Host.Engine
             {
                 try { Directory.Delete(stagingDir, true); } catch { }
             }
+        }
+
+        public async Task<PackageValidationResult> ValidateDirectoryAsync(
+            string pluginDirectory,
+            PluginManifest? installedManifest = null)
+        {
+            if (!Directory.Exists(pluginDirectory))
+                return PackageValidationResult.Fail("插件目录不存在。");
+
+            string root;
+            try
+            {
+                root = Path.GetFullPath(pluginDirectory);
+            }
+            catch (Exception ex)
+            {
+                return PackageValidationResult.Fail($"插件目录路径无效：{ex.Message}");
+            }
+
+            var manifestResult = await ManifestReader.ReadAsync(root);
+            if (!manifestResult.IsSuccess)
+            {
+                return PackageValidationResult.Fail(
+                    $"manifest.json 无效：{manifestResult.Error}",
+                    manifestFailureCode: manifestResult.ErrorCode,
+                    manifestIssues: manifestResult.Issues);
+            }
+
+            var manifest = manifestResult.Manifest!;
+            var contentError = ValidateDirectoryContents(root, manifest);
+            if (contentError != null)
+                return PackageValidationResult.Fail(contentError, manifest: manifest);
+
+            var compatibilityError = ValidateCompatibility(manifest);
+            if (compatibilityError != null)
+                return PackageValidationResult.Fail(compatibilityError, manifest: manifest);
+
+            return PackageValidationResult.Ok(
+                manifest,
+                sha256: null,
+                trust: PackageTrustLevel.LocalUnsigned,
+                permissionDiff: CreatePermissionDiff(
+                    installedManifest?.Capabilities,
+                    manifest.Capabilities),
+                highTrust: IsNativePlugin(manifest));
         }
 
         public static PermissionDiff CreatePermissionDiff(
@@ -182,6 +227,47 @@ namespace LongBetterWindows.Host.Engine
                         new ApiVersion(api.Major, api.Minor, Math.Max(0, api.Build)))))
                 return $"API 版本不兼容：需要 {manifest.MinApiVersion}，当前 {ApiVersion.Current}。";
             return null;
+        }
+
+        private static string? ValidateDirectoryContents(
+            string root,
+            PluginManifest manifest)
+        {
+            if (!IsExistingFileWithin(root, manifest.EntryPoint))
+                return "插件入口文件不存在或越出插件根目录。";
+
+            if (manifest.Background is { } background
+                && !IsExistingFileWithin(root, background.EntryPoint))
+            {
+                return "插件原生后台入口不存在或越出插件根目录。";
+            }
+
+            if (manifest.Localization is { } localization)
+            {
+                foreach (var resource in localization.Resources)
+                {
+                    if (!IsExistingFileWithin(root, resource.Value))
+                    {
+                        return $"插件语言资源不存在或越出插件根目录：{resource.Key}。";
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static bool IsExistingFileWithin(string root, string relativePath)
+        {
+            try
+            {
+                var path = Path.GetFullPath(Path.Combine(root, relativePath));
+                return IsWithin(root, path) && File.Exists(path);
+            }
+            catch (Exception exception) when (exception is
+                ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                return false;
+            }
         }
 
         private static string? ValidateStructure(ZipArchive archive)
@@ -304,7 +390,7 @@ namespace LongBetterWindows.Host.Engine
             = Array.Empty<ManifestValidationIssue>();
 
         public static PackageValidationResult Ok(
-            PluginManifest manifest, string sha256, PackageTrustLevel trust,
+            PluginManifest manifest, string? sha256, PackageTrustLevel trust,
             PermissionDiff permissionDiff, bool highTrust)
             => new()
             {

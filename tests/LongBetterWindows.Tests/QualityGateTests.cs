@@ -2049,6 +2049,32 @@ public class QualityGateTests
         Assert.DoesNotContain("\"entry\":", guide);
     }
 
+    [Fact]
+    public void PluginValidatorCli_ReusesProductionValidationAndDocumentsStableOutput()
+    {
+        var script = Read("validate-plugin.ps1");
+        var program = Read(
+            "tools", "LongBetterWindows.PluginValidator", "Program.cs");
+        var validator = Read(
+            "src", "LongBetterWindows.Host", "Engine",
+            "PluginPackageValidator.cs");
+        var guide = Read("docs", "插件开发指南.md");
+
+        Assert.Contains("LongBetterWindows.PluginValidator.csproj", script);
+        Assert.Contains("exit $LASTEXITCODE", script);
+        Assert.Contains("new PluginPackageValidator()", program);
+        Assert.Contains("ValidateDirectoryAsync", program);
+        Assert.Contains("ValidateAsync", program);
+        Assert.Contains("long_plugin_validation", program);
+        Assert.Contains("ValidateDirectoryContents", validator);
+        Assert.Contains("manifest.Background", validator);
+        Assert.Contains("localization.Resources", validator);
+        Assert.Contains("validate-plugin.ps1", guide);
+        Assert.Contains("成功为 `0`", guide);
+        Assert.Contains("验证失败为 `1`", guide);
+        Assert.Contains("参数错误为 `2`", guide);
+    }
+
     private static string Read(params string[] parts)
         => File.ReadAllText(Path.Combine(new[] { FindRepositoryRoot() }.Concat(parts).ToArray()));
 

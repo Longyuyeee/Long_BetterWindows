@@ -155,6 +155,58 @@ public sealed class PluginPackageValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateDirectoryAsync_UsesManifestEntryAndLocalizationRules()
+    {
+        var directory = CreatePluginDirectory();
+
+        var result = await new PluginPackageValidator(new Version(1, 0, 0))
+            .ValidateDirectoryAsync(directory);
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal("dev.long.directory", result.Manifest!.Id);
+        Assert.Equal(PackageTrustLevel.LocalUnsigned, result.TrustLevel);
+        Assert.False(result.RequiresHighTrustWarning);
+        Assert.Null(result.Sha256);
+    }
+
+    [Fact]
+    public async Task ValidateDirectoryAsync_MissingEntryIsRejectedBeforePackaging()
+    {
+        var directory = CreatePluginDirectory();
+        File.Delete(Path.Combine(directory, "index.html"));
+
+        var result = await new PluginPackageValidator()
+            .ValidateDirectoryAsync(directory);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("入口文件不存在", result.Error);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_MissingBackgroundBinaryIsRejected()
+    {
+        var manifest = JsonSerializer.Serialize(new
+        {
+            id = "dev.long.hybrid",
+            version = "1.0.0",
+            name = "Hybrid Plugin",
+            runtime = "webview",
+            entry_point = "index.html",
+            background = new { entry_point = "Hybrid.Background.dll" },
+            capabilities = Array.Empty<string>(),
+        });
+        var package = CreatePackage(
+            runtime: "webview",
+            entryPoint: "index.html",
+            manifestJson: manifest);
+
+        var result = await new PluginPackageValidator().ValidateAsync(package);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("原生后台入口不存在", result.Error);
+    }
+
+    [Fact]
     public void CreatePermissionDiff_SeparatesAddedRemovedAndUnchanged()
     {
         var diff = PluginPackageValidator.CreatePermissionDiff(
@@ -215,6 +267,37 @@ public sealed class PluginPackageValidatorTests : IDisposable
         WriteEntry(archive, entryPoint, "test-entry");
         if (extraEntryName != null) WriteEntry(archive, extraEntryName, "unsafe");
         return path;
+    }
+
+    private string CreatePluginDirectory()
+    {
+        var directory = Path.Combine(_tempDir, $"directory-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, "i18n"));
+        File.WriteAllText(
+            Path.Combine(directory, "manifest.json"),
+            JsonSerializer.Serialize(new
+            {
+                id = "dev.long.directory",
+                version = "1.0.0",
+                name = "Directory Plugin",
+                description = "Directory validation fixture",
+                runtime = "webview",
+                entry_point = "index.html",
+                capabilities = new[] { "storage.local" },
+                localization = new
+                {
+                    default_language = "zh-CN",
+                    resources = new Dictionary<string, string>
+                    {
+                        ["zh-CN"] = "i18n/zh-CN.json",
+                    },
+                },
+            }));
+        File.WriteAllText(Path.Combine(directory, "index.html"), "<html></html>");
+        File.WriteAllText(
+            Path.Combine(directory, "i18n", "zh-CN.json"),
+            """{"title":"测试"}""");
+        return directory;
     }
 
     private static void WriteEntry(ZipArchive archive, string name, string content)
