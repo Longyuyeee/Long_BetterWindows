@@ -25,6 +25,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
@@ -159,7 +160,11 @@ $manifest = [ordered]@{
     captures = $captures
 }
 $manifestPath = Join-Path $outputRoot 'physical-dpi-evidence.json'
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $manifest `
+    -Path $manifestPath `
+    -Depth 8 `
+    -Label 'Physical DPI evidence manifest'
 
 Write-Output "Physical DPI evidence captured: $($captures.Count) images at $ExpectedScalePercent%."
 Write-Output "Human review: $($manifest.human_review.status)"

@@ -23,6 +23,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $identityName = 'Long.LongBetterWindows'
 $completionPhrase = 'SPARSE EXPLORER CHECKS COMPLETE'
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
@@ -193,7 +194,7 @@ if ($PreflightOnly) {
     [IO.Directory]::CreateDirectory($outputRoot) | Out-Null
     $preflightPath = Join-Path $outputRoot `
         'sparse-package-explorer-preflight.json'
-    [ordered]@{
+    $preflight = [ordered]@{
         schema_version = 1
         generated_at = [DateTimeOffset]::UtcNow.ToString('O')
         classification = 'sparse_package_explorer_preflight'
@@ -208,8 +209,12 @@ if ($PreflightOnly) {
         package_registration_attempted = $false
         explorer_interaction_attempted = $false
         passed = $true
-    } | ConvertTo-Json -Depth 4 |
-        Set-Content -LiteralPath $preflightPath -Encoding UTF8
+    }
+    Write-NewJsonFileAtomically `
+        -Value $preflight `
+        -Path $preflightPath `
+        -Depth 4 `
+        -Label 'Sparse Explorer preflight'
     Write-Output 'Sparse Package Explorer read-only preflight passed.'
     Write-Output 'This result cannot replace interactive capture and independent approval.'
     Write-Output "Preflight: $preflightPath"
@@ -391,7 +396,10 @@ $evidence = [ordered]@{
     }
 }
 $evidencePath = Join-Path $outputRoot 'sparse-package-explorer-evidence.json'
-$evidence | ConvertTo-Json -Depth 8 |
-    Set-Content -LiteralPath $evidencePath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $evidence `
+    -Path $evidencePath `
+    -Depth 8 `
+    -Label 'Sparse Explorer evidence manifest'
 Write-Output 'Sparse Package Explorer capture passed; independent review remains pending.'
 Write-Output "Evidence: $evidencePath"

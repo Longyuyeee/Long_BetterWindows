@@ -219,6 +219,9 @@ public class SparsePackageTests
         Assert.Contains("finally", capture);
         Assert.Contains("-Action Unregister", capture);
         Assert.Contains("legacy_menu_state_unchanged", capture);
+        Assert.Contains("Write-NewJsonFileAtomically", capture);
+        Assert.DoesNotContain("Set-Content -LiteralPath $evidencePath", capture);
+        Assert.DoesNotContain("Set-Content -LiteralPath $preflightPath", capture);
         Assert.DoesNotContain("New-SelfSignedCertificate", capture);
         Assert.DoesNotContain("TrustedPeople", capture);
 

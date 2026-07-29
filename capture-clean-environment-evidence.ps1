@@ -19,6 +19,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -173,6 +174,10 @@ $manifest = [ordered]@{
     }
 }
 $evidencePath = Join-Path $outputRoot 'clean-environment-evidence.json'
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $manifest `
+    -Path $evidencePath `
+    -Depth 8 `
+    -Label 'Clean-environment evidence manifest'
 Write-Output 'Automated clean-environment release checks passed; independent human review remains pending.'
 Write-Output "Evidence: $evidencePath"

@@ -15,6 +15,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
@@ -124,7 +125,11 @@ $manifest = [ordered]@{
     }
 }
 $manifestPath = Join-Path $outputRoot 'accessibility-evidence.json'
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $manifest `
+    -Path $manifestPath `
+    -Depth 8 `
+    -Label 'Accessibility evidence manifest'
 Write-Output "Accessibility evidence captured for profile: $ExpectedProfile"
 Write-Output "Screen reader: $ScreenReader (detected=$readerDetected)"
 Write-Output "Manifest: $manifestPath"

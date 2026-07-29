@@ -21,6 +21,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 
 function Get-ZoneTransferFields([string] $filePath) {
     $zoneStream = Get-Item -LiteralPath $filePath -Stream 'Zone.Identifier' -ErrorAction SilentlyContinue
@@ -158,11 +159,11 @@ $evidence = [ordered]@{
     }
 }
 
-$outputParent = Split-Path -Parent $resolvedOutputPath
-if (-not [string]::IsNullOrWhiteSpace($outputParent)) {
-    [IO.Directory]::CreateDirectory($outputParent) | Out-Null
-}
-$evidence | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $resolvedOutputPath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $evidence `
+    -Path $resolvedOutputPath `
+    -Depth 8 `
+    -Label 'Download evidence output'
 Write-Output 'Downloaded release identity and Windows internet-origin evidence verified.'
 Write-Output 'Interactive extraction, SmartScreen, antivirus, and first-launch review remain pending.'
 Write-Output "Evidence: $resolvedOutputPath"

@@ -296,6 +296,8 @@ public class QualityGateTests
         Assert.Contains("requires a clean tracked source tree", capture);
         Assert.Contains("must rebuild the expected source commit", capture);
         Assert.Contains("source_commit = $expectedCommit", capture);
+        Assert.Contains("Write-NewJsonFileAtomically", capture);
+        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", capture);
         Assert.Contains("ApproveAfterVisualReview", capture);
         Assert.Contains("ProcessTimeoutSeconds = 90", capture);
         Assert.Contains("WaitForExit($ProcessTimeoutSeconds * 1000)", capture);
@@ -350,6 +352,8 @@ public class QualityGateTests
         Assert.Contains("Requested screen reader process is not running", capture);
         Assert.Contains("run-desktop-ui-smoke.ps1", capture);
         Assert.Contains("physical_accessibility_evidence", capture);
+        Assert.Contains("Write-NewJsonFileAtomically", capture);
+        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", capture);
         Assert.Contains("ConfirmKeyboardNavigation", approve);
         Assert.Contains("ConfirmFocusVisibility", approve);
         Assert.Contains("ConfirmMotionBehavior", approve);
@@ -403,6 +407,8 @@ public class QualityGateTests
         Assert.Contains("Start capture before the first launch", capture);
         Assert.Contains("-ReleaseDirectory $installRoot", capture);
         Assert.Contains("clean_windows_release_evidence", capture);
+        Assert.Contains("Write-NewJsonFileAtomically", capture);
+        Assert.DoesNotContain("Set-Content -LiteralPath $evidencePath", capture);
         Assert.Contains("ConfirmTrayIcon", approve);
         Assert.Contains("ExpectedSourceCommit", approve);
         Assert.Contains("ExpectedDistributionChannel", approve);
@@ -452,6 +458,8 @@ public class QualityGateTests
         Assert.Contains("Download evidence output already exists", capture);
         Assert.Contains("query_parameters_recorded = $false", capture);
         Assert.Contains("verified_release_download_provenance", capture);
+        Assert.Contains("Write-NewJsonFileAtomically", capture);
+        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutputPath", capture);
         Assert.Contains("smartscreen_observed = $false", capture);
         Assert.Contains("first_launch_observed = $false", capture);
         Assert.DoesNotContain("Start-Process", capture);
