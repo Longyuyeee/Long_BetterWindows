@@ -211,7 +211,7 @@ await Host.HotKey.RegisterAsync("Ctrl+Shift+N", async () => {
 
 ## 📚 进一步学习
 
-- [开发者文档](DEVELOPER_GUIDE.md) - 如何开发插件
+- [插件开发指南](插件开发指南.md) - 如何开发插件
 - [API 参考](API_REFERENCE.md) - 完整 API 文档
 - [示例插件](../examples/) - 学习最佳实践
 

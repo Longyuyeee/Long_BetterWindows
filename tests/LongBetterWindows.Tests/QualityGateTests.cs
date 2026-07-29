@@ -2023,6 +2023,32 @@ public class QualityGateTests
         Assert.True(adapter.Split('\n').Length < 130);
     }
 
+    [Fact]
+    public void PluginScaffold_ExposesTheDocumentedScriptTemplateContract()
+    {
+        var scaffold = Read("new-plugin.ps1");
+        var template = Read(
+            "src", "Templates", "script-plugin", "manifest.json");
+        var guide = Read("docs", "插件开发指南.md");
+
+        Assert.Contains(
+            "[ValidateSet(\"empty\", \"hotkey\", \"full\", \"script\")]",
+            scaffold);
+        Assert.Contains("\"script\" { $null }", scaffold);
+        Assert.Contains("*.csx", scaffold);
+        Assert.Contains("$csprojNew = \"$pluginDir/$typeName.csproj\"", scaffold);
+        Assert.DoesNotContain("$csprojNew = \"$pluginDir/$dirName.csproj\"", scaffold);
+        Assert.Contains(@"C:\Program Files\dotnet\dotnet.exe", scaffold);
+        Assert.Contains("& $dotnet build $csprojNew", scaffold);
+        Assert.Contains("\"-p:SolutionDir=$solutionDir\"", scaffold);
+        Assert.Contains("$manifest.runtime -eq \"csharp-script\"", scaffold);
+        Assert.Contains("Test-Path -LiteralPath $entryPath -PathType Leaf", scaffold);
+        Assert.Contains("\"runtime\": \"csharp-script\"", template);
+        Assert.Contains("\"entry_point\": \"plugin.csx\"", template);
+        Assert.Contains("-Template script", guide);
+        Assert.DoesNotContain("\"entry\":", guide);
+    }
+
     private static string Read(params string[] parts)
         => File.ReadAllText(Path.Combine(new[] { FindRepositoryRoot() }.Concat(parts).ToArray()));
 

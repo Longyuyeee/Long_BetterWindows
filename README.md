@@ -195,7 +195,8 @@ dotnet run --project src/LongBetterWindows.Host
 ## 文档导航
 
 - [用户指南](docs/USER_GUIDE.md)
-- [开发者指南](docs/DEVELOPER_GUIDE.md)
+- [插件开发指南](docs/插件开发指南.md)
+- [插件开发体系审计与优化计划](docs/插件开发体系审计与优化计划_2026-07-30.md)
 - [API Reference](docs/API_REFERENCE.md)
 - [UI / UX 设计与开发规范](docs/UI_UX_设计与开发规范_v1.0.md)
 - [安全审计报告](docs/安全审计报告.md)
