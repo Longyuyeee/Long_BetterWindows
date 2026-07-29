@@ -31,6 +31,32 @@ public sealed class ReleaseEvidenceIoScriptTests : IDisposable
     }
 
     [Fact]
+    public async Task WriteNewTextFileAtomically_CreatesNewFileWithoutResidue()
+    {
+        var path = Path.Combine(_root, "SHA256SUMS.txt");
+
+        var result = await RunWriteTextAsync(path, "abc  package.zip\n");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal("abc  package.zip\n", await File.ReadAllTextAsync(path));
+        AssertNoTemporaryFiles();
+    }
+
+    [Fact]
+    public async Task WriteNewTextFileAtomically_RejectsExistingFile()
+    {
+        var path = Path.Combine(_root, "SHA256SUMS.txt");
+        await File.WriteAllTextAsync(path, "old");
+
+        var result = await RunWriteTextAsync(path, "new");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("already exists", result.Error);
+        Assert.Equal("old", await File.ReadAllTextAsync(path));
+        AssertNoTemporaryFiles();
+    }
+
+    [Fact]
     public async Task UpdateJsonFileAtomically_RejectsChangedFileWithoutOverwriting()
     {
         var path = WritePendingManifest();
@@ -84,6 +110,24 @@ public sealed class ReleaseEvidenceIoScriptTests : IDisposable
             $"$value = [ordered]@{{ reviewer = {Quote(reviewer)} }}; " +
             $"Update-JsonFileAtomically -Value $value -Path {Quote(path)} " +
             $"-ExpectedSha256 {Quote(expectedHash)} -Depth 4 -Label 'Test evidence'";
+        return await RunPowerShellAsync(command);
+    }
+
+    private static Task<ProcessResult> RunWriteTextAsync(
+        string path,
+        string value)
+    {
+        var helper = Path.Combine(FindRepositoryRoot(), "release-evidence-io.ps1");
+        var command =
+            "$ErrorActionPreference = 'Stop'; " +
+            $". {Quote(helper)}; " +
+            $"Write-NewTextFileAtomically -Value {Quote(value)} " +
+            $"-Path {Quote(path)} -Label 'Test ledger'";
+        return RunPowerShellAsync(command);
+    }
+
+    private static async Task<ProcessResult> RunPowerShellAsync(string command)
+    {
         var start = new ProcessStartInfo
         {
             FileName = "powershell.exe",
@@ -106,7 +150,7 @@ public sealed class ReleaseEvidenceIoScriptTests : IDisposable
         }
 
         using var process = Process.Start(start)
-            ?? throw new InvalidOperationException("PowerShell update did not start.");
+            ?? throw new InvalidOperationException("PowerShell command did not start.");
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();

@@ -38,6 +38,44 @@ function Write-NewJsonFileAtomically {
     }
 }
 
+function Write-NewTextFileAtomically {
+    param(
+        [Parameter(Mandatory=$true)] [string] $Value,
+        [Parameter(Mandatory=$true)] [string] $Path,
+        [Parameter(Mandatory=$true)] [string] $Label
+    )
+
+    $resolvedPath = [IO.Path]::GetFullPath($Path)
+    if (Test-Path -LiteralPath $resolvedPath) {
+        throw "$Label already exists: $resolvedPath"
+    }
+    $parent = Split-Path -Parent $resolvedPath
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        [IO.Directory]::CreateDirectory($parent) | Out-Null
+    }
+    $fileName = [IO.Path]::GetFileName($resolvedPath)
+    $temporaryPath = Join-Path $parent (
+        ".$fileName.$([Guid]::NewGuid().ToString('N')).tmp")
+    try {
+        [IO.File]::WriteAllText(
+            $temporaryPath,
+            $Value,
+            [Text.UTF8Encoding]::new($false))
+        [IO.File]::Move($temporaryPath, $resolvedPath)
+    }
+    catch {
+        if (Test-Path -LiteralPath $resolvedPath) {
+            throw "$Label already exists: $resolvedPath"
+        }
+        throw
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryPath) {
+            Remove-Item -LiteralPath $temporaryPath -Force
+        }
+    }
+}
+
 function Update-JsonFileAtomically {
     param(
         [Parameter(Mandatory=$true)] $Value,

@@ -16,6 +16,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$evidenceIo = Join-Path $repoRoot 'release-evidence-io.ps1'
+if (-not (Test-Path -LiteralPath $evidenceIo -PathType Leaf)) {
+    throw "Release evidence writer was not found: $evidenceIo"
+}
+. $evidenceIo
 $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
 $project = Join-Path $repoRoot 'src\LongBetterWindows.Host\LongBetterWindows.Host.csproj'
 $tests = Join-Path $repoRoot 'tests\LongBetterWindows.Tests\LongBetterWindows.Tests.csproj'
@@ -272,7 +277,10 @@ try {
 
     $checksumLines = @($packages) + @($installers) |
         ForEach-Object { "$($_.sha256)  $($_.file)" }
-    $checksumLines | Set-Content -LiteralPath (Join-Path $releaseRoot 'SHA256SUMS.txt') -Encoding UTF8
+    Write-NewTextFileAtomically `
+        -Value (($checksumLines -join [Environment]::NewLine) + [Environment]::NewLine) `
+        -Path (Join-Path $releaseRoot 'SHA256SUMS.txt') `
+        -Label 'Release checksum ledger'
 
     # Generated evidence and local secrets are intentionally untracked and do not
     # change the reproducible source tree used by this release.
@@ -293,8 +301,11 @@ try {
         signed = $false
         release_eligible = -not $sourceDirty
     }
-    $manifest | ConvertTo-Json -Depth 5 | Set-Content `
-        -LiteralPath (Join-Path $releaseRoot 'release-manifest.json') -Encoding UTF8
+    Write-NewJsonFileAtomically `
+        -Value $manifest `
+        -Path (Join-Path $releaseRoot 'release-manifest.json') `
+        -Depth 5 `
+        -Label 'Release manifest'
 
     Remove-Item -LiteralPath $smokeDirectory -Recurse -Force
     Write-Host "发布候选已生成：$releaseRoot" -ForegroundColor Green

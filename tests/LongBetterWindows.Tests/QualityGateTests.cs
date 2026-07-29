@@ -968,6 +968,11 @@ public class QualityGateTests
         Assert.Contains("publisher_identity = 'unverified'", release);
         Assert.Contains("release_eligible = -not $sourceDirty", release);
         Assert.Contains("Get-FileHash", release);
+        Assert.Contains("release-evidence-io.ps1", release);
+        Assert.Contains("Write-NewJsonFileAtomically", release);
+        Assert.Contains("Write-NewTextFileAtomically", release);
+        Assert.DoesNotContain("$checksumLines | Set-Content", release);
+        Assert.DoesNotContain("ConvertTo-Json -Depth 5 | Set-Content", release);
         Assert.Contains("[IO.Compression.ZipArchiveMode]::Create", release);
         Assert.Contains("Add-Type -AssemblyName System.IO.Compression", release);
         Assert.Contains(".Replace('\\', '/')", release);
