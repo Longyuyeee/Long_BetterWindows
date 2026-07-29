@@ -1,9 +1,30 @@
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Interaction;
 
 namespace LongBetterWindows.Tests;
 
 public class PluginWorkspaceSessionTests
 {
+    [Fact]
+    public void PresentationPolicy_OnlyWebViewRuntimeUsesHostWorkspaceSession()
+    {
+        Assert.Equal(
+            PluginSurfaceOwnership.HostWorkspaceSession,
+            PluginWorkspacePresentationPolicy.Resolve(new PluginManifest
+            {
+                Runtime = "webview",
+            }));
+        Assert.Equal(
+            PluginSurfaceOwnership.PluginOwned,
+            PluginWorkspacePresentationPolicy.Resolve(new PluginManifest()));
+        Assert.Equal(
+            PluginSurfaceOwnership.PluginOwned,
+            PluginWorkspacePresentationPolicy.Resolve(new PluginManifest
+            {
+                Runtime = "csharp-script",
+            }));
+    }
+
     [Fact]
     public void PlacementTransitions_PreserveSessionAndLastVisiblePlacement()
     {
@@ -68,6 +89,19 @@ public class PluginWorkspaceSessionTests
         Assert.NotSame(first, second);
         Assert.Equal("two", second.State.SessionId);
         Assert.Null(manager.GetBySessionId("one"));
+    }
+
+    [Fact]
+    public void Manager_FindsActiveSessionByPluginId()
+    {
+        var manager = new PluginWorkspaceSessionManager(() => "session_1");
+        var session = manager.GetOrCreate(
+            "plugin.one",
+            PluginWorkspacePlacement.Detached);
+
+        Assert.Same(session, manager.GetByPluginId("PLUGIN.ONE"));
+        Assert.True(manager.End(session.State.SessionId));
+        Assert.Null(manager.GetByPluginId("plugin.one"));
     }
 
     [Fact]

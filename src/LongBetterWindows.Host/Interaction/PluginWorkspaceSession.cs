@@ -185,6 +185,14 @@ namespace LongBetterWindows.Host.Interaction
                 return _bySession.GetValueOrDefault(sessionId);
         }
 
+        public PluginWorkspaceSession? GetByPluginId(string pluginId)
+        {
+            if (string.IsNullOrWhiteSpace(pluginId))
+                return null;
+            lock (_stateLock)
+                return _byPlugin.GetValueOrDefault(pluginId);
+        }
+
         public bool End(string sessionId)
         {
             if (string.IsNullOrWhiteSpace(sessionId))

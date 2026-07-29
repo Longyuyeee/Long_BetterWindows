@@ -605,6 +605,64 @@ namespace LongBetterWindows.Host.Services
                 mainWindow.GetActiveWorkspaceModuleKeyForQuality()
                 == fallbackModule;
 
+            const string nativeDetachedPluginId = "com.long.quicklaunch";
+            var nativeDetachedEntry = registry.Get(nativeDetachedPluginId)
+                ?? throw new InvalidOperationException(
+                    $"Quality native plugin was not found: {nativeDetachedPluginId}");
+            var nativeSurfaceOwnedByPlugin =
+                PluginWorkspacePresentationPolicy.Resolve(
+                    nativeDetachedEntry.Manifest)
+                == PluginSurfaceOwnership.PluginOwned;
+            if (nativeDetachedEntry.State is not
+                (PluginState.Running or PluginState.Background)
+                && !await registry.StartPluginAsync(
+                    nativeDetachedPluginId,
+                    persistAutoStart: false))
+            {
+                throw new InvalidOperationException(
+                    "Quality native plugin could not start.");
+            }
+            if (nativeDetachedEntry.Instance is not IHasMainUI nativeMainUi)
+            {
+                throw new InvalidOperationException(
+                    "Quality native plugin does not expose a main UI.");
+            }
+            nativeMainUi.ShowMainUI();
+            var nativeWindowOpened = await WaitUntilAsync(
+                () => _application.Windows.Cast<Window>().Any(window =>
+                    window.IsVisible
+                    && string.Equals(
+                        window.GetType().Assembly.GetName().Name,
+                        "QuickLaunchPlugin",
+                        StringComparison.OrdinalIgnoreCase)),
+                10_000);
+            var nativeSessionAbsent =
+                ServicesInitializer.PluginSessions.GetByPluginId(
+                    nativeDetachedPluginId) is null;
+            var nativeModuleAbsent =
+                !mainWindow.HasPluginRuntimeModuleForPluginForQuality(
+                    nativeDetachedPluginId);
+            var nativePreservedWorkspace =
+                mainWindow.GetActiveWorkspaceModuleKeyForQuality()
+                == fallbackModule;
+            var nativeStopRequested = await registry.StopPluginAsync(
+                nativeDetachedPluginId,
+                persistAutoStart: false);
+            var nativeStoppedCleanly = await WaitUntilAsync(
+                () =>
+                    nativeDetachedEntry.State == PluginState.Stopped
+                    && !_application.Windows.Cast<Window>().Any(window =>
+                        window.IsVisible
+                        && string.Equals(
+                            window.GetType().Assembly.GetName().Name,
+                            "QuickLaunchPlugin",
+                            StringComparison.OrdinalIgnoreCase))
+                    && ServicesInitializer.PluginSessions.GetByPluginId(
+                        nativeDetachedPluginId) is null
+                    && !mainWindow.HasPluginRuntimeModuleForPluginForQuality(
+                        nativeDetachedPluginId),
+                10_000);
+
             var sameSessionAcrossMove =
                 initial.SessionId is not null
                 && initial.SessionId == detached.SessionId
@@ -662,7 +720,14 @@ namespace LongBetterWindows.Host.Services
                 && uninstallRegistryRemoved
                 && uninstallSessionEnded
                 && uninstallModuleRemoved
-                && uninstallMruRestored;
+                && uninstallMruRestored
+                && nativeSurfaceOwnedByPlugin
+                && nativeWindowOpened
+                && nativeSessionAbsent
+                && nativeModuleAbsent
+                && nativePreservedWorkspace
+                && nativeStopRequested
+                && nativeStoppedCleanly;
 
             var fullPath = Path.GetFullPath(reportPath);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -757,6 +822,17 @@ namespace LongBetterWindows.Host.Services
                         uninstall_module_removed = uninstallModuleRemoved,
                         uninstall_mru_restored = uninstallMruRestored,
                         uninstall_session_id = uninstallInitial.SessionId,
+                        native_detached_plugin_id =
+                            nativeDetachedPluginId,
+                        native_surface_owned_by_plugin =
+                            nativeSurfaceOwnedByPlugin,
+                        native_window_opened = nativeWindowOpened,
+                        native_session_absent = nativeSessionAbsent,
+                        native_module_absent = nativeModuleAbsent,
+                        native_preserved_workspace =
+                            nativePreservedWorkspace,
+                        native_stop_requested = nativeStopRequested,
+                        native_stopped_cleanly = nativeStoppedCleanly,
                     },
                     new JsonSerializerOptions { WriteIndented = true }));
             _application.Shutdown(passed ? 0 : 3);

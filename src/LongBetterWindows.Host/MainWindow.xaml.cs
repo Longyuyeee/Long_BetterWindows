@@ -490,6 +490,14 @@ namespace LongBetterWindows.Host
                     sessionId,
                     StringComparison.OrdinalIgnoreCase));
 
+        internal bool HasPluginRuntimeModuleForPluginForQuality(string pluginId)
+            => ServicesInitializer.Workspace.State.Modules.Any(module =>
+                module.Key.Kind == "plugin-runtime"
+                && string.Equals(
+                    module.Key.ResourceId,
+                    pluginId,
+                    StringComparison.OrdinalIgnoreCase));
+
         private async Task OpenLegacyWorkspacePageAsync(string page)
         {
             if (!WorkspaceLegacyModuleCatalog.TryCreate(

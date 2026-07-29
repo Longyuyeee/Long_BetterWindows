@@ -22,6 +22,12 @@ namespace LongBetterWindows.Host.Engine
             string pluginName,
             Func<Task> windowClosed)
         {
+            if (PluginWorkspacePresentationPolicy.Resolve(runtime.Manifest)
+                != PluginSurfaceOwnership.HostWorkspaceSession)
+            {
+                throw new InvalidOperationException(
+                    "Only host-owned plugin surfaces can create workspace sessions.");
+            }
             _runtime = runtime;
             _pluginId = pluginId;
             _pluginName = pluginName;
