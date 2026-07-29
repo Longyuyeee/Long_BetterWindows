@@ -586,7 +586,7 @@ namespace LongBetterWindows.Host
                 var entry = HostProvider.Instance.PluginStore.Get(pluginId);
                 if (entry is null)
                     return;
-                if (entry.State is not PluginState.Running and not PluginState.Background
+                if (entry.State != PluginState.Running
                     && !await HostProvider.Instance.PluginStore.StartPluginAsync(
                         pluginId,
                         persistAutoStart: false))

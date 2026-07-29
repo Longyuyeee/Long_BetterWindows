@@ -9,6 +9,7 @@ using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Views;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
@@ -393,6 +394,79 @@ namespace LongBetterWindows.Host.Services
                 && ServicesInitializer.PluginSessions.GetBySessionId(
                     reopened.SessionId) is null;
 
+            const string backgroundPluginId = "com.long.clipboardhistory";
+            var backgroundEntry = registry.Get(backgroundPluginId)
+                ?? throw new InvalidOperationException(
+                    $"Quality background plugin was not found: {backgroundPluginId}");
+
+            async Task OpenBackgroundAsync()
+            {
+                if (backgroundEntry.State != PluginState.Running
+                    && !await registry.StartPluginAsync(
+                        backgroundPluginId,
+                        persistAutoStart: false))
+                {
+                    throw new InvalidOperationException(
+                        "Quality background plugin could not start or resume.");
+                }
+                if (backgroundEntry.Instance is not IHasMainUI mainUi)
+                {
+                    throw new InvalidOperationException(
+                        "Quality background plugin does not expose a main UI.");
+                }
+                mainUi.ShowMainUI();
+            }
+
+            await OpenBackgroundAsync();
+            var backgroundEmbeddedReady = await WaitUntilAsync(
+                () =>
+                {
+                    var state = mainWindow.GetPluginRuntimeQualityState();
+                    return backgroundEntry.State == PluginState.Running
+                        && state.IsVisible
+                        && !state.IsDetached
+                        && state.ContentIdentity != 0;
+                },
+                15_000);
+            var backgroundInitial =
+                mainWindow.GetPluginRuntimeQualityState();
+
+            var backgroundCloseRequested =
+                await mainWindow.ClosePluginRuntimeForQualityAsync();
+            var backgroundStateReady = await WaitUntilAsync(
+                () => backgroundEntry.State == PluginState.Background,
+                10_000);
+            var backgroundSessionHidden =
+                backgroundInitial.SessionId is not null
+                && ServicesInitializer.PluginSessions.GetBySessionId(
+                    backgroundInitial.SessionId)?.State.Placement
+                    == PluginWorkspacePlacement.Hidden;
+
+            await OpenBackgroundAsync();
+            var backgroundResumedReady = await WaitUntilAsync(
+                () =>
+                {
+                    var state = mainWindow.GetPluginRuntimeQualityState();
+                    return backgroundEntry.State == PluginState.Running
+                        && state.IsVisible
+                        && !state.IsDetached
+                        && state.SessionId == backgroundInitial.SessionId
+                        && state.ContentIdentity
+                            == backgroundInitial.ContentIdentity;
+                },
+                15_000);
+            var backgroundResumed =
+                mainWindow.GetPluginRuntimeQualityState();
+            var backgroundEndRequested =
+                await mainWindow.EndPluginRuntimeForQualityAsync();
+            var backgroundEndStopped = await WaitUntilAsync(
+                () => backgroundEntry.State == PluginState.Stopped,
+                10_000);
+            var backgroundSessionEnded =
+                backgroundInitial.SessionId is not null
+                && ServicesInitializer.PluginSessions.GetBySessionId(
+                    backgroundInitial.SessionId) is null;
+
             var sameSessionAcrossMove =
                 initial.SessionId is not null
                 && initial.SessionId == detached.SessionId
@@ -413,7 +487,15 @@ namespace LongBetterWindows.Host.Services
                 && endStopped
                 && secondSessionEnded
                 && sameSessionAcrossMove
-                && sameViewAcrossMove;
+                && sameViewAcrossMove
+                && backgroundEmbeddedReady
+                && backgroundCloseRequested
+                && backgroundStateReady
+                && backgroundSessionHidden
+                && backgroundResumedReady
+                && backgroundEndRequested
+                && backgroundEndStopped
+                && backgroundSessionEnded;
 
             var fullPath = Path.GetFullPath(reportPath);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -445,6 +527,29 @@ namespace LongBetterWindows.Host.Services
                         first_session_id = initial.SessionId,
                         second_session_id = reopened.SessionId,
                         content_identity = initial.ContentIdentity,
+                        background_plugin_id = backgroundPluginId,
+                        background_embedded_ready =
+                            backgroundEmbeddedReady,
+                        background_close_requested =
+                            backgroundCloseRequested,
+                        background_state_ready = backgroundStateReady,
+                        background_session_hidden =
+                            backgroundSessionHidden,
+                        background_resumed_ready =
+                            backgroundResumedReady,
+                        background_same_session_after_resume =
+                            backgroundInitial.SessionId is not null
+                            && backgroundInitial.SessionId
+                                == backgroundResumed.SessionId,
+                        background_same_view_after_resume =
+                            backgroundInitial.ContentIdentity != 0
+                            && backgroundInitial.ContentIdentity
+                                == backgroundResumed.ContentIdentity,
+                        background_end_requested =
+                            backgroundEndRequested,
+                        background_end_stopped = backgroundEndStopped,
+                        background_session_ended =
+                            backgroundSessionEnded,
                     },
                     new JsonSerializerOptions { WriteIndented = true }));
             _application.Shutdown(passed ? 0 : 3);
