@@ -12,6 +12,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$evidenceIo = Join-Path $repoRoot 'release-evidence-io.ps1'
+if (-not (Test-Path -LiteralPath $evidenceIo -PathType Leaf)) {
+    throw "Release evidence writer was not found: $evidenceIo"
+}
+. $evidenceIo
 
 function Resolve-SignTool([string] $requestedPath) {
     if (-not [string]::IsNullOrWhiteSpace($requestedPath)) {
@@ -170,9 +176,11 @@ $summary = [ordered]@{
 }
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
     $resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
-    $parent = Split-Path -Parent $resolvedOutput
-    if (-not [string]::IsNullOrWhiteSpace($parent)) { [IO.Directory]::CreateDirectory($parent) | Out-Null }
-    $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $resolvedOutput -Encoding UTF8
+    Write-NewJsonFileAtomically `
+        -Value $summary `
+        -Path $resolvedOutput `
+        -Depth 6 `
+        -Label "Code-signing verification report"
     Write-Output "Code-signing verification report: $resolvedOutput"
 }
 Write-Output 'Signed Windows release verified.'

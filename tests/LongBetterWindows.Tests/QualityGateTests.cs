@@ -528,6 +528,9 @@ public class QualityGateTests
         Assert.Contains("ExpectedSourceCommit", verify);
         Assert.Contains("Signed release source commit does not match ExpectedSourceCommit", verify);
         Assert.Contains("source_commit = $expectedCommit", verify);
+        Assert.Contains("release-evidence-io.ps1", verify);
+        Assert.Contains("Write-NewJsonFileAtomically", verify);
+        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutput", verify);
     }
 
     [Fact]
