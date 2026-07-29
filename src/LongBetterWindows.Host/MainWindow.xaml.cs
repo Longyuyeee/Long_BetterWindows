@@ -60,6 +60,7 @@ namespace LongBetterWindows.Host
             WorkspaceShell.Bind(
                 ServicesInitializer.Workspace,
                 GetWorkspaceModuleTitle,
+                GetWorkspaceModuleCloseName,
                 GetWorkspaceSearchPlaceholder,
                 request => ToolCenter.ApplyWorkspaceSearchAsync(request));
             WorkspaceShell.ModuleActivationRequested +=
@@ -821,6 +822,11 @@ namespace LongBetterWindows.Host
             }
             return module.Title;
         }
+
+        private static string GetWorkspaceModuleCloseName(string title)
+            => string.Format(
+                ServicesInitializer.I18n.T("workspace.module.closeA11y"),
+                title);
 
         private static string GetWorkspaceSearchPlaceholder(
             WorkspaceModuleKey key)

@@ -28,6 +28,7 @@ public sealed class WorkspaceShellProjectionTests
         Assert.Equal(
             "Long.Workspace.ModuleClose.settings:root",
             tabs[2].CloseAutomationId);
+        Assert.Equal("Close Settings", tabs[2].CloseAutomationName);
         Assert.Equal(
             "active:true;closable:true;key:settings:root",
             tabs[2].AutomationStatus);
@@ -49,6 +50,7 @@ public sealed class WorkspaceShellProjectionTests
         var tab = Assert.Single(tabs);
         Assert.Equal(root.Key, tab.Key);
         Assert.Equal("Localized root", tab.Title);
+        Assert.Equal("Close Localized root", tab.CloseAutomationName);
     }
 
     [Fact]

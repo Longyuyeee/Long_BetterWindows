@@ -100,6 +100,7 @@
   "workspace.search.managementHint": "搜索管理功能",
   "workspace.search.marketHint": "搜索插件应用市场",
   "workspace.search.pluginsHint": "搜索已安装插件",
+  "workspace.module.closeA11y": "关闭{0}",
   "market.category": "插件分类",
   "market.refresh": "刷新插件目录",
   "market.allCategories": "全部分类",

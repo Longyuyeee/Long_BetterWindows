@@ -32,10 +32,10 @@
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="Surface"
                                         Property="BorderBrush"
-                                        Value="{DynamicResource Long.Brush.Accent.Primary}" />
+                                        Value="{DynamicResource Long.Brush.Focus}" />
                                 <Setter TargetName="Surface"
                                         Property="BorderThickness"
-                                        Value="1" />
+                                        Value="2" />
                             </Trigger>
                             <DataTrigger Binding="{Binding IsActive}" Value="True">
                                 <Setter TargetName="Surface"
@@ -116,7 +116,7 @@
                                             Tag="{Binding Key}"
                                             Click="ModuleClose_Click"
                                             ToolTip="{DynamicResource i18n.app.close}"
-                                            AutomationProperties.Name="{DynamicResource i18n.app.close}"
+                                            AutomationProperties.Name="{Binding CloseAutomationName}"
                                             AutomationProperties.AutomationId="{Binding CloseAutomationId}"
                                             AutomationProperties.HelpText="{Binding Title}">
                                         <Path Data="{StaticResource Long.Icon.Close}"

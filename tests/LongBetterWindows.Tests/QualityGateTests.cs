@@ -1041,12 +1041,25 @@ public class QualityGateTests
             toolCenter.Split(
                 "automation:AutomationProperties.AutomationId=\"Long.Management.Destination.",
                 StringSplitOptions.None).Length - 1);
+        Assert.Equal(
+            8,
+            toolCenter.Split(
+                "KeyboardNavigation.TabIndex=\"",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains("KeyboardNavigation.TabNavigation=\"Local\"", toolCenter);
         Assert.Contains("ManagementDestinationGrid.Columns = isNarrow ? 2 : 4", code);
         Assert.Contains("x:Name=\"OverviewStatusCard\"", toolCenter);
         Assert.Contains("ApplyResponsiveLayout", code);
         Assert.Contains("width < 860", code);
         Assert.Contains(
             "AutomationProperties.AutomationId=\"{Binding AutomationId}\"",
+            Read(
+                "src",
+                "LongBetterWindows.Host",
+                "Views",
+                "WorkspaceShellControl.xaml"));
+        Assert.Contains(
+            "AutomationProperties.Name=\"{Binding CloseAutomationName}\"",
             Read(
                 "src",
                 "LongBetterWindows.Host",
@@ -1582,6 +1595,10 @@ public class QualityGateTests
             "Long.Workspace.ModuleClose.settings:root",
             script);
         Assert.Contains("coordinate_clicks_used = $false", script);
+        Assert.Contains("destination_focus_order = $destinationFocusOrder", script);
+        Assert.Contains("physical_narrator_validated = $false", script);
+        Assert.Contains("Close Settings", script);
+        Assert.Contains("Close Plugin Market", script);
         Assert.Contains(
             "Workflow review search did not receive keyboard focus before selection.",
             script);

@@ -13,6 +13,7 @@ namespace LongBetterWindows.Host.Views
     {
         private WorkspaceSessionCoordinator? _coordinator;
         private Func<WorkspaceModuleDescriptor, string>? _titleSelector;
+        private Func<string, string>? _closeNameSelector;
         private Func<WorkspaceModuleKey, string>? _searchPlaceholderSelector;
         private Func<WorkspaceSearchRequest, Task>? _searchHandler;
         private readonly WorkspaceSearchSession _searchSession = new();
@@ -235,12 +236,14 @@ namespace LongBetterWindows.Host.Views
         internal void Bind(
             WorkspaceSessionCoordinator coordinator,
             Func<WorkspaceModuleDescriptor, string>? titleSelector = null,
+            Func<string, string>? closeNameSelector = null,
             Func<WorkspaceModuleKey, string>? searchPlaceholderSelector = null,
             Func<WorkspaceSearchRequest, Task>? searchHandler = null)
         {
             ArgumentNullException.ThrowIfNull(coordinator);
             if (ReferenceEquals(_coordinator, coordinator)
-                && ReferenceEquals(_titleSelector, titleSelector))
+                && ReferenceEquals(_titleSelector, titleSelector)
+                && ReferenceEquals(_closeNameSelector, closeNameSelector))
             {
                 return;
             }
@@ -248,6 +251,7 @@ namespace LongBetterWindows.Host.Views
             Unsubscribe();
             _coordinator = coordinator;
             _titleSelector = titleSelector;
+            _closeNameSelector = closeNameSelector;
             _searchPlaceholderSelector = searchPlaceholderSelector;
             _searchHandler = searchHandler;
             Subscribe();
@@ -333,7 +337,10 @@ namespace LongBetterWindows.Host.Views
 
         private void ApplyState(WorkspaceNavigationState state)
         {
-            var projected = WorkspaceShellProjection.Build(state, _titleSelector);
+            var projected = WorkspaceShellProjection.Build(
+                state,
+                _titleSelector,
+                _closeNameSelector);
             for (var index = ModuleTabs.Count - 1; index >= 0; index--)
             {
                 if (!projected.Any(tab => tab.Key == ModuleTabs[index].Key))

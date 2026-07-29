@@ -788,6 +788,27 @@ try {
         Find-DescendantByAutomationId `
             $managementMain 'Long.Management.Destination.Settings'
     } 'Clearing management search did not restore the Settings destination.'
+    $destinationFocusOrder = @()
+    $destinationIds = @(
+        'Long.Management.Destination.Overview',
+        'Long.Management.Destination.Workflows',
+        'Long.Management.Destination.Plugins',
+        'Long.Management.Destination.Market',
+        'Long.Management.Destination.System',
+        'Long.Management.Destination.Diagnostics',
+        'Long.Management.Destination.Developer',
+        'Long.Management.Destination.Settings')
+    foreach ($destinationId in $destinationIds) {
+        $destination = Wait-Until {
+            Find-DescendantByAutomationId $managementMain $destinationId
+        } "Management destination $destinationId was not discoverable."
+        $destination.SetFocus()
+        Wait-Until {
+            $destination.Current.HasKeyboardFocus
+        } "Management destination $destinationId could not receive keyboard focus." |
+            Out-Null
+        $destinationFocusOrder += $destination.Current.AutomationId
+    }
     $report.automation_semantics['management_navigation'] = [ordered]@{
         search = Get-AutomationSemantics $managementSearch 'ControlType.Edit' `
             'Management search semantics failed.'
@@ -843,6 +864,12 @@ try {
             $managementProcess.Id `
             'Long.Workspace.ModuleClose.settings:root'
     } 'The Settings module close action was not discoverable.'
+    $settingsCloseSemantics = Get-AutomationSemantics `
+        $settingsClose 'ControlType.Button' `
+        'Settings close-action semantics failed.'
+    if ($settingsCloseSemantics.name -ne 'Close Settings') {
+        throw "Unexpected Settings close name: $($settingsCloseSemantics.name)"
+    }
     Invoke-AutomationElement $settingsClose `
         'The Settings module close action did not support InvokePattern.'
     Wait-Until {
@@ -870,6 +897,12 @@ try {
             $managementProcess.Id `
             'Long.Workspace.ModuleClose.marketplace:catalog'
     } 'The Plugin Market module close action was not discoverable.'
+    $marketCloseSemantics = Get-AutomationSemantics `
+        $marketClose 'ControlType.Button' `
+        'Plugin Market close-action semantics failed.'
+    if ($marketCloseSemantics.name -ne 'Close Plugin Market') {
+        throw "Unexpected Plugin Market close name: $($marketCloseSemantics.name)"
+    }
     Invoke-AutomationElement $marketClose `
         'The Plugin Market module close action did not support InvokePattern.'
     Wait-Until {
@@ -882,6 +915,8 @@ try {
     } 'Closing Plugin Market did not restore the management root.' | Out-Null
     $report.management_navigation = [ordered]@{
         stable_destination_ids = $true
+        destination_focus_order = $destinationFocusOrder
+        destination_focus_verified = $destinationFocusOrder.Count -eq 8
         scoped_search_filtered = $true
         market_opened_as_module = $true
         settings_close_restored_root = $true
@@ -889,6 +924,9 @@ try {
         market_close_restored_root = $true
         coordinate_clicks_used = $false
         physical_keyboard_validated = $false
+        physical_narrator_validated = $false
+        settings_close_name = $settingsCloseSemantics.name
+        market_close_name = $marketCloseSemantics.name
     }
     Stop-QualityHost $managementProcess
     $managementProcess = $null
