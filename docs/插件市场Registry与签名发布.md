@@ -225,6 +225,8 @@ $env:LONG_MARKETPLACE_DEPLOY_TOKEN = '<由受控凭据系统注入>'
 
 发布负责人可先在不注入上传令牌、不写入线上状态的情况下执行只读预检；此模式不要求 `-ConfirmRehearsal`：
 
+`rehearsal-summary.json` 通过同目录临时文件不可覆盖地原子创建。若进程中断且目录中没有完整摘要，该目录只能用于诊断；不要手工补写或复用，正式重试必须指定新的证据目录。
+
 ```powershell
 .\rehearse-marketplace.ps1 `
   -BundleDir .\artifacts\marketplace `

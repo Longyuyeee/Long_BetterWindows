@@ -148,6 +148,9 @@ public class QualityGateTests
         Assert.Contains("if (-not $PreflightOnly -and -not $ConfirmRehearsal)", rehearsal);
         Assert.Contains("if ($PreflightOnly)", rehearsal);
         Assert.Contains("deployment_started", rehearsal);
+        Assert.Contains("release-evidence-io.ps1", rehearsal);
+        Assert.Contains("Write-NewJsonFileAtomically", rehearsal);
+        Assert.DoesNotContain("Set-Content -LiteralPath $summaryPath", rehearsal);
         Assert.True(
             rehearsal.IndexOf("$summary.preflight_dry_run_verified = $true", StringComparison.Ordinal)
             < rehearsal.IndexOf("$summary.deployment_started = $true", StringComparison.Ordinal));

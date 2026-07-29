@@ -17,6 +17,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 if (-not $PreflightOnly -and -not $ConfirmRehearsal) {
     throw 'Marketplace rehearsal requires -ConfirmRehearsal because it deploys and then rolls back a live Registry.'
 }
@@ -188,7 +189,11 @@ finally {
         }
         $summary.evidence = $lockedEvidence
     }
-    $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
+    Write-NewJsonFileAtomically `
+        -Value $summary `
+        -Path $summaryPath `
+        -Depth 5 `
+        -Label 'Marketplace rehearsal summary'
 }
 
 Write-Output "Marketplace rehearsal completed and rolled back: $($summary.release_id)"
