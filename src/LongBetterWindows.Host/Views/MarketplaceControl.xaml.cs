@@ -21,6 +21,7 @@ namespace LongBetterWindows.Host.Views
         private bool _isCompactLayout;
         private bool _forceListForQuality;
         private string _workspaceQuery = string.Empty;
+        private readonly MarketplaceModuleRouter _moduleRouter = new();
         private IInputElement? _confirmationFocusOrigin;
         private MarketplaceEntry? _selectedEntry;
         private MarketplacePackageVersion? _selectedVersion;
@@ -136,10 +137,12 @@ namespace LongBetterWindows.Host.Views
                 Grid.SetColumn(MarketDetailCard, 0);
                 Grid.SetColumnSpan(MarketDetailCard, 3);
                 MarketBackButton.Visibility = Visibility.Visible;
-                MarketListCard.Visibility = _forceListForQuality || _selectedEntry == null
+                MarketListCard.Visibility = _forceListForQuality
+                    || _moduleRouter.Route.Kind == MarketplaceModuleRouteKind.Catalog
                     ? Visibility.Visible
                     : Visibility.Collapsed;
-                MarketDetailCard.Visibility = _forceListForQuality || _selectedEntry == null
+                MarketDetailCard.Visibility = _forceListForQuality
+                    || _moduleRouter.Route.Kind == MarketplaceModuleRouteKind.Catalog
                     ? Visibility.Collapsed
                     : Visibility.Visible;
             }
@@ -230,6 +233,11 @@ namespace LongBetterWindows.Host.Views
             ResultCountText.Text = string.Format(
                 I18n("market.results.count"),
                 cards.Count);
+            var availableIds = cards
+                .Select(card => card.Entry.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (_moduleRouter.Reconcile(availableIds))
+                ShowCatalogRoute(clearSelection: true);
             if (_selectedEntry != null)
             {
                 var selected = cards.FirstOrDefault(x => string.Equals(
@@ -251,6 +259,7 @@ namespace LongBetterWindows.Host.Views
         private void ShowEntry(MarketCardModel card)
         {
             _selectedEntry = card.Entry;
+            _moduleRouter.OpenDetail(card.Entry.Id);
             MarketEmptyDetail.Visibility = Visibility.Collapsed;
             MarketDetail.Visibility = Visibility.Visible;
             if (_isCompactLayout)
@@ -602,8 +611,7 @@ namespace LongBetterWindows.Host.Views
                 && InstallProgress.Visibility != Visibility.Visible;
 
         internal bool CanNavigateBackInModule
-            => _isCompactLayout
-                && MarketDetailCard.Visibility == Visibility.Visible
+            => _moduleRouter.Route.Kind == MarketplaceModuleRouteKind.Detail
                 && ConfirmOverlay.Visibility != Visibility.Visible;
 
         internal bool DismissTransientLayer()
@@ -613,8 +621,9 @@ namespace LongBetterWindows.Host.Views
         {
             if (!CanNavigateBackInModule)
                 return false;
-            MarketDetailCard.Visibility = Visibility.Collapsed;
-            MarketListCard.Visibility = Visibility.Visible;
+            if (!_moduleRouter.BackToCatalog())
+                return false;
+            ShowCatalogRoute(clearSelection: false);
             MarketList.Focus();
             return true;
         }
@@ -641,6 +650,20 @@ namespace LongBetterWindows.Host.Views
             ApplyResponsiveLayout(0);
             MarketDetailCard.Visibility = Visibility.Collapsed;
             MarketListCard.Visibility = Visibility.Visible;
+        }
+
+        internal bool ShowFirstDetailForQuality()
+        {
+            if (MarketList.ItemsSource is not IEnumerable<MarketCardModel> cards
+                || cards.FirstOrDefault() is not { } first)
+            {
+                return false;
+            }
+            _forceListForQuality = false;
+            MarketList.SelectedItem = first;
+            ShowEntry(first);
+            return _moduleRouter.Route.Kind
+                == MarketplaceModuleRouteKind.Detail;
         }
 
         private void MarketplaceControl_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -724,7 +747,17 @@ namespace LongBetterWindows.Host.Views
 
         private void ShowEmptyDetail()
         {
-            _selectedEntry = null;
+            _moduleRouter.Reset();
+            ShowCatalogRoute(clearSelection: true);
+        }
+
+        private void ShowCatalogRoute(bool clearSelection)
+        {
+            if (clearSelection)
+            {
+                _selectedEntry = null;
+                MarketList.SelectedItem = null;
+            }
             MarketDetail.Visibility = Visibility.Collapsed;
             MarketEmptyDetail.Visibility = Visibility.Visible;
             if (_isCompactLayout)

@@ -874,6 +874,9 @@ namespace LongBetterWindows.Host
         internal void ShowMarketplaceListForQuality()
             => ToolCenter.ShowMarketplaceListForQuality();
 
+        internal bool ShowMarketplaceDetailForQuality()
+            => ToolCenter.ShowMarketplaceDetailForQuality();
+
         internal WeakReference ReleasePluginManagementForQuality()
             => ToolCenter.ReleasePluginsForQuality();
 

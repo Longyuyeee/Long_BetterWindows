@@ -381,6 +381,10 @@ namespace LongBetterWindows.Host.Views
                 marketplace.ShowListForQuality();
         }
 
+        internal bool ShowMarketplaceDetailForQuality()
+            => MarketHost.Content is MarketplaceControl marketplace
+                && marketplace.ShowFirstDetailForQuality();
+
         internal async Task<string?> OpenWorkflowReviewAsync(
             string workflowId,
             string? expectedStateFingerprint = null,

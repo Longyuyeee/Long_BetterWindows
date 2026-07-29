@@ -39,6 +39,7 @@ namespace LongBetterWindows.Host.Services
         public bool OpenDeveloperForQuality { get; private init; }
         public bool ShowWelcomeForQuality { get; private init; }
         public bool ShowMarketListForQuality { get; private init; }
+        public bool ShowMarketDetailForQuality { get; private init; }
         public string? MarketplaceCatalogPath { get; private init; }
         public string? MarketplaceTrustStorePath { get; private init; }
         public bool UseLiveContextForQuality { get; private init; }
@@ -147,6 +148,9 @@ namespace LongBetterWindows.Host.Services
                 OpenDeveloperForQuality = HasSwitch(arguments, "--quality-open-developer") || captureView == "developer",
                 ShowWelcomeForQuality = HasSwitch(arguments, "--quality-show-welcome"),
                 ShowMarketListForQuality = HasSwitch(arguments, "--quality-market-list"),
+                ShowMarketDetailForQuality = HasSwitch(
+                    arguments,
+                    "--quality-market-detail"),
                 MarketplaceCatalogPath = ReadArgument(arguments, "--quality-market-catalog"),
                 MarketplaceTrustStorePath = ReadArgument(arguments, "--quality-market-trust-store"),
                 UseLiveContextForQuality = HasSwitch(arguments, "--quality-live-context"),

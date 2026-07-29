@@ -48,6 +48,7 @@ public class AppStartupOptionsTests
             "--quality-management-card-shadows",
             "--quality-show-welcome",
             "--quality-market-list",
+            "--quality-market-detail",
         ]);
 
         Assert.Equal("dark", options.ThemeOverride);
@@ -116,6 +117,7 @@ public class AppStartupOptionsTests
         Assert.True(options.QualityManagementCardShadows);
         Assert.True(options.ShowWelcomeForQuality);
         Assert.True(options.ShowMarketListForQuality);
+        Assert.True(options.ShowMarketDetailForQuality);
     }
 
     [Fact]
