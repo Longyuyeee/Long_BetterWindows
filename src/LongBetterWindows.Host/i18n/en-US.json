@@ -41,6 +41,7 @@
   "nav.developer": "Developer",
   "nav.settings": "Settings",
   "shell.managementConfig": "Platform management and configuration",
+  "management.noResults": "No matching management modules",
   "shell.hostHealthy": "Host is healthy",
   "shell.switchPages": "Ctrl + Tab to switch pages",
   "shell.pageContent": "Tool Center page content",

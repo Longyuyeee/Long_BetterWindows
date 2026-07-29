@@ -79,13 +79,13 @@ namespace LongBetterWindows.Host.Views
             var isNarrow = width < 860;
             if (_isNarrowLayout == isNarrow) return;
             _isNarrowLayout = isNarrow;
-            NavigationColumn.Width = new GridLength(isNarrow ? 160 : 220);
             PageHeader.Margin = isNarrow
                 ? new Thickness(18, 16, 18, 12)
                 : new Thickness(32, 20, 32, 16);
             ContentBodyFrame.Padding = isNarrow
                 ? new Thickness(18, 0, 18, 18)
                 : new Thickness(32, 0, 32, 32);
+            ManagementDestinationGrid.Columns = isNarrow ? 2 : 4;
 
             if (isNarrow)
             {
@@ -276,28 +276,41 @@ namespace LongBetterWindows.Host.Views
         private void FilterManagementNavigation(string query)
         {
             var normalized = query.Trim();
-            (RadioButton Navigation, WorkspaceManagementPage Page)[] destinations =
+            (Button Destination, WorkspaceManagementPage Page)[] destinations =
             [
-                (NavOverview, WorkspaceManagementPage.Overview),
-                (NavWorkflows, WorkspaceManagementPage.Workflows),
-                (NavPlugins, WorkspaceManagementPage.Plugins),
-                (NavMarket, WorkspaceManagementPage.Market),
-                (NavSystem, WorkspaceManagementPage.System),
-                (NavDiagnostics, WorkspaceManagementPage.Diagnostics),
-                (NavDeveloper, WorkspaceManagementPage.Developer),
-                (NavSettings, WorkspaceManagementPage.Settings),
+                (DestinationOverview, WorkspaceManagementPage.Overview),
+                (DestinationWorkflows, WorkspaceManagementPage.Workflows),
+                (DestinationPlugins, WorkspaceManagementPage.Plugins),
+                (DestinationMarket, WorkspaceManagementPage.Market),
+                (DestinationSystem, WorkspaceManagementPage.System),
+                (DestinationDiagnostics, WorkspaceManagementPage.Diagnostics),
+                (DestinationDeveloper, WorkspaceManagementPage.Developer),
+                (DestinationSettings, WorkspaceManagementPage.Settings),
             ];
-            foreach (var (navigation, page) in destinations)
+            var hasMatch = false;
+            foreach (var (destination, page) in destinations)
             {
-                var label = navigation.Content?.ToString() ?? string.Empty;
-                navigation.Visibility = string.IsNullOrEmpty(normalized)
+                var label = destination.Content?.ToString() ?? string.Empty;
+                var isMatch = string.IsNullOrEmpty(normalized)
                     || label.Contains(normalized, StringComparison.OrdinalIgnoreCase)
                     || page.ToString().Contains(
                         normalized,
-                        StringComparison.OrdinalIgnoreCase)
-                        ? Visibility.Visible
-                        : Visibility.Collapsed;
+                        StringComparison.OrdinalIgnoreCase);
+                destination.Visibility = isMatch
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                hasMatch |= isMatch;
             }
+            var hasQuery = !string.IsNullOrEmpty(normalized);
+            OverviewMetricsGrid.Visibility = hasQuery
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            OverviewActionsGrid.Visibility = hasQuery
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            ManagementNoResultsText.Visibility = hasMatch
+                ? Visibility.Collapsed
+                : Visibility.Visible;
         }
 
         internal bool OpenPluginSettingsModule(string pluginId)
@@ -308,7 +321,6 @@ namespace LongBetterWindows.Host.Views
 
             RememberCurrentScrollOffset();
             CollapseAllContentPanels();
-            ClearManagementNavigationSelection();
             var module = GetOrCreatePluginSettingsModule(pluginId);
             PluginSettingsModuleHost.Content = module;
             PanelPluginSettings.Visibility = Visibility.Visible;
@@ -447,30 +459,16 @@ namespace LongBetterWindows.Host.Views
                 ? editor.ConfirmExecutionReviewAsync()
                 : Task.FromResult(false);
 
-        private void Navigation_Click(object sender, RoutedEventArgs e)
+        private void ManagementDestination_Click(object sender, RoutedEventArgs e)
         {
-            if (TryGetNavigationPage(sender, out var page))
-                RequestPageNavigation(page);
-        }
-
-        private bool TryGetNavigationPage(
-            object sender,
-            out WorkspaceManagementPage page)
-        {
-            var resolved = sender switch
+            if (sender is Button { Tag: string pageName }
+                && Enum.TryParse<WorkspaceManagementPage>(
+                    pageName,
+                    ignoreCase: true,
+                    out var page))
             {
-                _ when ReferenceEquals(sender, NavOverview) => WorkspaceManagementPage.Overview,
-                _ when ReferenceEquals(sender, NavWorkflows) => WorkspaceManagementPage.Workflows,
-                _ when ReferenceEquals(sender, NavPlugins) => WorkspaceManagementPage.Plugins,
-                _ when ReferenceEquals(sender, NavMarket) => WorkspaceManagementPage.Market,
-                _ when ReferenceEquals(sender, NavSystem) => WorkspaceManagementPage.System,
-                _ when ReferenceEquals(sender, NavDiagnostics) => WorkspaceManagementPage.Diagnostics,
-                _ when ReferenceEquals(sender, NavDeveloper) => WorkspaceManagementPage.Developer,
-                _ when ReferenceEquals(sender, NavSettings) => WorkspaceManagementPage.Settings,
-                _ => (WorkspaceManagementPage?)null,
-            };
-            page = resolved.GetValueOrDefault();
-            return resolved.HasValue;
+                RequestPageNavigation(page);
+            }
         }
 
         private void RequestPageNavigation(WorkspaceManagementPage page)
@@ -504,23 +502,22 @@ namespace LongBetterWindows.Host.Views
             PluginSettingsModuleHost.Content = null;
             _activePluginSettingsId = null;
 
-            (WorkspaceManagementPage Key, FrameworkElement Panel, RadioButton Navigation, string Title, string Subtitle)[] pages =
+            (WorkspaceManagementPage Key, FrameworkElement Panel, string Title, string Subtitle)[] pages =
             {
-                (WorkspaceManagementPage.Overview, PanelOverview, NavOverview, I18n("page.overview.title"), I18n("page.overview.subtitle")),
-                (WorkspaceManagementPage.Workflows, PanelWorkflows, NavWorkflows, I18n("page.workflows.title"), I18n("page.workflows.subtitle")),
-                (WorkspaceManagementPage.Plugins, PanelPlugins, NavPlugins, I18n("page.plugins.title"), I18n("page.plugins.subtitle")),
-                (WorkspaceManagementPage.Market, PanelMarket, NavMarket, I18n("page.market.title"), I18n("page.market.subtitle")),
-                (WorkspaceManagementPage.System, PanelSystem, NavSystem, I18n("page.system.title"), I18n("page.system.subtitle")),
-                (WorkspaceManagementPage.Diagnostics, PanelDiagnostics, NavDiagnostics, I18n("page.diagnostics.title"), I18n("page.diagnostics.subtitle")),
-                (WorkspaceManagementPage.Developer, PanelDev, NavDeveloper, I18n("page.developer.title"), I18n("page.developer.subtitle")),
-                (WorkspaceManagementPage.Settings, PanelSettings, NavSettings, I18n("page.settings.title"), I18n("page.settings.subtitle")),
+                (WorkspaceManagementPage.Overview, PanelOverview, I18n("page.overview.title"), I18n("page.overview.subtitle")),
+                (WorkspaceManagementPage.Workflows, PanelWorkflows, I18n("page.workflows.title"), I18n("page.workflows.subtitle")),
+                (WorkspaceManagementPage.Plugins, PanelPlugins, I18n("page.plugins.title"), I18n("page.plugins.subtitle")),
+                (WorkspaceManagementPage.Market, PanelMarket, I18n("page.market.title"), I18n("page.market.subtitle")),
+                (WorkspaceManagementPage.System, PanelSystem, I18n("page.system.title"), I18n("page.system.subtitle")),
+                (WorkspaceManagementPage.Diagnostics, PanelDiagnostics, I18n("page.diagnostics.title"), I18n("page.diagnostics.subtitle")),
+                (WorkspaceManagementPage.Developer, PanelDev, I18n("page.developer.title"), I18n("page.developer.subtitle")),
+                (WorkspaceManagementPage.Settings, PanelSettings, I18n("page.settings.title"), I18n("page.settings.subtitle")),
             };
 
-            foreach (var (key, panel, navigation, title, subtitle) in pages)
+            foreach (var (key, panel, title, subtitle) in pages)
             {
                 var selected = key == page;
                 panel.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
-                navigation.IsChecked = selected;
                 if (!selected) continue;
 
                 _activePage = key;
@@ -649,18 +646,6 @@ namespace LongBetterWindows.Host.Views
             PanelDiagnostics.Visibility = Visibility.Collapsed;
             PanelDev.Visibility = Visibility.Collapsed;
             PanelSettings.Visibility = Visibility.Collapsed;
-        }
-
-        private void ClearManagementNavigationSelection()
-        {
-            NavOverview.IsChecked = false;
-            NavWorkflows.IsChecked = false;
-            NavPlugins.IsChecked = false;
-            NavMarket.IsChecked = false;
-            NavSystem.IsChecked = false;
-            NavDiagnostics.IsChecked = false;
-            NavDeveloper.IsChecked = false;
-            NavSettings.IsChecked = false;
         }
 
         private void WelcomeDismiss_Click(object sender, RoutedEventArgs e)

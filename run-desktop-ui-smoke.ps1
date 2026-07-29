@@ -396,13 +396,49 @@ function Find-AncestorByControlType(
 function Select-AutomationElement(
     [Windows.Automation.AutomationElement] $element,
     [string] $failureMessage) {
-    $pattern = $null
-    if (-not $element.TryGetCurrentPattern(
-        [Windows.Automation.SelectionItemPattern]::Pattern,
-        [ref]$pattern)) {
-        throw $failureMessage
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        try {
+            $pattern = $null
+            if (-not $element.TryGetCurrentPattern(
+                [Windows.Automation.SelectionItemPattern]::Pattern,
+                [ref]$pattern)) {
+                throw $failureMessage
+            }
+            $selection = [Windows.Automation.SelectionItemPattern]$pattern
+            if ($selection.Current.IsSelected) {
+                return
+            }
+            $selection.Select()
+            if ($selection.Current.IsSelected) {
+                return
+            }
+            $lastError = 'Selection provider did not report IsSelected.'
+        }
+        catch {
+            $lastError = $_.Exception.Message
+        }
+        if ($attempt -lt 5) {
+            Start-Sleep -Milliseconds 120
+        }
     }
-    ([Windows.Automation.SelectionItemPattern]$pattern).Select()
+    try {
+        $element.SetFocus()
+        Start-Sleep -Milliseconds 120
+        $pattern = $null
+        $supportsSelection = $element.TryGetCurrentPattern(
+            [Windows.Automation.SelectionItemPattern]::Pattern,
+            [ref]$pattern)
+        $fallbackSelection =
+            [Windows.Automation.SelectionItemPattern]$pattern
+        if ($supportsSelection -and $fallbackSelection.Current.IsSelected) {
+            return
+        }
+    }
+    catch {
+        $lastError = $_.Exception.Message
+    }
+    throw "$failureMessage Last provider error: $lastError"
 }
 
 function Click-AutomationElement(

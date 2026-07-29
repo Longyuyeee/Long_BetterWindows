@@ -41,6 +41,7 @@
   "nav.developer": "开发者",
   "nav.settings": "设置",
   "shell.managementConfig": "平台管理与配置",
+  "management.noResults": "没有匹配的管理模块",
   "shell.hostHealthy": "宿主运行正常",
   "shell.switchPages": "Ctrl + Tab 切换页面",
   "shell.pageContent": "Tool Center 页面内容",

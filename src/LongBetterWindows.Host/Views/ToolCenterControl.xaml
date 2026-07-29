@@ -11,66 +11,7 @@
         <Style x:Key="OverviewCard" TargetType="Border" BasedOn="{StaticResource ManagementCard}" />
     </UserControl.Resources>
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="NavigationColumn" Width="220" />
-            <ColumnDefinition Width="1" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <!-- 管理导航，只承担配置与管理职责 -->
-        <Border Grid.Column="0" Background="{DynamicResource Long.Brush.Background.Raised}">
-            <Grid Margin="14,18,14,14">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <StackPanel Margin="8,0,8,18">
-                    <TextBlock Text="TOOLCENTER" FontSize="10" FontWeight="SemiBold"
-                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                    <TextBlock Text="{DynamicResource i18n.shell.managementConfig}" FontSize="12" Margin="0,4,0,0"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
-                </StackPanel>
-
-                <StackPanel Grid.Row="1">
-                    <RadioButton x:Name="NavOverview" Content="{DynamicResource i18n.nav.overview}" GroupName="MainNav" IsChecked="True"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
-                    <RadioButton x:Name="NavWorkflows" Content="{DynamicResource i18n.nav.workflows}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
-                    <RadioButton x:Name="NavPlugins" Content="{DynamicResource i18n.nav.plugins}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
-                    <RadioButton x:Name="NavMarket" Content="{DynamicResource i18n.nav.market}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
-                    <RadioButton x:Name="NavSystem" Content="{DynamicResource i18n.nav.system}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
-                    <RadioButton x:Name="NavDiagnostics" Content="{DynamicResource i18n.nav.diagnostics}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
-                    <RadioButton x:Name="NavDeveloper" Content="{DynamicResource i18n.nav.developer}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
-                    <RadioButton x:Name="NavSettings" Content="{DynamicResource i18n.nav.settings}" GroupName="MainNav"
-                                 Style="{StaticResource LongNavigationItem}" Click="Navigation_Click" />
-                </StackPanel>
-
-                <Border Grid.Row="2" Style="{StaticResource ManagementCard}" Padding="12">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="7" Height="7" Fill="{DynamicResource Long.Brush.State.Success}" VerticalAlignment="Center" />
-                            <TextBlock Text="{DynamicResource i18n.shell.hostHealthy}" Margin="7,0,0,0" FontSize="11"
-                                       Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
-                        </StackPanel>
-                        <TextBlock Text="{DynamicResource i18n.shell.switchPages}" FontSize="9" Margin="14,5,0,0"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
-
-        <Border Grid.Column="1" Background="{DynamicResource Long.Brush.Stroke.Default}" />
-
-        <Grid Grid.Column="2">
+        <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="104" />
                 <RowDefinition Height="*" />
@@ -129,7 +70,7 @@
                             </Grid>
                         </Border>
 
-                        <UniformGrid Columns="3" Margin="0,0,0,20">
+                        <UniformGrid x:Name="OverviewMetricsGrid" Columns="3" Margin="0,0,0,20">
                             <Border Style="{StaticResource OverviewCard}" Margin="0,0,12,0">
                                 <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.plugins}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     <TextBlock x:Name="OverviewPluginCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
@@ -143,6 +84,61 @@
                                     <TextBlock x:Name="OverviewCapabilityCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
                             </Border>
                         </UniformGrid>
+
+                        <StackPanel x:Name="ManagementDestinationsPanel" Margin="0,0,0,20">
+                            <TextBlock Text="{DynamicResource i18n.shell.managementConfig}"
+                                       Margin="0,0,0,10"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                            <UniformGrid x:Name="ManagementDestinationGrid" Columns="4">
+                                <Button x:Name="DestinationOverview"
+                                        Content="{DynamicResource i18n.nav.overview}"
+                                        Tag="Overview" Height="40" Margin="0,0,8,8"
+                                        Style="{StaticResource LongButton}"
+                                        Click="ManagementDestination_Click" />
+                                <Button x:Name="DestinationWorkflows"
+                                        Content="{DynamicResource i18n.nav.workflows}"
+                                        Tag="Workflows" Height="40" Margin="0,0,8,8"
+                                        Style="{StaticResource LongButton}"
+                                        Click="ManagementDestination_Click" />
+                                <Button x:Name="DestinationPlugins"
+                                        Content="{DynamicResource i18n.nav.plugins}"
+                                        Tag="Plugins" Height="40" Margin="0,0,8,8"
+                                        Style="{StaticResource LongButton}"
+                                        Click="ManagementDestination_Click" />
+                                <Button x:Name="DestinationMarket"
+                                        Content="{DynamicResource i18n.nav.market}"
+                                        Tag="Market" Height="40" Margin="0,0,0,8"
+                                        Style="{StaticResource LongButton}"
+                                        Click="ManagementDestination_Click" />
+                                <Button x:Name="DestinationSystem"
+                                        Content="{DynamicResource i18n.nav.system}"
+                                        Tag="System" Height="40" Margin="0,0,8,0"
+                                        Style="{StaticResource LongButton}"
+                                        Click="ManagementDestination_Click" />
+                                <Button x:Name="DestinationDiagnostics"
+                                        Content="{DynamicResource i18n.nav.diagnostics}"
+                                        Tag="Diagnostics" Height="40" Margin="0,0,8,0"
+                                        Style="{StaticResource LongButton}"
+                                        Click="ManagementDestination_Click" />
+                                <Button x:Name="DestinationDeveloper"
+                                        Content="{DynamicResource i18n.nav.developer}"
+                                        Tag="Developer" Height="40" Margin="0,0,8,0"
+                                        Style="{StaticResource LongButton}"
+                                        Click="ManagementDestination_Click" />
+                                <Button x:Name="DestinationSettings"
+                                        Content="{DynamicResource i18n.nav.settings}"
+                                        Tag="Settings" Height="40"
+                                        Style="{StaticResource LongButton}"
+                                        Click="ManagementDestination_Click" />
+                            </UniformGrid>
+                            <TextBlock x:Name="ManagementNoResultsText"
+                                       Text="{DynamicResource i18n.management.noResults}"
+                                       Margin="0,8,0,0"
+                                       Visibility="Collapsed"
+                                       Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                        </StackPanel>
 
                         <Grid x:Name="OverviewActionsGrid">
                             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>

@@ -980,7 +980,7 @@ public class QualityGateTests
 
         Assert.Contains("x:Key=\"ManagementCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource LongCard}\"", xaml);
-        Assert.Equal(1, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
+        Assert.Equal(0, xaml.Split("Style=\"{StaticResource ManagementCard}\"").Length - 1);
         Assert.Contains("x:Key=\"OverviewCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource ManagementCard}\"", xaml);
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
@@ -1024,9 +1024,19 @@ public class QualityGateTests
         var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml");
         var toolCenter = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
         var code = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
+        var pluginRail = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "InstalledPluginRailControl.xaml");
 
         Assert.Contains("MinWidth=\"720\" MinHeight=\"560\"", main);
-        Assert.Contains("x:Name=\"NavigationColumn\"", toolCenter);
+        Assert.Contains("Width=\"220\"", pluginRail);
+        Assert.DoesNotContain("x:Name=\"NavigationColumn\"", toolCenter);
+        Assert.DoesNotContain("LongNavigationItem", toolCenter);
+        Assert.Contains("x:Name=\"ManagementDestinationGrid\"", toolCenter);
+        Assert.Contains("ManagementDestination_Click", code);
+        Assert.Contains("ManagementDestinationGrid.Columns = isNarrow ? 2 : 4", code);
         Assert.Contains("x:Name=\"OverviewStatusCard\"", toolCenter);
         Assert.Contains("ApplyResponsiveLayout", code);
         Assert.Contains("width < 860", code);
@@ -1548,6 +1558,10 @@ public class QualityGateTests
         Assert.DoesNotContain("Click-AutomationElement $clearTerminalOutput", script);
         Assert.Contains(";layout:{(compact ? \"compact\" : \"wide\")};width:{Math.Round(width)}", mainCode);
         Assert.Contains("'--quality-width', '720'", script);
+        Assert.Contains("$attempt -le 5", script);
+        Assert.Contains("$selection.Current.IsSelected", script);
+        Assert.Contains("$element.SetFocus()", script);
+        Assert.Contains("Start-Sleep -Milliseconds 120", script);
         Assert.Contains("execution_was_not_confirmed", script);
         Assert.DoesNotContain("Invoke-AutomationElement $paletteWorkflowConfirm", script);
         Assert.DoesNotContain("Invoke-AutomationElement $panelWorkflowConfirm", script);
