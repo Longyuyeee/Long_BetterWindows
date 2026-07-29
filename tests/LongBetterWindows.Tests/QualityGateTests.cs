@@ -179,6 +179,11 @@ public class QualityGateTests
         Assert.Contains("preflight_only", gate);
         Assert.Contains("deployment_verified", gate);
         Assert.Contains("rollback_verified", gate);
+        Assert.Contains("Physical DPI gate schema version 2 is required", gate);
+        Assert.Contains("Physical DPI gate must contain exactly 32 captures", gate);
+        Assert.Contains("Accessibility gate schema version 2 is required", gate);
+        Assert.Contains("requires at least one screen-reader approval", gate);
+        Assert.Contains("evidence_contract", gate);
         Assert.Contains("Get-FileHash", gate);
         Assert.Contains("external_release_gate_decision", gate);
         Assert.Contains("decision already exists", gate);

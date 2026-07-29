@@ -34,6 +34,16 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.Equal(
             "registry.example.test",
             root.GetProperty("marketplace").GetProperty("destination_host").GetString());
+        Assert.Equal(
+            32,
+            root.GetProperty("evidence_contract")
+                .GetProperty("physical_dpi_capture_count")
+                .GetInt32());
+        Assert.Equal(
+            1,
+            root.GetProperty("evidence_contract")
+                .GetProperty("screen_reader_approval_count")
+                .GetInt32());
         Assert.All(
             root.GetProperty("inputs").EnumerateObject(),
             input => Assert.Matches("^[0-9a-f]{64}$", input.Value.GetString()));
@@ -66,9 +76,65 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.False(File.Exists(output));
     }
 
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsLegacyPhysicalDpiSummary()
+    {
+        var paths = WriteFixture(PackageHash, physicalDpiSchemaVersion: 1);
+        var output = Path.Combine(_root, "legacy-dpi-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Physical DPI gate schema version 2 is required", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsIncompletePhysicalDpiSummary()
+    {
+        var paths = WriteFixture(PackageHash, physicalDpiCaptureCount: 24);
+        var output = Path.Combine(_root, "incomplete-dpi-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("must contain exactly 32 captures", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsLegacyAccessibilitySummary()
+    {
+        var paths = WriteFixture(PackageHash, accessibilitySchemaVersion: 1);
+        var output = Path.Combine(_root, "legacy-accessibility-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Accessibility gate schema version 2 is required", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsAccessibilityWithoutScreenReader()
+    {
+        var paths = WriteFixture(PackageHash, screenReaderApprovalCount: 0);
+        var output = Path.Combine(_root, "screen-reader-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("requires at least one screen-reader approval", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
     private FixturePaths WriteFixture(
         string cleanPackageHash,
-        bool marketplacePreflightOnly = false)
+        bool marketplacePreflightOnly = false,
+        int physicalDpiSchemaVersion = 2,
+        int physicalDpiCaptureCount = 32,
+        int accessibilitySchemaVersion = 2,
+        int screenReaderApprovalCount = 1)
     {
         Directory.CreateDirectory(_root);
         var release = WriteJson("release.json", new
@@ -101,15 +167,38 @@ public sealed class ExternalReleaseGateTests : IDisposable
         });
         var dpi = WriteJson("dpi.json", new
         {
+            schema_version = physicalDpiSchemaVersion,
             classification = "approved_physical_device_dpi_matrix",
             passed = true,
             source_commit = Commit,
+            required_scales = new[] { 100, 125, 150, 200 },
+            capture_count = physicalDpiCaptureCount,
+            evidence = new[] { 100, 125, 150, 200 }.Select(scale => new
+            {
+                scale_percent = scale,
+                source_commit = Commit,
+                capture_count = 8,
+            }),
         });
         var accessibility = WriteJson("accessibility.json", new
         {
+            schema_version = accessibilitySchemaVersion,
             classification = "approved_physical_accessibility_matrix",
             passed = true,
             source_commit = Commit,
+            required_profiles = new[]
+            {
+                "high_contrast",
+                "reduced_motion",
+                "combined",
+            },
+            screen_reader_approval_count = screenReaderApprovalCount,
+            evidence = new[]
+            {
+                new { profile = "high_contrast", source_commit = Commit },
+                new { profile = "reduced_motion", source_commit = Commit },
+                new { profile = "combined", source_commit = Commit },
+            },
         });
         var marketplace = WriteJson("marketplace.json", new
         {

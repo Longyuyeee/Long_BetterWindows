@@ -46,6 +46,66 @@ function Assert-Classification($gate, [string] $expected, [string] $label) {
     }
 }
 
+function Assert-ExactSet(
+    [object[]] $actual,
+    [object[]] $required,
+    [string] $label) {
+    $actualValues = @($actual | Sort-Object -Unique)
+    $requiredValues = @($required | Sort-Object -Unique)
+    if ($actualValues.Count -ne $requiredValues.Count `
+        -or (Compare-Object -ReferenceObject $requiredValues `
+            -DifferenceObject $actualValues).Count -ne 0) {
+        throw "$label is incomplete. Required: $($requiredValues -join ', '); found: $($actualValues -join ', ')."
+    }
+}
+
+function Assert-PhysicalDpiContract($document, [string] $sourceCommit) {
+    $requiredScales = @(100,125,150,200)
+    if ([int]$document.schema_version -ne 2) {
+        throw 'Physical DPI gate schema version 2 is required.'
+    }
+    if ([int]$document.capture_count -ne 32) {
+        throw 'Physical DPI gate must contain exactly 32 captures.'
+    }
+    Assert-ExactSet @($document.required_scales | ForEach-Object { [int]$_ }) `
+        $requiredScales 'Physical DPI required scales'
+    $evidence = @($document.evidence)
+    if ($evidence.Count -ne 4) {
+        throw 'Physical DPI gate must contain exactly four evidence entries.'
+    }
+    Assert-ExactSet @($evidence | ForEach-Object { [int]$_.scale_percent }) `
+        $requiredScales 'Physical DPI evidence scales'
+    foreach ($entry in $evidence) {
+        if ([string]$entry.source_commit -ne $sourceCommit `
+            -or [int]$entry.capture_count -ne 8) {
+            throw 'Physical DPI evidence entry does not match the candidate or eight-capture contract.'
+        }
+    }
+}
+
+function Assert-AccessibilityContract($document, [string] $sourceCommit) {
+    $requiredProfiles = @('high_contrast','reduced_motion','combined')
+    if ([int]$document.schema_version -ne 2) {
+        throw 'Accessibility gate schema version 2 is required.'
+    }
+    if ([int]$document.screen_reader_approval_count -lt 1) {
+        throw 'Accessibility gate requires at least one screen-reader approval.'
+    }
+    Assert-ExactSet @($document.required_profiles | ForEach-Object { [string]$_ }) `
+        $requiredProfiles 'Accessibility required profiles'
+    $evidence = @($document.evidence)
+    if ($evidence.Count -ne 3) {
+        throw 'Accessibility gate must contain exactly three evidence entries.'
+    }
+    Assert-ExactSet @($evidence | ForEach-Object { [string]$_.profile }) `
+        $requiredProfiles 'Accessibility evidence profiles'
+    foreach ($entry in $evidence) {
+        if ([string]$entry.source_commit -ne $sourceCommit) {
+            throw 'Accessibility evidence entry does not match the candidate.'
+        }
+    }
+}
+
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -83,6 +143,8 @@ foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
         throw "External gate source commit mismatch: $($gate.document.classification)"
     }
 }
+Assert-PhysicalDpiContract $dpi.document $expectedCommit
+Assert-AccessibilityContract $accessibility.document $expectedCommit
 foreach ($gate in @($download, $clean)) {
     if ([string]$gate.document.distribution_channel -ne $ExpectedDistributionChannel) {
         throw "External gate distribution channel mismatch: $($gate.document.classification)"
@@ -158,6 +220,13 @@ $decision = [ordered]@{
         registry_committed_last = [bool]$rehearsal.preflight_dry_run_verified
         deployment_verified = [bool]$rehearsal.deployment_verified
         rollback_verified = [bool]$rehearsal.rollback_verified
+    }
+    evidence_contract = [ordered]@{
+        physical_dpi_schema_version = [int]$dpi.document.schema_version
+        physical_dpi_capture_count = [int]$dpi.document.capture_count
+        accessibility_schema_version = [int]$accessibility.document.schema_version
+        screen_reader_approval_count =
+            [int]$accessibility.document.screen_reader_approval_count
     }
     inputs = [ordered]@{
         release_manifest_sha256 = $release.sha256
