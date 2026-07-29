@@ -18,6 +18,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$evidenceIo = Join-Path $repoRoot 'release-evidence-io.ps1'
+if (-not (Test-Path -LiteralPath $evidenceIo -PathType Leaf)) {
+    throw "Release evidence writer was not found: $evidenceIo"
+}
+. $evidenceIo
+
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $outputRoot) {
     throw "Visual matrix output directory already exists: $outputRoot"
@@ -105,7 +111,10 @@ $manifest = [ordered]@{
     physical_device_matrix_required = $true
     captures = $captures
 }
-$manifest | ConvertTo-Json -Depth 6 | Set-Content `
-    -LiteralPath (Join-Path $outputRoot 'visual-matrix.json') -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $manifest `
+    -Path (Join-Path $outputRoot 'visual-matrix.json') `
+    -Depth 6 `
+    -Label 'Visual matrix manifest'
 Write-Output "Visual matrix captured: $($captures.Count) images"
 Write-Output "Output: $outputRoot"

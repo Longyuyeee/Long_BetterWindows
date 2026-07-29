@@ -282,6 +282,10 @@ public class QualityGateTests
         Assert.Contains("Get-FileHash", matrix);
         Assert.Contains("visual-matrix.json", matrix);
         Assert.Contains("already exists", matrix);
+        Assert.Contains("release-evidence-io.ps1", matrix);
+        Assert.Contains("Write-NewJsonFileAtomically", matrix);
+        Assert.Contains("Visual matrix manifest", matrix);
+        Assert.DoesNotContain("Set-Content `", matrix);
     }
 
     [Fact]
