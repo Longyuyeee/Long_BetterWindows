@@ -1036,10 +1036,22 @@ public class QualityGateTests
         Assert.DoesNotContain("LongNavigationItem", toolCenter);
         Assert.Contains("x:Name=\"ManagementDestinationGrid\"", toolCenter);
         Assert.Contains("ManagementDestination_Click", code);
+        Assert.Equal(
+            8,
+            toolCenter.Split(
+                "automation:AutomationProperties.AutomationId=\"Long.Management.Destination.",
+                StringSplitOptions.None).Length - 1);
         Assert.Contains("ManagementDestinationGrid.Columns = isNarrow ? 2 : 4", code);
         Assert.Contains("x:Name=\"OverviewStatusCard\"", toolCenter);
         Assert.Contains("ApplyResponsiveLayout", code);
         Assert.Contains("width < 860", code);
+        Assert.Contains(
+            "AutomationProperties.AutomationId=\"{Binding AutomationId}\"",
+            Read(
+                "src",
+                "LongBetterWindows.Host",
+                "Views",
+                "WorkspaceShellControl.xaml"));
     }
 
     [Fact]
@@ -1562,6 +1574,24 @@ public class QualityGateTests
         Assert.Contains("$selection.Current.IsSelected", script);
         Assert.Contains("$element.SetFocus()", script);
         Assert.Contains("Start-Sleep -Milliseconds 120", script);
+        Assert.Contains("Long.Management.Destination.Market", script);
+        Assert.Contains(
+            "Long.Workspace.ModuleTab.marketplace:catalog",
+            script);
+        Assert.Contains(
+            "Long.Workspace.ModuleClose.settings:root",
+            script);
+        Assert.Contains("coordinate_clicks_used = $false", script);
+        Assert.Contains(
+            "Workflow review search did not receive keyboard focus before selection.",
+            script);
+        Assert.Contains("QualityWindowAction.SelectDeterministicResult", Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "CommandPaletteWindow.xaml.cs"));
+        Assert.Contains("Current.IsSelected", script);
+        Assert.Contains("selection_transport = 'quality_window_message'", script);
         Assert.Contains("execution_was_not_confirmed", script);
         Assert.DoesNotContain("Invoke-AutomationElement $paletteWorkflowConfirm", script);
         Assert.DoesNotContain("Invoke-AutomationElement $panelWorkflowConfirm", script);

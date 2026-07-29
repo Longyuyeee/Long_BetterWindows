@@ -538,6 +538,7 @@ $report = [ordered]@{
     release_executable = $executable
     palette = [ordered]@{}
     super_panel = [ordered]@{}
+    management_navigation = [ordered]@{}
     workflow_review = [ordered]@{}
     workflow_argument_schema = [ordered]@{}
     workflow_output = [ordered]@{}
@@ -553,6 +554,7 @@ $paletteProcess = $null
 $paletteMenuProcess = $null
 $superPanelProcess = $null
 $superPanelTransitionProcess = $null
+$managementProcess = $null
 $workflowPaletteProcess = $null
 $workflowPanelProcess = $null
 $workflowSchemaWideProcess = $null
@@ -757,6 +759,139 @@ try {
     $report.super_panel['palette_shown_on_transition'] = $true
     Stop-QualityHost $superPanelTransitionProcess
     $superPanelTransitionProcess = $null
+
+    Write-Stage 'Starting Workspace management navigation workflow.'
+    $managementProcess = Start-QualityHost @(
+        '--language', 'en-US',
+        '--quality-width', '1120',
+        '--quality-height', '760')
+    $managementMain = Wait-Until {
+        Find-WindowByAutomationId $managementProcess.Id 'Long.MainWindow'
+    } 'The Workspace management host did not appear.'
+    $managementSearch = Wait-Until {
+        Find-DescendantByAutomationId $managementMain 'Long.Workspace.Search'
+    } 'The management-scoped search was not discoverable.'
+    $managementSearchPattern =
+        [Windows.Automation.ValuePattern]$managementSearch.GetCurrentPattern(
+            [Windows.Automation.ValuePattern]::Pattern)
+    $managementSearchPattern.SetValue('Market')
+    $marketDestination = Wait-Until {
+        Find-DescendantByAutomationId `
+            $managementMain 'Long.Management.Destination.Market'
+    } 'The filtered Plugin Market destination was not discoverable.'
+    Wait-Until {
+        $null -eq (Find-DescendantByAutomationId `
+            $managementMain 'Long.Management.Destination.Settings')
+    } 'Management search did not hide a nonmatching destination.' | Out-Null
+    $managementSearchPattern.SetValue('')
+    $settingsDestination = Wait-Until {
+        Find-DescendantByAutomationId `
+            $managementMain 'Long.Management.Destination.Settings'
+    } 'Clearing management search did not restore the Settings destination.'
+    $report.automation_semantics['management_navigation'] = [ordered]@{
+        search = Get-AutomationSemantics $managementSearch 'ControlType.Edit' `
+            'Management search semantics failed.'
+        market_destination = Get-AutomationSemantics `
+            $marketDestination 'ControlType.Button' `
+            'Plugin Market destination semantics failed.'
+        settings_destination = Get-AutomationSemantics `
+            $settingsDestination 'ControlType.Button' `
+            'Settings destination semantics failed.'
+    }
+
+    Write-Stage 'Opening Plugin Market from the management overview.'
+    Invoke-AutomationElement $marketDestination `
+        'The Plugin Market destination did not support InvokePattern.'
+    $marketTab = Wait-Until {
+        $candidate = Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleTab.marketplace:catalog'
+        if ($null -ne $candidate -and
+            $candidate.Current.ItemStatus -like 'active:true;*') {
+            $candidate
+        }
+    } 'Opening Plugin Market did not create an active Workspace module tab.'
+    $rootTab = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleTab.management:root'
+    } 'The protected management root tab was not discoverable.'
+
+    Write-Stage 'Returning to management and opening Settings.'
+    Invoke-AutomationElement $rootTab `
+        'The management root tab did not support InvokePattern.'
+    Wait-Until {
+        $rootTab.Current.ItemStatus -like 'active:true;*'
+    } 'The management root tab did not become active.' | Out-Null
+    $settingsDestination = Wait-Until {
+        Find-DescendantByAutomationId `
+            $managementMain 'Long.Management.Destination.Settings'
+    } 'Settings was not restored after returning to management.'
+    Invoke-AutomationElement $settingsDestination `
+        'The Settings destination did not support InvokePattern.'
+    $settingsTab = Wait-Until {
+        $candidate = Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleTab.settings:root'
+        if ($null -ne $candidate -and
+            $candidate.Current.ItemStatus -like 'active:true;*') {
+            $candidate
+        }
+    } 'Opening Settings did not create an active Workspace module tab.'
+    $settingsClose = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleClose.settings:root'
+    } 'The Settings module close action was not discoverable.'
+    Invoke-AutomationElement $settingsClose `
+        'The Settings module close action did not support InvokePattern.'
+    Wait-Until {
+        $null -eq (Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleTab.settings:root')
+    } 'Closing Settings did not remove its Workspace tab.' | Out-Null
+    Wait-Until {
+        $rootTab.Current.ItemStatus -like 'active:true;*'
+    } 'Closing Settings did not restore the management root.' | Out-Null
+
+    Write-Stage 'Activating and closing Plugin Market through its module tab.'
+    $marketTab = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleTab.marketplace:catalog'
+    } 'The inactive Plugin Market module tab was not preserved.'
+    Invoke-AutomationElement $marketTab `
+        'The Plugin Market module tab did not support InvokePattern.'
+    Wait-Until {
+        $marketTab.Current.ItemStatus -like 'active:true;*'
+    } 'The Plugin Market module tab did not become active.' | Out-Null
+    $marketClose = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleClose.marketplace:catalog'
+    } 'The Plugin Market module close action was not discoverable.'
+    Invoke-AutomationElement $marketClose `
+        'The Plugin Market module close action did not support InvokePattern.'
+    Wait-Until {
+        $null -eq (Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleTab.marketplace:catalog')
+    } 'Closing Plugin Market did not remove its Workspace tab.' | Out-Null
+    Wait-Until {
+        $rootTab.Current.ItemStatus -like 'active:true;*'
+    } 'Closing Plugin Market did not restore the management root.' | Out-Null
+    $report.management_navigation = [ordered]@{
+        stable_destination_ids = $true
+        scoped_search_filtered = $true
+        market_opened_as_module = $true
+        settings_close_restored_root = $true
+        market_tab_reactivated = $true
+        market_close_restored_root = $true
+        coordinate_clicks_used = $false
+        physical_keyboard_validated = $false
+    }
+    Stop-QualityHost $managementProcess
+    $managementProcess = $null
     }
 
     if (-not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
@@ -774,6 +909,12 @@ try {
     $workflowResults = Wait-Until {
         Find-DescendantByAutomationId $workflowPalette 'Long.CommandPalette.Results'
     } 'Workflow review results were not discoverable.'
+    [LongDesktopInput]::Activate(
+        [IntPtr]$workflowPalette.Current.NativeWindowHandle) | Out-Null
+    $workflowSearch.SetFocus()
+    Wait-Until { $workflowSearch.Current.HasKeyboardFocus } `
+        'Workflow review search did not receive keyboard focus before selection.' |
+        Out-Null
     $workflowValuePattern = [Windows.Automation.ValuePattern]$workflowSearch.GetCurrentPattern(
         [Windows.Automation.ValuePattern]::Pattern)
     $workflowValuePattern.SetValue('Quality Workflow Review')
@@ -784,11 +925,17 @@ try {
         Find-AncestorByControlType $paletteWorkflowResult `
             ([Windows.Automation.ControlType]::ListItem)
     } 'The managed workflow Command Palette item was not selectable.'
-    Select-AutomationElement $paletteWorkflowItem `
-        'The managed workflow Command Palette item did not support selection.'
+    $paletteSelectionPattern = $null
+    if (-not $paletteWorkflowItem.TryGetCurrentPattern(
+        [Windows.Automation.SelectionItemPattern]::Pattern,
+        [ref]$paletteSelectionPattern)) {
+        throw 'The managed workflow Command Palette item did not expose SelectionItemPattern.'
+    }
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$workflowPalette.Current.NativeWindowHandle, 4) -ne 1) {
+        throw 'The Command Palette rejected the exact-title selection action.'
+    }
     $workflowSearch.SetFocus()
-    Wait-Until { $workflowSearch.Current.HasKeyboardFocus } `
-        'Workflow review search did not receive keyboard focus.' | Out-Null
     Write-Stage 'Opening the managed workflow review with Enter.'
     if ([LongDesktopInput]::WindowAction(
         [IntPtr]$workflowPalette.Current.NativeWindowHandle, 1) -ne 1) {
@@ -865,6 +1012,9 @@ try {
     $workflowPanelResults = Wait-Until {
         Find-DescendantByAutomationId $workflowPanel 'Long.SuperPanel.Results'
     } 'Super Panel workflow results were not discoverable.'
+    [LongDesktopInput]::Activate(
+        [IntPtr]$workflowPanel.Current.NativeWindowHandle) | Out-Null
+    $workflowPanelResults.SetFocus()
     $panelWorkflowResult = Wait-Until {
         Find-DescendantByName $workflowPanelResults 'Quality Workflow Review'
     } 'The managed workflow did not appear in Super Panel.'
@@ -872,8 +1022,16 @@ try {
         Find-AncestorByControlType $panelWorkflowResult `
             ([Windows.Automation.ControlType]::ListItem)
     } 'The managed workflow Super Panel item was not selectable.'
-    Select-AutomationElement $panelWorkflowItem `
-        'The managed workflow Super Panel item did not support selection.'
+    $panelSelectionPattern = $null
+    if (-not $panelWorkflowItem.TryGetCurrentPattern(
+        [Windows.Automation.SelectionItemPattern]::Pattern,
+        [ref]$panelSelectionPattern)) {
+        throw 'The managed workflow Super Panel item did not expose SelectionItemPattern.'
+    }
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$workflowPanel.Current.NativeWindowHandle, 4) -ne 1) {
+        throw 'Super Panel rejected the deterministic first-result action.'
+    }
     $workflowPanelResults.SetFocus()
     Write-Stage 'Opening the managed workflow review from Super Panel with Enter.'
     if ([LongDesktopInput]::WindowAction(
@@ -923,6 +1081,7 @@ try {
         super_panel_hidden_on_navigation = $true
         super_panel_cancel_closed_review = $true
         execution_was_not_confirmed = $true
+        selection_transport = 'quality_window_message'
     }
     Stop-QualityHost $workflowPanelProcess
     $workflowPanelProcess = $null
@@ -1360,6 +1519,7 @@ finally {
     Stop-QualityHost $paletteMenuProcess
     Stop-QualityHost $superPanelProcess
     Stop-QualityHost $superPanelTransitionProcess
+    Stop-QualityHost $managementProcess
     Stop-QualityHost $workflowPaletteProcess
     Stop-QualityHost $workflowPanelProcess
     Stop-QualityHost $workflowSchemaWideProcess

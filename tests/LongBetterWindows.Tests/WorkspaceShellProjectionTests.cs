@@ -22,6 +22,18 @@ public sealed class WorkspaceShellProjectionTests
         Assert.False(tabs[0].CanClose);
         Assert.True(tabs[2].IsActive);
         Assert.Single(tabs, tab => tab.IsActive);
+        Assert.Equal(
+            "Long.Workspace.ModuleTab.settings:root",
+            tabs[2].AutomationId);
+        Assert.Equal(
+            "Long.Workspace.ModuleClose.settings:root",
+            tabs[2].CloseAutomationId);
+        Assert.Equal(
+            "active:true;closable:true;key:settings:root",
+            tabs[2].AutomationStatus);
+        Assert.Equal(
+            "active:false;closable:false;key:management:root",
+            tabs[0].AutomationStatus);
     }
 
     [Fact]

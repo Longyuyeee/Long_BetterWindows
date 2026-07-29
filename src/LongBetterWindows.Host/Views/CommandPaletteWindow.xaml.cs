@@ -527,6 +527,19 @@ namespace LongBetterWindows.Host.Views
                 case QualityWindowAction.Dismiss:
                     DismissAndRestoreOrigin();
                     return true;
+                case QualityWindowAction.SelectDeterministicResult:
+                    var query = SearchBox.Text.Trim();
+                    var match = ResultsList.Items
+                        .OfType<LauncherResultViewItem>()
+                        .FirstOrDefault(item => string.Equals(
+                            item.Title,
+                            query,
+                            StringComparison.OrdinalIgnoreCase));
+                    if (match is null)
+                        return false;
+                    ResultsList.SelectedItem = match;
+                    ResultsList.ScrollIntoView(match);
+                    return true;
                 default:
                     return false;
             }

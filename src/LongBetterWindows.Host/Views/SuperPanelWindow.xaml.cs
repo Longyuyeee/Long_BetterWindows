@@ -510,6 +510,11 @@ namespace LongBetterWindows.Host.Views
                 case QualityWindowAction.Dismiss:
                     _windowLifecycle.Dismiss(restoreFocus: true);
                     return true;
+                case QualityWindowAction.SelectDeterministicResult
+                    when ResultsList.Items.Count > 0:
+                    ResultsList.SelectedIndex = 0;
+                    ResultsList.ScrollIntoView(ResultsList.SelectedItem);
+                    return ResultsList.SelectedItem is SearchResultItem;
                 default:
                     return false;
             }

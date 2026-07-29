@@ -4,7 +4,10 @@ namespace LongBetterWindows.Host.Interaction
         WorkspaceModuleKey Key,
         string Title,
         bool IsActive,
-        bool CanClose);
+        bool CanClose,
+        string AutomationId,
+        string CloseAutomationId,
+        string AutomationStatus);
 
     internal static class WorkspaceShellProjection
     {
@@ -14,11 +17,20 @@ namespace LongBetterWindows.Host.Interaction
         {
             ArgumentNullException.ThrowIfNull(state);
             return state.Modules
-                .Select(module => new WorkspaceModuleTabState(
-                    module.Key,
-                    titleSelector?.Invoke(module) ?? module.Title,
-                    module.Key == state.ActiveModuleKey,
-                    module.CanClose))
+                .Select(module =>
+                {
+                    var isActive = module.Key == state.ActiveModuleKey;
+                    return new WorkspaceModuleTabState(
+                        module.Key,
+                        titleSelector?.Invoke(module) ?? module.Title,
+                        isActive,
+                        module.CanClose,
+                        $"Long.Workspace.ModuleTab.{module.Key}",
+                        $"Long.Workspace.ModuleClose.{module.Key}",
+                        $"active:{isActive.ToString().ToLowerInvariant()};"
+                            + $"closable:{module.CanClose.ToString().ToLowerInvariant()};"
+                            + $"key:{module.Key}");
+                })
                 .ToArray();
         }
     }

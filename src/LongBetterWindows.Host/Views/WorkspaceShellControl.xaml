@@ -104,7 +104,8 @@
                                             ToolTip="{Binding Title}"
                                             Click="ModuleTab_Click"
                                             AutomationProperties.Name="{Binding Title}"
-                                            AutomationProperties.AutomationId="Long.Workspace.ModuleTab">
+                                            AutomationProperties.AutomationId="{Binding AutomationId}"
+                                            AutomationProperties.ItemStatus="{Binding AutomationStatus}">
                                         <TextBlock Text="{Binding Title}"
                                                    FontSize="12"
                                                    FontWeight="SemiBold"
@@ -116,7 +117,8 @@
                                             Click="ModuleClose_Click"
                                             ToolTip="{DynamicResource i18n.app.close}"
                                             AutomationProperties.Name="{DynamicResource i18n.app.close}"
-                                            AutomationProperties.AutomationId="Long.Workspace.ModuleClose">
+                                            AutomationProperties.AutomationId="{Binding CloseAutomationId}"
+                                            AutomationProperties.HelpText="{Binding Title}">
                                         <Path Data="{StaticResource Long.Icon.Close}"
                                               Style="{StaticResource LongIcon}"
                                               Width="11"
