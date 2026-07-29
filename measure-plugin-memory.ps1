@@ -14,6 +14,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$evidenceIo = Join-Path $repoRoot "release-evidence-io.ps1"
+if (-not (Test-Path -LiteralPath $evidenceIo -PathType Leaf)) {
+    throw "Release evidence writer was not found: $evidenceIo"
+}
+. $evidenceIo
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $outputRoot) { throw "Memory evidence directory already exists: $outputRoot" }
 [string]$trackedStatus = ((& git -C $repoRoot status `
@@ -113,7 +118,11 @@ $report = [ordered]@{
     passed = $passed
 }
 $reportPath = Join-Path $outputRoot 'plugin-memory-report.json'
-$report | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $report `
+    -Path $reportPath `
+    -Depth 6 `
+    -Label "Plugin memory report"
 Write-Output "25-plugin memory probe: median=$median MB, max=$maximum MB, passed=$passed"
 Write-Output "Report: $reportPath"
 if (-not $passed) { throw '25-plugin memory probe did not meet the release threshold.' }

@@ -83,3 +83,5 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 报告绑定 Git 提交、工作区状态、Release 宿主 SHA-256、25 个插件 ID、采样数、空闲时长和每次工作集。`-AllowDirty` 只允许开发诊断，生成的报告不得用于发布。
+
+内存采集目录和 `plugin-memory-report.json` 都是不可覆盖产物。若采集中断、报告缺失或输出路径已存在，不要手工补写或删除后复用旧路径；保留目录作诊断，换新的 `plugin-memory-<commit>-<run>` 目录重新采集。

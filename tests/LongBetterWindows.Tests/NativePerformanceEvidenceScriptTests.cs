@@ -50,6 +50,11 @@ public sealed class NativePerformanceEvidenceScriptTests
         Assert.Contains("host_executable_sha256", source);
         Assert.Contains("maximum_working_set_mb", source);
         Assert.Contains("$maximum -lt $WorkingSetLimitMB", source);
+        Assert.Contains("release-evidence-io.ps1", source);
+        Assert.Contains("Write-NewJsonFileAtomically", source);
+        Assert.DoesNotContain(
+            "Set-Content -LiteralPath $reportPath",
+            source);
 
         var verifier = ReadRepositoryFile(
             "verify-plugin-memory-evidence.ps1");
