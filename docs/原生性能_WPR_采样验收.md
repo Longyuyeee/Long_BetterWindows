@@ -36,6 +36,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 6. 将 `analysis_status` 固定为 `pending_analysis`，并保持 `release_gate_passed=false`。
 
 采集异常时脚本只取消自己成功启动的 WPR 会话，并终止自己启动且超时的宿主进程。
+Manifest 只在 ETL 与性能报告全部完成后不可覆盖地原子创建。中断目录若只有 ETL、运行目录或性能报告而没有完整 `native-performance-evidence.json`，只能用于诊断；不得手工补写，正式重采必须使用新的输出目录。
 
 ## 3. 完整性验证
 

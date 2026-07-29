@@ -19,6 +19,9 @@ public sealed class NativePerformanceEvidenceScriptTests
         Assert.Contains("release_gate_passed = $false", source);
         Assert.Contains("Get-FileHash", source);
         Assert.Contains("-cancel", source);
+        Assert.Contains("release-evidence-io.ps1", source);
+        Assert.Contains("Write-NewJsonFileAtomically", source);
+        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", source);
     }
 
     [Fact]

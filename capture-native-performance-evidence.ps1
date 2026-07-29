@@ -11,6 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot "release-evidence-io.ps1")
 
 function Resolve-RepositoryPath([string]$PathValue) {
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
@@ -209,8 +210,11 @@ $manifest = [ordered]@{
     performance_sample_count = @($performance.samples).Count
 }
 $manifestPath = Join-Path $outputRoot "native-performance-evidence.json"
-$manifest | ConvertTo-Json -Depth 6 |
-    Set-Content -LiteralPath $manifestPath -Encoding UTF8
+Write-NewJsonFileAtomically `
+    -Value $manifest `
+    -Path $manifestPath `
+    -Depth 6 `
+    -Label "Native performance evidence manifest"
 
 Write-Host "Native WPR capture completed; WPA analysis is still pending."
 Write-Host "Evidence: $manifestPath"
