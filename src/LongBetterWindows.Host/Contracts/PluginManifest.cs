@@ -13,6 +13,9 @@ namespace LongBetterWindows.Host.Contracts
         [JsonPropertyName("name")]
         public string Name { get; init; } = string.Empty;
 
+        [JsonPropertyName("description")]
+        public string Description { get; init; } = string.Empty;
+
         [JsonPropertyName("author")]
         public string Author { get; init; } = string.Empty;
 
