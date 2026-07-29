@@ -57,6 +57,36 @@ public sealed class ReleaseEvidenceIoScriptTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateTextFileAtomically_ReplacesValidatedFileWithoutResidue()
+    {
+        var path = Path.Combine(_root, "SHA256SUMS.txt");
+        await File.WriteAllTextAsync(path, "old");
+        var expectedHash = Hash(path);
+
+        var result = await RunUpdateTextAsync(path, expectedHash, "new\n");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal("new\n", await File.ReadAllTextAsync(path));
+        AssertNoTemporaryFiles();
+    }
+
+    [Fact]
+    public async Task UpdateTextFileAtomically_RejectsChangedFileWithoutOverwriting()
+    {
+        var path = Path.Combine(_root, "SHA256SUMS.txt");
+        await File.WriteAllTextAsync(path, "old");
+        var staleHash = Hash(path);
+        await File.WriteAllTextAsync(path, "changed");
+
+        var result = await RunUpdateTextAsync(path, staleHash, "new\n");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("changed after validation", result.Error);
+        Assert.Equal("changed", await File.ReadAllTextAsync(path));
+        AssertNoTemporaryFiles();
+    }
+
+    [Fact]
     public async Task UpdateJsonFileAtomically_RejectsChangedFileWithoutOverwriting()
     {
         var path = WritePendingManifest();
@@ -123,6 +153,21 @@ public sealed class ReleaseEvidenceIoScriptTests : IDisposable
             $". {Quote(helper)}; " +
             $"Write-NewTextFileAtomically -Value {Quote(value)} " +
             $"-Path {Quote(path)} -Label 'Test ledger'";
+        return RunPowerShellAsync(command);
+    }
+
+    private static Task<ProcessResult> RunUpdateTextAsync(
+        string path,
+        string expectedHash,
+        string value)
+    {
+        var helper = Path.Combine(FindRepositoryRoot(), "release-evidence-io.ps1");
+        var command =
+            "$ErrorActionPreference = 'Stop'; " +
+            $". {Quote(helper)}; " +
+            $"Update-TextFileAtomically -Value {Quote(value)} " +
+            $"-Path {Quote(path)} -ExpectedSha256 {Quote(expectedHash)} " +
+            "-Label 'Test ledger'";
         return RunPowerShellAsync(command);
     }
 

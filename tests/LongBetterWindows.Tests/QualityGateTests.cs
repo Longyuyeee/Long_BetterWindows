@@ -516,6 +516,12 @@ public class QualityGateTests
         Assert.Contains("@($signedPackages) + @($signedInstallers)", sign);
         Assert.Contains("Move-Item -LiteralPath $stagingRoot -Destination $outputRoot", sign);
         Assert.Contains("release_eligible = $true", sign);
+        Assert.Contains("release-evidence-io.ps1", sign);
+        Assert.Contains("Update-JsonFileAtomically", sign);
+        Assert.Contains("Update-TextFileAtomically", sign);
+        Assert.Contains("Write-NewTextFileAtomically", sign);
+        Assert.DoesNotContain("Set-Content -LiteralPath (Join-Path $stagingRoot 'release-manifest.json')", sign);
+        Assert.DoesNotContain("Set-Content -LiteralPath (Join-Path $stagingRoot 'SHA256SUMS.txt')", sign);
         Assert.Contains("Expand-Archive", verify);
         Assert.Contains("Resolve-Within", verify);
         Assert.Contains("escapes release root", verify);

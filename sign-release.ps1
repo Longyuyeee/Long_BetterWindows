@@ -19,6 +19,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$evidenceIo = Join-Path $repoRoot 'release-evidence-io.ps1'
+if (-not (Test-Path -LiteralPath $evidenceIo -PathType Leaf)) {
+    throw "Release evidence writer was not found: $evidenceIo"
+}
+. $evidenceIo
 if (-not $ConfirmSign) { throw 'ConfirmSign is required before invoking a protected code-signing key.' }
 if ($TimestampUrl.Scheme -ne 'https') { throw 'TimestampUrl must use HTTPS.' }
 if ([string]::IsNullOrWhiteSpace($ExpectedSubject)) { throw 'ExpectedSubject must not be empty.' }
@@ -69,7 +75,7 @@ $hasCodeSigningEku = @($certificate.Extensions | Where-Object { $_.Oid.Value -eq
     ForEach-Object { $_.EnhancedKeyUsages } | Where-Object { $_.Value -eq $codeSigningOid }).Count -gt 0
 if (-not $hasCodeSigningEku) { throw 'Certificate does not include the Code Signing enhanced key usage.' }
 
-$verifyScript = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'verify-signed-release.ps1'
+$verifyScript = Join-Path $repoRoot 'verify-signed-release.ps1'
 $signToolResolver = & {
     if (-not [string]::IsNullOrWhiteSpace($SignToolPath)) { return [IO.Path]::GetFullPath($SignToolPath) }
     $sdkRoot = 'C:\Program Files (x86)\Windows Kits\10\bin'
@@ -162,10 +168,36 @@ try {
         certificate_store = "$CertificateStoreLocation\\My"
         signtool_version = [Diagnostics.FileVersionInfo]::GetVersionInfo($signToolResolver).FileVersion
     }) -Force
-    $manifest | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $stagingRoot 'release-manifest.json') -Encoding UTF8
-    @(@($signedPackages) + @($signedInstallers) |
-        ForEach-Object { "$($_.sha256)  $($_.file)" }) |
-        Set-Content -LiteralPath (Join-Path $stagingRoot 'SHA256SUMS.txt') -Encoding UTF8
+    $stagingManifestPath = Join-Path $stagingRoot 'release-manifest.json'
+    $stagingManifestHash = (Get-FileHash `
+        -LiteralPath $stagingManifestPath -Algorithm SHA256).
+        Hash.ToLowerInvariant()
+    Update-JsonFileAtomically `
+        -Value $manifest `
+        -Path $stagingManifestPath `
+        -ExpectedSha256 $stagingManifestHash `
+        -Depth 7 `
+        -Label 'Signed release manifest'
+
+    $checksumPath = Join-Path $stagingRoot 'SHA256SUMS.txt'
+    $checksumText = (@(@($signedPackages) + @($signedInstallers) |
+        ForEach-Object { "$($_.sha256)  $($_.file)" }) -join `
+        [Environment]::NewLine) + [Environment]::NewLine
+    if (Test-Path -LiteralPath $checksumPath -PathType Leaf) {
+        $checksumHash = (Get-FileHash `
+            -LiteralPath $checksumPath -Algorithm SHA256).
+            Hash.ToLowerInvariant()
+        Update-TextFileAtomically `
+            -Value $checksumText `
+            -Path $checksumPath `
+            -ExpectedSha256 $checksumHash `
+            -Label 'Signed release checksum ledger'
+    } else {
+        Write-NewTextFileAtomically `
+            -Value $checksumText `
+            -Path $checksumPath `
+            -Label 'Signed release checksum ledger'
+    }
 
     & $verifyScript `
         -ReleaseDirectory $stagingRoot `

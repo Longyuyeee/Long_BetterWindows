@@ -135,3 +135,61 @@ function Update-JsonFileAtomically {
         }
     }
 }
+
+function Update-TextFileAtomically {
+    param(
+        [Parameter(Mandatory=$true)] [string] $Value,
+        [Parameter(Mandatory=$true)] [string] $Path,
+        [Parameter(Mandatory=$true)] [string] $ExpectedSha256,
+        [Parameter(Mandatory=$true)] [string] $Label
+    )
+
+    $resolvedPath = [IO.Path]::GetFullPath($Path)
+    if ($ExpectedSha256 -notmatch '^[0-9a-f]{64}$' `
+        -or -not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+        throw "$Label update identity is invalid: $resolvedPath"
+    }
+    $parent = Split-Path -Parent $resolvedPath
+    $fileName = [IO.Path]::GetFileName($resolvedPath)
+    $temporaryPath = Join-Path $parent (
+        ".$fileName.$([Guid]::NewGuid().ToString('N')).tmp")
+    $backupPath = Join-Path $parent (
+        ".$fileName.$([Guid]::NewGuid().ToString('N')).bak")
+    $lockPath = Join-Path $parent ".$fileName.update.lock"
+    $lock = $null
+    try {
+        try {
+            $lock = [IO.FileStream]::new(
+                $lockPath,
+                [IO.FileMode]::CreateNew,
+                [IO.FileAccess]::Write,
+                [IO.FileShare]::None,
+                1,
+                [IO.FileOptions]::DeleteOnClose)
+        }
+        catch [IO.IOException] {
+            throw "$Label is already being updated: $resolvedPath"
+        }
+        $actualHash = (Get-FileHash -LiteralPath $resolvedPath -Algorithm SHA256).
+            Hash.ToLowerInvariant()
+        if ($actualHash -ne $ExpectedSha256) {
+            throw "$Label changed after validation: $resolvedPath"
+        }
+        [IO.File]::WriteAllText(
+            $temporaryPath,
+            $Value,
+            [Text.UTF8Encoding]::new($false))
+        [IO.File]::Replace($temporaryPath, $resolvedPath, $backupPath)
+    }
+    finally {
+        if ($null -ne $lock) {
+            $lock.Dispose()
+        }
+        if (Test-Path -LiteralPath $temporaryPath) {
+            Remove-Item -LiteralPath $temporaryPath -Force
+        }
+        if (Test-Path -LiteralPath $backupPath) {
+            Remove-Item -LiteralPath $backupPath -Force
+        }
+    }
+}
