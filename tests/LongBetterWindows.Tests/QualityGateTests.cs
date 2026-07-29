@@ -185,6 +185,11 @@ public class QualityGateTests
         Assert.Contains("requires at least one screen-reader approval", gate);
         Assert.Contains("Release-download gate summary contract is incomplete", gate);
         Assert.Contains("Clean-environment gate summary contract is incomplete", gate);
+        Assert.Contains("Assert-HashLockedSource", gate);
+        Assert.Contains("'Release-download evidence'", gate);
+        Assert.Contains("'Release-download approval'", gate);
+        Assert.Contains("'Clean-environment evidence'", gate);
+        Assert.Contains("source hash mismatch", gate);
         Assert.Contains("Marketplace rehearsal schema version 2 is required", gate);
         Assert.Contains("Marketplace rehearsal evidence hash mismatch", gate);
         Assert.Contains("Release Manifest candidate identity contract is incomplete", gate);
@@ -370,6 +375,9 @@ public class QualityGateTests
         Assert.Contains("source_commit = $expectedCommit", verify);
         Assert.Contains("Captured release manifest source commit does not match ExpectedSourceCommit", verify);
         Assert.Contains("package identity does not match the captured release manifest", verify);
+        Assert.Contains("schema_version = 2", verify);
+        Assert.Contains("evidence_manifest = [ordered]@", verify);
+        Assert.Contains("summary and evidence manifest must share one directory", verify);
         Assert.Contains("ReleaseDirectory", desktopSmoke);
         Assert.Contains("Plugins directory was not found", desktopSmoke);
     }
@@ -405,6 +413,10 @@ public class QualityGateTests
         Assert.Contains("distinct operator and reviewer identities", verify);
         Assert.Contains("Interactive release-download checklist is incomplete", verify);
         Assert.Contains("approved_release_download_gate", verify);
+        Assert.Contains("schema_version = 2", verify);
+        Assert.Contains("evidence = [ordered]@", verify);
+        Assert.Contains("approval = [ordered]@", verify);
+        Assert.Contains("summary and source files must share one directory", verify);
     }
 
     [Fact]

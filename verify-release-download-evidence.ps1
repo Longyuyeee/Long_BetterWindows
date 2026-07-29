@@ -74,7 +74,7 @@ foreach ($property in $approval.observations.psobject.Properties) {
 }
 
 $summary = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_release_download_gate'
     passed = $true
@@ -85,8 +85,14 @@ $summary = [ordered]@{
     download_host = [string]$evidence.windows_origin.host.host
     operator = [string]$approval.operator
     reviewer = [string]$approval.reviewer
-    evidence_sha256 = $actualEvidenceHash
-    approval_sha256 = (Get-FileHash -LiteralPath $resolvedApprovalPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    evidence = [ordered]@{
+        file = [IO.Path]::GetFileName($resolvedEvidencePath)
+        sha256 = $actualEvidenceHash
+    }
+    approval = [ordered]@{
+        file = [IO.Path]::GetFileName($resolvedApprovalPath)
+        sha256 = (Get-FileHash -LiteralPath $resolvedApprovalPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
 }
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
     $resolvedOutputPath = [IO.Path]::GetFullPath($OutputPath)
@@ -94,6 +100,14 @@ if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
         throw "Release-download gate summary already exists: $resolvedOutputPath"
     }
     $outputParent = Split-Path -Parent $resolvedOutputPath
+    foreach ($sourcePath in @($resolvedEvidencePath, $resolvedApprovalPath)) {
+        if (-not [string]::Equals(
+            [IO.Path]::GetFullPath((Split-Path -Parent $sourcePath)).TrimEnd('\'),
+            [IO.Path]::GetFullPath($outputParent).TrimEnd('\'),
+            [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Release-download summary and source files must share one directory.'
+        }
+    }
     if (-not [string]::IsNullOrWhiteSpace($outputParent)) {
         [IO.Directory]::CreateDirectory($outputParent) | Out-Null
     }

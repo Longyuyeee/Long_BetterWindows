@@ -64,12 +64,12 @@ public sealed class ExternalReleaseGateTests : IDisposable
                 .GetProperty("screen_reader_approval_count")
                 .GetInt32());
         Assert.Equal(
-            1,
+            2,
             root.GetProperty("evidence_contract")
                 .GetProperty("download_schema_version")
                 .GetInt32());
         Assert.Equal(
-            1,
+            2,
             root.GetProperty("evidence_contract")
                 .GetProperty("clean_environment_schema_version")
                 .GetInt32());
@@ -185,6 +185,34 @@ public sealed class ExternalReleaseGateTests : IDisposable
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains("Clean-environment gate summary contract is incomplete", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsTamperedDownloadSource()
+    {
+        var paths = WriteFixture(PackageHash);
+        await File.AppendAllTextAsync(paths.DownloadEvidence, "tampered");
+        var output = Path.Combine(_root, "download-source-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Release-download evidence source hash mismatch", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsMissingCleanEnvironmentSource()
+    {
+        var paths = WriteFixture(PackageHash);
+        File.Delete(paths.CleanEvidence);
+        var output = Path.Combine(_root, "clean-source-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Clean-environment evidence source hash mismatch", result.Error);
         Assert.False(File.Exists(output));
     }
 
@@ -320,8 +348,8 @@ public sealed class ExternalReleaseGateTests : IDisposable
         int physicalDpiCaptureCount = 32,
         int accessibilitySchemaVersion = 2,
         int screenReaderApprovalCount = 1,
-        int downloadSchemaVersion = 1,
-        int cleanSchemaVersion = 1,
+        int downloadSchemaVersion = 2,
+        int cleanSchemaVersion = 2,
         int marketplaceSchemaVersion = 2,
         int releaseSchemaVersion = 1,
         bool releaseSourceDirty = false,
@@ -391,6 +419,12 @@ public sealed class ExternalReleaseGateTests : IDisposable
             $"{frameworkPackageHash}  LongBetterWindows-framework-dependent.zip",
             $"{installerHash}  LongAssistant-Setup.exe",
         });
+        var downloadEvidencePath = Path.Combine(_root, "download-evidence.json");
+        var downloadApprovalPath = Path.Combine(_root, "download-approval.json");
+        var cleanEvidencePath = Path.Combine(_root, "clean-environment-evidence.json");
+        File.WriteAllText(downloadEvidencePath, "download evidence fixture");
+        File.WriteAllText(downloadApprovalPath, "download approval fixture");
+        File.WriteAllText(cleanEvidencePath, "clean environment fixture");
         var download = WriteJson("download.json", new
         {
             schema_version = downloadSchemaVersion,
@@ -403,8 +437,8 @@ public sealed class ExternalReleaseGateTests : IDisposable
             download_host = "github.com",
             @operator = "capture-user",
             reviewer = "review-user",
-            evidence_sha256 = new string('a', 64),
-            approval_sha256 = new string('b', 64),
+            evidence = EvidenceEntry("download-evidence.json"),
+            approval = EvidenceEntry("download-approval.json"),
         });
         var clean = WriteJson("clean.json", new
         {
@@ -417,7 +451,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
             package_sha256 = cleanPackageHash,
             environment_label = "clean-vm",
             reviewer = "clean-reviewer",
-            evidence_manifest_sha256 = new string('c', 64),
+            evidence_manifest = EvidenceEntry("clean-environment-evidence.json"),
         });
         var dpi = WriteJson("dpi.json", new
         {
@@ -494,7 +528,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
             packagePath,
             frameworkPackagePath,
             installerPath,
-            checksumsPath);
+            checksumsPath,
+            downloadEvidencePath,
+            cleanEvidencePath);
     }
 
     private static object ReleasePackage(
@@ -620,7 +656,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
         string Package,
         string FrameworkPackage,
         string Installer,
-        string Checksums);
+        string Checksums,
+        string DownloadEvidence,
+        string CleanEvidence);
 
     private sealed record ProcessResult(int ExitCode, string Output, string Error);
 }

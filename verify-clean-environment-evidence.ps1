@@ -68,7 +68,7 @@ if ($capturedPackage.Count -ne 1 -or [string]$capturedPackage[0].sha256 -ne [str
 }
 
 $summary = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_clean_windows_release_gate'
     passed = $true
@@ -79,11 +79,20 @@ $summary = [ordered]@{
     package_sha256 = [string]$manifest.release.package_sha256
     environment_label = [string]$manifest.environment.label
     reviewer = [string]$manifest.human_review.reviewer
-    evidence_manifest_sha256 = (Get-FileHash $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    evidence_manifest = [ordered]@{
+        file = 'clean-environment-evidence.json'
+        sha256 = (Get-FileHash $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
 }
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
     $resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
     $parent = Split-Path -Parent $resolvedOutput
+    if (-not [string]::Equals(
+        [IO.Path]::GetFullPath($root).TrimEnd('\'),
+        [IO.Path]::GetFullPath($parent).TrimEnd('\'),
+        [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Clean-environment summary and evidence manifest must share one directory.'
+    }
     if (-not [string]::IsNullOrWhiteSpace($parent)) { [IO.Directory]::CreateDirectory($parent) | Out-Null }
     $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $resolvedOutput -Encoding UTF8
     Write-Output "Clean-environment gate summary: $resolvedOutput"

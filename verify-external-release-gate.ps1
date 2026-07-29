@@ -106,24 +106,44 @@ function Assert-AccessibilityContract($document, [string] $sourceCommit) {
     }
 }
 
-function Assert-DownloadContract($document) {
-    if ([int]$document.schema_version -ne 1 `
-        -or [string]::IsNullOrWhiteSpace([string]$document.download_host) `
-        -or [string]$document.evidence_sha256 -notmatch '^[0-9a-f]{64}$' `
-        -or [string]$document.approval_sha256 -notmatch '^[0-9a-f]{64}$') {
-        throw 'Release-download gate summary contract is incomplete.'
+function Assert-HashLockedSource($gate, $entry, [string] $label) {
+    $file = [string]$entry.file
+    if ([string]::IsNullOrWhiteSpace($file) `
+        -or [IO.Path]::GetFileName($file) -ne $file `
+        -or [string]$entry.sha256 -notmatch '^[0-9a-f]{64}$') {
+        throw "$label source identity is incomplete."
+    }
+    $path = Join-Path (Split-Path -Parent $gate.path) $file
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf) `
+        -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).
+            Hash.ToLowerInvariant() -ne [string]$entry.sha256) {
+        throw "$label source hash mismatch: $file"
     }
 }
 
+function Assert-DownloadContract($gate) {
+    $document = $gate.document
+    if ([int]$document.schema_version -ne 2 `
+        -or [string]::IsNullOrWhiteSpace([string]$document.download_host)) {
+        throw 'Release-download gate summary contract is incomplete.'
+    }
+    Assert-HashLockedSource $gate $document.evidence 'Release-download evidence'
+    Assert-HashLockedSource $gate $document.approval 'Release-download approval'
+}
+
 function Assert-CleanEnvironmentContract(
-    $document,
+    $gate,
     [string] $distributionChannel) {
-    if ([int]$document.schema_version -ne 1 `
+    $document = $gate.document
+    if ([int]$document.schema_version -ne 2 `
         -or [string]::IsNullOrWhiteSpace([string]$document.environment_label) `
-        -or [string]$document.evidence_manifest_sha256 -notmatch '^[0-9a-f]{64}$' `
         -or [bool]$document.signed -ne ($distributionChannel -eq 'signed')) {
         throw 'Clean-environment gate summary contract is incomplete.'
     }
+    if ([string]$document.evidence_manifest.file -ne 'clean-environment-evidence.json') {
+        throw 'Clean-environment evidence source identity is incomplete.'
+    }
+    Assert-HashLockedSource $gate $document.evidence_manifest 'Clean-environment evidence'
 }
 
 function Assert-MarketplaceEvidenceContract($gate) {
@@ -331,8 +351,8 @@ foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
         throw "External gate source commit mismatch: $($gate.document.classification)"
     }
 }
-Assert-DownloadContract $download.document
-Assert-CleanEnvironmentContract $clean.document $ExpectedDistributionChannel
+Assert-DownloadContract $download
+Assert-CleanEnvironmentContract $clean $ExpectedDistributionChannel
 Assert-PhysicalDpiContract $dpi.document $expectedCommit
 Assert-AccessibilityContract $accessibility.document $expectedCommit
 foreach ($gate in @($download, $clean)) {
