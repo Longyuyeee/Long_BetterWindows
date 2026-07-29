@@ -440,6 +440,29 @@ namespace LongBetterWindows.Host
             }
         }
 
+        internal (
+            string? ModuleKey,
+            string? SessionId,
+            int ContentIdentity,
+            bool IsVisible,
+            bool IsDetached) GetPluginRuntimeQualityState()
+            => WorkspaceShell.GetPluginRuntimeQualityState();
+
+        internal bool DetachPluginRuntimeForQuality()
+            => WorkspaceShell.DetachActivePluginRuntime();
+
+        internal Task<bool> EndPluginRuntimeForQualityAsync()
+            => WorkspaceShell.EndActivePluginRuntimeAsync();
+
+        internal async Task<bool> ClosePluginRuntimeForQualityAsync()
+        {
+            var key = ServicesInitializer.Workspace.State.ActiveModuleKey;
+            if (key.Kind != "plugin-runtime")
+                return false;
+            await CloseWorkspaceModuleAsync(key);
+            return true;
+        }
+
         private async Task OpenLegacyWorkspacePageAsync(string page)
         {
             if (!WorkspaceLegacyModuleCatalog.TryCreate(

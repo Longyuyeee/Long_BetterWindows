@@ -296,6 +296,160 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
+        public async Task RunPluginRuntimeSessionProbeAsync(
+            MainWindow mainWindow,
+            string reportPath)
+        {
+            const string pluginId = "com.long.base64";
+            var registry = HostProvider.Instance.PluginStore;
+            var entry = registry.Get(pluginId)
+                ?? throw new InvalidOperationException(
+                    $"Quality runtime plugin was not found: {pluginId}");
+
+            async Task OpenAsync()
+            {
+                if (entry.State is not
+                    (PluginState.Running or PluginState.Background)
+                    && !await registry.StartPluginAsync(
+                        pluginId,
+                        persistAutoStart: false))
+                {
+                    throw new InvalidOperationException(
+                        "Quality runtime plugin could not start.");
+                }
+                if (entry.Instance is not IHasMainUI mainUi)
+                {
+                    throw new InvalidOperationException(
+                        "Quality runtime plugin does not expose a main UI.");
+                }
+                mainUi.ShowMainUI();
+            }
+
+            await OpenAsync();
+            var embeddedReady = await WaitUntilAsync(
+                () =>
+                {
+                    var state = mainWindow.GetPluginRuntimeQualityState();
+                    return state.IsVisible
+                        && !state.IsDetached
+                        && state.ContentIdentity != 0;
+                },
+                15_000);
+            var initial = mainWindow.GetPluginRuntimeQualityState();
+
+            var detachRequested = mainWindow.DetachPluginRuntimeForQuality();
+            var detachedReady = await WaitUntilAsync(
+                () =>
+                    mainWindow.GetPluginRuntimeQualityState().IsDetached
+                    && _application.Windows.OfType<PluginWindowHost>()
+                        .Any(window => window.IsVisible),
+                10_000);
+            var detached = mainWindow.GetPluginRuntimeQualityState();
+            var detachedWindow = _application.Windows
+                .OfType<PluginWindowHost>()
+                .FirstOrDefault(window => window.IsVisible);
+            detachedWindow?.ReturnToOwnerForQuality();
+
+            var returnedReady = await WaitUntilAsync(
+                () =>
+                {
+                    var state = mainWindow.GetPluginRuntimeQualityState();
+                    return state.IsVisible
+                        && !state.IsDetached
+                        && state.ContentIdentity == initial.ContentIdentity;
+                },
+                10_000);
+            var returned = mainWindow.GetPluginRuntimeQualityState();
+
+            var closeRequested =
+                await mainWindow.ClosePluginRuntimeForQualityAsync();
+            var closeStopped = await WaitUntilAsync(
+                () => entry.State == PluginState.Stopped,
+                10_000);
+            var firstSessionEnded =
+                initial.SessionId is not null
+                && ServicesInitializer.PluginSessions.GetBySessionId(
+                    initial.SessionId) is null;
+
+            await OpenAsync();
+            var reopenedReady = await WaitUntilAsync(
+                () =>
+                {
+                    var state = mainWindow.GetPluginRuntimeQualityState();
+                    return state.IsVisible
+                        && !state.IsDetached
+                        && state.SessionId is not null
+                        && state.SessionId != initial.SessionId;
+                },
+                15_000);
+            var reopened = mainWindow.GetPluginRuntimeQualityState();
+            var endRequested =
+                await mainWindow.EndPluginRuntimeForQualityAsync();
+            var endStopped = await WaitUntilAsync(
+                () => entry.State == PluginState.Stopped,
+                10_000);
+            var secondSessionEnded =
+                reopened.SessionId is not null
+                && ServicesInitializer.PluginSessions.GetBySessionId(
+                    reopened.SessionId) is null;
+
+            var sameSessionAcrossMove =
+                initial.SessionId is not null
+                && initial.SessionId == detached.SessionId
+                && initial.SessionId == returned.SessionId;
+            var sameViewAcrossMove =
+                initial.ContentIdentity != 0
+                && initial.ContentIdentity == detached.ContentIdentity
+                && initial.ContentIdentity == returned.ContentIdentity;
+            var passed = embeddedReady
+                && detachRequested
+                && detachedReady
+                && returnedReady
+                && closeRequested
+                && closeStopped
+                && firstSessionEnded
+                && reopenedReady
+                && endRequested
+                && endStopped
+                && secondSessionEnded
+                && sameSessionAcrossMove
+                && sameViewAcrossMove;
+
+            var fullPath = Path.GetFullPath(reportPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await File.WriteAllTextAsync(
+                fullPath,
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        schema_version = 1,
+                        captured_at = DateTimeOffset.UtcNow,
+                        plugin_id = pluginId,
+                        passed,
+                        embedded_ready = embeddedReady,
+                        detach_requested = detachRequested,
+                        detached_ready = detachedReady,
+                        returned_ready = returnedReady,
+                        same_session_across_move = sameSessionAcrossMove,
+                        same_view_across_move = sameViewAcrossMove,
+                        close_requested = closeRequested,
+                        close_stopped = closeStopped,
+                        first_session_ended = firstSessionEnded,
+                        reopened_ready = reopenedReady,
+                        new_session_after_close =
+                            reopened.SessionId is not null
+                            && reopened.SessionId != initial.SessionId,
+                        end_requested = endRequested,
+                        end_stopped = endStopped,
+                        second_session_ended = secondSessionEnded,
+                        first_session_id = initial.SessionId,
+                        second_session_id = reopened.SessionId,
+                        content_identity = initial.ContentIdentity,
+                    },
+                    new JsonSerializerOptions { WriteIndented = true }));
+            _application.Shutdown(passed ? 0 : 3);
+        }
+
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
         {
             var originalTheme = App.IsLightTheme;

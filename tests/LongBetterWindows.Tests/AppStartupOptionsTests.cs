@@ -34,6 +34,7 @@ public class AppStartupOptionsTests
             "--quality-terminal-export-dir", "quality-exports",
             "--quality-plugin-page-release-report", "plugin-release.json",
             "--quality-plugin-page-performance-report", "plugin-performance.json",
+            "--quality-plugin-runtime-session-report", "plugin-runtime-session.json",
             "--quality-taskbar-identity-report", "taskbar-identity.json",
             "--quality-ui-service-theme-report", "ui-service-theme.json",
             "--quality-themed-message-dialog-report", "message-dialog.json",
@@ -80,6 +81,9 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "plugin-performance.json",
             options.QualityPluginPagePerformanceReportPath);
+        Assert.Equal(
+            "plugin-runtime-session.json",
+            options.QualityPluginRuntimeSessionReportPath);
         Assert.Equal(
             "taskbar-identity.json",
             options.QualityTaskbarIdentityReportPath);

@@ -1704,6 +1704,10 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Views", "WorkspaceShellControl.xaml");
         var address = Read(
             "src", "LongBetterWindows.Host", "Interaction", "WorkspaceModuleAddress.cs");
+        var quality = Read(
+            "src", "LongBetterWindows.Host", "Services", "QualityRuntimeService.cs");
+        var options = Read(
+            "src", "LongBetterWindows.Host", "Services", "AppStartupOptions.cs");
 
         Assert.Contains("_presentation.EnsureVisible()", adapter);
         Assert.Contains("_presentation.CloseVisibleSurface()", adapter);
@@ -1716,6 +1720,9 @@ public class QualityGateTests
         Assert.Contains("Long.Workspace.PluginRuntime", shell);
         Assert.Contains("<ContentControl x:Name=\"PluginRuntimeContent\"", shell);
         Assert.Contains("WorkspaceModuleAddressKind.PluginRuntime", address);
+        Assert.Contains("RunPluginRuntimeSessionProbeAsync", quality);
+        Assert.Contains("same_session_across_move", quality);
+        Assert.Contains("--quality-plugin-runtime-session-report", options);
         Assert.DoesNotContain("PluginWindowHost", adapter);
         Assert.DoesNotContain("ShowEmbeddedPlugin", presentation);
         Assert.True(adapter.Split('\n').Length < 130);

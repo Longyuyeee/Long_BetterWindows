@@ -128,5 +128,7 @@ namespace LongBetterWindows.Host.Views
         }
 
         public void DetachContent() => PluginContent.Content = null;
+
+        internal void ReturnToOwnerForQuality() => ReturnToOwner();
     }
 }

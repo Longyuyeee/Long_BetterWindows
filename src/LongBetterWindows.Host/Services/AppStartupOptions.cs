@@ -23,6 +23,7 @@ namespace LongBetterWindows.Host.Services
         public string? QualityPluginSettingsId { get; private init; }
         public string? QualityPluginPageReleaseReportPath { get; private init; }
         public string? QualityPluginPagePerformanceReportPath { get; private init; }
+        public string? QualityPluginRuntimeSessionReportPath { get; private init; }
         public string? QualityTaskbarIdentityReportPath { get; private init; }
         public string? QualityUiServiceThemeReportPath { get; private init; }
         public string? QualityThemedMessageDialogReportPath { get; private init; }
@@ -111,6 +112,9 @@ namespace LongBetterWindows.Host.Services
                 QualityPluginPageReleaseReportPath = pluginPageReleaseReport,
                 QualityPluginPagePerformanceReportPath =
                     pluginPagePerformanceReport,
+                QualityPluginRuntimeSessionReportPath = ReadArgument(
+                    arguments,
+                    "--quality-plugin-runtime-session-report"),
                 QualityTaskbarIdentityReportPath = ReadArgument(
                     arguments,
                     "--quality-taskbar-identity-report"),

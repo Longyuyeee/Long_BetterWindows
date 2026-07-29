@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -182,6 +183,37 @@ namespace LongBetterWindows.Host.Views
             return true;
         }
 
+        internal async Task<bool> EndActivePluginRuntimeAsync()
+        {
+            if (_runtimeEndRequested is null)
+                return false;
+            await _runtimeEndRequested();
+            return true;
+        }
+
+        internal (
+            string? ModuleKey,
+            string? SessionId,
+            int ContentIdentity,
+            bool IsVisible,
+            bool IsDetached) GetPluginRuntimeQualityState()
+        {
+            var isVisible =
+                PluginRuntimeSurface.Visibility == Visibility.Visible;
+            var isAttached = _runtimeContent is not null
+                && ReferenceEquals(
+                    PluginRuntimeContent.Content,
+                    _runtimeContent);
+            return (
+                _runtimeModuleKey?.ToString(),
+                _runtimeModuleKey?.InstanceId,
+                _runtimeContent is null
+                    ? 0
+                    : RuntimeHelpers.GetHashCode(_runtimeContent),
+                isVisible,
+                isVisible && !isAttached);
+        }
+
         private void ClearPluginRuntimeState()
         {
             _runtimeModuleKey = null;
@@ -350,7 +382,7 @@ namespace LongBetterWindows.Host.Views
             PluginRuntimeEndButton.IsEnabled = false;
             try
             {
-                await _runtimeEndRequested();
+                await EndActivePluginRuntimeAsync();
             }
             catch (Exception exception)
             {

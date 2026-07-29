@@ -300,6 +300,20 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginRuntimeSessionReportPath))
+                {
+                    if (MainWindow is not MainWindow runtimeSessionWindow)
+                    {
+                        throw new InvalidOperationException(
+                            "Plugin runtime session probe requires the main window.");
+                    }
+                    await _qualityRuntime!.RunPluginRuntimeSessionProbeAsync(
+                        runtimeSessionWindow,
+                        _startupOptions.QualityPluginRuntimeSessionReportPath);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityTaskbarIdentityReportPath))
                 {
                     await _qualityRuntime!.RunTaskbarIdentityProbeAsync(
@@ -372,6 +386,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityPluginPageReleaseReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginPagePerformanceReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginRuntimeSessionReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityTaskbarIdentityReportPath)
                     || !string.IsNullOrWhiteSpace(
