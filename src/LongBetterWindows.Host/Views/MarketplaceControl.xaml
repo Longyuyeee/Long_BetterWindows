@@ -13,7 +13,8 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Border CornerRadius="{DynamicResource Long.Radius.Flyout}"
+        <Border x:Name="MarketHeroCard"
+                CornerRadius="{DynamicResource Long.Radius.Flyout}"
                 Background="{DynamicResource Long.Brush.Accent.Gradient}"
                 Padding="24,20" Margin="0,0,0,16">
             <Grid x:Name="MarketHeroGrid">
@@ -68,6 +69,12 @@
                     AutomationProperties.AutomationId="Long.Marketplace.Refresh"
                     AutomationProperties.Name="{DynamicResource i18n.market.refresh}"
                     Height="48" Click="RefreshCatalog_Click" />
+            <Button x:Name="CompactImportLocalPackageButton" Grid.Row="1" Grid.ColumnSpan="3"
+                    Content="{DynamicResource i18n.market.import}" Margin="0,10,0,0"
+                    Visibility="Collapsed"
+                    AutomationProperties.Name="{DynamicResource i18n.market.import}"
+                    Style="{StaticResource LongButton}"
+                    Click="ImportLocalPackage_Click" />
         </Grid>
 
         <Grid x:Name="MarketBodyGrid" Grid.Row="2">
@@ -79,7 +86,12 @@
 
             <Border x:Name="MarketListCard" Style="{StaticResource LongCard}" Padding="10" Effect="{x:Null}">
                 <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <Grid Margin="8,6,8,10">
                         <TextBlock x:Name="ResultCountText" Text="{DynamicResource i18n.market.results.empty}" FontSize="13" FontWeight="SemiBold"
                                    AutomationProperties.AutomationId="Long.Marketplace.ResultCount"
@@ -87,7 +99,29 @@
                         <TextBlock Text="{DynamicResource i18n.market.trustedDiscovery}" HorizontalAlignment="Right" FontSize="10"
                                    Foreground="{DynamicResource Long.Brush.State.Success}" />
                     </Grid>
-                    <ListBox x:Name="MarketList" Grid.Row="1" Background="Transparent" BorderThickness="0"
+                    <Border x:Name="CatalogNotice" Grid.Row="1" Visibility="Collapsed"
+                            Margin="2,0,2,8" Padding="10" CornerRadius="6"
+                            Background="{DynamicResource Long.Brush.Background.Raised}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock x:Name="CatalogNoticeTitle" FontSize="11" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="CatalogNoticeDescription" Margin="0,3,10,0" FontSize="10"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
+                            </StackPanel>
+                            <Button x:Name="CatalogNoticeRetryButton" Grid.Column="1"
+                                    Content="{DynamicResource i18n.market.retry}"
+                                    AutomationProperties.Name="{DynamicResource i18n.market.retry}"
+                                    Style="{StaticResource LongButton}"
+                                    Click="CatalogRetry_Click"/>
+                        </Grid>
+                    </Border>
+                    <Grid Grid.Row="2">
+                    <ListBox x:Name="MarketList" Background="Transparent" BorderThickness="0"
                              AutomationProperties.AutomationId="Long.Marketplace.Results"
                              AutomationProperties.Name="{DynamicResource i18n.market.results}"
                              SelectionChanged="MarketList_SelectionChanged"
@@ -145,7 +179,26 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                    <TextBlock x:Name="CatalogStatusText" Grid.Row="2" Margin="8,10,8,6" FontSize="10"
+                    <StackPanel x:Name="CatalogStatePanel" Visibility="Collapsed"
+                                VerticalAlignment="Center" Margin="20"
+                                AutomationProperties.AutomationId="Long.Marketplace.CatalogState"
+                                AutomationProperties.LiveSetting="Polite">
+                        <TextBlock x:Name="CatalogStateTitle" FontSize="15" FontWeight="SemiBold"
+                                   TextAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="CatalogStateDescription" Margin="0,7,0,0" FontSize="11"
+                                   TextAlignment="Center" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
+                        <ProgressBar x:Name="CatalogStateProgress" Width="120" Height="4" Margin="0,16,0,0"
+                                     IsIndeterminate="True" Visibility="Collapsed"/>
+                        <Button x:Name="CatalogStateRetryButton"
+                                Content="{DynamicResource i18n.market.retry}" Margin="0,16,0,0"
+                                HorizontalAlignment="Center"
+                                AutomationProperties.Name="{DynamicResource i18n.market.retry}"
+                                Style="{StaticResource LongButton}"
+                                Click="CatalogRetry_Click"/>
+                    </StackPanel>
+                    </Grid>
+                    <TextBlock x:Name="CatalogStatusText" Grid.Row="3" Margin="8,10,8,6" FontSize="10"
                                AutomationProperties.AutomationId="Long.Marketplace.Status"
                                AutomationProperties.LiveSetting="Polite"
                                TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />

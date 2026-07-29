@@ -20,6 +20,7 @@ namespace LongBetterWindows.Host.Views
         private bool _languageEventsSubscribed;
         private bool _isCompactLayout;
         private bool _forceListForQuality;
+        private bool _catalogDegraded;
         private string _workspaceQuery = string.Empty;
         private readonly MarketplaceModuleRouter _moduleRouter = new();
         private IInputElement? _confirmationFocusOrigin;
@@ -113,6 +114,10 @@ namespace LongBetterWindows.Host.Views
 
             if (compact)
             {
+                MarketHeroCard.Visibility = Visibility.Collapsed;
+                CompactImportLocalPackageButton.Visibility = Visibility.Visible;
+                CatalogStatePanel.VerticalAlignment = VerticalAlignment.Top;
+                CatalogStatePanel.Margin = new Thickness(20, 56, 20, 20);
                 MarketHeroTextColumn.Width = new GridLength(1, GridUnitType.Star);
                 MarketHeroActionColumn.Width = new GridLength(0);
                 Grid.SetRow(ImportLocalPackageButton, 1);
@@ -148,6 +153,10 @@ namespace LongBetterWindows.Host.Views
             }
             else
             {
+                MarketHeroCard.Visibility = Visibility.Visible;
+                CompactImportLocalPackageButton.Visibility = Visibility.Collapsed;
+                CatalogStatePanel.VerticalAlignment = VerticalAlignment.Center;
+                CatalogStatePanel.Margin = new Thickness(20);
                 MarketHeroTextColumn.Width = new GridLength(1, GridUnitType.Star);
                 MarketHeroActionColumn.Width = GridLength.Auto;
                 Grid.SetRow(ImportLocalPackageButton, 0);
@@ -180,11 +189,13 @@ namespace LongBetterWindows.Host.Views
         private async Task LoadCatalogAsync()
         {
             CatalogStatusText.Text = I18n("market.status.loading");
+            ApplyCatalogViewState(MarketplaceCatalogViewStatePresenter.Loading());
             var load = await _session.LoadCatalogAsync();
             if (load.IsSuperseded || load.Result == null) return;
             var result = load.Result;
             if (!result.IsSuccess)
             {
+                _catalogDegraded = false;
                 MarketList.ItemsSource = Array.Empty<MarketCardModel>();
                 ResultCountText.Text = I18n("market.status.offline");
                 CatalogStatusText.Text = I18n(
@@ -192,11 +203,14 @@ namespace LongBetterWindows.Host.Views
                 MarketSourceBadge.Text = I18n("market.source.offline");
                 CategoryBox.ItemsSource = new[] { I18n("market.allCategories") };
                 CategoryBox.SelectedIndex = 0;
+                ApplyCatalogViewState(
+                    MarketplaceCatalogViewStatePresenter.FromLoad(result));
                 ShowEmptyDetail();
                 return;
             }
 
             var catalog = _session.Catalog!;
+            _catalogDegraded = result.IsFallback;
             MarketSourceBadge.Text = catalog.Source == MarketplaceSourceKind.RemoteRegistry
                 ? I18n("market.source.remote")
                 : I18n("market.source.local");
@@ -230,6 +244,10 @@ namespace LongBetterWindows.Host.Views
                 pluginId => HostProvider.Instance.PluginStore
                     .Get(pluginId)?.Manifest.Version);
             MarketList.ItemsSource = cards;
+            ApplyCatalogViewState(MarketplaceCatalogViewStatePresenter.FromFilter(
+                cards.Count,
+                !string.IsNullOrWhiteSpace(_workspaceQuery) || category != null,
+                _catalogDegraded));
             ResultCountText.Text = string.Format(
                 I18n("market.results.count"),
                 cards.Count);
@@ -254,6 +272,39 @@ namespace LongBetterWindows.Host.Views
                 ShowEmptyDetail();
             }
             return Task.CompletedTask;
+        }
+
+        private void ApplyCatalogViewState(MarketplaceCatalogViewState state)
+        {
+            MarketList.Visibility = state.ShowsCatalog
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            CatalogStatePanel.Visibility = state.ShowsBlockingState
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            CatalogNotice.Visibility = state.ShowsNotice
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            CatalogStateProgress.Visibility = state.ShowsProgress
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            CatalogStateRetryButton.Visibility = state.CanRetry
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            CatalogNoticeRetryButton.Visibility = state.CanRetry
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (!string.IsNullOrWhiteSpace(state.TitleResourceKey))
+            {
+                var title = I18n(state.TitleResourceKey);
+                var description = I18n(state.DescriptionResourceKey);
+                CatalogStateTitle.Text = title;
+                CatalogStateDescription.Text = description;
+                CatalogNoticeTitle.Text = title;
+                CatalogNoticeDescription.Text = description;
+                AutomationProperties.SetName(CatalogStatePanel, $"{title}. {description}");
+            }
         }
 
         private void ShowEntry(MarketCardModel card)
@@ -586,6 +637,7 @@ namespace LongBetterWindows.Host.Views
             => DismissConfirmation();
 
         private async void RefreshCatalog_Click(object sender, RoutedEventArgs e) => await LoadCatalogAsync();
+        private async void CatalogRetry_Click(object sender, RoutedEventArgs e) => await LoadCatalogAsync();
         private async void CategoryBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => await ApplyFiltersAsync();
 
         private void MarketList_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -138,6 +138,9 @@ public sealed class MarketplaceErrorContractTests : IDisposable
             "Views",
             "MarketplaceControl.xaml.cs"));
         Assert.DoesNotContain("CatalogStatusText.Text = result.Error", view);
+        Assert.Contains(
+            "MarketplaceCatalogViewStatePresenter.FromLoad(result)",
+            view);
         Assert.DoesNotContain("DetailHint.Text = preparation.Error", view);
         Assert.DoesNotContain("error.Contains(", view);
     }
