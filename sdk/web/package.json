@@ -1,0 +1,33 @@
+{
+  "name": "@long-assistant/plugin-sdk",
+  "version": "1.0.0",
+  "description": "TypeScript contracts and a deterministic Mock Host for Long Assistant Web plugins.",
+  "license": "MIT",
+  "type": "module",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts"
+    },
+    "./mock": {
+      "types": "./mock/index.d.ts",
+      "default": "./mock/index.js"
+    }
+  },
+  "files": [
+    "index.d.ts",
+    "mock",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "npm run test:types && npm run test:mock",
+    "test:types": "tsc -p tests/tsconfig.json",
+    "test:mock": "node --test tests/mock.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

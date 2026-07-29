@@ -59,3 +59,5 @@ Desktop.ini
 
 # Rider
 .idea/
+# Node/TypeScript local dependencies
+**/node_modules/

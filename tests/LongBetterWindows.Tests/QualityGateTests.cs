@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Interaction;
 
@@ -2127,6 +2128,67 @@ public class QualityGateTests
         Assert.Contains("permission_summary", program);
         Assert.Contains("distribution_eligibility", program);
         Assert.Contains("high_trust_runtime_not_supported", policy);
+    }
+
+    [Fact]
+    public void WebPluginSdk_MatchesProductionBridgeAndProvidesStrictMockTests()
+    {
+        var bridge = Read(
+            "src", "LongBetterWindows.Host", "Engine",
+            "WebPluginBridgeProtocol.cs");
+        var apiVersion = Read(
+            "src", "LongBetterWindows.Host", "Contracts",
+            "ApiVersion.cs");
+        var types = Read("sdk", "web", "index.d.ts");
+        var mock = Read("sdk", "web", "mock", "index.js");
+        var mockTypes = Read("sdk", "web", "mock", "index.d.ts");
+        var package = Read("sdk", "web", "package.json");
+        var typeTest = Read("sdk", "web", "tests", "usage.test.ts");
+        var behaviorTest = Read("sdk", "web", "tests", "mock.test.mjs");
+
+        var productionMethods = Regex.Matches(
+                bridge,
+                @"call\('([^']+)'")
+            .Select(match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        var ledgerBlock = Regex.Match(
+            mock,
+            @"BRIDGE_METHODS = Object\.freeze\(\[(?<body>[\s\S]*?)\]\);");
+        Assert.True(ledgerBlock.Success);
+        var mockMethods = Regex.Matches(
+                ledgerBlock.Groups["body"].Value,
+                "\"([^\"]+)\"")
+            .Select(match => match.Groups[1].Value)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(127, productionMethods.Length);
+        Assert.Equal(productionMethods, mockMethods);
+        Assert.Contains("\"name\": \"@long-assistant/plugin-sdk\"", package);
+        using var packageDocument = System.Text.Json.JsonDocument.Parse(package);
+        var sdkVersion = packageDocument.RootElement
+            .GetProperty("version")
+            .GetString();
+        var hostVersion = Regex.Match(
+            apiVersion,
+            @"Current\s*=>\s*new\((\d+),\s*(\d+),\s*(\d+)\)");
+        Assert.True(hostVersion.Success);
+        Assert.Equal(
+            $"{hostVersion.Groups[1].Value}.{hostVersion.Groups[2].Value}."
+            + hostVersion.Groups[3].Value,
+            sdkVersion);
+        Assert.Contains("\"typescript\": \"5.9.3\"", package);
+        Assert.Contains("interface LongApi", types);
+        Assert.Contains("interface Window", types);
+        Assert.Contains("LongClipboardChangedEvent", types);
+        Assert.Contains("LongLanguageChangedMessage", types);
+        Assert.Contains("LongMockController", mockTypes);
+        Assert.Contains("storage.compareExchange", mock);
+        Assert.Contains("@ts-expect-error", typeTest);
+        Assert.Contains("node:test", behaviorTest);
     }
 
     private static string Read(params string[] parts)

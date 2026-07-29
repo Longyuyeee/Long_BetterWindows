@@ -144,6 +144,7 @@ async function saveNote() {
 
 继续阅读 [插件开发指南](docs/插件开发指南.md)、[宿主能力 API 手册](docs/基础能力_API_手册.md) 与 [Long Design System 使用指南](docs/Long_Design_System_使用指南.md)。
 插件 Manifest 的机器可读权威契约见 [JSON Schema](schemas/plugin-manifest.schema.json)。
+Web 插件可以直接使用 [`@long-assistant/plugin-sdk`](sdk/web/README.md) 的 API v1.0.0 TypeScript 声明和 Mock Host，在不启动 WPF/WebView2 的情况下完成严格类型检查与单元测试。
 
 ## 架构
 
@@ -204,6 +205,8 @@ dotnet run --project src/LongBetterWindows.Host
 - [插件开发指南](docs/插件开发指南.md)
 - [插件开发体系审计与优化计划](docs/插件开发体系审计与优化计划_2026-07-30.md)
 - [Plugin Manifest JSON Schema](schemas/plugin-manifest.schema.json)
+- [Web Plugin SDK v1.0.0](sdk/web/README.md)
+- [宿主能力 API 手册](docs/基础能力_API_手册.md)
 - [API Reference](docs/API_REFERENCE.md)
 - [UI / UX 设计与开发规范](docs/UI_UX_设计与开发规范_v1.0.md)
 - [安全审计报告](docs/安全审计报告.md)
