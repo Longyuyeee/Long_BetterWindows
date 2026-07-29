@@ -18,9 +18,6 @@ namespace LongBetterWindows.Host
     public partial class MainWindow : Window
     {
         private TrayService? _tray;
-        private Func<Task>? _embeddedCloseRequested;
-        private Action? _embeddedDetachRequested;
-        private Func<Task>? _embeddedEndRequested;
         private string? _activeWorkflowReviewId;
         private bool _workflowTerminalOutputApproved;
         private int _workflowTerminalOutputLength;
@@ -280,8 +277,6 @@ namespace LongBetterWindows.Host
         {
             ArgumentNullException.ThrowIfNull(module);
             cancellationToken.ThrowIfCancellationRequested();
-            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
-                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
 
             var previousActive = ServicesInitializer.Workspace.State.ActiveModuleKey;
             var navigation = ServicesInitializer.Workspace.Open(module);
@@ -313,8 +308,6 @@ namespace LongBetterWindows.Host
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
-                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
             if (module.Key.Kind == "plugin-runtime")
             {
                 if (!_pluginRuntimePresentations.TryGetValue(
@@ -854,16 +847,8 @@ namespace LongBetterWindows.Host
         private void Minimize_Click(object sender, RoutedEventArgs e)
             => WindowState = WindowState.Minimized;
 
-        private async void Close_Click(object sender, RoutedEventArgs e)
-        {
-            if (EmbeddedPluginSurface.Visibility == Visibility.Visible)
-                await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
-            Close();
-        }
-
-        internal bool IsHostingEmbedded(FrameworkElement content)
-            => EmbeddedPluginSurface.Visibility == Visibility.Visible
-               && ReferenceEquals(EmbeddedPluginContent.Content, content);
+        private void Close_Click(object sender, RoutedEventArgs e)
+            => Close();
 
         internal void ShowMarketplaceListForQuality()
             => ToolCenter.ShowMarketplaceListForQuality();
@@ -877,114 +862,6 @@ namespace LongBetterWindows.Host
         internal WeakReference ReleasePluginManagementForQuality()
             => ToolCenter.ReleasePluginsForQuality();
 
-        internal void ShowEmbeddedPlugin(
-            string title,
-            FrameworkElement content,
-            Func<Task> closeRequested,
-            Action detachRequested,
-            string? sessionId = null,
-            Func<Task>? endRequested = null)
-        {
-            if (EmbeddedPluginContent.Content is FrameworkElement existing
-                && !ReferenceEquals(existing, content))
-            {
-                EmbeddedPluginContent.Content = null;
-                _ = _embeddedCloseRequested?.Invoke();
-            }
-            EmbeddedPluginTitle.Text = title;
-            EmbeddedPluginContent.Content = content;
-            _embeddedCloseRequested = closeRequested;
-            _embeddedDetachRequested = detachRequested;
-            _embeddedEndRequested = endRequested;
-            EmbeddedEndRunButton.Visibility = endRequested is null
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-            AutomationProperties.SetItemStatus(
-                EmbeddedPluginSurface,
-                string.IsNullOrWhiteSpace(sessionId)
-                    ? string.Empty
-                    : $"plugin-session:{sessionId};placement:embedded");
-            ToolCenter.Visibility = Visibility.Collapsed;
-            EmbeddedPluginSurface.Visibility = Visibility.Visible;
-            if (!IsVisible) Show();
-            if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-            Activate();
-        }
-
-        internal void CloseEmbeddedPlugin(FrameworkElement content)
-        {
-            if (!ReferenceEquals(EmbeddedPluginContent.Content, content)) return;
-            EmbeddedPluginContent.Content = null;
-            EmbeddedPluginSurface.Visibility = Visibility.Collapsed;
-            ToolCenter.Visibility = Visibility.Visible;
-            ClearEmbeddedCallbacks();
-        }
-
-        private async Task CloseEmbeddedSurfaceAsync(bool notifyLifecycle)
-        {
-            var callback = _embeddedCloseRequested;
-            EmbeddedPluginContent.Content = null;
-            EmbeddedPluginSurface.Visibility = Visibility.Collapsed;
-            ToolCenter.Visibility = Visibility.Visible;
-            ClearEmbeddedCallbacks();
-            if (notifyLifecycle && callback is not null)
-                await callback();
-        }
-
-        private async void EmbeddedBack_Click(object sender, RoutedEventArgs e)
-            => await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
-
-        private async void EmbeddedClose_Click(object sender, RoutedEventArgs e)
-            => await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
-
-        private void DetachEmbedded_Click(object sender, RoutedEventArgs e)
-            => DetachEmbeddedSurface();
-
-        private bool DetachEmbeddedSurface()
-        {
-            var callback = _embeddedDetachRequested;
-            if (callback is null
-                || EmbeddedPluginSurface.Visibility != Visibility.Visible)
-            {
-                return false;
-            }
-            EmbeddedPluginContent.Content = null;
-            EmbeddedPluginSurface.Visibility = Visibility.Collapsed;
-            ToolCenter.Visibility = Visibility.Visible;
-            ClearEmbeddedCallbacks();
-            callback?.Invoke();
-            return true;
-        }
-
-        private async void EmbeddedEndRun_Click(
-            object sender,
-            RoutedEventArgs e)
-        {
-            var callback = _embeddedEndRequested;
-            if (callback is null)
-                return;
-            EmbeddedEndRunButton.IsEnabled = false;
-            try
-            {
-                await callback();
-            }
-            catch (Exception exception)
-            {
-                Log.Warning(exception, "Could not end embedded plugin run");
-                EmbeddedEndRunButton.IsEnabled = true;
-            }
-        }
-
-        private void ClearEmbeddedCallbacks()
-        {
-            _embeddedCloseRequested = null;
-            _embeddedDetachRequested = null;
-            _embeddedEndRequested = null;
-            EmbeddedEndRunButton.IsEnabled = true;
-            EmbeddedEndRunButton.Visibility = Visibility.Collapsed;
-            AutomationProperties.SetItemStatus(EmbeddedPluginSurface, string.Empty);
-        }
-
         private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             var modifiers = Keyboard.Modifiers;
@@ -996,8 +873,7 @@ namespace LongBetterWindows.Host
             }
             if (key == Key.D
                 && modifiers.HasFlag(ModifierKeys.Control)
-                && (WorkspaceShell.DetachActivePluginRuntime()
-                    || DetachEmbeddedSurface()))
+                && WorkspaceShell.DetachActivePluginRuntime())
             {
                 e.Handled = true;
                 return;
@@ -1031,22 +907,16 @@ namespace LongBetterWindows.Host
                 return;
 
             var state = ServicesInitializer.Workspace.State;
-            var workspaceIsVisible =
-                EmbeddedPluginSurface.Visibility != Visibility.Visible;
             var action = WorkspaceEscapeRouter.Route(
                 new WorkspaceEscapeContext(
                     HasTransientLayer:
-                        workspaceIsVisible
-                        && (_activeWorkflowReviewId is not null
-                            || ToolCenter.HasDismissibleTransientLayer),
+                        _activeWorkflowReviewId is not null
+                            || ToolCenter.HasDismissibleTransientLayer,
                     HasScopedSearchQuery:
-                        workspaceIsVisible
-                        && WorkspaceShell.HasScopedSearchQuery,
+                        WorkspaceShell.HasScopedSearchQuery,
                     CanNavigateBackInModule:
-                        workspaceIsVisible
-                        && ToolCenter.CanNavigateBackInModule,
-                    CanNavigateBackInWorkspace:
-                        EmbeddedPluginSurface.Visibility == Visibility.Visible,
+                        ToolCenter.CanNavigateBackInModule,
+                    CanNavigateBackInWorkspace: false,
                     CanCloseActiveModule: state.ActiveModule.CanClose,
                     CanReturnToLauncher:
                         ServicesInitializer.LauncherContinuity.HasPendingFor(
@@ -1062,10 +932,6 @@ namespace LongBetterWindows.Host
                     break;
                 case WorkspaceEscapeAction.NavigateBackInModule:
                     e.Handled = ToolCenter.NavigateBackInModule();
-                    break;
-                case WorkspaceEscapeAction.NavigateBackInWorkspace:
-                    await CloseEmbeddedSurfaceAsync(notifyLifecycle: true);
-                    e.Handled = true;
                     break;
                 case WorkspaceEscapeAction.CloseActiveModule:
                     await CloseWorkspaceModuleAsync(state.ActiveModuleKey);

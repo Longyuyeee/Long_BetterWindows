@@ -221,6 +221,7 @@
                                            FontSize="14"
                                            FontWeight="SemiBold"
                                            VerticalAlignment="Center"
+                                           AutomationProperties.AutomationId="Long.Workspace.PluginRuntime.Title"
                                            TextTrimming="CharacterEllipsis" />
                                 <Border Style="{StaticResource LongBadge}"
                                         Margin="9,0,0,0"

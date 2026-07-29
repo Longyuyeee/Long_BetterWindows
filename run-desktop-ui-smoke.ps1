@@ -1073,26 +1073,27 @@ try {
     }
 
     if (-not $WorkflowOnly -and -not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
-    Write-Stage 'Starting embedded Base64 plugin workflow.'
+    Write-Stage 'Starting Workspace Base64 plugin workflow.'
     $pluginProcess = Start-QualityHost @(
-        '--run-command', 'com.long.base64:base64.encode',
-        '--command-text', 'Long-UI-smoke')
+        '--quality-open-plugin-runtime', 'com.long.base64')
     $mainWindow = Wait-Until {
         Find-WindowByAutomationId $pluginProcess.Id 'Long.MainWindow'
-    } 'The main window did not appear for the embedded plugin workflow.'
-    $embeddedSurface = Wait-Until {
-        Find-DescendantByAutomationId $mainWindow 'Long.Plugin.EmbeddedTitle'
-    } 'The Base64 embedded plugin title did not appear.'
+    } 'The main window did not appear for the Workspace plugin workflow.'
+    $workspaceRuntime = Wait-Until {
+        Find-DescendantByAutomationId `
+            $mainWindow 'Long.Workspace.PluginRuntime.Title'
+    } 'The Base64 Workspace runtime did not appear.'
     $detach = Wait-Until {
-        Find-DescendantByAutomationId $mainWindow 'Long.Plugin.Detach'
-    } 'The embedded plugin detach button was not discoverable.'
+        Find-DescendantByAutomationId `
+            $mainWindow 'Long.Workspace.PluginRuntime.Detach'
+    } 'The Workspace plugin detach button was not discoverable.'
     $report.automation_semantics['plugin_lifecycle'] = [ordered]@{
         main_window = Get-AutomationSemantics $mainWindow 'ControlType.Window' 'Main window semantics failed.'
         detach = Get-AutomationSemantics $detach 'ControlType.Button' 'Plugin detach semantics failed.'
     }
-    Write-Stage 'Detaching the embedded plugin through UI Automation.'
+    Write-Stage 'Detaching the Workspace plugin through UI Automation.'
     Invoke-AutomationElement $detach `
-        'The embedded plugin detach button did not support InvokePattern.'
+        'The Workspace plugin detach button did not support InvokePattern.'
     $detachedWindow = Wait-Until {
         Find-WindowByAutomationId $pluginProcess.Id 'Long.Plugin.DetachedWindow'
     } 'The detached plugin window did not appear.'
@@ -1112,17 +1113,18 @@ try {
         $null -eq (Find-WindowByAutomationId `
             $pluginProcess.Id 'Long.Plugin.DetachedWindow')
     } 'Escape did not close the detached plugin window.' | Out-Null
-    $toolCenter = Wait-Until {
-        Find-DescendantByAutomationId $mainWindow 'ToolCenter'
-    } 'Returning from the detached plugin did not restore Tool Center.'
+    $restoredRuntime = Wait-Until {
+        Find-DescendantByAutomationId `
+            $mainWindow 'Long.Workspace.PluginRuntime.Title'
+    } 'Returning from the detached plugin did not restore the Workspace runtime.'
     $report.plugin_lifecycle = [ordered]@{
         main_window_discovered = $true
-        embedded_surface_discovered = $null -ne $embeddedSurface
+        workspace_runtime_discovered = $null -ne $workspaceRuntime
         detach_invoked = $true
         detached_window_discovered = $true
         detached_back_discovered = $null -ne $detachedBack
         escape_closed_detached_window = $true
-        tool_center_restored = $null -ne $toolCenter
+        workspace_runtime_restored = $null -ne $restoredRuntime
     }
     Stop-QualityHost $pluginProcess
     $pluginProcess = $null

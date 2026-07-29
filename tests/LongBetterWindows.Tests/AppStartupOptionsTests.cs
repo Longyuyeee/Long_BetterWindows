@@ -41,6 +41,7 @@ public class AppStartupOptionsTests
             "--quality-plugin-settings-report", "plugin-settings.json",
             "--quality-plugin-settings-persistence-report", "plugin-settings-persistence.json",
             "--quality-open-plugin-settings", "com.long.folder-note",
+            "--quality-open-plugin-runtime", "com.long.base64",
             "--quality-skip-auto-start-plugin", "com.long.clipboardhistory",
             "--quality-skip-auto-start-plugin", "COM.LONG.MACRO",
             "--quality-hide-window-during-idle",
@@ -104,6 +105,9 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "com.long.folder-note",
             options.QualityPluginSettingsId);
+        Assert.Equal(
+            "com.long.base64",
+            options.QualityPluginRuntimeId);
         Assert.Equal(
             2,
             options.QualitySkippedAutoStartPluginIds.Count);

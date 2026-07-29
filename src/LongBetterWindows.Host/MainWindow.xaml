@@ -117,72 +117,7 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1">
-                <views:WorkspaceShellControl x:Name="WorkspaceShell" />
-                <Grid x:Name="EmbeddedPluginSurface" Visibility="Collapsed"
-                      AutomationProperties.AutomationId="Long.Plugin.EmbeddedSurface"
-                      Background="{DynamicResource Long.Brush.Background.Base}">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="54" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <Border Background="{DynamicResource Long.Brush.Background.Raised}"
-                            BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
-                            BorderThickness="0,0,0,1">
-                        <Grid Margin="18,0,14,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Button Style="{StaticResource LongIconButton}" Width="32" Height="30"
-                                    Click="EmbeddedBack_Click" ToolTip="{DynamicResource i18n.pluginWindow.back}"
-                                    AutomationProperties.AutomationId="Long.Plugin.EmbeddedBack"
-                                    AutomationProperties.Name="{DynamicResource i18n.pluginWindow.back}">
-                                <TextBlock Text="‹" FontSize="22" Margin="0,-3,0,0" />
-                            </Button>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="11,0,0,0"
-                                        VerticalAlignment="Center">
-                                <Border Width="26" Height="26" CornerRadius="8"
-                                        Background="{DynamicResource Long.Brush.Accent.Soft}">
-                                    <Path Data="{StaticResource Long.Icon.Plugin}" Style="{StaticResource LongIcon}"
-                                          Width="14" Height="14" Stroke="{DynamicResource Long.Brush.Accent.Primary}"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <TextBlock x:Name="EmbeddedPluginTitle" Margin="9,0,0,0"
-                                           AutomationProperties.AutomationId="Long.Plugin.EmbeddedTitle"
-                                           FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Border Style="{StaticResource LongBadge}" Margin="9,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="{DynamicResource i18n.pluginWindow.embeddedMode}" FontSize="9"
-                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                                </Border>
-                            </StackPanel>
-                            <Button Grid.Column="2" Content="{DynamicResource i18n.pluginWindow.detach}" Style="{StaticResource LongButton}"
-                                    Height="30" Margin="0,0,7,0" Click="DetachEmbedded_Click"
-                                    AutomationProperties.AutomationId="Long.Plugin.Detach"
-                                    AutomationProperties.Name="{DynamicResource i18n.pluginWindow.detachAutomation}" />
-                            <Button x:Name="EmbeddedEndRunButton"
-                                    Grid.Column="3"
-                                    Content="{DynamicResource i18n.pluginWindow.endRun}"
-                                    Style="{StaticResource LongButton}"
-                                    Height="30" Margin="0,0,7,0"
-                                    Click="EmbeddedEndRun_Click"
-                                    AutomationProperties.AutomationId="Long.Plugin.EmbeddedEndRun"
-                                    AutomationProperties.Name="{DynamicResource i18n.pluginWindow.endRun}" />
-                            <Button Grid.Column="4" Style="{StaticResource LongIconButton}" Width="32" Height="30"
-                                    Click="EmbeddedClose_Click"
-                                    AutomationProperties.AutomationId="Long.Plugin.EmbeddedClose"
-                                    AutomationProperties.Name="{DynamicResource i18n.pluginWindow.close}">
-                                <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}"
-                                      Width="13" Height="13" />
-                            </Button>
-                        </Grid>
-                    </Border>
-                    <ContentControl x:Name="EmbeddedPluginContent" Grid.Row="1" Margin="1" />
-                </Grid>
-            </Grid>
+            <views:WorkspaceShellControl x:Name="WorkspaceShell" Grid.Row="1" />
         </Grid>
     </Border>
 </Window>

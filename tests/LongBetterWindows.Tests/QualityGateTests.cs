@@ -766,10 +766,11 @@ public class QualityGateTests
         var zhResources = Read("src", "LongBetterWindows.Host", "i18n", "zh-CN.json");
         var gestures = Read("src", "LongBetterWindows.Host", "Services", "MouseGestureService.cs");
 
-        Assert.Contains("EmbeddedPluginSurface", mainXaml);
-        Assert.Contains("i18n.pluginWindow.detachAutomation", mainXaml);
-        Assert.Contains("ShowEmbeddedPlugin", mainSource);
-        Assert.Contains("CloseEmbeddedSurfaceAsync", mainSource);
+        Assert.DoesNotContain("EmbeddedPluginSurface", mainXaml);
+        Assert.DoesNotContain("ShowEmbeddedPlugin", mainSource);
+        Assert.DoesNotContain("CloseEmbeddedSurfaceAsync", mainSource);
+        Assert.Contains("WorkspaceShell.DetachActivePluginRuntime()", mainSource);
+        Assert.Contains("ShowPluginRuntimeModuleAsync", mainSource);
         Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", pluginXaml);
         Assert.Contains("i18n.pluginWindow.back", pluginXaml);
         Assert.Contains("Key.Escape", pluginSource);
@@ -1430,6 +1431,11 @@ public class QualityGateTests
         var mainAutomation = Read(
             "src", "LongBetterWindows.Host", "Automation", "QualityWorkflowAutomation.cs");
         var plugin = Read("src", "LongBetterWindows.Host", "Views", "PluginWindowHost.xaml");
+        var workspace = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "WorkspaceShellControl.xaml");
 
         Assert.Contains("Long.CommandPalette.Search", palette);
         Assert.Contains("Long.CommandPalette.Results", palette);
@@ -1464,8 +1470,10 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml"));
         Assert.Contains("Long.Workflow.ReviewCancel", main);
         Assert.Contains("BooleanToVisibilityConverter x:Key=\"BooleanToVisibility\"", appResources);
-        Assert.Contains("Long.Plugin.EmbeddedTitle", main);
-        Assert.Contains("Long.Plugin.Detach", main);
+        Assert.DoesNotContain("Long.Plugin.EmbeddedTitle", main);
+        Assert.DoesNotContain("Long.Plugin.Detach", main);
+        Assert.Contains("Long.Workspace.PluginRuntime.Title", workspace);
+        Assert.Contains("Long.Workspace.PluginRuntime.Detach", workspace);
         Assert.Contains("Long.Plugin.DetachedWindow", plugin);
         Assert.Contains("[LongDesktopInput]::TopLevelWindows", script);
         Assert.Contains("$valuePattern.SetValue('wifi')", script);

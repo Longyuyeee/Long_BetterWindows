@@ -326,6 +326,19 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginRuntimeId))
+                {
+                    if (MainWindow is not MainWindow runtimeWindow)
+                    {
+                        throw new InvalidOperationException(
+                            "Opening a quality plugin runtime requires the main window.");
+                    }
+                    await _qualityRuntime!.OpenPluginRuntimeAsync(
+                        runtimeWindow,
+                        _startupOptions.QualityPluginRuntimeId);
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityTaskbarIdentityReportPath))
                 {
                     await _qualityRuntime!.RunTaskbarIdentityProbeAsync(
@@ -400,6 +413,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityPluginPagePerformanceReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeSessionReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityPluginRuntimeId)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityTaskbarIdentityReportPath)
                     || !string.IsNullOrWhiteSpace(

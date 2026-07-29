@@ -21,6 +21,7 @@ namespace LongBetterWindows.Host.Services
         public bool OpenDiagnosticsForQuality { get; private init; }
         public bool OpenPluginsForQuality { get; private init; }
         public string? QualityPluginSettingsId { get; private init; }
+        public string? QualityPluginRuntimeId { get; private init; }
         public string? QualityPluginPageReleaseReportPath { get; private init; }
         public string? QualityPluginPagePerformanceReportPath { get; private init; }
         public string? QualityPluginRuntimeSessionReportPath { get; private init; }
@@ -111,6 +112,9 @@ namespace LongBetterWindows.Host.Services
                 QualityPluginSettingsId = ReadArgument(
                     arguments,
                     "--quality-open-plugin-settings"),
+                QualityPluginRuntimeId = ReadArgument(
+                    arguments,
+                    "--quality-open-plugin-runtime"),
                 QualityPluginPageReleaseReportPath = pluginPageReleaseReport,
                 QualityPluginPagePerformanceReportPath =
                     pluginPagePerformanceReport,

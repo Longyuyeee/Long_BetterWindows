@@ -334,23 +334,7 @@ namespace LongBetterWindows.Host.Services
                     $"Quality runtime plugin was not found: {pluginId}");
 
             async Task OpenAsync()
-            {
-                if (entry.State is not
-                    (PluginState.Running or PluginState.Background)
-                    && !await registry.StartPluginAsync(
-                        pluginId,
-                        persistAutoStart: false))
-                {
-                    throw new InvalidOperationException(
-                        "Quality runtime plugin could not start.");
-                }
-                if (entry.Instance is not IHasMainUI mainUi)
-                {
-                    throw new InvalidOperationException(
-                        "Quality runtime plugin does not expose a main UI.");
-                }
-                mainUi.ShowMainUI();
-            }
+                => await OpenPluginRuntimeAsync(mainWindow, pluginId);
 
             await OpenAsync();
             var embeddedReady = await WaitUntilAsync(
@@ -807,7 +791,7 @@ namespace LongBetterWindows.Host.Services
                         second_session_id = reopened.SessionId,
                         content_identity = initial.ContentIdentity,
                         background_plugin_id = backgroundPluginId,
-                        background_embedded_ready =
+                        background_workspace_runtime_ready =
                             backgroundEmbeddedReady,
                         background_close_requested =
                             backgroundCloseRequested,
@@ -831,7 +815,7 @@ namespace LongBetterWindows.Host.Services
                             backgroundSessionEnded,
                         fallback_module = fallbackModule.ToString(),
                         settings_open_error = settingsOpenError,
-                        upgrade_embedded_ready = upgradeEmbeddedReady,
+                        upgrade_workspace_runtime_ready = upgradeEmbeddedReady,
                         upgrade_cleaned = upgradeCleaned,
                         upgrade_registration_restored =
                             upgradeRegistrationRestored,
@@ -862,6 +846,31 @@ namespace LongBetterWindows.Host.Services
                     },
                     new JsonSerializerOptions { WriteIndented = true }));
             _application.Shutdown(passed ? 0 : 3);
+        }
+
+        public async Task OpenPluginRuntimeAsync(
+            MainWindow mainWindow,
+            string pluginId)
+        {
+            ArgumentNullException.ThrowIfNull(mainWindow);
+            var registry = HostProvider.Instance.PluginStore;
+            var entry = registry.Get(pluginId)
+                ?? throw new InvalidOperationException(
+                    $"Quality runtime plugin was not found: {pluginId}");
+            if (entry.State is not (PluginState.Running or PluginState.Background)
+                && !await registry.StartPluginAsync(
+                    pluginId,
+                    persistAutoStart: false))
+            {
+                throw new InvalidOperationException(
+                    $"Quality runtime plugin could not start: {pluginId}");
+            }
+            if (entry.Instance is not IHasMainUI mainUi)
+            {
+                throw new InvalidOperationException(
+                    $"Quality runtime plugin has no main UI: {pluginId}");
+            }
+            mainUi.ShowMainUI();
         }
 
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
