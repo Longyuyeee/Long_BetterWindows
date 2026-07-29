@@ -138,6 +138,8 @@ async function saveNote() {
 .\pack-plugin.ps1 -PluginDir "src/MyPlugin"
 ```
 
+打包器会先后两次复用生产验证规则，并生成带逐文件 SHA-256 总账的确定性 `.lpak`；相同输入可得到相同包哈希，缓存、临时文件和常见秘密文件会在发布前被阻断。
+
 继续阅读 [插件开发指南](docs/插件开发指南.md)、[宿主能力 API 手册](docs/基础能力_API_手册.md) 与 [Long Design System 使用指南](docs/Long_Design_System_使用指南.md)。
 插件 Manifest 的机器可读权威契约见 [JSON Schema](schemas/plugin-manifest.schema.json)。
 

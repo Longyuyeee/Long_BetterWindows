@@ -13,12 +13,14 @@
 #>
 param(
     [Parameter(Mandatory=$true)] [string] $Path,
-    [string] $InstalledPluginDirectory
+    [string] $InstalledPluginDirectory,
+    [switch] $NoBuild
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $toolProject = Join-Path $root "tools\LongBetterWindows.PluginValidator\LongBetterWindows.PluginValidator.csproj"
+$toolDll = Join-Path $root "tools\LongBetterWindows.PluginValidator\bin\Release\net8.0-windows\LongBetterWindows.PluginValidator.dll"
 
 $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
 if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) {
@@ -33,15 +35,19 @@ if (-not (Test-Path -LiteralPath $toolProject -PathType Leaf)) {
     throw "插件验证工具项目不存在：$toolProject"
 }
 
+if (-not $NoBuild) {
+    $buildOutput = & $dotnet build $toolProject -c Release --nologo 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $buildOutput | Write-Error
+        exit 2
+    }
+}
+if (-not (Test-Path -LiteralPath $toolDll -PathType Leaf)) {
+    throw "插件验证工具尚未构建：$toolDll"
+}
+
 $target = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
-$arguments = @(
-    "run",
-    "--project", $toolProject,
-    "-c", "Release",
-    "--no-launch-profile",
-    "--",
-    $target
-)
+$arguments = @($toolDll, $target)
 if (-not [string]::IsNullOrWhiteSpace($InstalledPluginDirectory)) {
     $installed = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath(
         $InstalledPluginDirectory)

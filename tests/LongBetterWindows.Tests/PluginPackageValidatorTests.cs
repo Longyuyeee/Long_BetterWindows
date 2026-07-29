@@ -55,6 +55,17 @@ public sealed class PluginPackageValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateAsync_CaseInsensitiveDuplicatePath_IsRejected()
+    {
+        var package = CreatePackage(extraEntryName: "PLUGIN.DLL");
+
+        var result = await new PluginPackageValidator().ValidateAsync(package);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("重复路径", result.Error);
+    }
+
+    [Fact]
     public async Task ValidateAsync_RegistryHashMismatch_IsRejected()
     {
         var package = CreatePackage();
@@ -207,6 +218,43 @@ public sealed class PluginPackageValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateAsync_ValidFileManifest_IsAccepted()
+    {
+        var package = CreatePackageWithFileManifest();
+
+        var result = await new PluginPackageValidator(new Version(1, 0, 0))
+            .ValidateAsync(package);
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal("dev.long.test", result.Manifest!.Id);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_TamperedFileManifestHash_IsRejected()
+    {
+        var package = CreatePackageWithFileManifest(tamperEntryHash: true);
+
+        var result = await new PluginPackageValidator(new Version(1, 0, 0))
+            .ValidateAsync(package);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("SHA-256", result.Error);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_FileManifestIdentityMismatch_IsRejected()
+    {
+        var package = CreatePackageWithFileManifest(
+            ledgerPluginId: "dev.long.someone-else");
+
+        var result = await new PluginPackageValidator(new Version(1, 0, 0))
+            .ValidateAsync(package);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("manifest.json", result.Error);
+    }
+
+    [Fact]
     public void CreatePermissionDiff_SeparatesAddedRemovedAndUnchanged()
     {
         var diff = PluginPackageValidator.CreatePermissionDiff(
@@ -300,11 +348,69 @@ public sealed class PluginPackageValidatorTests : IDisposable
         return directory;
     }
 
+    private string CreatePackageWithFileManifest(
+        bool tamperEntryHash = false,
+        string ledgerPluginId = "dev.long.test")
+    {
+        var path = Path.Combine(_tempDir, $"{Guid.NewGuid():N}.lpak");
+        var manifestBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+        {
+            id = "dev.long.test",
+            version = "1.0.0",
+            name = "Test Plugin",
+            author = "Long",
+            runtime = "webview",
+            entry_point = "index.html",
+            capabilities = new[] { "storage.local" },
+        }));
+        var entryBytes = Encoding.UTF8.GetBytes("<html>test</html>");
+        var ledgerBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+        {
+            schema_version = 1,
+            classification = "long_plugin_file_manifest",
+            plugin_id = ledgerPluginId,
+            version = "1.0.0",
+            files = new object[]
+            {
+                new
+                {
+                    path = "index.html",
+                    size = entryBytes.LongLength,
+                    sha256 = tamperEntryHash
+                        ? new string('0', 64)
+                        : Convert.ToHexString(SHA256.HashData(entryBytes)),
+                },
+                new
+                {
+                    path = "manifest.json",
+                    size = manifestBytes.LongLength,
+                    sha256 = Convert.ToHexString(SHA256.HashData(manifestBytes)),
+                },
+            },
+        }));
+
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        WriteEntryBytes(archive, "index.html", entryBytes);
+        WriteEntryBytes(archive, "manifest.json", manifestBytes);
+        WriteEntryBytes(archive, "package-files.json", ledgerBytes);
+        return path;
+    }
+
     private static void WriteEntry(ZipArchive archive, string name, string content)
     {
         var entry = archive.CreateEntry(name);
         using var writer = new StreamWriter(entry.Open(), Encoding.UTF8);
         writer.Write(content);
+    }
+
+    private static void WriteEntryBytes(
+        ZipArchive archive,
+        string name,
+        byte[] content)
+    {
+        var entry = archive.CreateEntry(name);
+        using var stream = entry.Open();
+        stream.Write(content);
     }
 
     public void Dispose()

@@ -2,6 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text.Json;
 using LongBetterWindows.Host.Contracts;
 
 namespace LongBetterWindows.Host.Engine
@@ -87,6 +88,13 @@ namespace LongBetterWindows.Host.Engine
                 if (structureError != null)
                     return PackageValidationResult.Fail(structureError, sha256);
 
+                var fileManifestError = ValidateFileManifest(
+                    archive,
+                    out var fileManifestPluginId,
+                    out var fileManifestVersion);
+                if (fileManifestError != null)
+                    return PackageValidationResult.Fail(fileManifestError, sha256);
+
                 ExtractSafely(archive, stagingDir);
                 var manifestResult = await ManifestReader.ReadAsync(stagingDir);
                 if (!manifestResult.IsSuccess)
@@ -101,6 +109,14 @@ namespace LongBetterWindows.Host.Engine
                     return PackageValidationResult.Fail("插件 ID 与市场元数据不一致。", sha256);
                 if (!Matches(metadata.ExpectedVersion, manifest.Version))
                     return PackageValidationResult.Fail("插件版本与市场元数据不一致。", sha256);
+                if (!Matches(fileManifestPluginId, manifest.Id)
+                    || !Matches(fileManifestVersion, manifest.Version))
+                {
+                    return PackageValidationResult.Fail(
+                        "插件文件总账身份与 manifest.json 不一致。",
+                        sha256,
+                        manifest);
+                }
 
                 if (metadata.Source == MarketplaceSourceKind.RemoteRegistry
                     && !string.Equals(manifest.Runtime, "webview", StringComparison.OrdinalIgnoreCase))
@@ -276,6 +292,7 @@ namespace LongBetterWindows.Host.Engine
             if (archive.Entries.Count > MaximumEntryCount) return "插件包文件数量超过安全限制。";
             long total = 0;
             var manifests = 0;
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in archive.Entries)
             {
                 total = checked(total + entry.Length);
@@ -284,9 +301,118 @@ namespace LongBetterWindows.Host.Engine
                 if (normalized.StartsWith('/') || normalized.Contains("../", StringComparison.Ordinal)
                     || Path.IsPathRooted(entry.FullName))
                     return "插件包包含非法路径。";
+                if (!paths.Add(normalized))
+                    return $"插件包包含重复路径：{normalized}。";
                 if (string.Equals(normalized, "manifest.json", StringComparison.OrdinalIgnoreCase)) manifests++;
             }
             return manifests == 1 ? null : "插件包根目录必须且只能包含一个 manifest.json。";
+        }
+
+        private static string? ValidateFileManifest(
+            ZipArchive archive,
+            out string? pluginId,
+            out string? version)
+        {
+            pluginId = null;
+            version = null;
+            var ledgerEntries = archive.Entries
+                .Where(entry => string.Equals(
+                    entry.FullName.Replace('\\', '/'),
+                    "package-files.json",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            if (ledgerEntries.Length == 0)
+                return null;
+            if (ledgerEntries.Length != 1)
+                return "插件包根目录最多只能包含一个 package-files.json。";
+
+            try
+            {
+                using var stream = ledgerEntries[0].Open();
+                using var document = JsonDocument.Parse(stream);
+                var root = document.RootElement;
+                if (root.GetProperty("schema_version").GetInt32() != 1
+                    || !string.Equals(
+                        root.GetProperty("classification").GetString(),
+                        "long_plugin_file_manifest",
+                        StringComparison.Ordinal))
+                {
+                    return "插件文件总账版本或分类无效。";
+                }
+
+                pluginId = root.GetProperty("plugin_id").GetString();
+                version = root.GetProperty("version").GetString();
+                if (string.IsNullOrWhiteSpace(pluginId)
+                    || string.IsNullOrWhiteSpace(version))
+                {
+                    return "插件文件总账缺少插件身份。";
+                }
+
+                var declared = new Dictionary<
+                    string,
+                    (long Size, string Sha256)>(
+                    StringComparer.OrdinalIgnoreCase);
+                foreach (var item in root.GetProperty("files").EnumerateArray())
+                {
+                    var path = item.GetProperty("path").GetString() ?? string.Empty;
+                    var normalized = path.Replace('\\', '/');
+                    var size = item.GetProperty("size").GetInt64();
+                    var hash = item.GetProperty("sha256").GetString() ?? string.Empty;
+                    if (normalized.Length == 0
+                        || normalized.StartsWith('/')
+                        || normalized.Contains("../", StringComparison.Ordinal)
+                        || Path.IsPathRooted(path)
+                        || string.Equals(
+                            normalized,
+                            "package-files.json",
+                            StringComparison.OrdinalIgnoreCase)
+                        || size < 0
+                        || hash.Length != 64
+                        || !hash.All(Uri.IsHexDigit)
+                        || !declared.TryAdd(normalized, (size, hash)))
+                    {
+                        return "插件文件总账包含无效或重复条目。";
+                    }
+                }
+
+                var actualFiles = archive.Entries
+                    .Where(entry => !string.IsNullOrEmpty(entry.Name))
+                    .Where(entry => !string.Equals(
+                        entry.FullName.Replace('\\', '/'),
+                        "package-files.json",
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                if (actualFiles.Length != declared.Count)
+                    return "插件文件总账与包内文件数量不一致。";
+
+                foreach (var entry in actualFiles)
+                {
+                    var path = entry.FullName.Replace('\\', '/');
+                    if (!declared.TryGetValue(path, out var expected)
+                        || expected.Size != entry.Length)
+                    {
+                        return $"插件文件总账与包内文件不一致：{path}。";
+                    }
+
+                    using var content = entry.Open();
+                    var actualHash = Convert.ToHexString(SHA256.HashData(content));
+                    if (!CryptographicOperations.FixedTimeEquals(
+                        Convert.FromHexString(actualHash),
+                        Convert.FromHexString(expected.Sha256)))
+                    {
+                        return $"插件文件总账 SHA-256 不一致：{path}。";
+                    }
+                }
+
+                return null;
+            }
+            catch (Exception exception) when (exception is
+                InvalidDataException or InvalidOperationException
+                or FormatException or KeyNotFoundException
+                or JsonException or OverflowException)
+            {
+                return $"插件文件总账无效：{exception.Message}";
+            }
         }
 
         private static bool VerifySignature(

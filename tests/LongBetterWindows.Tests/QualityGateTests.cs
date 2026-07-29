@@ -2075,6 +2075,30 @@ public class QualityGateTests
         Assert.Contains("参数错误为 `2`", guide);
     }
 
+    [Fact]
+    public void PluginPacker_IsDeterministicAuditedAndProductionValidated()
+    {
+        var packer = Read("pack-plugin.ps1");
+        var validator = Read(
+            "src", "LongBetterWindows.Host", "Engine",
+            "PluginPackageValidator.cs");
+
+        Assert.Contains("Invoke-ProductionValidation", packer);
+        Assert.Contains("package-files.json", packer);
+        Assert.Contains("long_plugin_file_manifest", packer);
+        Assert.Contains("Get-FileHash", packer);
+        Assert.Contains("1980, 1, 1", packer);
+        Assert.Contains("Sort-Object Path", packer);
+        Assert.Contains("ZipArchive", packer);
+        Assert.Contains("$postflight", packer);
+        Assert.Contains("-NoBuild", packer);
+        Assert.Contains(".env", packer);
+        Assert.Contains("pfx|p12|snk", packer);
+        Assert.DoesNotContain("Compress-Archive", packer);
+        Assert.Contains("ValidateFileManifest", validator);
+        Assert.Contains("CryptographicOperations.FixedTimeEquals", validator);
+    }
+
     private static string Read(params string[] parts)
         => File.ReadAllText(Path.Combine(new[] { FindRepositoryRoot() }.Concat(parts).ToArray()));
 
