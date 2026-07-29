@@ -92,7 +92,9 @@ $summary = [ordered]@{
     classification = 'approved_physical_device_dpi_matrix'
     source_commit = $expectedCommit
     required_scales = $requiredScales
-    capture_count = ($results | Measure-Object -Property capture_count -Sum).Sum
+    capture_count = ($results `
+        | ForEach-Object { [int]$_['capture_count'] } `
+        | Measure-Object -Sum).Sum
     passed = $true
     evidence = $results
 }
