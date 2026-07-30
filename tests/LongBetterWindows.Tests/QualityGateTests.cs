@@ -1956,7 +1956,9 @@ public class QualityGateTests
         Assert.Contains("WebPluginArguments.GetJson", dispatcher);
         Assert.Contains("GetHeaders", arguments);
         Assert.Contains("CoreWebView2.NavigationStarting +=", lifecycle);
-        Assert.Contains("_navigationPolicy.IsTrustedLocalUri", lifecycle);
+        Assert.Contains("_navigationPolicy.IsTrustedWebViewUri", lifecycle);
+        Assert.Contains("SetVirtualHostNameToFolderMapping", lifecycle);
+        Assert.Contains("BuildContentSecurityPolicyInjectionScript", lifecycle);
         Assert.Contains("dispatcher.Invoke(Dispose)", lifecycle);
         Assert.Contains("dispatcher.InvokeAsync(() => PostMessageCore(json))", lifecycle);
         Assert.DoesNotContain("window.long =", runtime);

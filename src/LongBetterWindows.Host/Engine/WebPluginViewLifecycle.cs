@@ -52,11 +52,18 @@ namespace LongBetterWindows.Host.Engine
                 webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
                 webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    _navigationPolicy.VirtualHostName,
+                    _navigationPolicy.PluginRoot,
+                    CoreWebView2HostResourceAccessKind.DenyCors);
                 webView.CoreWebView2.NavigationStarting += OnNavigationStarting;
                 webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
                 webView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
                 webView.CoreWebView2.DownloadStarting += OnDownloadStarting;
                 webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                    _navigationPolicy.BuildContentSecurityPolicyInjectionScript());
 
                 var uiKitScript = BuildUiKitInjectionScript();
                 if (!string.IsNullOrEmpty(uiKitScript))
@@ -179,7 +186,7 @@ namespace LongBetterWindows.Host.Engine
             object? sender,
             CoreWebView2NavigationStartingEventArgs args)
         {
-            if (_navigationPolicy.IsTrustedLocalUri(args.Uri))
+            if (_navigationPolicy.IsTrustedWebViewUri(args.Uri))
             {
                 _languageMessages.BeginNavigation();
                 return;
@@ -220,7 +227,7 @@ namespace LongBetterWindows.Host.Engine
             object? sender,
             CoreWebView2WebMessageReceivedEventArgs args)
         {
-            if (!_navigationPolicy.IsTrustedLocalUri(args.Source))
+            if (!_navigationPolicy.IsTrustedWebViewUri(args.Source))
             {
                 Log.Warning("[Web:{Id}] 已拒绝非插件页面的 Bridge 消息：{Source}",
                     _manifest.Id, args.Source);
