@@ -1,4 +1,4 @@
-export type LongApiVersion = "1.0.0";
+export type LongApiVersion = "1.1.0";
 
 export interface LongResult<T = never> {
   success: boolean;
@@ -245,11 +245,61 @@ export interface LongCommandMessage {
   command: LongCommandInvocation;
 }
 
+export type LongHostSurface = "plugin" | "action-card" | "widget";
+export type LongHostId = "long-assistant" | "long-grid" | string;
+
+export interface LongHostInfo {
+  protocol_version: "1.0";
+  api_version: LongApiVersion;
+  host: {
+    id: LongHostId;
+    version: string;
+  };
+  plugin_id: string;
+  surface: LongHostSurface;
+  widget_id?: string | null;
+  instance_id?: string | null;
+  surfaces: LongHostSurface[];
+  features: string[];
+  limits: {
+    instance_state_bytes: number;
+    bridge_message_bytes: number;
+  };
+}
+
+export interface LongWidgetEventEnvelope<TPayload = Record<string, unknown>> {
+  protocol_version: "1.0";
+  plugin_id: string;
+  widget_id: string;
+  instance_id: string;
+  sequence: number;
+  payload: TPayload;
+}
+
+export interface LongWidgetHostMessage<TPayload = Record<string, unknown>> {
+  type:
+    | "long.widget-mounted"
+    | "long.widget-visibility-changed"
+    | "long.widget-resized"
+    | "long.widget-theme-changed"
+    | "long.widget-locale-changed"
+    | "long.widget-settings-changed"
+    | "long.widget-suspend"
+    | "long.widget-resume"
+    | "long.widget-unmount";
+  detail: LongWidgetEventEnvelope<TPayload>;
+}
+
 export type LongHostMessage =
   | LongClipboardChangedEvent
   | LongLanguageChangedMessage
   | LongCommandMessage
+  | LongWidgetHostMessage
   | { type: "hotkey"; hotkey: string };
+
+export interface LongHostApi {
+  getInfo(): Promise<LongHostInfo>;
+}
 
 export interface LongAppApi {
   openUrl(url: string): Promise<LongResult>;
@@ -486,8 +536,21 @@ export interface LongWindowApi {
   getVisible(): Promise<LongResult<LongWindowInfo[]>>;
 }
 
+export interface LongWidgetApi {
+  ready(contentVersion?: number): Promise<LongResult>;
+  getInstanceState<T = unknown>(): Promise<LongResult<T | null>>;
+  setInstanceState<T = unknown>(state: T): Promise<LongResult>;
+  openSettings(): Promise<LongResult>;
+  invalidate(reason?: string): Promise<LongResult>;
+  setBadge(badge: {
+    text?: string;
+    status?: "normal" | "success" | "warning" | "danger" | "info" | string;
+  }): Promise<LongResult>;
+}
+
 export interface LongApi {
   app: LongAppApi;
+  host: LongHostApi;
   clipboard: LongClipboardApi;
   shell: LongShellApi;
   fs: { ads: LongAdsApi };
@@ -513,6 +576,7 @@ export interface LongApi {
   screenshot: LongScreenshotApi;
   http: LongHttpApi;
   window: LongWindowApi;
+  widget: LongWidgetApi;
 }
 
 export interface LongWebView {

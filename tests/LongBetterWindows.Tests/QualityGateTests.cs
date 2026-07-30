@@ -2168,7 +2168,7 @@ public class QualityGateTests
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(128, productionMethods.Length);
+        Assert.Equal(135, productionMethods.Length);
         Assert.Equal(productionMethods, mockMethods);
         Assert.Contains("\"name\": \"@long-assistant/plugin-sdk\"", package);
         using var packageDocument = System.Text.Json.JsonDocument.Parse(package);
@@ -2188,7 +2188,11 @@ public class QualityGateTests
         Assert.Contains("interface Window", types);
         Assert.Contains("LongClipboardChangedEvent", types);
         Assert.Contains("LongLanguageChangedMessage", types);
+        Assert.Contains("LongHostInfo", types);
+        Assert.Contains("LongWidgetApi", types);
         Assert.Contains("LongMockController", mockTypes);
+        Assert.Contains("host.getInfo", mock);
+        Assert.Contains("widget.setInstanceState", mock);
         Assert.Contains("storage.compareExchange", mock);
         Assert.Contains("@ts-expect-error", typeTest);
         Assert.Contains("node:test", behaviorTest);

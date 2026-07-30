@@ -1,6 +1,6 @@
 # Long助手实施交接单：LPWP 1.0
 
-状态：Ready for implementation planning
+状态：PR-A completed；PR-B foundation in progress
 Long助手审计基线：`Longyuyeee/Long_BetterWindows@0d1366f`
 上位规范：[Long 插件小组件兼容协议（LPWP）1.0](LONG_WIDGET_PROTOCOL_V1.md)
 
@@ -32,9 +32,9 @@ Long助手审计基线：`Longyuyeee/Long_BetterWindows@0d1366f`
 
 当前尚缺：
 
-- Manifest `widgets` 定义；
+- Manifest `widgets` 定义；（PR-A 已完成）
 - Widget 实例、尺寸、可见性、暂停/恢复等生命周期；
-- `host.getInfo` 和 Widget Bridge；
+- `host.getInfo` 和 Widget Bridge；（PR-B 已完成 `host.getInfo`、基础 Widget 方法、受信上下文绑定与事件信封；真实生命周期调度和持久化仍未完成）
 - 足够严格的 Widget 子资源沙箱；
 - Long Grid 可调用的同用户 IPC Broker；
 - 跨仓库 Golden Fixtures。
@@ -130,6 +130,8 @@ src/LongBetterWindows.Host/Broker/
 
 验收：所有旧 Manifest 测试不变，新 Schema 测试通过；尚不要求 UI 显示 Widget。
 
+当前状态：已完成。已同步主 Manifest Schema、`PluginManifest.Widgets`、Manifest 语义校验、包资源校验、SDK 版本与测试门禁。
+
 ### PR-B：Web Widget Bridge 与沙箱
 
 - `host.getInfo`；
@@ -140,6 +142,8 @@ src/LongBetterWindows.Host/Broker/
 - 参考 Widget 开发包。
 
 验收：生命周期、来源伪造、超大消息、导航、挂起与恢复测试通过。
+
+当前状态：部分完成。已完成 `host.getInfo`、宿主绑定身份上下文、基础 Widget 方法、实例状态大小限制、Widget 事件信封、Web SDK 类型和 Mock Host；尚未完成受控 HTTPS 虚拟来源、子资源拦截/CSP、真实 mounted/ready/suspend/resume/unmount 调度、实例状态持久化和参考 Widget `.lpak`。
 
 ### PR-C：Broker IPC
 

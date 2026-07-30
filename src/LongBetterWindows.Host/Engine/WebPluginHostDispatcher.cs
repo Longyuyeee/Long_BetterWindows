@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
@@ -9,20 +10,24 @@ namespace LongBetterWindows.Host.Engine
     internal sealed class WebPluginHostDispatcher : IDisposable
     {
         private readonly string _pluginId;
+        private readonly WebPluginBridgeContext _context;
         private readonly IHostApi _host;
         private readonly Action<string> _postMessage;
         private readonly SemaphoreSlim _clipboardGate = new(1, 1);
         private readonly object _clipboardStateLock = new();
         private Task<HostApiResponse>? _clipboardAcquireTask;
+        private object? _widgetInstanceState;
         private bool _clipboardSubscribed;
         private bool _disposed;
 
         internal WebPluginHostDispatcher(
             string pluginId,
             IHostApi host,
-            Action<string> postMessage)
+            Action<string> postMessage,
+            WebPluginBridgeContext? context = null)
         {
             _pluginId = pluginId;
+            _context = context ?? new WebPluginBridgeContext(pluginId);
             _host = host;
             _postMessage = postMessage;
         }
@@ -45,6 +50,15 @@ namespace LongBetterWindows.Host.Engine
                 "app.showNotification" => Task.FromResult<object?>(UIToast(WebPluginArguments.GetString(args, 0) + "\n" + WebPluginArguments.GetString(args, 1))),
                 "app.getVersion" => Task.FromResult<object?>(new { version = App.ProductVersion }),
                 "app.log" => Task.FromResult<object?>(PluginLog(args)),
+                "host.getInfo" => Task.FromResult<object?>(_context.ToHostInfo()),
+
+                // === long.widget ===
+                "widget.ready" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
+                "widget.getInstanceState" => Task.FromResult<object?>(WidgetContextOnly(new { success = true, data = _widgetInstanceState })),
+                "widget.setInstanceState" => WidgetSetInstanceState(args),
+                "widget.openSettings" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
+                "widget.invalidate" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
+                "widget.setBadge" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
 
                 // === long.clipboard ===
                 "clipboard.getText" => Ok(h.Clipboard.GetTextAsync()),
@@ -389,6 +403,46 @@ namespace LongBetterWindows.Host.Engine
         {
             Log.Information("[Web:{PluginId}] {Message}", _pluginId, string.Join(" ", args.Select(a => a?.ToString())));
             return OkObj();
+        }
+
+        private object WidgetContextOnly(object result)
+        {
+            if (_context.IsWidget)
+                return result;
+
+            return new
+            {
+                success = false,
+                error = "Widget API 仅在 Widget 上下文中可用",
+            };
+        }
+
+        private Task<object?> WidgetSetInstanceState(object?[] args)
+        {
+            if (!_context.IsWidget)
+                return Task.FromResult<object?>(WidgetContextOnly(OkObj()));
+
+            var stateEnvelope = args.Length > 0 ? args[0] : null;
+            object? state = stateEnvelope;
+            if (stateEnvelope is JsonElement element
+                && element.ValueKind == JsonValueKind.Object
+                && element.TryGetProperty("state", out var stateProperty))
+            {
+                state = stateProperty.Clone();
+            }
+
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(state);
+            if (bytes.Length > WebPluginBridgeContext.InstanceStateLimitBytes)
+            {
+                return Task.FromResult<object?>(new
+                {
+                    success = false,
+                    error = "Widget 实例状态超过 256 KiB",
+                });
+            }
+
+            _widgetInstanceState = state;
+            return Task.FromResult<object?>(OkObj());
         }
 
         private async Task<object?> CaptureRegionToFile(object?[] args)

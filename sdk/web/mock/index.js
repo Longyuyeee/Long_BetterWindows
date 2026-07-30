@@ -1,6 +1,9 @@
 export const BRIDGE_METHODS = Object.freeze([
   "app.openUrl", "app.openFolder", "app.openWithDefault",
   "app.showNotification", "app.getVersion", "app.log",
+  "host.getInfo",
+  "widget.ready", "widget.getInstanceState", "widget.setInstanceState",
+  "widget.openSettings", "widget.invalidate", "widget.setBadge",
   "clipboard.getText", "clipboard.setText", "clipboard.clear",
   "clipboard.startMonitoring", "clipboard.stopMonitoring",
   "shell.getActiveFolder", "shell.getSelectedItems",
@@ -57,6 +60,13 @@ const API_TO_BRIDGE = Object.freeze({
   "app.showNotification": "app.showNotification",
   "app.getVersion": "app.getVersion",
   "app.log": "app.log",
+  "host.getInfo": "host.getInfo",
+  "widget.ready": "widget.ready",
+  "widget.getInstanceState": "widget.getInstanceState",
+  "widget.setInstanceState": "widget.setInstanceState",
+  "widget.openSettings": "widget.openSettings",
+  "widget.invalidate": "widget.invalidate",
+  "widget.setBadge": "widget.setBadge",
   "clipboard.getText": "clipboard.getText",
   "clipboard.setText": "clipboard.setText",
   "clipboard.clear": "clipboard.clear",
@@ -214,6 +224,26 @@ export function createLongMock(options = {}) {
   const hotkeys = new Map();
   let clipboardCallback = null;
   let clipboardText = options.clipboardText ?? "";
+  let widgetState = options.widgetState ?? null;
+  const hostInfo = Object.freeze({
+    protocol_version: "1.0",
+    api_version: "1.1.0",
+    host: {
+      id: options.hostId ?? "long-assistant",
+      version: options.version ?? "1.1.0"
+    },
+    plugin_id: options.pluginId ?? "com.long.mock",
+    surface: options.surface ?? "plugin",
+    widget_id: options.widgetId ?? null,
+    instance_id: options.instanceId ?? null,
+    surfaces: ["plugin", "action-card", "widget"],
+    features: options.features ?? ["theme.v1", "locale.v1"],
+    limits: {
+      instance_state_bytes: 262144,
+      bridge_message_bytes: 1048576
+    },
+    ...(options.hostInfo ?? {})
+  });
 
   async function invoke(method, args) {
     calls.push(Object.freeze({
@@ -226,6 +256,18 @@ export function createLongMock(options = {}) {
     switch (method) {
       case "app.getVersion":
         return ok(options.version ?? "1.0.0");
+      case "host.getInfo":
+        return hostInfo;
+      case "widget.ready":
+      case "widget.openSettings":
+      case "widget.invalidate":
+      case "widget.setBadge":
+        return ok();
+      case "widget.getInstanceState":
+        return ok(widgetState);
+      case "widget.setInstanceState":
+        widgetState = args[0]?.state ?? args[0] ?? null;
+        return ok();
       case "clipboard.getText":
         return ok(clipboardText);
       case "clipboard.setText":
@@ -310,6 +352,7 @@ export function createLongMock(options = {}) {
         storage.set(key, value);
       }
       clipboardText = options.clipboardText ?? "";
+      widgetState = options.widgetState ?? null;
     },
     emitHotkey(hotkey) {
       const callback = hotkeys.get(hotkey);

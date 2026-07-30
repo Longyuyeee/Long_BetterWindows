@@ -2,6 +2,7 @@ import type {
   LongApi,
   LongClipboardChangedEvent,
   LongFileOrganizationItem,
+  LongHostInfo,
   LongResult
 } from "@long-assistant/plugin-sdk";
 import {
@@ -10,6 +11,15 @@ import {
 } from "@long-assistant/plugin-sdk/mock";
 
 async function exercise(api: LongApi): Promise<void> {
+  const info: LongHostInfo = await api.host.getInfo();
+  info.api_version satisfies "1.1.0";
+  if (info.surface === "widget") {
+    await api.widget.ready();
+    await api.widget.setInstanceState({ view: "compact" });
+    const widgetState = await api.widget.getInstanceState<{ view: string }>();
+    widgetState.data?.view.toUpperCase();
+  }
+
   const clipboard: LongResult<string | null> = await api.clipboard.getText();
   if (clipboard.success && clipboard.data) {
     await api.clipboard.setText(clipboard.data.toUpperCase());

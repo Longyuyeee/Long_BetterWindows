@@ -1,5 +1,6 @@
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Core;
 using System.Text.Json.Serialization;
 
 namespace LongBetterWindows.Host.Engine
@@ -129,6 +130,25 @@ namespace LongBetterWindows.Host.Engine
                 timestamp = args.Timestamp,
             });
 
+        internal static string SerializeWidgetEvent(
+            WebPluginBridgeContext context,
+            string eventName,
+            long sequence,
+            object? payload) =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                type = eventName,
+                detail = new
+                {
+                    protocol_version = WebPluginBridgeContext.ProtocolVersion,
+                    plugin_id = context.PluginId,
+                    widget_id = context.WidgetId,
+                    instance_id = context.InstanceId,
+                    sequence,
+                    payload = payload ?? new { },
+                },
+            });
+
         internal static string? GetRequiredCapability(string method) => method switch
         {
             // 文件系统 ADS
@@ -233,7 +253,9 @@ namespace LongBetterWindows.Host.Engine
                 => "ui.window",
 
             // 应用信息（无需权限）
-            "app.getVersion" or "app.log"
+            "app.getVersion" or "app.log" or "host.getInfo"
+                or "widget.ready" or "widget.getInstanceState" or "widget.setInstanceState"
+                or "widget.openSettings" or "widget.invalidate" or "widget.setBadge"
                 => null,
 
             _ => null
@@ -259,6 +281,9 @@ window.long = {
     showNotification: function(title,body){return call('app.showNotification',[title,body]);},
     getVersion: function(){return call('app.getVersion',[]);},
     log: function(){return call('app.log',Array.prototype.slice.call(arguments));}
+  },
+  host: {
+    getInfo: function(){return call('host.getInfo',[]);}
   },
   clipboard: {
     getText: function(){return call('clipboard.getText',[]);},
@@ -432,6 +457,14 @@ window.long = {
   window: {
     getForeground: function(){return call('window.getForeground',[]);},
     getVisible: function(){return call('window.getVisible',[]);}
+  },
+  widget: {
+    ready: function(contentVersion){return call('widget.ready',[{content_version:contentVersion||1}]);},
+    getInstanceState: function(){return call('widget.getInstanceState',[]);},
+    setInstanceState: function(state){return call('widget.setInstanceState',[{state:state}]);},
+    openSettings: function(){return call('widget.openSettings',[]);},
+    invalidate: function(reason){return call('widget.invalidate',[{reason:reason||'manual'}]);},
+    setBadge: function(badge){return call('widget.setBadge',[badge||{}]);}
   }
 };
 window.chrome.webview.addEventListener('message',function(e){
@@ -461,6 +494,75 @@ console.log('[Long] Bridge ready · __PLUGIN_ID__');
                 && (char.IsLetter(value[0]) || value[0] == '_')
                 && value.All(character => char.IsLetterOrDigit(character)
                     || character is '_' or '-' or '.');
+    }
+
+    internal sealed class WebPluginBridgeContext
+    {
+        internal const string ProtocolVersion = "1.0";
+        internal const string ApiVersion = "1.1.0";
+        internal const int InstanceStateLimitBytes = 256 * 1024;
+        internal const int BridgeMessageLimitBytes = 1024 * 1024;
+
+        internal WebPluginBridgeContext(
+            string pluginId,
+            string surface = "plugin",
+            string? widgetId = null,
+            string? instanceId = null,
+            string hostId = "long-assistant",
+            string? hostVersion = null)
+        {
+            PluginId = pluginId;
+            Surface = surface;
+            WidgetId = widgetId;
+            InstanceId = instanceId;
+            HostId = hostId;
+            HostVersion = string.IsNullOrWhiteSpace(hostVersion)
+                ? App.ProductVersion
+                : hostVersion;
+        }
+
+        internal string PluginId { get; }
+        internal string Surface { get; }
+        internal string? WidgetId { get; }
+        internal string? InstanceId { get; }
+        internal string HostId { get; }
+        internal string HostVersion { get; }
+        internal bool IsWidget => string.Equals(Surface, "widget", StringComparison.Ordinal);
+
+        internal object ToHostInfo() => new
+        {
+            protocol_version = ProtocolVersion,
+            api_version = ApiVersion,
+            host = new
+            {
+                id = HostId,
+                version = HostVersion,
+            },
+            plugin_id = PluginId,
+            surface = Surface,
+            widget_id = WidgetId,
+            instance_id = InstanceId,
+            surfaces = new[] { "plugin", "action-card", "widget" },
+            features = IsWidget
+                ? new[]
+                {
+                    "widget.instance-state",
+                    "widget.visibility",
+                    "widget.resize",
+                    "theme.v1",
+                    "locale.v1",
+                }
+                : new[]
+                {
+                    "theme.v1",
+                    "locale.v1",
+                },
+            limits = new
+            {
+                instance_state_bytes = InstanceStateLimitBytes,
+                bridge_message_bytes = BridgeMessageLimitBytes,
+            },
+        };
     }
 
     internal sealed class WebBridgeRequest

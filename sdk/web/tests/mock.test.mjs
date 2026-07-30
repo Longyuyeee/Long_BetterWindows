@@ -12,6 +12,8 @@ test("exposes the complete bridge method ledger without duplicates", () => {
   assert.ok(BRIDGE_METHODS.length > 100);
   assert.equal(new Set(BRIDGE_METHODS).size, BRIDGE_METHODS.length);
   assert.ok(BRIDGE_METHODS.includes("clipboard.getText"));
+  assert.ok(BRIDGE_METHODS.includes("host.getInfo"));
+  assert.ok(BRIDGE_METHODS.includes("widget.setInstanceState"));
   assert.ok(BRIDGE_METHODS.includes("fileSystem.executeOrganization"));
   assert.ok(BRIDGE_METHODS.includes("process.killVerified"));
   assert.ok(BRIDGE_METHODS.includes("window.getVisible"));
@@ -36,6 +38,32 @@ test("provides deterministic clipboard and atomic storage behavior", async () =>
   assert.deepEqual(await mock.long.storage.get("revision"), ok("v2"));
 
   assert.equal(mock.getCalls("storage.compareExchange").length, 2);
+});
+
+test("exposes host capability negotiation and widget state helpers", async () => {
+  const mock = createLongMock({
+    pluginId: "com.test.widget",
+    surface: "widget",
+    widgetId: "system.status",
+    instanceId: "instance-1",
+    features: ["widget.instance-state", "theme.v1"]
+  });
+
+  const host = await mock.long.host.getInfo();
+  assert.equal(host.protocol_version, "1.0");
+  assert.equal(host.api_version, "1.1.0");
+  assert.equal(host.plugin_id, "com.test.widget");
+  assert.equal(host.surface, "widget");
+  assert.equal(host.widget_id, "system.status");
+  assert.ok(host.features.includes("widget.instance-state"));
+
+  assert.deepEqual(await mock.long.widget.ready(), ok());
+  assert.deepEqual(
+    await mock.long.widget.setInstanceState({ selectedView: "cpu" }),
+    ok());
+  assert.deepEqual(
+    await mock.long.widget.getInstanceState(),
+    ok({ selectedView: "cpu" }));
 });
 
 test("supports handlers, call inspection, hotkeys, and clipboard events", async () => {

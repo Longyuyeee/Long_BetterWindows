@@ -436,11 +436,28 @@ public class CoreTests
         Assert.Equal(capability, WebPluginBridgeProtocol.GetRequiredCapability(method));
     }
 
+    [Theory]
+    [InlineData("host.getInfo")]
+    [InlineData("widget.ready")]
+    [InlineData("widget.getInstanceState")]
+    [InlineData("widget.setInstanceState")]
+    [InlineData("widget.openSettings")]
+    [InlineData("widget.invalidate")]
+    [InlineData("widget.setBadge")]
+    public void WebBridgeWidgetMethods_DoNotRequireManifestCapabilities(string method)
+    {
+        Assert.Null(WebPluginBridgeProtocol.GetRequiredCapability(method));
+    }
+
     [Fact]
     public void WebBridgeScript_ContainsPlatformApisAndPromiseResolution()
     {
         var script = WebPluginBridgeProtocol.BuildInjectionScript("com.test.bridge");
 
+        Assert.Contains("host:", script);
+        Assert.Contains("getInfo: function", script);
+        Assert.Contains("widget:", script);
+        Assert.Contains("setInstanceState: function", script);
         Assert.Contains("process:", script);
         Assert.Contains("performance:", script);
         Assert.Contains("networkPort:", script);
@@ -458,6 +475,102 @@ public class CoreTests
         Assert.Contains("compareExchange: function(k,e,v)", script);
         Assert.Contains("m.type==='clipboard.changed'", script);
         Assert.Contains("com.test.bridge", script);
+    }
+
+    [Fact]
+    public async Task WebBridgeDispatcher_ReturnsBoundHostInfo()
+    {
+        using var dispatcher = new WebPluginHostDispatcher(
+            "com.test.bridge",
+            HostProvider.Instance,
+            _ => { },
+            new WebPluginBridgeContext(
+                "com.test.bridge",
+                surface: "widget",
+                widgetId: "system.status",
+                instanceId: "instance-1",
+                hostVersion: "9.9.9"));
+
+        var result = await dispatcher.DispatchAsync("host.getInfo", []);
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal("1.0", root.GetProperty("protocol_version").GetString());
+        Assert.Equal("1.1.0", root.GetProperty("api_version").GetString());
+        Assert.Equal("long-assistant", root.GetProperty("host").GetProperty("id").GetString());
+        Assert.Equal("9.9.9", root.GetProperty("host").GetProperty("version").GetString());
+        Assert.Equal("com.test.bridge", root.GetProperty("plugin_id").GetString());
+        Assert.Equal("widget", root.GetProperty("surface").GetString());
+        Assert.Equal("system.status", root.GetProperty("widget_id").GetString());
+        Assert.Equal("instance-1", root.GetProperty("instance_id").GetString());
+        Assert.Contains(
+            root.GetProperty("features").EnumerateArray(),
+            item => item.GetString() == "widget.instance-state");
+    }
+
+    [Fact]
+    public async Task WebBridgeDispatcher_WidgetStateRequiresWidgetContext()
+    {
+        using var pluginDispatcher = new WebPluginHostDispatcher(
+            "com.test.bridge",
+            HostProvider.Instance,
+            _ => { });
+
+        var denied = await pluginDispatcher.DispatchAsync("widget.getInstanceState", []);
+        using var deniedJson = JsonDocument.Parse(JsonSerializer.Serialize(denied));
+        Assert.False(deniedJson.RootElement.GetProperty("success").GetBoolean());
+
+        using var widgetDispatcher = new WebPluginHostDispatcher(
+            "com.test.bridge",
+            HostProvider.Instance,
+            _ => { },
+            new WebPluginBridgeContext(
+                "com.test.bridge",
+                surface: "widget",
+                widgetId: "system.status",
+                instanceId: "instance-1"));
+
+        using var state = JsonDocument.Parse("""{"state":{"selectedView":"cpu"}}""");
+        var saved = await widgetDispatcher.DispatchAsync(
+            "widget.setInstanceState",
+            [state.RootElement.Clone()]);
+        using var savedJson = JsonDocument.Parse(JsonSerializer.Serialize(saved));
+        Assert.True(savedJson.RootElement.GetProperty("success").GetBoolean());
+
+        var loaded = await widgetDispatcher.DispatchAsync("widget.getInstanceState", []);
+        using var loadedJson = JsonDocument.Parse(JsonSerializer.Serialize(loaded));
+        Assert.Equal(
+            "cpu",
+            loadedJson.RootElement
+                .GetProperty("data")
+                .GetProperty("selectedView")
+                .GetString());
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_SerializesWidgetEventEnvelope()
+    {
+        var message = WebPluginBridgeProtocol.SerializeWidgetEvent(
+            new WebPluginBridgeContext(
+                "com.test.bridge",
+                surface: "widget",
+                widgetId: "system.status",
+                instanceId: "instance-1"),
+            "long.widget-resized",
+            12,
+            new { width = 320, height = 160 });
+
+        using var document = JsonDocument.Parse(message);
+        var detail = document.RootElement.GetProperty("detail");
+
+        Assert.Equal("long.widget-resized", document.RootElement.GetProperty("type").GetString());
+        Assert.Equal("1.0", detail.GetProperty("protocol_version").GetString());
+        Assert.Equal("com.test.bridge", detail.GetProperty("plugin_id").GetString());
+        Assert.Equal("system.status", detail.GetProperty("widget_id").GetString());
+        Assert.Equal("instance-1", detail.GetProperty("instance_id").GetString());
+        Assert.Equal(12, detail.GetProperty("sequence").GetInt64());
+        Assert.Equal(320, detail.GetProperty("payload").GetProperty("width").GetInt32());
     }
 
     [Fact]
