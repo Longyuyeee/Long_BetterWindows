@@ -513,6 +513,8 @@ public class CoreTests
     [Fact]
     public async Task WebBridgeDispatcher_WidgetStateRequiresWidgetContext()
     {
+        var stateRoot = Path.Combine(Path.GetTempPath(), $"long-widget-state-{Guid.NewGuid():N}");
+        var store = new WidgetInstanceStateStore(stateRoot);
         using var pluginDispatcher = new WebPluginHostDispatcher(
             "com.test.bridge",
             HostProvider.Instance,
@@ -522,31 +524,60 @@ public class CoreTests
         using var deniedJson = JsonDocument.Parse(JsonSerializer.Serialize(denied));
         Assert.False(deniedJson.RootElement.GetProperty("success").GetBoolean());
 
-        using var widgetDispatcher = new WebPluginHostDispatcher(
-            "com.test.bridge",
-            HostProvider.Instance,
-            _ => { },
-            new WebPluginBridgeContext(
+        try
+        {
+            var firstContext = new WebPluginBridgeContext(
                 "com.test.bridge",
                 surface: "widget",
                 widgetId: "system.status",
-                instanceId: "instance-1"));
+                instanceId: "instance-1");
+            using var widgetDispatcher = new WebPluginHostDispatcher(
+                "com.test.bridge",
+                HostProvider.Instance,
+                _ => { },
+                firstContext,
+                widgetStateStore: store);
 
-        using var state = JsonDocument.Parse("""{"state":{"selectedView":"cpu"}}""");
-        var saved = await widgetDispatcher.DispatchAsync(
-            "widget.setInstanceState",
-            [state.RootElement.Clone()]);
-        using var savedJson = JsonDocument.Parse(JsonSerializer.Serialize(saved));
-        Assert.True(savedJson.RootElement.GetProperty("success").GetBoolean());
+            using var state = JsonDocument.Parse("""{"state":{"selectedView":"cpu"}}""");
+            var saved = await widgetDispatcher.DispatchAsync(
+                "widget.setInstanceState",
+                [state.RootElement.Clone()]);
+            using var savedJson = JsonDocument.Parse(JsonSerializer.Serialize(saved));
+            Assert.True(savedJson.RootElement.GetProperty("success").GetBoolean());
 
-        var loaded = await widgetDispatcher.DispatchAsync("widget.getInstanceState", []);
-        using var loadedJson = JsonDocument.Parse(JsonSerializer.Serialize(loaded));
-        Assert.Equal(
-            "cpu",
-            loadedJson.RootElement
-                .GetProperty("data")
-                .GetProperty("selectedView")
-                .GetString());
+            using var restoredDispatcher = new WebPluginHostDispatcher(
+                "com.test.bridge",
+                HostProvider.Instance,
+                _ => { },
+                firstContext,
+                widgetStateStore: store);
+            var loaded = await restoredDispatcher.DispatchAsync("widget.getInstanceState", []);
+            using var loadedJson = JsonDocument.Parse(JsonSerializer.Serialize(loaded));
+            Assert.Equal(
+                "cpu",
+                loadedJson.RootElement
+                    .GetProperty("data")
+                    .GetProperty("selectedView")
+                    .GetString());
+
+            using var otherInstanceDispatcher = new WebPluginHostDispatcher(
+                "com.test.bridge",
+                HostProvider.Instance,
+                _ => { },
+                new WebPluginBridgeContext(
+                    "com.test.bridge",
+                    surface: "widget",
+                    widgetId: "system.status",
+                    instanceId: "instance-2"),
+                widgetStateStore: store);
+            var isolated = await otherInstanceDispatcher.DispatchAsync("widget.getInstanceState", []);
+            using var isolatedJson = JsonDocument.Parse(JsonSerializer.Serialize(isolated));
+            Assert.Equal(JsonValueKind.Null, isolatedJson.RootElement.GetProperty("data").ValueKind);
+        }
+        finally
+        {
+            try { Directory.Delete(stateRoot, true); } catch { }
+        }
     }
 
     [Fact]

@@ -1945,6 +1945,7 @@ public class QualityGateTests
         var protocol = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginBridgeProtocol.cs");
         var dispatcher = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs");
         var widgetLifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WidgetLifecycleCoordinator.cs");
+        var widgetState = Read("src", "LongBetterWindows.Host", "Engine", "WidgetInstanceStateStore.cs");
         var arguments = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginArguments.cs");
         var lifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
 
@@ -1962,6 +1963,12 @@ public class QualityGateTests
         Assert.Contains("long.widget-resume", widgetLifecycle);
         Assert.Contains("long.widget-unmount", widgetLifecycle);
         Assert.Contains("ready-timeout", widgetLifecycle);
+        Assert.Contains("WidgetInstanceStateStore", dispatcher);
+        Assert.Contains("WidgetGetInstanceState()", dispatcher);
+        Assert.Contains("_widgetStateStore.SetAsync", dispatcher);
+        Assert.Contains("HashIdentity", widgetState);
+        Assert.Contains("File.Replace", widgetState);
+        Assert.Contains("LocalApplicationData", widgetState);
         Assert.Contains("FileOps.MoveAsync", dispatcher);
         Assert.Contains("WidgetReady(args)", dispatcher);
         Assert.Contains("WebPluginArguments.GetJson", dispatcher);

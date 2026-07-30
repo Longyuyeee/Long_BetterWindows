@@ -14,10 +14,10 @@ namespace LongBetterWindows.Host.Engine
         private readonly IHostApi _host;
         private readonly Action<string> _postMessage;
         private readonly Func<object?, object>? _widgetReady;
+        private readonly WidgetInstanceStateStore _widgetStateStore;
         private readonly SemaphoreSlim _clipboardGate = new(1, 1);
         private readonly object _clipboardStateLock = new();
         private Task<HostApiResponse>? _clipboardAcquireTask;
-        private object? _widgetInstanceState;
         private bool _clipboardSubscribed;
         private bool _disposed;
 
@@ -26,13 +26,15 @@ namespace LongBetterWindows.Host.Engine
             IHostApi host,
             Action<string> postMessage,
             WebPluginBridgeContext? context = null,
-            Func<object?, object>? widgetReady = null)
+            Func<object?, object>? widgetReady = null,
+            WidgetInstanceStateStore? widgetStateStore = null)
         {
             _pluginId = pluginId;
             _context = context ?? new WebPluginBridgeContext(pluginId);
             _host = host;
             _postMessage = postMessage;
             _widgetReady = widgetReady;
+            _widgetStateStore = widgetStateStore ?? new WidgetInstanceStateStore();
         }
 
         internal async Task<object?> DispatchAsync(string method, object?[] args)
@@ -57,7 +59,7 @@ namespace LongBetterWindows.Host.Engine
 
                 // === long.widget ===
                 "widget.ready" => Task.FromResult<object?>(WidgetReady(args)),
-                "widget.getInstanceState" => Task.FromResult<object?>(WidgetContextOnly(new { success = true, data = _widgetInstanceState })),
+                "widget.getInstanceState" => WidgetGetInstanceState(),
                 "widget.setInstanceState" => WidgetSetInstanceState(args),
                 "widget.openSettings" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
                 "widget.invalidate" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
@@ -438,10 +440,19 @@ namespace LongBetterWindows.Host.Engine
             return _widgetReady?.Invoke(contentVersion) ?? OkObj();
         }
 
-        private Task<object?> WidgetSetInstanceState(object?[] args)
+        private async Task<object?> WidgetGetInstanceState()
         {
             if (!_context.IsWidget)
-                return Task.FromResult<object?>(WidgetContextOnly(OkObj()));
+                return WidgetContextOnly(OkObj());
+
+            var state = await _widgetStateStore.GetAsync(_context).ConfigureAwait(false);
+            return new { success = true, data = state };
+        }
+
+        private async Task<object?> WidgetSetInstanceState(object?[] args)
+        {
+            if (!_context.IsWidget)
+                return WidgetContextOnly(OkObj());
 
             var stateEnvelope = args.Length > 0 ? args[0] : null;
             object? state = stateEnvelope;
@@ -455,15 +466,15 @@ namespace LongBetterWindows.Host.Engine
             var bytes = JsonSerializer.SerializeToUtf8Bytes(state);
             if (bytes.Length > WebPluginBridgeContext.InstanceStateLimitBytes)
             {
-                return Task.FromResult<object?>(new
+                return new
                 {
                     success = false,
                     error = "Widget 实例状态超过 256 KiB",
-                });
+                };
             }
 
-            _widgetInstanceState = state;
-            return Task.FromResult<object?>(OkObj());
+            await _widgetStateStore.SetAsync(_context, state).ConfigureAwait(false);
+            return OkObj();
         }
 
         private async Task<object?> CaptureRegionToFile(object?[] args)
