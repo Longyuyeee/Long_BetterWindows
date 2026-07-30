@@ -309,7 +309,34 @@ public sealed class WindowInfoServiceTests
         Assert.True(result.Data?.Changed);
         Assert.False(result.Data?.Before?.IsTopmost);
         Assert.True(result.Data?.After?.IsTopmost);
+        Assert.Equal(result.Data?.Before?.X, result.Data?.After?.X);
+        Assert.Equal(
+            result.Data?.Before?.DisplayState,
+            result.Data?.After?.DisplayState);
         Assert.True(native.Topmost);
+    }
+
+    [Fact]
+    public void ToggleTopmost_RestoresUnexpectedGeometryChange()
+    {
+        var original = new NativeWindowRect(100, 120, 900, 720);
+        var native = new FakeWindowNativeApi
+        {
+            Rect = original,
+            NextRectAfterPosition =
+                new NativeWindowRect(300, 320, 1100, 920),
+        };
+        var service = new WindowInfoService(native);
+
+        var result = service.ToggleTopmost(TestWindow);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("geometry", result.ErrorMessage);
+        Assert.True(result.Data?.RecoveryAttempted);
+        Assert.True(result.Data?.RecoverySucceeded);
+        Assert.Equal(original, native.Rect);
+        Assert.False(native.Topmost);
+        Assert.Equal(2, native.PositionCalls.Count);
     }
 
     [Fact]
@@ -461,6 +488,7 @@ public sealed class WindowInfoServiceTests
             CreatePlacement(1, new NativeWindowRect(100, 120, 900, 720));
         public bool Topmost { get; set; }
         public uint? PlacementShowCommandAfterPosition { get; set; }
+        public NativeWindowRect? NextRectAfterPosition { get; set; }
         public IntPtr Monitor { get; set; } = new(7);
         public NativeWindowRect WorkArea { get; set; } =
             new(0, 0, 1920, 1080);
@@ -531,6 +559,11 @@ public sealed class WindowInfoServiceTests
             {
                 if ((flags & SwpNoMove) == 0 || (flags & SwpNoSize) == 0)
                     Rect = rect;
+                if (NextRectAfterPosition is { } nextRect)
+                {
+                    Rect = nextRect;
+                    NextRectAfterPosition = null;
+                }
                 if (PlacementShowCommandAfterPosition is { } showCommand)
                 {
                     var placement = Placement;

@@ -339,6 +339,17 @@ public sealed class WindowInfoService : IWindowInfoService
                 after.ErrorMessage,
                 after.ErrorCode);
         }
+        if (!RectEquals(after.Data.Rect, snapshot.Data.Rect)
+            || after.Data.Info.DisplayState
+                != snapshot.Data.Info.DisplayState)
+        {
+            return FailureWithRecovery(
+                window,
+                snapshot.Data,
+                "VerifyTopmostWindowState",
+                0,
+                "The window geometry or display state changed while toggling topmost.");
+        }
 
         return HostApiResponse<WindowOperationOutcome>.Success(new()
         {

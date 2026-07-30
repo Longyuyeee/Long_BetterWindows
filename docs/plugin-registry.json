@@ -65,7 +65,7 @@
     {
       "id": "com.long.window-manager",
       "name": "窗口管理",
-      "version": "2.1.5",
+      "version": "2.1.6",
       "description": "事务化置顶、分屏与状态恢复",
       "author": "Long",
       "download_url": null,

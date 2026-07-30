@@ -722,6 +722,11 @@
             "symbol": "ApplyLayout_RestoresWhenLayoutRemainsMaximized"
           },
           {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ToggleTopmost_RestoresUnexpectedGeometryChange"
+          },
+          {
             "level": "integration",
             "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
             "symbol": "PluginStop_WindowManagerRetainsFailedHotkeyForRetry"
