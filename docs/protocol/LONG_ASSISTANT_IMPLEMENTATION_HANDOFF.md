@@ -34,8 +34,8 @@ Long助手审计基线：`Longyuyeee/Long_BetterWindows@0d1366f`
 
 - Manifest `widgets` 定义；（PR-A 已完成）
 - Widget 实例、尺寸、可见性、暂停/恢复等生命周期；
-- `host.getInfo` 和 Widget Bridge；（PR-B 已完成 `host.getInfo`、基础 Widget 方法、受信上下文绑定、标准事件信封、注入脚本事件派发、Bridge 消息大小边界、虚拟 HTTPS 来源和基础 CSP meta；真实生命周期调度和持久化仍未完成）
-- 足够严格的 Widget 子资源沙箱；（PR-B 已完成虚拟 Host 和基础 CSP meta；响应头级 CSP 与子资源请求拦截仍未完成）
+- `host.getInfo` 和 Widget Bridge；（PR-B 已完成 `host.getInfo`、基础 Widget 方法、受信上下文绑定、标准事件信封、注入脚本事件派发、Bridge 消息大小边界、虚拟 HTTPS 来源、响应头级 CSP 基础和基础 CSP meta；真实生命周期调度和持久化仍未完成）
+- 足够严格的 Widget 子资源沙箱；（PR-B 已完成虚拟 Host、虚拟来源外子资源阻断、HTML 文档响应头级 CSP 和基础 CSP meta；仍需真实 Widget Surface 下的端到端验收）
 - Long Grid 可调用的同用户 IPC Broker；
 - 跨仓库 Golden Fixtures。
 
@@ -143,7 +143,7 @@ src/LongBetterWindows.Host/Broker/
 
 验收：生命周期、来源伪造、超大消息、导航、挂起与恢复测试通过。
 
-当前状态：部分完成。已完成 `host.getInfo`、宿主绑定身份上下文、基础 Widget 方法、实例状态大小限制、Widget 事件信封、注入脚本 `CustomEvent` 派发、1 MiB Bridge 消息入口限制、受控 `https://plugin-*.longplugin.local/` 虚拟来源、基础 CSP meta、Web SDK 类型和 Mock Host；尚未完成子资源请求拦截与响应头级 CSP、真实 mounted/ready/suspend/resume/unmount 调度、实例状态持久化和参考 Widget `.lpak`。
+当前状态：部分完成。已完成 `host.getInfo`、宿主绑定身份上下文、基础 Widget 方法、实例状态大小限制、Widget 事件信封、注入脚本 `CustomEvent` 派发、1 MiB Bridge 消息入口限制、受控 `https://plugin-*.longplugin.local/` 虚拟来源、WebView2 子资源来源阻断、HTML 文档响应头级 CSP、基础 CSP meta、Web SDK 类型和 Mock Host；尚未完成真实 mounted/ready/suspend/resume/unmount 调度、实例状态持久化、参考 Widget `.lpak` 和最终 Widget Surface。
 
 ### PR-C：Broker IPC
 

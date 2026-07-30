@@ -1958,6 +1958,10 @@ public class QualityGateTests
         Assert.Contains("CoreWebView2.NavigationStarting +=", lifecycle);
         Assert.Contains("_navigationPolicy.IsTrustedWebViewUri", lifecycle);
         Assert.Contains("SetVirtualHostNameToFolderMapping", lifecycle);
+        Assert.Contains("AddWebResourceRequestedFilter", lifecycle);
+        Assert.Contains("WebResourceRequested += OnWebResourceRequested", lifecycle);
+        Assert.Contains("ShouldBlockWebResourceRequest", lifecycle);
+        Assert.Contains("BuildContentSecurityPolicyResponseHeader", lifecycle);
         Assert.Contains("BuildContentSecurityPolicyInjectionScript", lifecycle);
         Assert.Contains("dispatcher.Invoke(Dispose)", lifecycle);
         Assert.Contains("dispatcher.InvokeAsync(() => PostMessageCore(json))", lifecycle);

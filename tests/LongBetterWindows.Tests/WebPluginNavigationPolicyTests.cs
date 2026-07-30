@@ -75,6 +75,53 @@ public sealed class WebPluginNavigationPolicyTests : IDisposable
         Assert.Contains("form-action 'none'", WebPluginNavigationPolicy.DefaultContentSecurityPolicy);
     }
 
+    [Fact]
+    public void TryResolveVirtualUriToLocalPath_AllowsOnlyExistingFilesInsidePluginDirectory()
+    {
+        var policy = new WebPluginNavigationPolicy(_root);
+
+        Assert.True(policy.TryResolveVirtualUriToLocalPath(
+            $"https://{policy.VirtualHostName}/index.html",
+            out var localPath));
+        Assert.Equal(Path.GetFullPath(Path.Combine(_root, "index.html")), localPath);
+        Assert.False(policy.TryResolveVirtualUriToLocalPath(
+            $"https://{policy.VirtualHostName}/../outside.html",
+            out _));
+        Assert.False(policy.TryResolveVirtualUriToLocalPath(
+            $"https://{policy.VirtualHostName}/missing.html",
+            out _));
+        Assert.False(policy.TryResolveVirtualUriToLocalPath(
+            "https://example.com/index.html",
+            out _));
+    }
+
+    [Fact]
+    public void WebResourceSandbox_BlocksAnythingOutsideVirtualOrigin()
+    {
+        var policy = new WebPluginNavigationPolicy(_root);
+
+        Assert.False(policy.ShouldBlockWebResourceRequest(
+            $"https://{policy.VirtualHostName}/index.html"));
+        Assert.True(policy.ShouldBlockWebResourceRequest(
+            $"https://evil.{policy.VirtualHostName}/index.html"));
+        Assert.True(policy.ShouldBlockWebResourceRequest("https://example.com/script.js"));
+        Assert.True(policy.ShouldBlockWebResourceRequest("file:///C:/Windows/win.ini"));
+        Assert.True(policy.ShouldBlockWebResourceRequest("about:blank"));
+    }
+
+    [Fact]
+    public void ContentSecurityPolicy_ResponseHeaderUsesCanonicalPolicy()
+    {
+        var policy = new WebPluginNavigationPolicy(_root);
+
+        Assert.Equal(
+            "Content-Security-Policy: " + WebPluginNavigationPolicy.DefaultContentSecurityPolicy,
+            policy.BuildContentSecurityPolicyResponseHeader());
+        Assert.True(WebPluginNavigationPolicy.IsHtmlDocumentPath("index.html"));
+        Assert.True(WebPluginNavigationPolicy.IsHtmlDocumentPath("INDEX.HTM"));
+        Assert.False(WebPluginNavigationPolicy.IsHtmlDocumentPath("style.css"));
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_root, true); } catch { }

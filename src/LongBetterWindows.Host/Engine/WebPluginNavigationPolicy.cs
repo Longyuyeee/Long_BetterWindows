@@ -29,6 +29,8 @@ namespace LongBetterWindows.Host.Engine
             + "img-src 'self' data:; font-src 'self'; connect-src 'none'; "
             + "object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'";
 
+        public const string ContentSecurityPolicyHeaderName = "Content-Security-Policy";
+
         public bool IsTrustedLocalUri(string? value)
         {
             if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
@@ -93,6 +95,53 @@ namespace LongBetterWindows.Host.Engine
             {
                 return false;
             }
+        }
+
+        public bool TryResolveVirtualUriToLocalPath(string? value, out string? localPath)
+        {
+            localPath = null;
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                || !IsTrustedVirtualUri(uri))
+            {
+                return false;
+            }
+
+            try
+            {
+                var relativePath = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/'))
+                    .Replace('/', Path.DirectorySeparatorChar);
+                if (string.IsNullOrWhiteSpace(relativePath))
+                    relativePath = "index.html";
+
+                var candidate = Path.GetFullPath(Path.Combine(_pluginRoot, relativePath));
+                if (!IsLocalPathInsidePluginRoot(candidate) || !File.Exists(candidate))
+                    return false;
+
+                localPath = candidate;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public bool ShouldBlockWebResourceRequest(string? value)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+                return true;
+
+            return !IsTrustedVirtualUri(uri);
+        }
+
+        public string BuildContentSecurityPolicyResponseHeader()
+            => $"{ContentSecurityPolicyHeaderName}: {DefaultContentSecurityPolicy}";
+
+        public static bool IsHtmlDocumentPath(string path)
+        {
+            var extension = Path.GetExtension(path);
+            return extension.Equals(".html", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".htm", StringComparison.OrdinalIgnoreCase);
         }
 
         public bool IsTrustedWebViewUri(string? value)
