@@ -118,13 +118,21 @@
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.plugins}"
                                         KeyboardNavigation.TabIndex="2"
                                         Click="ManagementDestination_Click" />
+                                <Button x:Name="DestinationWidgets"
+                                        Content="{DynamicResource i18n.nav.widgets}"
+                                        Tag="Widgets" Height="40" Margin="0,0,8,8"
+                                        Style="{StaticResource LongButton}"
+                                        automation:AutomationProperties.AutomationId="Long.Management.Destination.Widgets"
+                                        automation:AutomationProperties.Name="{DynamicResource i18n.nav.widgets}"
+                                        KeyboardNavigation.TabIndex="3"
+                                        Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationMarket"
                                         Content="{DynamicResource i18n.nav.market}"
                                         Tag="Market" Height="40" Margin="0,0,0,8"
                                         Style="{StaticResource LongButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Market"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.market}"
-                                        KeyboardNavigation.TabIndex="3"
+                                        KeyboardNavigation.TabIndex="4"
                                         Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationSystem"
                                         Content="{DynamicResource i18n.nav.system}"
@@ -132,7 +140,7 @@
                                         Style="{StaticResource LongButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.System"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.system}"
-                                        KeyboardNavigation.TabIndex="4"
+                                        KeyboardNavigation.TabIndex="5"
                                         Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationDiagnostics"
                                         Content="{DynamicResource i18n.nav.diagnostics}"
@@ -140,7 +148,7 @@
                                         Style="{StaticResource LongButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Diagnostics"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.diagnostics}"
-                                        KeyboardNavigation.TabIndex="5"
+                                        KeyboardNavigation.TabIndex="6"
                                         Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationDeveloper"
                                         Content="{DynamicResource i18n.nav.developer}"
@@ -148,7 +156,7 @@
                                         Style="{StaticResource LongButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Developer"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.developer}"
-                                        KeyboardNavigation.TabIndex="6"
+                                        KeyboardNavigation.TabIndex="7"
                                         Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationSettings"
                                         Content="{DynamicResource i18n.nav.settings}"
@@ -156,7 +164,7 @@
                                         Style="{StaticResource LongButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Settings"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.settings}"
-                                        KeyboardNavigation.TabIndex="7"
+                                        KeyboardNavigation.TabIndex="8"
                                         Click="ManagementDestination_Click" />
                             </UniformGrid>
                             <TextBlock x:Name="ManagementNoResultsText"
@@ -212,6 +220,14 @@
                         <ContentControl x:Name="PluginManagementHost"
                                         HorizontalContentAlignment="Stretch"
                                         VerticalContentAlignment="Stretch" />
+                    </Grid>
+
+                    <!-- Web Widgets -->
+                    <Grid x:Name="PanelWidgets" Visibility="Collapsed">
+                        <ContentControl x:Name="WidgetDashboardHost"
+                                        HorizontalContentAlignment="Stretch"
+                                        VerticalContentAlignment="Stretch"
+                                        automation:AutomationProperties.AutomationId="Long.ToolCenter.WidgetDashboardHost" />
                     </Grid>
 
                     <!-- 工作区插件设置模块 -->

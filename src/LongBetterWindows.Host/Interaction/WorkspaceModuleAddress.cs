@@ -11,6 +11,7 @@ namespace LongBetterWindows.Host.Interaction
         Diagnostics,
         Developer,
         Workflow,
+        Widgets,
         PluginSettings,
         PluginRuntime,
     }
@@ -78,6 +79,7 @@ namespace LongBetterWindows.Host.Interaction
                 "diagnostics" => WorkspaceModuleAddressKind.Diagnostics,
                 "developer" => WorkspaceModuleAddressKind.Developer,
                 "workflow" => WorkspaceModuleAddressKind.Workflow,
+                "widgets" => WorkspaceModuleAddressKind.Widgets,
                 "plugin-settings" => WorkspaceModuleAddressKind.PluginSettings,
                 "plugin-runtime" => WorkspaceModuleAddressKind.PluginRuntime,
                 _ => default,
@@ -96,6 +98,7 @@ namespace LongBetterWindows.Host.Interaction
                 WorkspaceModuleAddressKind.Settings => "root",
                 WorkspaceModuleAddressKind.Diagnostics => "root",
                 WorkspaceModuleAddressKind.Developer => "root",
+                WorkspaceModuleAddressKind.Widgets => "root",
                 _ => null,
             };
             if (fixedResource is not null)
@@ -122,6 +125,7 @@ namespace LongBetterWindows.Host.Interaction
                 WorkspaceModuleAddressKind.Diagnostics => "diagnostics",
                 WorkspaceModuleAddressKind.Developer => "developer",
                 WorkspaceModuleAddressKind.Workflow => "workflow",
+                WorkspaceModuleAddressKind.Widgets => "widgets",
                 WorkspaceModuleAddressKind.PluginSettings => "plugin-settings",
                 WorkspaceModuleAddressKind.PluginRuntime => "plugin-runtime",
                 _ => string.Empty,
@@ -187,6 +191,10 @@ namespace LongBetterWindows.Host.Interaction
                     return Success(canonical, Text("page.diagnostics.title", "诊断"));
                 case WorkspaceModuleAddressKind.Developer:
                     return Success(canonical, Text("page.developer.title", "开发者"));
+                case WorkspaceModuleAddressKind.Widgets:
+                    return Success(
+                        canonical,
+                        Text("page.widgets.title", "桌面组件"));
                 case WorkspaceModuleAddressKind.Workflow:
                     var workflow = await _workflows.LoadManagedAsync(
                         canonical.ResourceId,

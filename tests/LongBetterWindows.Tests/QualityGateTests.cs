@@ -1190,12 +1190,12 @@ public class QualityGateTests
         Assert.Contains("x:Name=\"ManagementDestinationGrid\"", toolCenter);
         Assert.Contains("ManagementDestination_Click", code);
         Assert.Equal(
-            8,
+            9,
             toolCenter.Split(
                 "automation:AutomationProperties.AutomationId=\"Long.Management.Destination.",
                 StringSplitOptions.None).Length - 1);
         Assert.Equal(
-            8,
+            9,
             toolCenter.Split(
                 "KeyboardNavigation.TabIndex=\"",
                 StringSplitOptions.None).Length - 1);
@@ -1953,6 +1953,10 @@ public class QualityGateTests
         var widgetCatalog = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetCatalogProjection.cs");
         var widgetLayoutStore = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetLayoutStore.cs");
         var widgetLayoutCoordinator = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetLayoutCoordinator.cs");
+        var widgetDashboard = Read("src", "LongBetterWindows.Host", "Views", "WidgetDashboardControl.xaml.cs");
+        var widgetDashboardView = Read("src", "LongBetterWindows.Host", "Views", "WidgetDashboardControl.xaml");
+        var workspaceAddress = Read("src", "LongBetterWindows.Host", "Interaction", "WorkspaceModuleAddress.cs");
+        var toolCenter = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
         var services = Read("src", "LongBetterWindows.Host", "Services", "ServicesInitializer.cs");
         var arguments = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginArguments.cs");
         var lifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
@@ -2006,6 +2010,16 @@ public class QualityGateTests
         Assert.Contains("MultipleInstancesNotAllowed", widgetLayoutCoordinator);
         Assert.Contains("PlacementOccupied", widgetLayoutCoordinator);
         Assert.Contains("Reconcile(", widgetLayoutCoordinator);
+        Assert.Contains("new WebWidgetSurfaceSession", widgetDashboard);
+        Assert.Contains("if (!_cards.TryGetValue", widgetDashboard);
+        Assert.Contains("card.Host.SetGridSize", widgetDashboard);
+        Assert.Contains("ServicesInitializer.Widgets.MoveResizeAsync", widgetDashboard);
+        Assert.Contains("ServicesInitializer.Widgets.RemoveAsync", widgetDashboard);
+        Assert.Contains("for (var column = 0; column < 24; column++)", widgetDashboard);
+        Assert.Contains("AutomationProperties.SetAutomationId", widgetDashboard);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", widgetDashboardView);
+        Assert.Contains("x:Name=\"PanelWidgets\"", toolCenter);
+        Assert.Contains("\"widgets\" => WorkspaceModuleAddressKind.Widgets", workspaceAddress);
         Assert.Contains("WidgetCatalogProjection.Build", services);
         Assert.Contains("new WidgetLayoutStore", services);
         Assert.Contains("WidgetInstanceStateStore", dispatcher);

@@ -143,7 +143,7 @@ src/LongBetterWindows.Host/Broker/
 
 验收：生命周期、来源伪造、超大消息、导航、挂起与恢复测试通过。
 
-当前状态：部分完成。已完成 `host.getInfo`、宿主绑定身份上下文、基础 Widget 方法、实例状态大小限制、Widget 事件信封、注入脚本 `CustomEvent` 派发、1 MiB Bridge 消息入口限制、受控 `https://plugin-*.longplugin.local/` 虚拟来源、WebView2 子资源来源阻断、HTML 文档响应头级 CSP、基础 CSP meta、Widget 生命周期协调器、Widget 实例状态持久化、独立 `WebWidgetSurfaceSession`、Widget 专属入口、网格/像素/DPI 布局和可见性输入、隐藏策略计时、专用 WPF `WebWidgetSurfaceHost` 的真实尺寸/DPI/加载/可见性接线、Widget 目录投影、版本化原子布局存储和实例布局协调器、Web SDK 类型和 Mock Host；尚未完成用户可见 Widget 目录/网格页面、Long Grid 跨进程接入、参考 Widget `.lpak` 和端到端验收。
+当前状态：部分完成。已完成 `host.getInfo`、宿主绑定身份上下文、基础 Widget 方法、实例状态大小限制、Widget 事件信封、注入脚本 `CustomEvent` 派发、1 MiB Bridge 消息入口限制、受控 `https://plugin-*.longplugin.local/` 虚拟来源、WebView2 子资源来源阻断、HTML 文档响应头级 CSP、基础 CSP meta、Widget 生命周期协调器、Widget 实例状态持久化、独立 `WebWidgetSurfaceSession`、Widget 专属入口、网格/像素/DPI 布局和可见性输入、隐藏策略计时、专用 WPF `WebWidgetSurfaceHost` 的真实尺寸/DPI/加载/可见性接线、Widget 目录投影、版本化原子布局存储和实例布局协调器、用户可见 `widgets:root` 目录/24 列工作台、统一工作区与 Launcher 入口、Web SDK 类型和 Mock Host；尚未完成 Long Grid 跨进程接入、参考 Widget `.lpak` 和端到端验收。
 
 ### PR-C：Broker IPC
 

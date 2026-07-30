@@ -797,6 +797,7 @@ namespace LongBetterWindows.Host
                 ("management", "root") => "page.overview.title",
                 ("management-page", "workflows") => "page.workflows.title",
                 ("management-page", "plugins") => "page.plugins.title",
+                ("widgets", "root") => "page.widgets.title",
                 ("management-page", "system") => "page.system.title",
                 ("marketplace", "catalog") => "page.market.title",
                 ("settings", "root") => "page.settings.title",

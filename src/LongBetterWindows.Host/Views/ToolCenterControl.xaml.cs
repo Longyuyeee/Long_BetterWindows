@@ -38,6 +38,11 @@ namespace LongBetterWindows.Host.Views
             {
                 ReleasePluginManagementPage();
                 ReleasePluginSettingsModules();
+                if (WidgetDashboardHost.Content is WidgetDashboardControl widgetDashboard)
+                {
+                    WidgetDashboardHost.Content = null;
+                    widgetDashboard.Dispose();
+                }
                 if (DeveloperHost.Content is DeveloperPageControl developerPage)
                 {
                     DeveloperHost.Content = null;
@@ -281,6 +286,7 @@ namespace LongBetterWindows.Host.Views
                 (DestinationOverview, WorkspaceManagementPage.Overview),
                 (DestinationWorkflows, WorkspaceManagementPage.Workflows),
                 (DestinationPlugins, WorkspaceManagementPage.Plugins),
+                (DestinationWidgets, WorkspaceManagementPage.Widgets),
                 (DestinationMarket, WorkspaceManagementPage.Market),
                 (DestinationSystem, WorkspaceManagementPage.System),
                 (DestinationDiagnostics, WorkspaceManagementPage.Diagnostics),
@@ -507,6 +513,7 @@ namespace LongBetterWindows.Host.Views
                 (WorkspaceManagementPage.Overview, PanelOverview, I18n("page.overview.title"), I18n("page.overview.subtitle")),
                 (WorkspaceManagementPage.Workflows, PanelWorkflows, I18n("page.workflows.title"), I18n("page.workflows.subtitle")),
                 (WorkspaceManagementPage.Plugins, PanelPlugins, I18n("page.plugins.title"), I18n("page.plugins.subtitle")),
+                (WorkspaceManagementPage.Widgets, PanelWidgets, I18n("page.widgets.title"), I18n("page.widgets.subtitle")),
                 (WorkspaceManagementPage.Market, PanelMarket, I18n("page.market.title"), I18n("page.market.subtitle")),
                 (WorkspaceManagementPage.System, PanelSystem, I18n("page.system.title"), I18n("page.system.subtitle")),
                 (WorkspaceManagementPage.Diagnostics, PanelDiagnostics, I18n("page.diagnostics.title"), I18n("page.diagnostics.subtitle")),
@@ -535,6 +542,10 @@ namespace LongBetterWindows.Host.Views
                         PluginManagementHost.Content = plugins;
                     }
                     plugins.Refresh();
+                }
+                else if (key == WorkspaceManagementPage.Widgets)
+                {
+                    WidgetDashboardHost.Content ??= new WidgetDashboardControl();
                 }
                 else if (key == WorkspaceManagementPage.Workflows
                     && WorkflowEditorHost.Content == null)
@@ -640,6 +651,7 @@ namespace LongBetterWindows.Host.Views
             PanelOverview.Visibility = Visibility.Collapsed;
             PanelWorkflows.Visibility = Visibility.Collapsed;
             PanelPlugins.Visibility = Visibility.Collapsed;
+            PanelWidgets.Visibility = Visibility.Collapsed;
             PanelPluginSettings.Visibility = Visibility.Collapsed;
             PanelMarket.Visibility = Visibility.Collapsed;
             PanelSystem.Visibility = Visibility.Collapsed;

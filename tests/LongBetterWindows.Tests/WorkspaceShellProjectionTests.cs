@@ -54,7 +54,7 @@ public sealed class WorkspaceShellProjectionTests
     }
 
     [Fact]
-    public void ManagementCatalog_MapsAllEightPagesToUniqueStableModules()
+    public void ManagementCatalog_MapsAllNinePagesToUniqueStableModules()
     {
         var pages = Enum.GetValues<WorkspaceManagementPage>();
 
@@ -64,7 +64,7 @@ public sealed class WorkspaceShellProjectionTests
                 key => $"localized:{key}"))
             .ToArray();
 
-        Assert.Equal(8, modules.Select(module => module.Key).Distinct().Count());
+        Assert.Equal(9, modules.Select(module => module.Key).Distinct().Count());
         Assert.False(modules[0].CanClose);
         Assert.All(modules.Skip(1), module => Assert.True(module.CanClose));
         Assert.All(modules, module => Assert.StartsWith("localized:", module.Title));

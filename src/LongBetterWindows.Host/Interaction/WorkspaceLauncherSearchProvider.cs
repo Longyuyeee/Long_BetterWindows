@@ -57,6 +57,16 @@ namespace LongBetterWindows.Host.Interaction
                 results,
                 request,
                 query,
+                "widgets:root",
+                Text("page.widgets.title", "桌面组件"),
+                Text("page.widgets.subtitle", "组合来自插件的常驻信息与快捷操作"),
+                Text("launcher.source.workspace", "工作区"),
+                SearchResultIconKind.Plugin,
+                aliases: ["组件", "桌面组件", "widget", "widgets"]);
+            AddDestination(
+                results,
+                request,
+                query,
                 "settings:root",
                 Text("page.settings.title", "设置"),
                 Text("page.settings.subtitle", "外观、语言、本地数据与隐私"),
@@ -138,6 +148,7 @@ namespace LongBetterWindows.Host.Interaction
                 Score = query.Length == 0
                     ? target.StartsWith("management:", StringComparison.Ordinal) ? 520
                     : target.StartsWith("marketplace:", StringComparison.Ordinal) ? 440
+                    : target.StartsWith("widgets:", StringComparison.Ordinal) ? 400
                     : 360
                     : Score(query, aliases.Prepend(title).ToArray()),
                 Kind = SearchResultKind.Data,
