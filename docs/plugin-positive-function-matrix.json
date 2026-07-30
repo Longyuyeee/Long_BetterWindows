@@ -310,12 +310,12 @@
           {
             "level": "component",
             "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
-            "symbol": "StopRecording_DropsInFlightKeyboardCallback"
+            "symbol": "RestartRecording_DropsInFlightKeyboardCallbackFromPreviousSession"
           },
           {
             "level": "component",
             "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
-            "symbol": "StopRecording_DropsInFlightMouseCallback"
+            "symbol": "RestartRecording_DropsInFlightMouseCallbackFromPreviousSession"
           },
           {
             "level": "component",

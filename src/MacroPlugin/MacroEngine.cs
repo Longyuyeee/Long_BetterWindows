@@ -120,6 +120,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     private Task<bool>? _playTask;
     private MacroState _state = MacroState.Idle;
     private string? _lastError;
+    private long _recordingSession;
     private bool _disposed;
 
     public MacroEngine()
@@ -227,6 +228,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             }
             else
             {
+                _recordingSession = unchecked(_recordingSession + 1);
                 _state = MacroState.Recording;
                 stateToPublish = _state;
             }
@@ -765,17 +767,18 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     {
         var messageCode = message.ToInt32();
         if (code >= 0
-            && State == MacroState.Recording
             && (messageCode == LeftButtonDownMessage
                 || messageCode == LeftButtonUpMessage
                 || messageCode == RightButtonDownMessage
-                || messageCode == RightButtonUpMessage))
+                || messageCode == RightButtonUpMessage)
+            && TryCaptureRecordingSession(out var recordingSession))
         {
             var hookData = _native.ReadMouseHookData(data);
             var now = DateTime.UtcNow;
             lock (_sync)
             {
-                if (_state == MacroState.Recording)
+                if (_state == MacroState.Recording
+                    && _recordingSession == recordingSession)
                 {
                     _actions.Add(MacroAction.MouseTransition(
                         hookData.X,
@@ -799,17 +802,18 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     {
         var messageCode = message.ToInt32();
         if (code >= 0
-            && State == MacroState.Recording
             && (messageCode == KeyDownMessage
                 || messageCode == KeyUpMessage
                 || messageCode == SystemKeyDownMessage
-                || messageCode == SystemKeyUpMessage))
+                || messageCode == SystemKeyUpMessage)
+            && TryCaptureRecordingSession(out var recordingSession))
         {
             var hookData = _native.ReadKeyboardHookData(data);
             var now = DateTime.UtcNow;
             lock (_sync)
             {
-                if (_state == MacroState.Recording)
+                if (_state == MacroState.Recording
+                    && _recordingSession == recordingSession)
                 {
                     _actions.Add(MacroAction.KeyTransition(
                         checked((int)hookData.VirtualKey),
@@ -901,4 +905,13 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     private bool HasPendingInputReleases()
         => _pendingKeyReleases.Count > 0
             || _pendingMouseReleases.Count > 0;
+
+    private bool TryCaptureRecordingSession(out long recordingSession)
+    {
+        lock (_sync)
+        {
+            recordingSession = _recordingSession;
+            return _state == MacroState.Recording;
+        }
+    }
 }

@@ -32,7 +32,7 @@
     {
       "id": "com.long.macro",
       "name": "宏录制器",
-      "version": "1.1.5",
+      "version": "1.1.6",
       "description": "键鼠宏录制、安全回放、可等待取消与异常输入释放",
       "author": "Long",
       "download_url": null,

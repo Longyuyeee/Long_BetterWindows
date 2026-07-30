@@ -246,7 +246,7 @@ public sealed class MacroEngineTests
     }
 
     [Fact]
-    public async Task StopRecording_DropsInFlightKeyboardCallback()
+    public async Task RestartRecording_DropsInFlightKeyboardCallbackFromPreviousSession()
     {
         var native = new FakeMacroNativeApi();
         await using var engine = CreateEngine(native);
@@ -259,6 +259,7 @@ public sealed class MacroEngineTests
         try
         {
             stopped = engine.StopRecording();
+            Assert.True(engine.StartRecording());
         }
         finally
         {
@@ -267,12 +268,13 @@ public sealed class MacroEngineTests
         await callback.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.True(stopped);
-        Assert.Equal(MacroState.Idle, engine.State);
+        Assert.Equal(MacroState.Recording, engine.State);
         Assert.Equal(0, engine.ActionCount);
+        Assert.True(engine.StopRecording());
     }
 
     [Fact]
-    public async Task StopRecording_DropsInFlightMouseCallback()
+    public async Task RestartRecording_DropsInFlightMouseCallbackFromPreviousSession()
     {
         var native = new FakeMacroNativeApi();
         await using var engine = CreateEngine(native);
@@ -285,6 +287,7 @@ public sealed class MacroEngineTests
         try
         {
             stopped = engine.StopRecording();
+            Assert.True(engine.StartRecording());
         }
         finally
         {
@@ -293,8 +296,9 @@ public sealed class MacroEngineTests
         await callback.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.True(stopped);
-        Assert.Equal(MacroState.Idle, engine.State);
+        Assert.Equal(MacroState.Recording, engine.State);
         Assert.Equal(0, engine.ActionCount);
+        Assert.True(engine.StopRecording());
     }
 
     [Fact]
