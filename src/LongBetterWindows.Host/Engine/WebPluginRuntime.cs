@@ -19,7 +19,7 @@ namespace LongBetterWindows.Host.Engine
     ///   let note = await long.ads.read(path, "long_note")
     ///   await long.storage.set("key", "value")
     /// </summary>
-    public class WebPluginRuntime : IDisposable
+    public partial class WebPluginRuntime : IDisposable
     {
         private readonly PluginManifest _manifest;
         private readonly WebPluginViewLifecycle _viewLifecycle;
@@ -27,10 +27,8 @@ namespace LongBetterWindows.Host.Engine
         private readonly WebPluginCommandCoordinator _commands;
         private readonly WebPluginBridgeContext _bridgeContext;
         private readonly WidgetLifecycleCoordinator? _widgetLifecycle;
-
         public WebView2? WebView => _viewLifecycle.View;
         public PluginManifest Manifest => _manifest;
-
         public WebPluginRuntime(PluginManifest manifest, string pluginDir)
             : this(manifest, pluginDir, new WebPluginBridgeContext(manifest.Id))
         {
@@ -39,16 +37,22 @@ namespace LongBetterWindows.Host.Engine
         internal WebPluginRuntime(
             PluginManifest manifest,
             string pluginDir,
-            WebPluginBridgeContext bridgeContext)
+            WebPluginBridgeContext bridgeContext,
+            string? entryPoint = null,
+            WidgetSurfaceLayout? initialWidgetLayout = null)
         {
             _manifest = manifest;
             _bridgeContext = bridgeContext;
             _viewLifecycle = new WebPluginViewLifecycle(
                 manifest,
                 pluginDir,
-                HandleJsMessage);
+                HandleJsMessage,
+                entryPoint);
             _widgetLifecycle = _bridgeContext.IsWidget
-                ? new WidgetLifecycleCoordinator(_bridgeContext, PostWebMessage)
+                ? new WidgetLifecycleCoordinator(
+                    _bridgeContext,
+                    PostWebMessage,
+                    initialLayout: initialWidgetLayout)
                 : null;
             _hostDispatcher = new WebPluginHostDispatcher(
                 manifest.Id,
@@ -135,7 +139,6 @@ namespace LongBetterWindows.Host.Engine
             PluginLanguageContext context)
             => _viewLifecycle.SetLanguageMessageAsync(
                 WebPluginBridgeProtocol.SerializeLanguageChanged(context));
-
         private async Task<object?> DispatchJsCall(string method, object?[] args)
         {
             // ✅ 权限检查：验证插件是否声明了所需的 capability

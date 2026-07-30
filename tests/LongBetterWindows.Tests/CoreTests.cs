@@ -664,6 +664,129 @@ public class CoreTests
     }
 
     [Fact]
+    public void WidgetLifecycleCoordinator_UsesSurfaceLayoutAndPublishesRealChanges()
+    {
+        var messages = new List<string>();
+        var context = new WebPluginBridgeContext(
+            "com.test.bridge",
+            surface: "widget",
+            widgetId: "system.status",
+            instanceId: "instance-1");
+        var initialLayout = new WidgetSurfaceLayout(2, 1, 320, 160, 1.25);
+        using var coordinator = new WidgetLifecycleCoordinator(
+            context,
+            messages.Add,
+            TimeSpan.FromSeconds(10),
+            initialLayout);
+
+        coordinator.Mount();
+        coordinator.Resize(initialLayout);
+        coordinator.Resize(new WidgetSurfaceLayout(3, 2, 480, 320, 1.5));
+        coordinator.SetVisibility(false, "surface-hidden");
+        coordinator.SetVisibility(false, "duplicate-hidden");
+        coordinator.SetVisibility(true, "surface-visible");
+
+        Assert.Equal(4, messages.Count);
+        using var mounted = JsonDocument.Parse(messages[0]);
+        var mountedSize = mounted.RootElement
+            .GetProperty("detail")
+            .GetProperty("payload")
+            .GetProperty("size");
+        Assert.Equal(320, mountedSize.GetProperty("width").GetDouble());
+        Assert.Equal(1.25, mountedSize.GetProperty("dpi_scale").GetDouble());
+
+        using var resized = JsonDocument.Parse(messages[1]);
+        var resizedPayload = resized.RootElement
+            .GetProperty("detail")
+            .GetProperty("payload");
+        Assert.Equal(3, resizedPayload.GetProperty("columns").GetInt32());
+        Assert.Equal(480, resizedPayload.GetProperty("width").GetDouble());
+        Assert.Equal(1.5, resizedPayload.GetProperty("scale").GetDouble());
+
+        AssertWidgetEvent(messages[0], "long.widget-mounted", 1);
+        AssertWidgetEvent(messages[1], "long.widget-resized", 2);
+        AssertWidgetEvent(messages[2], "long.widget-visibility-changed", 3);
+        AssertWidgetEvent(messages[3], "long.widget-visibility-changed", 4);
+    }
+
+    [Fact]
+    public void WebWidgetSurfaceSession_BindsWidgetEntryPointAndInstanceIdentity()
+    {
+        var widget = new PluginWidgetDefinition
+        {
+            Id = "system.status",
+            Title = "System status",
+            EntryPoint = "widgets/system-status.html",
+            DefaultSize = new PluginWidgetSize { Columns = 2, Rows = 1 },
+        };
+        var manifest = new PluginManifest
+        {
+            Id = "com.test.widgets",
+            Name = "Test widgets",
+            Version = "1.0.0",
+            Runtime = "webview",
+            EntryPoint = "index.html",
+            Widgets = [widget],
+        };
+
+        using var surface = new WebWidgetSurfaceSession(
+            manifest,
+            ".",
+            widget,
+            "instance-42",
+            new WidgetSurfaceLayout(2, 1, 320, 160, 1.25));
+
+        Assert.Equal("com.test.widgets", surface.PluginId);
+        Assert.Equal("system.status", surface.WidgetId);
+        Assert.Equal("instance-42", surface.InstanceId);
+        Assert.Equal("widgets/system-status.html", surface.EntryPoint);
+        Assert.Equal(
+            TimeSpan.FromSeconds(30),
+            WebWidgetSurfaceSession.DefaultHiddenSuspendDelay);
+    }
+
+    [Fact]
+    public void WebWidgetSurfaceSession_RejectsForeignDefinitionAndInvalidLayout()
+    {
+        var manifestWidget = new PluginWidgetDefinition
+        {
+            Id = "system.status",
+            Title = "System status",
+            EntryPoint = "widgets/system-status.html",
+            DefaultSize = new PluginWidgetSize { Columns = 2, Rows = 1 },
+        };
+        var manifest = new PluginManifest
+        {
+            Id = "com.test.widgets",
+            Name = "Test widgets",
+            Version = "1.0.0",
+            Runtime = "webview",
+            EntryPoint = "index.html",
+            Widgets = [manifestWidget],
+        };
+        var foreignWidget = new PluginWidgetDefinition
+        {
+            Id = "other",
+            Title = "Other",
+            EntryPoint = "widgets/other.html",
+            DefaultSize = new PluginWidgetSize { Columns = 1, Rows = 1 },
+        };
+
+        Assert.Throws<ArgumentException>(() => new WebWidgetSurfaceSession(
+            manifest,
+            ".",
+            foreignWidget,
+            "instance-1",
+            new WidgetSurfaceLayout(1, 1, 160, 160, 1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new WebWidgetSurfaceSession(
+            manifest,
+            ".",
+            manifestWidget,
+            "instance-1",
+            new WidgetSurfaceLayout(0, 1, 160, 160, 1)));
+    }
+
+    [Fact]
     public void WidgetLifecycleCoordinator_ReadyTimeoutEmitsAuditableVisibilityEvent()
     {
         var messages = new List<string>();

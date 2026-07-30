@@ -19,14 +19,19 @@ namespace LongBetterWindows.Host.Engine
         internal WebPluginViewLifecycle(
             PluginManifest manifest,
             string pluginDirectory,
-            Action<string> messageReceived)
+            Action<string> messageReceived,
+            string? entryPoint = null)
         {
             _manifest = manifest;
             _navigationPolicy = new WebPluginNavigationPolicy(pluginDirectory);
             _messageReceived = messageReceived;
+            EntryPoint = string.IsNullOrWhiteSpace(entryPoint)
+                ? manifest.EntryPoint
+                : entryPoint;
         }
 
         internal WebView2? View => _webView;
+        internal string EntryPoint { get; }
 
         internal WebView2 EnsureView()
         {
@@ -86,9 +91,9 @@ namespace LongBetterWindows.Host.Engine
                 }
 
                 // 加载插件 HTML
-                if (!_navigationPolicy.TryResolveEntryPoint(_manifest.EntryPoint, out var entryUri))
+                if (!_navigationPolicy.TryResolveEntryPoint(EntryPoint, out var entryUri))
                     throw new InvalidDataException(
-                        $"Web 插件入口不存在或越出插件目录：{_manifest.EntryPoint}");
+                        $"Web 插件入口不存在或越出插件目录：{EntryPoint}");
 
                 _navigationCompletion = new TaskCompletionSource<bool>(
                     TaskCreationOptions.RunContinuationsAsynchronously);

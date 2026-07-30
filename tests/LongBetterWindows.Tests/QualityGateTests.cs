@@ -1942,10 +1942,12 @@ public class QualityGateTests
     public void WebBridgeProtocolAndHostDispatch_AreSeparatedFromWebViewRuntime()
     {
         var runtime = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.cs");
+        var widgetRuntime = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.Widget.cs");
         var protocol = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginBridgeProtocol.cs");
         var dispatcher = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs");
         var widgetLifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WidgetLifecycleCoordinator.cs");
         var widgetState = Read("src", "LongBetterWindows.Host", "Engine", "WidgetInstanceStateStore.cs");
+        var widgetSurface = Read("src", "LongBetterWindows.Host", "Engine", "WebWidgetSurfaceSession.cs");
         var arguments = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginArguments.cs");
         var lifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
 
@@ -1955,6 +1957,7 @@ public class QualityGateTests
         Assert.Contains("SerializeResult", protocol);
         Assert.Contains("BuildInjectionScript", protocol);
         Assert.Contains("WidgetLifecycleCoordinator", runtime);
+        Assert.Contains("NotifyWidgetLayoutChanged", widgetRuntime);
         Assert.Contains("_widgetLifecycle?.Mount()", runtime);
         Assert.Contains("_widgetLifecycle?.Dispose()", runtime);
         Assert.Contains("coordinator.MarkReady", Read("tests", "LongBetterWindows.Tests", "CoreTests.cs"));
@@ -1963,6 +1966,18 @@ public class QualityGateTests
         Assert.Contains("long.widget-resume", widgetLifecycle);
         Assert.Contains("long.widget-unmount", widgetLifecycle);
         Assert.Contains("ready-timeout", widgetLifecycle);
+        Assert.Contains("long.widget-resized", widgetLifecycle);
+        Assert.Contains("long.widget-visibility-changed", widgetLifecycle);
+        Assert.Contains("WidgetSurfaceLayout", widgetLifecycle);
+        Assert.Contains("new WebPluginBridgeContext(", widgetSurface);
+        Assert.Contains("surface: \"widget\"", widgetSurface);
+        Assert.Contains("declaredWidget.EntryPoint", widgetSurface);
+        Assert.Contains("DefaultHiddenSuspendDelay", widgetSurface);
+        Assert.Contains("PluginWidgetHiddenBehavior.Suspend", widgetSurface);
+        Assert.Contains("_runtime.NotifyWidgetLayoutChanged", widgetSurface);
+        Assert.Contains("_runtime.NotifyWidgetVisibilityChanged", widgetSurface);
+        Assert.Contains("_runtime.SuspendWidget", widgetSurface);
+        Assert.Contains("_runtime.ResumeWidget", widgetSurface);
         Assert.Contains("WidgetInstanceStateStore", dispatcher);
         Assert.Contains("WidgetGetInstanceState()", dispatcher);
         Assert.Contains("_widgetStateStore.SetAsync", dispatcher);

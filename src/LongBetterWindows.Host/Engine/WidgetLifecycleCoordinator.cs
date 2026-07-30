@@ -16,15 +16,19 @@ namespace LongBetterWindows.Host.Engine
         private bool _ready;
         private bool _suspended;
         private bool _unmounted;
+        private bool _visible = true;
+        private WidgetSurfaceLayout _layout;
 
         internal WidgetLifecycleCoordinator(
             WebPluginBridgeContext context,
             Action<string> postMessage,
-            TimeSpan? readyTimeout = null)
+            TimeSpan? readyTimeout = null,
+            WidgetSurfaceLayout? initialLayout = null)
         {
             _context = context;
             _postMessage = postMessage;
             _readyTimeout = readyTimeout ?? DefaultReadyTimeout;
+            _layout = initialLayout ?? WidgetSurfaceLayout.Empty;
         }
 
         internal long Sequence
@@ -76,16 +80,45 @@ namespace LongBetterWindows.Host.Engine
                 context = _context.ToHostInfo(),
                 theme = "system",
                 locale = CultureInfo.CurrentUICulture.Name,
-                size = new
-                {
-                    columns = 0,
-                    rows = 0,
-                    width = 0,
-                    height = 0,
-                    dpi_scale = 1.0,
-                },
+                size = _layout.ToPayload(),
             });
             ScheduleReadyTimeout();
+        }
+
+        internal void Resize(WidgetSurfaceLayout layout)
+        {
+            long sequence;
+            lock (_gate)
+            {
+                if (!_context.IsWidget || _unmounted || _layout == layout)
+                    return;
+
+                _layout = layout;
+                if (!_mounted)
+                    return;
+                sequence = ++_sequence;
+            }
+
+            Post("long.widget-resized", sequence, layout.ToPayload());
+        }
+
+        internal void SetVisibility(bool visible, string reason)
+        {
+            long sequence;
+            lock (_gate)
+            {
+                if (!_context.IsWidget || _unmounted || !_mounted || _visible == visible)
+                    return;
+
+                _visible = visible;
+                sequence = ++_sequence;
+            }
+
+            Post("long.widget-visibility-changed", sequence, new
+            {
+                visible,
+                reason,
+            });
         }
 
         internal object MarkReady(object? contentVersion)
@@ -230,5 +263,25 @@ namespace LongBetterWindows.Host.Engine
                 eventName,
                 sequence,
                 payload));
+    }
+
+    internal sealed record WidgetSurfaceLayout(
+        int Columns,
+        int Rows,
+        double Width,
+        double Height,
+        double DpiScale)
+    {
+        internal static WidgetSurfaceLayout Empty { get; } = new(0, 0, 0, 0, 1);
+
+        internal object ToPayload() => new
+        {
+            columns = Columns,
+            rows = Rows,
+            width = Width,
+            height = Height,
+            dpi_scale = DpiScale,
+            scale = DpiScale,
+        };
     }
 }
