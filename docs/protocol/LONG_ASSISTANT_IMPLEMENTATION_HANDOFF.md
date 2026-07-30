@@ -1,6 +1,6 @@
 # Long助手实施交接单：LPWP 1.0
 
-状态：PR-A completed；PR-B foundation in progress
+状态：PR-A completed；PR-B code complete / desktop validation pending；PR-C foundation in progress
 Long助手审计基线：`Longyuyeee/Long_BetterWindows@0d1366f`
 上位规范：[Long 插件小组件兼容协议（LPWP）1.0](LONG_WIDGET_PROTOCOL_V1.md)
 
@@ -36,7 +36,7 @@ Long助手审计基线：`Longyuyeee/Long_BetterWindows@0d1366f`
 - Widget 实例、尺寸、可见性、暂停/恢复等生命周期；（PR-B 已完成生命周期协调器、独立 Surface Session、WPF 控件真实尺寸/DPI/可见性接线及目录/布局事务核心，仍未接用户可见目录/网格页面与 Long Grid）
 - `host.getInfo` 和 Widget Bridge；（PR-B 已完成 `host.getInfo`、基础 Widget 方法、受信上下文绑定、标准事件信封、注入脚本事件派发、Bridge 消息大小边界、虚拟 HTTPS 来源、响应头级 CSP 基础、基础 CSP meta、ready 回执和实例状态持久化基础）
 - 足够严格的 Widget 子资源沙箱；（PR-B 已完成虚拟 Host、虚拟来源外子资源阻断、HTML 文档响应头级 CSP 和基础 CSP meta；仍需真实 Widget Surface 下的端到端验收）
-- Long Grid 可调用的同用户 IPC Broker；
+- Long Grid 可调用的同用户 IPC Broker；（PR-C 已完成无 Host/WPF 依赖的契约、帧协议、SID 哈希管道名、强制 `host.hello` 的最小客户端与真实 Named Pipe 回归；Host 服务端与业务端点仍待接入）
 - 跨仓库 Golden Fixtures。
 
 ## 3. 建议变更位置
@@ -155,6 +155,15 @@ src/LongBetterWindows.Host/Broker/
 
 验收：Long Grid 的最小测试客户端能枚举并调用现有命令插件。
 
+当前状态：基础切片已完成。新增可独立构建和打包的
+`LongBetterWindows.PluginIpc` v1.1.0，提供 `long.plugin.ipc/1.0`
+请求/响应信封、标准错误码、4 字节小端长度前缀 UTF-8 JSON 帧、1 MiB
+上限、100–120000 ms deadline 校验、基于当前用户 SID 不可逆摘要的版本化
+Pipe 名称，以及必须先完成 `host.hello` 的 Named Pipe 客户端。客户端对协议、
+响应 ID、响应类型和未知错误码失败关闭；包不引用 Host、WPF 或具体插件实现。
+CI 已接入专项门禁和 NuGet 制品。后续切片依次接入当前用户 ACL/完整性级别认证
+的 Host 服务端、只读 catalog、命令调用/取消和 `plugin.open`。
+
 ### PR-D：发行与兼容门禁
 
 - 签名参考 `.lpak`；
@@ -194,7 +203,7 @@ Long助手提交设计 PR 时，需要明确回答：
 - [ ] 协议文档副本及版本号
 - [ ] 合并后的完整 Manifest Schema
 - [ ] C# Contracts NuGet 或项目包
-- [ ] IPC Client 包
+- [x] IPC Client 包（PR-C 基础版；服务端业务端点未完成）
 - [ ] TypeScript Web SDK
 - [ ] Mock Host
 - [ ] 合法/非法 Manifest Fixtures

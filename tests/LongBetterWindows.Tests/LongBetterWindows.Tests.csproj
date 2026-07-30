@@ -16,6 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\sdk\dotnet\LongBetterWindows.PluginSdk.Testing\LongBetterWindows.PluginSdk.Testing.csproj" />
     <ProjectReference Include="..\..\src\LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj" />
+    <ProjectReference Include="..\..\src\LongBetterWindows.PluginIpc\LongBetterWindows.PluginIpc.csproj" />
     <ProjectReference Include="..\..\src\LongBetterWindows.PluginSdk.Wpf\LongBetterWindows.PluginSdk.Wpf.csproj" />
     <ProjectReference Include="..\..\src\ClipboardHistoryBackground\ClipboardHistoryBackground.csproj" />
     <ProjectReference Include="..\..\src\ColorPickerPlugin\ColorPickerPlugin.csproj" />
