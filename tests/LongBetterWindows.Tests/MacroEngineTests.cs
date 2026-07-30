@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using MacroPlugin;
 
@@ -259,10 +260,15 @@ public sealed class MacroEngineTests
             MacroAction.KeyTransition(0x43, isDown: false, delay: 0),
             MacroAction.KeyTransition(0x11, isDown: false, delay: 0));
 
-        var playback = engine.PlayOnceAsync();
-        await Task.Delay(30);
-        Assert.Empty(native.KeyInputs);
-        Assert.True(await playback.WaitAsync(TimeSpan.FromSeconds(2)));
+        var started = Stopwatch.GetTimestamp();
+        Assert.True(await engine.PlayOnceAsync()
+            .WaitAsync(TimeSpan.FromSeconds(2)));
+        var firstInputElapsed = Stopwatch.GetElapsedTime(
+            started,
+            Assert.Single(native.KeyInputTimestamps.Take(1)));
+        Assert.True(
+            firstInputElapsed >= TimeSpan.FromMilliseconds(120),
+            $"First input was sent after {firstInputElapsed.TotalMilliseconds:F1}ms.");
         Assert.Equal(
             new[]
             {
@@ -403,6 +409,7 @@ public sealed class MacroEngineTests
         public List<IntPtr> UninstallCalls { get; } = [];
         public List<MouseInputCall> MouseInputs { get; } = [];
         public List<KeyInputCall> KeyInputs { get; } = [];
+        public List<long> KeyInputTimestamps { get; } = [];
         public TaskCompletionSource MouseDown { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource KeyDown { get; } = new(
@@ -491,6 +498,7 @@ public sealed class MacroEngineTests
             bool isDown,
             out int error)
         {
+            KeyInputTimestamps.Add(Stopwatch.GetTimestamp());
             KeyInputs.Add(new KeyInputCall(virtualKey, isDown));
             if (isDown)
                 KeyDown.TrySetResult();
