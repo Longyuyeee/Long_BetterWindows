@@ -313,6 +313,21 @@
             "symbol": "Playback_WaitsBeforeActionAndReplaysChordTransitions"
           },
           {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "Recording_PreservesMouseDownAndUpCoordinates"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "Playback_ReplaysMouseDragTransitions"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "StopPlayAsync_ReleasesCanceledMouseTransition"
+          },
+          {
             "level": "integration",
             "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
             "symbol": "PluginStop_MacroCleansEngineAndRetainsFailedHotkeyForRetry"
@@ -327,7 +342,7 @@
         {
           "id": "record-play-cancel",
           "commands": ["macro.record-toggle", "macro.play-once", "macro.loop-toggle"],
-          "description": "Record a harmless sequence in a disposable target, play once, start/stop loop playback and confirm no key/button remains pressed.",
+          "description": "In a disposable target, record text with a modifier chord, a left-button drag and a right-button action; play once, start/stop loop playback and confirm timing is preserved with no key/button left pressed.",
           "status": "pending",
           "required_for_release": true,
           "evidence_path": null,

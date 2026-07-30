@@ -274,6 +274,87 @@ public sealed class MacroEngineTests
             native.KeyInputs);
     }
 
+    [Fact]
+    public async Task Recording_PreservesMouseDownAndUpCoordinates()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = CreateEngine(native);
+        Assert.True(engine.StartRecording());
+
+        native.RaiseMouse(0x0201, 20, 30);
+        native.RaiseMouse(0x0202, 240, 180);
+        native.RaiseMouse(0x0204, 300, 220);
+        native.RaiseMouse(0x0205, 310, 230);
+        Assert.True(engine.StopRecording());
+
+        var actions = JsonSerializer.Deserialize<List<MacroAction>>(
+            engine.SaveToJson());
+        Assert.Collection(
+            actions!,
+            action => AssertMouseTransition(
+                action, MacroActionType.MouseDown, 20, 30, right: false),
+            action => AssertMouseTransition(
+                action, MacroActionType.MouseUp, 240, 180, right: false),
+            action => AssertMouseTransition(
+                action, MacroActionType.MouseDown, 300, 220, right: true),
+            action => AssertMouseTransition(
+                action, MacroActionType.MouseUp, 310, 230, right: true));
+    }
+
+    [Fact]
+    public async Task Playback_ReplaysMouseDragTransitions()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = new MacroEngine(
+            native,
+            TimeSpan.Zero,
+            TimeSpan.FromMilliseconds(10));
+        Load(
+            engine,
+            MacroAction.MouseTransition(
+                25, 35, right: false, isDown: true, delay: 0),
+            MacroAction.MouseTransition(
+                225, 185, right: false, isDown: false, delay: 0));
+
+        Assert.True(await engine.PlayOnceAsync());
+        Assert.Equal(
+            new[]
+            {
+                new MouseInputCall(
+                    25, 35, MacroMouseButton.Left, IsDown: true),
+                new MouseInputCall(
+                    225, 185, MacroMouseButton.Left, IsDown: false),
+            },
+            native.MouseInputs);
+    }
+
+    [Fact]
+    public async Task StopPlayAsync_ReleasesCanceledMouseTransition()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = CreateEngine(native);
+        Load(
+            engine,
+            MacroAction.MouseTransition(
+                40, 50, right: true, isDown: true, delay: 0),
+            MacroAction.MouseTransition(
+                240, 250, right: true, isDown: false, delay: 60_000));
+
+        var playback = engine.PlayOnceAsync();
+        await native.MouseDown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(await engine.StopPlayAsync());
+        Assert.False(await playback);
+        Assert.Equal(
+            new[]
+            {
+                new MouseInputCall(
+                    40, 50, MacroMouseButton.Right, IsDown: true),
+                new MouseInputCall(
+                    40, 50, MacroMouseButton.Right, IsDown: false),
+            },
+            native.MouseInputs);
+    }
+
     private static MacroEngine CreateEngine(FakeMacroNativeApi native)
         => new(
             native,
@@ -294,10 +375,25 @@ public sealed class MacroEngineTests
         Assert.Equal(expectedKey, action.KeyCode);
     }
 
+    private static void AssertMouseTransition(
+        MacroAction action,
+        MacroActionType expectedType,
+        int expectedX,
+        int expectedY,
+        bool right)
+    {
+        Assert.Equal(expectedType, action.Type);
+        Assert.Equal(expectedX, action.X);
+        Assert.Equal(expectedY, action.Y);
+        Assert.Equal(right, action.IsRightButton);
+    }
+
     private sealed class FakeMacroNativeApi : IMacroNativeApi
     {
         private int _nextHook = 10;
+        private MacroHookProc? _mouseHook;
         private MacroHookProc? _keyboardHook;
+        private MacroMouseHookData _mouseData;
         private uint _keyboardVirtualKey;
 
         public Queue<HookResult> HookResults { get; } = new();
@@ -317,6 +413,8 @@ public sealed class MacroEngineTests
             MacroHookProc callback,
             out int error)
         {
+            if (hookType == 14)
+                _mouseHook = callback;
             if (hookType == 13)
                 _keyboardHook = callback;
             var result = HookResults.TryDequeue(out var queued)
@@ -341,7 +439,14 @@ public sealed class MacroEngineTests
             => IntPtr.Zero;
 
         public MacroMouseHookData ReadMouseHookData(IntPtr data)
-            => new(10, 20);
+            => _mouseData;
+
+        public void RaiseMouse(int message, int x, int y)
+        {
+            _mouseData = new MacroMouseHookData(x, y);
+            Assert.NotNull(_mouseHook);
+            _mouseHook(0, new IntPtr(message), IntPtr.Zero);
+        }
 
         public MacroKeyboardHookData ReadKeyboardHookData(IntPtr data)
             => new(_keyboardVirtualKey);

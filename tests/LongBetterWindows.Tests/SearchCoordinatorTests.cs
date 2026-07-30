@@ -59,6 +59,7 @@ public class SearchCoordinatorTests
             new FakeSearchProvider("fast", 10, 1, Result("fast", 200)),
             new FakeSearchProvider("slow", 20, 160, Result("slow", 400)),
         });
+        _ = await coordinator.SearchIncrementalAsync(Request());
         TimeSpan? firstUpdate = null;
         SearchRunMetrics? metrics = null;
         var started = Stopwatch.GetTimestamp();

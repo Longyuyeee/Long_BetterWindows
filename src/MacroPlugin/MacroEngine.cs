@@ -17,6 +17,8 @@ public enum MacroActionType
     KeyPress,
     KeyDown,
     KeyUp,
+    MouseDown,
+    MouseUp,
 }
 
 public class MacroAction
@@ -62,6 +64,23 @@ public class MacroAction
             KeyCode = virtualKey,
             DelayMs = delay,
         };
+
+    public static MacroAction MouseTransition(
+        int x,
+        int y,
+        bool right,
+        bool isDown,
+        int delay)
+        => new()
+        {
+            Type = isDown
+                ? MacroActionType.MouseDown
+                : MacroActionType.MouseUp,
+            X = x,
+            Y = y,
+            IsRightButton = right,
+            DelayMs = delay,
+        };
 }
 
 public sealed class MacroEngine : IDisposable, IAsyncDisposable
@@ -69,7 +88,9 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     private const int MouseHookType = 14;
     private const int KeyboardHookType = 13;
     private const int LeftButtonDownMessage = 0x0201;
+    private const int LeftButtonUpMessage = 0x0202;
     private const int RightButtonDownMessage = 0x0204;
+    private const int RightButtonUpMessage = 0x0205;
     private const int KeyDownMessage = 0x0100;
     private const int KeyUpMessage = 0x0101;
     private const int SystemKeyDownMessage = 0x0104;
@@ -500,6 +521,12 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                     case MacroActionType.KeyUp:
                         PlayKeyTransition(action, isDown: false);
                         break;
+                    case MacroActionType.MouseDown:
+                        PlayMouseTransition(action, isDown: true);
+                        break;
+                    case MacroActionType.MouseUp:
+                        PlayMouseTransition(action, isDown: false);
+                        break;
                     default:
                         throw new InvalidOperationException(
                             $"Unsupported macro action: {action.Type}.");
@@ -572,6 +599,44 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         }
         lock (_sync)
             _pendingMouseReleases.Remove(button);
+    }
+
+    private void PlayMouseTransition(MacroAction action, bool isDown)
+    {
+        if (!_native.TrySetCursorPosition(
+                action.X,
+                action.Y,
+                out var cursorError))
+        {
+            throw new InvalidOperationException(
+                NativeFailure("SetCursorPos", cursorError));
+        }
+
+        var button = action.IsRightButton
+            ? MacroMouseButton.Right
+            : MacroMouseButton.Left;
+        if (!_native.TrySendMouseButton(
+                action.X,
+                action.Y,
+                button,
+                isDown,
+                out var error))
+        {
+            throw new InvalidOperationException(
+                NativeFailure(
+                    isDown
+                        ? "SendInput(mouse down)"
+                        : "SendInput(mouse up)",
+                    error));
+        }
+
+        lock (_sync)
+        {
+            if (isDown)
+                _pendingMouseReleases[button] = (action.X, action.Y);
+            else
+                _pendingMouseReleases.Remove(button);
+        }
     }
 
     private async Task PlayKeyActionAsync(
@@ -698,19 +763,25 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         IntPtr message,
         IntPtr data)
     {
+        var messageCode = message.ToInt32();
         if (code >= 0
             && State == MacroState.Recording
-            && (message.ToInt32() == LeftButtonDownMessage
-                || message.ToInt32() == RightButtonDownMessage))
+            && (messageCode == LeftButtonDownMessage
+                || messageCode == LeftButtonUpMessage
+                || messageCode == RightButtonDownMessage
+                || messageCode == RightButtonUpMessage))
         {
             var hookData = _native.ReadMouseHookData(data);
             var now = DateTime.UtcNow;
             lock (_sync)
             {
-                _actions.Add(MacroAction.Mouse(
+                _actions.Add(MacroAction.MouseTransition(
                     hookData.X,
                     hookData.Y,
-                    message.ToInt32() == RightButtonDownMessage,
+                    messageCode == RightButtonDownMessage
+                        || messageCode == RightButtonUpMessage,
+                    messageCode == LeftButtonDownMessage
+                        || messageCode == RightButtonDownMessage,
                     ElapsedMilliseconds(now)));
                 _lastEvent = now;
             }
