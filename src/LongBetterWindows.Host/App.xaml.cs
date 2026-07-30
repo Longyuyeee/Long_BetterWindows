@@ -797,7 +797,7 @@ namespace LongBetterWindows.Host
                 ["Long.Color.Text.Secondary"] = "#505B70",
                 ["Long.Color.Text.Muted"] = "#667085",
                 ["Long.Color.Accent.Primary"] = "#6847F5",
-                ["Long.Color.Accent.Hover"] = "#795CFF",
+                ["Long.Color.Accent.Hover"] = "#7354F0",
                 ["Long.Color.Accent.Pressed"] = "#5637D8",
                 ["Long.Color.Accent.Soft"] = "#1F6847F5",
                 ["Long.Color.Focus"] = "#665CC8FF",

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using LongBetterWindows.Host.Views;
 
 namespace LongBetterWindows.Tests;
@@ -45,6 +46,73 @@ public sealed class ReleaseBlockingRegressionTests
     }
 
     [Fact]
+    public void PrimaryButtonStatesMeetNormalTextContrastInBothThemes()
+    {
+        var root = FindRepositoryRoot();
+        var app = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "App.xaml.cs"));
+        var css = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "WebAssets",
+            "long-ui.css"));
+
+        var darkPaletteStart = app.IndexOf("DarkPalette =", StringComparison.Ordinal);
+        var lightPaletteStart = app.IndexOf("LightPalette =", darkPaletteStart, StringComparison.Ordinal);
+        var lightPaletteEnd = app.IndexOf(
+            "HighContrastPalette",
+            lightPaletteStart,
+            StringComparison.Ordinal);
+        var darkPalette = app[darkPaletteStart..lightPaletteStart];
+        var lightPalette = app[lightPaletteStart..lightPaletteEnd];
+        var darkCssStart = css.IndexOf(":root {", StringComparison.Ordinal);
+        var darkCssEnd = css.IndexOf('}', darkCssStart);
+        var lightCssStart = css.IndexOf(
+            ":root[data-long-theme=\"light\"]",
+            StringComparison.Ordinal);
+        var lightCssEnd = css.IndexOf('}', lightCssStart);
+        var darkCss = css[darkCssStart..darkCssEnd];
+        var lightCss = css[lightCssStart..lightCssEnd];
+
+        AssertPrimaryButtonContrastAndParity(darkPalette, darkCss);
+        AssertPrimaryButtonContrastAndParity(lightPalette, lightCss);
+        Assert.Contains(
+            "button.btn-primary:active, .long-button--primary:active",
+            css);
+    }
+
+    private static void AssertPrimaryButtonContrastAndParity(
+        string palette,
+        string css)
+    {
+        var wpfColors = new[]
+        {
+            ExtractColor(palette, "Long.Color.Accent.Primary"),
+            ExtractColor(palette, "Long.Color.Accent.Hover"),
+            ExtractColor(palette, "Long.Color.Accent.Pressed"),
+        };
+        var webColors = new[]
+        {
+            ExtractCssColor(css, "--long-accent"),
+            ExtractCssColor(css, "--long-accent-hover"),
+            ExtractCssColor(css, "--long-accent-pressed"),
+        };
+
+        Assert.Equal(wpfColors[0], webColors[0], ignoreCase: true);
+        Assert.Equal(wpfColors[1], webColors[1], ignoreCase: true);
+        Assert.Equal(wpfColors[2], webColors[2], ignoreCase: true);
+        Assert.All(
+            wpfColors.Concat(webColors),
+            color => Assert.True(
+                ContrastRatio("#FFFFFF", color) >= 4.5,
+                $"{color} does not provide 4.5:1 contrast for white button text."));
+    }
+
+    [Fact]
     public void WebPluginInitialization_WaitsForBridgeAndInitialNavigation()
     {
         var root = FindRepositoryRoot();
@@ -68,6 +136,50 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains(
             "_navigationCompletion?.TrySetResult(args.IsSuccess)",
             lifecycle);
+    }
+
+    private static string ExtractColor(string source, string key)
+    {
+        var match = Regex.Match(
+            source,
+            $@"\[""{Regex.Escape(key)}""\]\s*=\s*""(?<color>#[0-9A-Fa-f]{{6}})""");
+        Assert.True(match.Success, $"Missing color {key}.");
+        return match.Groups["color"].Value;
+    }
+
+    private static string ExtractCssColor(string source, string variable)
+    {
+        var match = Regex.Match(
+            source,
+            $@"{Regex.Escape(variable)}\s*:\s*(?<color>#[0-9A-Fa-f]{{6}})");
+        Assert.True(match.Success, $"Missing CSS color {variable}.");
+        return match.Groups["color"].Value;
+    }
+
+    private static double ContrastRatio(string first, string second)
+    {
+        var firstLuminance = RelativeLuminance(first);
+        var secondLuminance = RelativeLuminance(second);
+        return (Math.Max(firstLuminance, secondLuminance) + 0.05)
+            / (Math.Min(firstLuminance, secondLuminance) + 0.05);
+    }
+
+    private static double RelativeLuminance(string hex)
+    {
+        var channels = new[]
+        {
+            Convert.ToByte(hex.Substring(1, 2), 16),
+            Convert.ToByte(hex.Substring(3, 2), 16),
+            Convert.ToByte(hex.Substring(5, 2), 16),
+        };
+        var linear = channels.Select(channel =>
+        {
+            var value = channel / 255d;
+            return value <= 0.04045
+                ? value / 12.92
+                : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }).ToArray();
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
     }
 
     [Fact]

@@ -12,6 +12,7 @@
   --long-text-muted: #7c879e;
   --long-accent: #7059f5;
   --long-accent-hover: #765ee8;
+  --long-accent-pressed: #6248de;
   --long-accent-soft: rgba(139, 120, 255, .2);
   --long-success: #47d18c;
   --long-warning: #ffb84d;
@@ -39,7 +40,8 @@
   --long-text-secondary: #505b70;
   --long-text-muted: #667085;
   --long-accent: #6847f5;
-  --long-accent-hover: #795cff;
+  --long-accent-hover: #7354f0;
+  --long-accent-pressed: #5637d8;
   --long-accent-soft: rgba(104, 71, 245, .12);
   --long-success: #148a57;
   --long-warning: #b56500;
@@ -87,6 +89,7 @@ button:focus-visible, .long-button:focus-visible { outline: 2px solid var(--long
 button:disabled, .long-button:disabled { opacity: .42; cursor: default; }
 button.btn-primary, .long-button--primary { background: var(--long-accent) !important; border-color: var(--long-accent) !important; color: #fff !important; }
 button.btn-primary:hover, .long-button--primary:hover { background: var(--long-accent-hover) !important; }
+button.btn-primary:active, .long-button--primary:active { background: var(--long-accent-pressed) !important; border-color: var(--long-accent-pressed) !important; }
 button.btn-secondary, .long-button--secondary { background: var(--long-surface-card) !important; color: var(--long-text-primary) !important; }
 
 input:not([type="checkbox"]):not([type="radio"]), textarea, select, .long-input {
