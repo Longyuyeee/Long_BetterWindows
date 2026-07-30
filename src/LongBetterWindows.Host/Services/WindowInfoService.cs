@@ -88,6 +88,13 @@ public sealed class WindowInfoService : IWindowInfoService
     public HostApiResponse<WindowOperationOutcome> ApplyForegroundLayout(
         WindowLayout layout)
     {
+        if (!Enum.IsDefined(layout))
+        {
+            return Failure(
+                ApiErrorCode.InvalidArgument,
+                $"Unknown window layout: {(int)layout}.");
+        }
+
         var window = _native.GetForegroundWindow();
         if (window == IntPtr.Zero || !_native.IsWindow(window))
         {
@@ -116,6 +123,13 @@ public sealed class WindowInfoService : IWindowInfoService
         IntPtr window,
         WindowLayout layout)
     {
+        if (!Enum.IsDefined(layout))
+        {
+            return Failure(
+                ApiErrorCode.InvalidArgument,
+                $"Unknown window layout: {(int)layout}.");
+        }
+
         if (window == IntPtr.Zero || !_native.IsWindow(window))
         {
             return Failure(

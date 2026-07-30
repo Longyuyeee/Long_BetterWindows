@@ -727,6 +727,16 @@
             "symbol": "ToggleTopmost_RestoresUnexpectedGeometryChange"
           },
           {
+            "level": "contract",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_RejectsUnknownLayoutWithoutNativeCalls"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_RejectsMonitorAccessDeniedWithoutMutation"
+          },
+          {
             "level": "integration",
             "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
             "symbol": "PluginStop_WindowManagerRetainsFailedHotkeyForRetry"

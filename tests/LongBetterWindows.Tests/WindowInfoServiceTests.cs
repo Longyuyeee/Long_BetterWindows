@@ -112,6 +112,72 @@ public sealed class WindowInfoServiceTests
     }
 
     [Fact]
+    public void ApplyLayout_RejectsUnknownLayoutWithoutNativeCalls()
+    {
+        var native = new FakeWindowNativeApi();
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, (WindowLayout)999);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.InvalidArgument, result.ErrorCode);
+        Assert.Contains("999", result.ErrorMessage);
+        Assert.Equal(0, native.WindowRectReadCount);
+        Assert.Equal(0, native.MonitorLookupCount);
+        Assert.Empty(native.PositionCalls);
+        Assert.Empty(native.PlacementCalls);
+    }
+
+    [Fact]
+    public void ApplyLayout_RejectsMonitorUnavailableWithoutMutation()
+    {
+        var native = new FakeWindowNativeApi { Monitor = IntPtr.Zero };
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Left);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.NotFound, result.ErrorCode);
+        Assert.Contains("No monitor", result.ErrorMessage);
+        Assert.Equal(1, native.MonitorLookupCount);
+        Assert.Empty(native.PositionCalls);
+        Assert.Empty(native.PlacementCalls);
+    }
+
+    [Fact]
+    public void ApplyLayout_RejectsMonitorInvalidWorkAreaWithoutMutation()
+    {
+        var native = new FakeWindowNativeApi
+        {
+            WorkArea = new NativeWindowRect(0, 0, 0, 1080),
+        };
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Right);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.InvalidArgument, result.ErrorCode);
+        Assert.Contains("work area is invalid", result.ErrorMessage);
+        Assert.Empty(native.PositionCalls);
+        Assert.Empty(native.PlacementCalls);
+    }
+
+    [Fact]
+    public void ApplyLayout_RejectsMonitorAccessDeniedWithoutMutation()
+    {
+        var native = new FakeWindowNativeApi { MonitorInfoError = 5 };
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Bottom);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.PermissionDenied, result.ErrorCode);
+        Assert.Contains("denied by Windows", result.ErrorMessage);
+        Assert.Empty(native.PositionCalls);
+        Assert.Empty(native.PlacementCalls);
+    }
+
+    [Fact]
     public void ApplyLayout_AccessDeniedDuringRecoveryIsReportedSeparately()
     {
         var native = new FakeWindowNativeApi();
@@ -482,6 +548,9 @@ public sealed class WindowInfoServiceTests
         public IntPtr ForegroundWindow { get; set; } = TestWindow;
         public bool WindowExists { get; set; } = true;
         public int RectError { get; set; }
+        public int WindowRectReadCount { get; private set; }
+        public int MonitorLookupCount { get; private set; }
+        public int MonitorInfoError { get; set; }
         public NativeWindowRect Rect { get; set; } =
             new(100, 120, 900, 720);
         public NativeWindowPlacement Placement { get; set; } =
@@ -507,6 +576,7 @@ public sealed class WindowInfoServiceTests
             out NativeWindowRect rect,
             out int error)
         {
+            WindowRectReadCount++;
             rect = Rect;
             error = RectError;
             return IsWindow(window) && error == 0;
@@ -578,7 +648,11 @@ public sealed class WindowInfoServiceTests
             return result.Succeeded;
         }
 
-        public IntPtr MonitorFromWindow(IntPtr window) => Monitor;
+        public IntPtr MonitorFromWindow(IntPtr window)
+        {
+            MonitorLookupCount++;
+            return Monitor;
+        }
 
         public bool TryGetMonitorWorkArea(
             IntPtr monitor,
@@ -586,8 +660,10 @@ public sealed class WindowInfoServiceTests
             out int error)
         {
             workArea = WorkArea;
-            error = 0;
-            return monitor == Monitor && monitor != IntPtr.Zero;
+            error = MonitorInfoError;
+            return monitor == Monitor
+                && monitor != IntPtr.Zero
+                && error == 0;
         }
 
         public static NativeWindowPlacement CreatePlacement(

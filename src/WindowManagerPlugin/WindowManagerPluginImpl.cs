@@ -27,7 +27,7 @@ public class WindowManagerPluginImpl :
 
     public string Id => "com.long.window-manager";
     public string Name => Text("plugin.name", "窗口管理");
-    public string Version => "2.1.6";
+    public string Version => "2.1.7";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
