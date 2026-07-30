@@ -60,9 +60,7 @@ public class MacroPluginImpl :
         _configuredLoopHotkey = await ReadHotkeyAsync(
             "play_loop_hotkey",
             _configuredLoopHotkey);
-        _engine = new MacroEngine();
-        _engine.StateChanged += OnStateChanged;
-        _engine.PlaybackFailed += OnPlaybackFailed;
+        EnsureEngine();
 
         Log.Information("[Macro] 初始化完成");
         return true;
@@ -70,6 +68,7 @@ public class MacroPluginImpl :
 
     public async Task<bool> StartAsync()
     {
+        EnsureEngine();
         var hotKey = _host!.HotKey!;
 
         _registeredRecordHotkey = await RegisterWithFallbackAsync(
@@ -94,6 +93,16 @@ public class MacroPluginImpl :
             _registeredPlayHotkey ?? "command-center",
             _registeredLoopHotkey ?? "command-center");
         return true;
+    }
+
+    private void EnsureEngine()
+    {
+        if (_engine is not null)
+            return;
+
+        _engine = new MacroEngine();
+        _engine.StateChanged += OnStateChanged;
+        _engine.PlaybackFailed += OnPlaybackFailed;
     }
 
     private async Task<string?> RegisterWithFallbackAsync(

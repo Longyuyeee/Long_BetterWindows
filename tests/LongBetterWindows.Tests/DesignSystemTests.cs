@@ -858,11 +858,16 @@ public class DesignSystemTests
         var palette = File.ReadAllText(Path.Combine(
             root, "src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml.cs"));
         var hideIndex = palette.IndexOf("Hide();", StringComparison.Ordinal);
+        var restoreIndex = palette.IndexOf(
+            "Shell32.SetForegroundWindow(_originWindowHandle);",
+            hideIndex,
+            StringComparison.Ordinal);
         var delayIndex = palette.IndexOf("await Task.Delay(40)", StringComparison.Ordinal);
         var executeIndex = palette.IndexOf("_executor.ExecuteAsync", StringComparison.Ordinal);
 
         Assert.True(hideIndex >= 0, "Command Palette must hide before command execution.");
-        Assert.True(delayIndex > hideIndex);
+        Assert.True(restoreIndex > hideIndex, "The captured foreground window must be restored.");
+        Assert.True(delayIndex > restoreIndex);
         Assert.True(executeIndex > delayIndex);
         Assert.Contains("Show();", palette);
         Assert.Contains("Activate();", palette);

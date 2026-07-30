@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Reflection;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
@@ -231,6 +232,25 @@ public sealed class WindowInfoServiceTests
     }
 
     [Fact]
+    public async Task PluginRestart_MacroRecreatesDisposedEngine()
+    {
+        var hotkeys = new StubHotKeyService();
+        var plugin = new MacroPluginImpl();
+        await plugin.InitializeAsync(new StubHostApi(
+            new StubWindowInfoService(),
+            hotkeys));
+        Assert.True(await plugin.StartAsync());
+        Assert.NotNull(GetMacroEngine(plugin));
+
+        Assert.True(await plugin.StopAsync());
+        Assert.Null(GetMacroEngine(plugin));
+
+        Assert.True(await plugin.StartAsync());
+        Assert.NotNull(GetMacroEngine(plugin));
+        Assert.True(await plugin.StopAsync());
+    }
+
+    [Fact]
     public void ApplyLayout_WorksAgainstIsolatedNativeWindow()
     {
         if (!OperatingSystem.IsWindows())
@@ -398,6 +418,11 @@ public sealed class WindowInfoServiceTests
         IntPtr InsertAfter,
         NativeWindowRect Rect,
         uint Flags);
+
+    private static MacroEngine? GetMacroEngine(MacroPluginImpl plugin)
+        => (MacroEngine?)typeof(MacroPluginImpl)
+            .GetField("_engine", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(plugin);
 
     private sealed class StubWindowInfoService : IWindowInfoService
     {
