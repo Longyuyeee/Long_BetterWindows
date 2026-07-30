@@ -65,6 +65,126 @@ namespace LongBetterWindows.Host.Contracts
         /// </summary>
         [JsonPropertyName("background")]
         public PluginBackgroundPreference? Background { get; init; }
+
+        /// <summary>
+        /// LPWP Web Widget definitions. Only webview plugins with min_api_version
+        /// 1.1.0 or newer may declare widgets.
+        /// </summary>
+        [JsonPropertyName("widgets")]
+        public List<PluginWidgetDefinition> Widgets { get; init; } = new();
+    }
+
+    public sealed class PluginWidgetDefinition
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; init; } = string.Empty;
+
+        [JsonPropertyName("title")]
+        public string Title { get; init; } = string.Empty;
+
+        [JsonPropertyName("description")]
+        public string Description { get; init; } = string.Empty;
+
+        [JsonPropertyName("entry_point")]
+        public string EntryPoint { get; init; } = string.Empty;
+
+        [JsonPropertyName("icon")]
+        public string? Icon { get; init; }
+
+        [JsonPropertyName("multiple_instances")]
+        public bool MultipleInstances { get; init; }
+
+        [JsonPropertyName("default_size")]
+        public PluginWidgetSize? DefaultSize { get; init; }
+
+        [JsonPropertyName("min_size")]
+        public PluginWidgetSize? MinSize { get; init; }
+
+        [JsonPropertyName("max_size")]
+        public PluginWidgetSize? MaxSize { get; init; }
+
+        [JsonPropertyName("refresh")]
+        public PluginWidgetRefreshPolicy? Refresh { get; init; }
+
+        [JsonPropertyName("appearance")]
+        public PluginWidgetAppearance? Appearance { get; init; }
+
+        [JsonPropertyName("settings_schema")]
+        public List<PluginWidgetSettingDeclaration> SettingsSchema { get; init; } = new();
+    }
+
+    public sealed class PluginWidgetSize
+    {
+        [JsonPropertyName("columns")]
+        public int Columns { get; init; }
+
+        [JsonPropertyName("rows")]
+        public int Rows { get; init; }
+    }
+
+    public enum PluginWidgetRefreshMode
+    {
+        Event,
+        Interval,
+        Manual,
+    }
+
+    public enum PluginWidgetHiddenBehavior
+    {
+        Suspend,
+        Throttle,
+        Continue,
+    }
+
+    public sealed class PluginWidgetRefreshPolicy
+    {
+        [JsonPropertyName("mode")]
+        public PluginWidgetRefreshMode Mode { get; init; } = PluginWidgetRefreshMode.Event;
+
+        [JsonPropertyName("interval_seconds")]
+        public int? IntervalSeconds { get; init; }
+
+        [JsonPropertyName("hidden_behavior")]
+        public PluginWidgetHiddenBehavior HiddenBehavior { get; init; } = PluginWidgetHiddenBehavior.Suspend;
+    }
+
+    public sealed class PluginWidgetAppearance
+    {
+        [JsonPropertyName("transparent")]
+        public bool Transparent { get; init; }
+
+        [JsonPropertyName("host_chrome")]
+        public bool HostChrome { get; init; } = true;
+    }
+
+    public enum PluginWidgetSettingType
+    {
+        String,
+        Number,
+        Integer,
+        Boolean,
+        Enum,
+    }
+
+    public sealed class PluginWidgetSettingDeclaration
+    {
+        [JsonPropertyName("key")]
+        public string Key { get; init; } = string.Empty;
+
+        [JsonPropertyName("type")]
+        public PluginWidgetSettingType Type { get; init; } = PluginWidgetSettingType.String;
+
+        [JsonPropertyName("title")]
+        public string Title { get; init; } = string.Empty;
+
+        [JsonPropertyName("description")]
+        public string Description { get; init; } = string.Empty;
+
+        [JsonPropertyName("default")]
+        public object? Default { get; init; }
+
+        [JsonPropertyName("enum_values")]
+        public List<object> EnumValues { get; init; } = new();
     }
 
     public sealed class PluginBackgroundPreference

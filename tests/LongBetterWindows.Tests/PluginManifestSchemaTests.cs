@@ -46,6 +46,16 @@ public sealed class PluginManifestSchemaTests
             definitions.GetProperty("localization").GetProperty("properties"));
         AssertPropertySet<PluginBackgroundPreference>(
             definitions.GetProperty("background").GetProperty("properties"));
+        AssertPropertySet<PluginWidgetDefinition>(
+            definitions.GetProperty("widget").GetProperty("properties"));
+        AssertPropertySet<PluginWidgetSize>(
+            definitions.GetProperty("widgetSize").GetProperty("properties"));
+        AssertPropertySet<PluginWidgetRefreshPolicy>(
+            definitions.GetProperty("widgetRefresh").GetProperty("properties"));
+        AssertPropertySet<PluginWidgetAppearance>(
+            definitions.GetProperty("widgetAppearance").GetProperty("properties"));
+        AssertPropertySet<PluginWidgetSettingDeclaration>(
+            definitions.GetProperty("widgetSetting").GetProperty("properties"));
 
         Assert.Equal(
             new[] { "entry_point", "id", "name", "version" },
@@ -116,6 +126,49 @@ public sealed class PluginManifestSchemaTests
                 .GetProperty("properties")
                 .GetProperty("default_presentation")
                 .GetProperty("enum"));
+        AssertSchemaEnum<PluginWidgetRefreshMode>(
+            definitions
+                .GetProperty("widgetRefresh")
+                .GetProperty("properties")
+                .GetProperty("mode")
+                .GetProperty("enum"));
+        AssertSchemaEnum<PluginWidgetHiddenBehavior>(
+            definitions
+                .GetProperty("widgetRefresh")
+                .GetProperty("properties")
+                .GetProperty("hidden_behavior")
+                .GetProperty("enum"));
+        AssertSchemaEnum<PluginWidgetSettingType>(
+            definitions
+                .GetProperty("widgetSetting")
+                .GetProperty("properties")
+                .GetProperty("type")
+                .GetProperty("enum"));
+    }
+
+    [Fact]
+    public void LpwpWidgetSchema_IsMergedIntoCanonicalManifestSchema()
+    {
+        using var document = ReadSchema();
+        var root = document.RootElement;
+        var properties = root.GetProperty("properties");
+        var definitions = root.GetProperty("$defs");
+
+        Assert.True(properties.TryGetProperty("widgets", out var widgets));
+        Assert.Equal("#/$defs/widgets", widgets.GetProperty("$ref").GetString());
+        Assert.Equal(32, definitions.GetProperty("widgets").GetProperty("maxItems").GetInt32());
+
+        var widget = definitions.GetProperty("widget");
+        Assert.Equal(
+            new[] { "default_size", "entry_point", "id", "title" },
+            ReadStrings(widget.GetProperty("required")).Order().ToArray());
+        Assert.Equal(
+            "^(?![A-Za-z]:)(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+\\.html$",
+            widget
+                .GetProperty("properties")
+                .GetProperty("entry_point")
+                .GetProperty("pattern")
+                .GetString());
     }
 
     [Fact]

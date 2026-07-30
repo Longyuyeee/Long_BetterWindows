@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <AssemblyName>LongBetterWindows.PluginSdk.Testing</AssemblyName>
     <RootNamespace>LongBetterWindows.PluginSdk.Testing</RootNamespace>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <PackageId>LongBetterWindows.PluginSdk.Testing</PackageId>
     <Title>Long Assistant .NET Plugin SDK Testing</Title>
     <Description>Headless contract test host and lifecycle harness for Long Assistant native plugins.</Description>

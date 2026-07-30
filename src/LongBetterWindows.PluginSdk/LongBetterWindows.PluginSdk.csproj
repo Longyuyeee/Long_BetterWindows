@@ -7,9 +7,9 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>LongBetterWindows.PluginSdk</AssemblyName>
     <RootNamespace>LongBetterWindows</RootNamespace>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <PackageId>LongBetterWindows.PluginSdk</PackageId>
     <Title>Long Assistant .NET Plugin SDK</Title>
     <Description>Stable contracts, lifecycle interfaces, and capability abstractions for Long Assistant native plugins.</Description>

@@ -1,6 +1,6 @@
 # @long-assistant/plugin-sdk
 
-Long助手 Web 插件 API v1.0.0 的 TypeScript 合同与确定性 Mock Host。
+Long助手 Web 插件 API v1.1.0 的 TypeScript 合同与确定性 Mock Host。
 
 ## 使用类型
 
