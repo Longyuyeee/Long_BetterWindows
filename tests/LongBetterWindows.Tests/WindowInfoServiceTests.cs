@@ -66,7 +66,7 @@ public sealed class WindowInfoServiceTests
     }
 
     [Fact]
-    public void ApplyLayout_RestoresSnapshotAfterPartialMutationFailure()
+    public void ApplyLayout_AccessDeniedDuringMutationIsClassifiedAndRecovered()
     {
         var original = new NativeWindowRect(100, 120, 900, 720);
         var native = new FakeWindowNativeApi { Rect = original };
@@ -83,15 +83,60 @@ public sealed class WindowInfoServiceTests
         var result = service.ApplyLayout(TestWindow, WindowLayout.Left);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(ApiErrorCode.Win32Error, result.ErrorCode);
+        Assert.Equal(ApiErrorCode.PermissionDenied, result.ErrorCode);
         Assert.Contains("SetWindowPos", result.ErrorMessage);
-        Assert.Contains("5", result.ErrorMessage);
+        Assert.Contains("denied by Windows", result.ErrorMessage);
         Assert.True(result.Data?.RecoveryAttempted);
         Assert.True(result.Data?.RecoverySucceeded);
         Assert.Null(result.Data?.RecoveryErrorMessage);
         Assert.Equal(original, native.Rect);
         Assert.Equal(original.Left, result.Data?.After?.X);
         Assert.Equal(original.Width, result.Data?.After?.Width);
+    }
+
+    [Fact]
+    public void ApplyLayout_AccessDeniedDuringSnapshotIsClassifiedWithoutMutation()
+    {
+        var native = new FakeWindowNativeApi { RectError = 5 };
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Left);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.PermissionDenied, result.ErrorCode);
+        Assert.Contains("GetWindowRect", result.ErrorMessage);
+        Assert.Contains("denied by Windows", result.ErrorMessage);
+        Assert.False(result.Data?.RecoveryAttempted);
+        Assert.Empty(native.PositionCalls);
+        Assert.Empty(native.PlacementCalls);
+    }
+
+    [Fact]
+    public void ApplyLayout_AccessDeniedDuringRecoveryIsReportedSeparately()
+    {
+        var native = new FakeWindowNativeApi();
+        native.PositionResults.Enqueue(new NativeMutationResult(
+            Succeeded: false,
+            Error: 32,
+            Mutate: true));
+        native.PositionResults.Enqueue(new NativeMutationResult(
+            Succeeded: false,
+            Error: 5,
+            Mutate: false));
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Left);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.Win32Error, result.ErrorCode);
+        Assert.True(result.Data?.RecoveryAttempted);
+        Assert.False(result.Data?.RecoverySucceeded);
+        Assert.Equal(
+            ApiErrorCode.PermissionDenied,
+            result.Data?.RecoveryErrorCode);
+        Assert.Contains(
+            "denied by Windows",
+            result.Data?.RecoveryErrorMessage);
     }
 
     [Fact]
@@ -197,7 +242,9 @@ public sealed class WindowInfoServiceTests
         var result = service.ApplyLayout(TestWindow, WindowLayout.Maximize);
 
         Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.PermissionDenied, result.ErrorCode);
         Assert.Contains("SetWindowPlacement(maximize)", result.ErrorMessage);
+        Assert.Contains("denied by Windows", result.ErrorMessage);
         Assert.True(result.Data?.RecoveryAttempted);
         Assert.True(result.Data?.RecoverySucceeded);
         Assert.Equal(3u, native.PlacementCalls[0].ShowCommand);
@@ -362,6 +409,7 @@ public sealed class WindowInfoServiceTests
 
         public IntPtr ForegroundWindow { get; set; } = TestWindow;
         public bool WindowExists { get; set; } = true;
+        public int RectError { get; set; }
         public NativeWindowRect Rect { get; set; } =
             new(100, 120, 900, 720);
         public NativeWindowPlacement Placement { get; set; } =
@@ -386,8 +434,8 @@ public sealed class WindowInfoServiceTests
             out int error)
         {
             rect = Rect;
-            error = 0;
-            return IsWindow(window);
+            error = RectError;
+            return IsWindow(window) && error == 0;
         }
 
         public bool TryGetWindowPlacement(

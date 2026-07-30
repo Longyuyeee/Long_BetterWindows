@@ -8,6 +8,7 @@ namespace LongBetterWindows.Host.Services;
 
 public sealed class WindowInfoService : IWindowInfoService
 {
+    private const int ErrorAccessDenied = 5;
     private const uint SwRestore = 9;
     private const uint SwShowMinimized = 2;
     private const uint SwShowMaximized = 3;
@@ -79,7 +80,7 @@ public sealed class WindowInfoService : IWindowInfoService
             return succeeded
                 ? HostApiResponse<List<WindowInfo>>.Success(list)
                 : HostApiResponse<List<WindowInfo>>.Failure(
-                    ApiErrorCode.Win32Error,
+                    ClassifyWin32Error(enumerationError),
                     Win32Failure("EnumWindows", enumerationError));
         });
     }
@@ -143,7 +144,7 @@ public sealed class WindowInfoService : IWindowInfoService
                 out var monitorError))
         {
             return Failure(
-                ApiErrorCode.Win32Error,
+                ClassifyWin32Error(monitorError),
                 Win32Failure("GetMonitorInfo", monitorError),
                 snapshot.Data.Info);
         }
@@ -195,7 +196,8 @@ public sealed class WindowInfoService : IWindowInfoService
                 snapshot.Data,
                 "VerifyWindowState",
                 0,
-                after.ErrorMessage);
+                after.ErrorMessage,
+                after.ErrorCode);
         }
         if (!RectEquals(after.Data.Rect, target)
             || after.Data.Topmost != snapshot.Data.Topmost)
@@ -254,7 +256,8 @@ public sealed class WindowInfoService : IWindowInfoService
                 snapshot,
                 "VerifyWindowState",
                 0,
-                after.ErrorMessage);
+                after.ErrorMessage,
+                after.ErrorCode);
         }
         if (after.Data.Info.DisplayState != WindowDisplayState.Maximized
             || after.Data.Topmost != snapshot.Topmost)
@@ -332,7 +335,8 @@ public sealed class WindowInfoService : IWindowInfoService
                 snapshot.Data,
                 "VerifyWindowState",
                 0,
-                after.ErrorMessage);
+                after.ErrorMessage,
+                after.ErrorCode);
         }
 
         return HostApiResponse<WindowOperationOutcome>.Success(new()
@@ -351,7 +355,7 @@ public sealed class WindowInfoService : IWindowInfoService
                 out var rectError))
         {
             return HostApiResponse<WindowSnapshot>.Failure(
-                ApiErrorCode.Win32Error,
+                ClassifyWin32Error(rectError),
                 Win32Failure("GetWindowRect", rectError));
         }
         if (rect.Width <= 0 || rect.Height <= 0)
@@ -366,7 +370,7 @@ public sealed class WindowInfoService : IWindowInfoService
                 out var placementError))
         {
             return HostApiResponse<WindowSnapshot>.Failure(
-                ApiErrorCode.Win32Error,
+                ClassifyWin32Error(placementError),
                 Win32Failure("GetWindowPlacement", placementError));
         }
         if (!_native.TryGetTopmost(
@@ -375,7 +379,7 @@ public sealed class WindowInfoService : IWindowInfoService
                 out var styleError))
         {
             return HostApiResponse<WindowSnapshot>.Failure(
-                ApiErrorCode.Win32Error,
+                ClassifyWin32Error(styleError),
                 Win32Failure("GetWindowLongPtr", styleError));
         }
 
@@ -433,14 +437,15 @@ public sealed class WindowInfoService : IWindowInfoService
         WindowSnapshot snapshot,
         string operation,
         int error,
-        string? detail = null)
+        string? detail = null,
+        ApiErrorCode? errorCode = null)
     {
         var originalMessage = detail ?? Win32Failure(operation, error);
         var recovery = Restore(window, snapshot);
         return new HostApiResponse<WindowOperationOutcome>
         {
             IsSuccess = false,
-            ErrorCode = ApiErrorCode.Win32Error,
+            ErrorCode = errorCode ?? ClassifyWin32Error(error),
             ErrorMessage = originalMessage,
             Data = new WindowOperationOutcome
             {
@@ -460,6 +465,7 @@ public sealed class WindowInfoService : IWindowInfoService
     {
         var failures = new List<string>();
         var recoveryError = 0;
+        var recoveryErrorCode = ApiErrorCode.None;
         if (!_native.TrySetWindowPosition(
                 window,
                 snapshot.Topmost ? HwndTopmost : HwndNoTopmost,
@@ -468,6 +474,7 @@ public sealed class WindowInfoService : IWindowInfoService
                 out var positionError))
         {
             recoveryError = positionError;
+            recoveryErrorCode = ClassifyWin32Error(positionError);
             failures.Add(Win32Failure(
                 "Restore SetWindowPos",
                 positionError));
@@ -478,7 +485,10 @@ public sealed class WindowInfoService : IWindowInfoService
                 out var placementError))
         {
             if (recoveryError == 0)
+            {
                 recoveryError = placementError;
+                recoveryErrorCode = ClassifyWin32Error(placementError);
+            }
             failures.Add(Win32Failure(
                 "Restore SetWindowPlacement",
                 placementError));
@@ -487,6 +497,8 @@ public sealed class WindowInfoService : IWindowInfoService
         var restored = CaptureSnapshot(window);
         if (!restored.IsSuccess || restored.Data is null)
         {
+            if (recoveryErrorCode == ApiErrorCode.None)
+                recoveryErrorCode = restored.ErrorCode;
             failures.Add(
                 restored.ErrorMessage ?? "Restored state could not be verified.");
         }
@@ -498,7 +510,9 @@ public sealed class WindowInfoService : IWindowInfoService
         return failures.Count == 0 && restored.Data is not null
             ? HostApiResponse<WindowInfo>.Success(restored.Data.Info)
             : HostApiResponse<WindowInfo>.Failure(
-                ApiErrorCode.Win32Error,
+                recoveryErrorCode == ApiErrorCode.None
+                    ? ApiErrorCode.Win32Error
+                    : recoveryErrorCode,
                 $"{string.Join(" ", failures)}"
                 + (recoveryError == 0
                     ? string.Empty
@@ -616,9 +630,18 @@ public sealed class WindowInfoService : IWindowInfoService
         };
 
     private static string Win32Failure(string operation, int error)
-        => error == 0
-            ? $"{operation} failed."
-            : $"{operation} failed with Win32 error {error}.";
+        => error switch
+        {
+            0 => $"{operation} failed.",
+            ErrorAccessDenied =>
+                $"{operation} was denied by Windows (Win32 error 5).",
+            _ => $"{operation} failed with Win32 error {error}.",
+        };
+
+    private static ApiErrorCode ClassifyWin32Error(int error)
+        => error == ErrorAccessDenied
+            ? ApiErrorCode.PermissionDenied
+            : ApiErrorCode.Win32Error;
 
     private sealed record WindowSnapshot(
         NativeWindowRect Rect,

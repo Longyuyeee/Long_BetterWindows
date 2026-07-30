@@ -702,6 +702,16 @@
             "symbol": "ApplyLayout_MaximizeFailureRestoresOriginalPlacement"
           },
           {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_AccessDeniedDuringMutationIsClassifiedAndRecovered"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_AccessDeniedDuringRecoveryIsReportedSeparately"
+          },
+          {
             "level": "integration",
             "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
             "symbol": "PluginStop_WindowManagerRetainsFailedHotkeyForRetry"
