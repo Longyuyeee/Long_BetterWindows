@@ -219,6 +219,9 @@ public sealed class PluginTestingSdkTests
         Assert.Contains(
             "dotnet test tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj",
             workflow);
+        Assert.Contains("shell: powershell", workflow);
+        Assert.Contains("actions/checkout@v5", workflow);
+        Assert.Contains("actions/setup-dotnet@v5", workflow);
         Assert.Contains("npm test --prefix sdk/web", workflow);
         Assert.Contains("verify-plugin-runtime-matrix.ps1", workflow);
         Assert.Equal(3, workflow.Split("dotnet pack ").Length - 1);
