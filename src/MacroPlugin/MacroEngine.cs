@@ -775,15 +775,18 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             var now = DateTime.UtcNow;
             lock (_sync)
             {
-                _actions.Add(MacroAction.MouseTransition(
-                    hookData.X,
-                    hookData.Y,
-                    messageCode == RightButtonDownMessage
-                        || messageCode == RightButtonUpMessage,
-                    messageCode == LeftButtonDownMessage
-                        || messageCode == RightButtonDownMessage,
-                    ElapsedMilliseconds(now)));
-                _lastEvent = now;
+                if (_state == MacroState.Recording)
+                {
+                    _actions.Add(MacroAction.MouseTransition(
+                        hookData.X,
+                        hookData.Y,
+                        messageCode == RightButtonDownMessage
+                            || messageCode == RightButtonUpMessage,
+                        messageCode == LeftButtonDownMessage
+                            || messageCode == RightButtonDownMessage,
+                        ElapsedMilliseconds(now)));
+                    _lastEvent = now;
+                }
             }
         }
         return _native.CallNextHook(code, message, data);
@@ -806,12 +809,15 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             var now = DateTime.UtcNow;
             lock (_sync)
             {
-                _actions.Add(MacroAction.KeyTransition(
-                    checked((int)hookData.VirtualKey),
-                    messageCode == KeyDownMessage
-                        || messageCode == SystemKeyDownMessage,
-                    ElapsedMilliseconds(now)));
-                _lastEvent = now;
+                if (_state == MacroState.Recording)
+                {
+                    _actions.Add(MacroAction.KeyTransition(
+                        checked((int)hookData.VirtualKey),
+                        messageCode == KeyDownMessage
+                            || messageCode == SystemKeyDownMessage,
+                        ElapsedMilliseconds(now)));
+                    _lastEvent = now;
+                }
             }
         }
         return _native.CallNextHook(code, message, data);

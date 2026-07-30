@@ -246,6 +246,58 @@ public sealed class MacroEngineTests
     }
 
     [Fact]
+    public async Task StopRecording_DropsInFlightKeyboardCallback()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = CreateEngine(native);
+        Assert.True(engine.StartRecording());
+        native.PauseHookRead();
+
+        var callback = Task.Run(() => native.RaiseKeyboard(0x0100, 0x41));
+        await native.HookReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        bool stopped;
+        try
+        {
+            stopped = engine.StopRecording();
+        }
+        finally
+        {
+            native.ResumeHookRead();
+        }
+        await callback.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(stopped);
+        Assert.Equal(MacroState.Idle, engine.State);
+        Assert.Equal(0, engine.ActionCount);
+    }
+
+    [Fact]
+    public async Task StopRecording_DropsInFlightMouseCallback()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = CreateEngine(native);
+        Assert.True(engine.StartRecording());
+        native.PauseHookRead();
+
+        var callback = Task.Run(() => native.RaiseMouse(0x0201, 40, 50));
+        await native.HookReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        bool stopped;
+        try
+        {
+            stopped = engine.StopRecording();
+        }
+        finally
+        {
+            native.ResumeHookRead();
+        }
+        await callback.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(stopped);
+        Assert.Equal(MacroState.Idle, engine.State);
+        Assert.Equal(0, engine.ActionCount);
+    }
+
+    [Fact]
     public async Task Playback_WaitsBeforeActionAndReplaysChordTransitions()
     {
         var native = new FakeMacroNativeApi();
@@ -414,6 +466,9 @@ public sealed class MacroEngineTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource KeyDown { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource HookReadStarted { get; private set; } =
+            CompletedSignal();
+        private TaskCompletionSource _resumeHookRead = CompletedSignal();
 
         public IntPtr InstallHook(
             int hookType,
@@ -446,7 +501,21 @@ public sealed class MacroEngineTests
             => IntPtr.Zero;
 
         public MacroMouseHookData ReadMouseHookData(IntPtr data)
-            => _mouseData;
+        {
+            WaitForHookRead();
+            return _mouseData;
+        }
+
+        public void PauseHookRead()
+        {
+            HookReadStarted = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            _resumeHookRead = new(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public void ResumeHookRead()
+            => _resumeHookRead.TrySetResult();
 
         public void RaiseMouse(int message, int x, int y)
         {
@@ -456,7 +525,10 @@ public sealed class MacroEngineTests
         }
 
         public MacroKeyboardHookData ReadKeyboardHookData(IntPtr data)
-            => new(_keyboardVirtualKey);
+        {
+            WaitForHookRead();
+            return new(_keyboardVirtualKey);
+        }
 
         public void RaiseKeyboard(int message, uint virtualKey)
         {
@@ -511,6 +583,20 @@ public sealed class MacroEngineTests
             => results.TryDequeue(out var result)
                 ? result
                 : new NativeResult(true, 0);
+
+        private void WaitForHookRead()
+        {
+            HookReadStarted.TrySetResult();
+            _resumeHookRead.Task.GetAwaiter().GetResult();
+        }
+
+        private static TaskCompletionSource CompletedSignal()
+        {
+            var signal = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            signal.SetResult();
+            return signal;
+        }
     }
 
     private readonly record struct HookResult(

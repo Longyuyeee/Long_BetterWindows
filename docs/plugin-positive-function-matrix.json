@@ -310,6 +310,16 @@
           {
             "level": "component",
             "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "StopRecording_DropsInFlightKeyboardCallback"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "StopRecording_DropsInFlightMouseCallback"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
             "symbol": "Playback_WaitsBeforeActionAndReplaysChordTransitions"
           },
           {
