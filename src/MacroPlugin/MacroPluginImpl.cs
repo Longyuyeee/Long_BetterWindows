@@ -35,7 +35,7 @@ public class MacroPluginImpl :
 
     public string Id => "com.long.macro";
     public string Name => Text("plugin.name", "宏录制器");
-    public string Version => "1.1.2";
+    public string Version => "1.1.3";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -228,9 +228,10 @@ public class MacroPluginImpl :
         }
     }
 
-    private void ToggleRecording() => TryToggleRecording();
+    private void ToggleRecording()
+        => TryToggleRecording(discardTrailingPressedKeys: true);
 
-    private bool TryToggleRecording()
+    private bool TryToggleRecording(bool discardTrailingPressedKeys = false)
     {
         if (_engine == null) return false;
 
@@ -238,7 +239,7 @@ public class MacroPluginImpl :
 
         if (_engine.State == MacroState.Recording)
         {
-            if (!_engine.StopRecording())
+            if (!_engine.StopRecording(discardTrailingPressedKeys))
             {
                 Log.Error(
                     "[Macro] 录制 Hook 清理失败: {Error}",

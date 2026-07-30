@@ -298,10 +298,30 @@
             "symbol": "StopPlayAsync_ReleasesPressedMouseButtonAndWaits"
           },
           {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "Recording_PreservesModifierChordTransitions"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "StopRecording_RemovesTrailingActivationChord"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "Playback_WaitsBeforeActionAndReplaysChordTransitions"
+          },
+          {
             "level": "integration",
             "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
             "symbol": "PluginStop_MacroCleansEngineAndRetainsFailedHotkeyForRetry"
-        }
+          },
+          {
+            "level": "integration",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "PluginRestart_MacroRecreatesDisposedEngine"
+          }
       ],
       "manual_checks": [
         {

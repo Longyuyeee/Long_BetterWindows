@@ -215,6 +215,16 @@ public class ServiceTests
     }
 
     [Fact]
+    public async Task HotKeyService_Register_StandaloneFunctionKey_IsValid()
+    {
+        var svc = new HotKeyService();
+        var result = await svc.RegisterAsync("F6", () => { });
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("未初始化", result.ErrorMessage);
+    }
+
+    [Fact]
     public async Task HotKeyService_Unregister_NotFound_Fails()
     {
         var svc = new HotKeyService();

@@ -384,9 +384,20 @@ namespace LongBetterWindows.Host.Services
                 .Select(p => p.Trim())
                 .ToList();
 
-            if (parts.Count < 2)
+            if (parts.Count == 0)
             {
                 error = "热键格式无效。需要至少一个修饰键和一个主键，如 'Alt+M'。";
+                return false;
+            }
+
+            var keyPart = parts.Last();
+            var isStandaloneFunctionKey = parts.Count == 1
+                && keyPart.StartsWith('F')
+                && int.TryParse(keyPart.AsSpan(1), out var function)
+                && function is >= 1 and <= 12;
+            if (parts.Count == 1 && !isStandaloneFunctionKey)
+            {
+                error = "热键格式无效。普通按键需要修饰键；仅 F1-F12 可单独注册。";
                 return false;
             }
 
@@ -409,7 +420,6 @@ namespace LongBetterWindows.Host.Services
                 }
             }
 
-            var keyPart = parts.Last();
             if (!KeyNameMap.TryGetValue(keyPart, out vk))
             {
                 error = $"未知键名: '{keyPart}'";

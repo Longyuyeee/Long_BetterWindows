@@ -135,7 +135,7 @@ public sealed class MacroEngineTests
     {
         var native = new FakeMacroNativeApi();
         await using var engine = CreateEngine(native);
-        Load(engine, MacroAction.Mouse(40, 50, right: true, delay: 60_000));
+        Load(engine, MacroAction.Mouse(40, 50, right: true, delay: 0));
 
         Assert.True(engine.PlayLoop());
         await native.MouseDown.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -206,6 +206,74 @@ public sealed class MacroEngineTests
         Assert.Equal(2, native.KeyInputs.Count);
     }
 
+    [Fact]
+    public async Task Recording_PreservesModifierChordTransitions()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = CreateEngine(native);
+        Assert.True(engine.StartRecording());
+
+        native.RaiseKeyboard(0x0100, 0x11);
+        native.RaiseKeyboard(0x0100, 0x43);
+        native.RaiseKeyboard(0x0101, 0x43);
+        native.RaiseKeyboard(0x0101, 0x11);
+        Assert.True(engine.StopRecording());
+
+        var actions = JsonSerializer.Deserialize<List<MacroAction>>(
+            engine.SaveToJson());
+        Assert.Collection(
+            actions!,
+            action => AssertTransition(action, MacroActionType.KeyDown, 0x11),
+            action => AssertTransition(action, MacroActionType.KeyDown, 0x43),
+            action => AssertTransition(action, MacroActionType.KeyUp, 0x43),
+            action => AssertTransition(action, MacroActionType.KeyUp, 0x11));
+    }
+
+    [Fact]
+    public async Task StopRecording_RemovesTrailingActivationChord()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = CreateEngine(native);
+        Assert.True(engine.StartRecording());
+
+        native.RaiseKeyboard(0x0100, 0x11);
+        native.RaiseKeyboard(0x0104, 0x12);
+        native.RaiseKeyboard(0x0100, 0x75);
+        Assert.True(engine.StopRecording(discardTrailingPressedKeys: true));
+
+        Assert.Equal(0, engine.ActionCount);
+    }
+
+    [Fact]
+    public async Task Playback_WaitsBeforeActionAndReplaysChordTransitions()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = new MacroEngine(
+            native,
+            TimeSpan.Zero,
+            TimeSpan.FromMilliseconds(10));
+        Load(
+            engine,
+            MacroAction.KeyTransition(0x11, isDown: true, delay: 150),
+            MacroAction.KeyTransition(0x43, isDown: true, delay: 0),
+            MacroAction.KeyTransition(0x43, isDown: false, delay: 0),
+            MacroAction.KeyTransition(0x11, isDown: false, delay: 0));
+
+        var playback = engine.PlayOnceAsync();
+        await Task.Delay(30);
+        Assert.Empty(native.KeyInputs);
+        Assert.True(await playback.WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.Equal(
+            new[]
+            {
+                new KeyInputCall(0x11, IsDown: true),
+                new KeyInputCall(0x43, IsDown: true),
+                new KeyInputCall(0x43, IsDown: false),
+                new KeyInputCall(0x11, IsDown: false),
+            },
+            native.KeyInputs);
+    }
+
     private static MacroEngine CreateEngine(FakeMacroNativeApi native)
         => new(
             native,
@@ -217,9 +285,20 @@ public sealed class MacroEngineTests
         params MacroAction[] actions)
         => engine.LoadFromJson(JsonSerializer.Serialize(actions));
 
+    private static void AssertTransition(
+        MacroAction action,
+        MacroActionType expectedType,
+        int expectedKey)
+    {
+        Assert.Equal(expectedType, action.Type);
+        Assert.Equal(expectedKey, action.KeyCode);
+    }
+
     private sealed class FakeMacroNativeApi : IMacroNativeApi
     {
         private int _nextHook = 10;
+        private MacroHookProc? _keyboardHook;
+        private uint _keyboardVirtualKey;
 
         public Queue<HookResult> HookResults { get; } = new();
         public Queue<NativeResult> UninstallResults { get; } = new();
@@ -238,6 +317,8 @@ public sealed class MacroEngineTests
             MacroHookProc callback,
             out int error)
         {
+            if (hookType == 13)
+                _keyboardHook = callback;
             var result = HookResults.TryDequeue(out var queued)
                 ? queued
                 : new HookResult(new IntPtr(_nextHook++), 0);
@@ -263,7 +344,14 @@ public sealed class MacroEngineTests
             => new(10, 20);
 
         public MacroKeyboardHookData ReadKeyboardHookData(IntPtr data)
-            => new(0x41);
+            => new(_keyboardVirtualKey);
+
+        public void RaiseKeyboard(int message, uint virtualKey)
+        {
+            _keyboardVirtualKey = virtualKey;
+            Assert.NotNull(_keyboardHook);
+            _keyboardHook(0, new IntPtr(message), IntPtr.Zero);
+        }
 
         public bool TrySetCursorPosition(
             int x,

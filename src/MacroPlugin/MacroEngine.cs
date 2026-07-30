@@ -15,6 +15,8 @@ public enum MacroActionType
 {
     MouseClick,
     KeyPress,
+    KeyDown,
+    KeyUp,
 }
 
 public class MacroAction
@@ -47,6 +49,19 @@ public class MacroAction
             KeyCode = virtualKey,
             DelayMs = delay,
         };
+
+    public static MacroAction KeyTransition(
+        int virtualKey,
+        bool isDown,
+        int delay)
+        => new()
+        {
+            Type = isDown
+                ? MacroActionType.KeyDown
+                : MacroActionType.KeyUp,
+            KeyCode = virtualKey,
+            DelayMs = delay,
+        };
 }
 
 public sealed class MacroEngine : IDisposable, IAsyncDisposable
@@ -56,6 +71,9 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     private const int LeftButtonDownMessage = 0x0201;
     private const int RightButtonDownMessage = 0x0204;
     private const int KeyDownMessage = 0x0100;
+    private const int KeyUpMessage = 0x0101;
+    private const int SystemKeyDownMessage = 0x0104;
+    private const int SystemKeyUpMessage = 0x0105;
     private const int ReleaseAttemptCount = 3;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -197,7 +215,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         return stateToPublish == MacroState.Recording;
     }
 
-    public bool StopRecording()
+    public bool StopRecording(bool discardTrailingPressedKeys = false)
     {
         MacroState? stateToPublish = null;
         lock (_sync)
@@ -225,6 +243,8 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                     errors);
                 if (errors.Count == 0)
                 {
+                    if (discardTrailingPressedKeys)
+                        RemoveTrailingPressedKeys();
                     _lastError = null;
                     _state = MacroState.Idle;
                 }
@@ -455,6 +475,13 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             foreach (var action in snapshot)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (action.DelayMs > 0)
+                {
+                    await Task.Delay(
+                        action.DelayMs,
+                        cancellationToken).ConfigureAwait(false);
+                }
+
                 switch (action.Type)
                 {
                     case MacroActionType.MouseClick:
@@ -467,16 +494,15 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                             action,
                             cancellationToken).ConfigureAwait(false);
                         break;
+                    case MacroActionType.KeyDown:
+                        PlayKeyTransition(action, isDown: true);
+                        break;
+                    case MacroActionType.KeyUp:
+                        PlayKeyTransition(action, isDown: false);
+                        break;
                     default:
                         throw new InvalidOperationException(
                             $"Unsupported macro action: {action.Type}.");
-                }
-
-                if (action.DelayMs > 0)
-                {
-                    await Task.Delay(
-                        action.DelayMs,
-                        cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -577,6 +603,30 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             _pendingKeyReleases.Remove(action.KeyCode);
     }
 
+    private void PlayKeyTransition(MacroAction action, bool isDown)
+    {
+        if (!_native.TrySendKey(
+                action.KeyCode,
+                isDown,
+                out var error))
+        {
+            throw new InvalidOperationException(
+                NativeFailure(
+                    isDown
+                        ? "SendInput(key down)"
+                        : "SendInput(key up)",
+                    error));
+        }
+
+        lock (_sync)
+        {
+            if (isDown)
+                _pendingKeyReleases.Add(action.KeyCode);
+            else
+                _pendingKeyReleases.Remove(action.KeyCode);
+        }
+    }
+
     private List<string> ReleasePressedInputs()
     {
         var errors = new List<string>();
@@ -673,21 +723,37 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         IntPtr message,
         IntPtr data)
     {
+        var messageCode = message.ToInt32();
         if (code >= 0
             && State == MacroState.Recording
-            && message.ToInt32() == KeyDownMessage)
+            && (messageCode == KeyDownMessage
+                || messageCode == KeyUpMessage
+                || messageCode == SystemKeyDownMessage
+                || messageCode == SystemKeyUpMessage))
         {
             var hookData = _native.ReadKeyboardHookData(data);
             var now = DateTime.UtcNow;
             lock (_sync)
             {
-                _actions.Add(MacroAction.Key(
+                _actions.Add(MacroAction.KeyTransition(
                     checked((int)hookData.VirtualKey),
+                    messageCode == KeyDownMessage
+                        || messageCode == SystemKeyDownMessage,
                     ElapsedMilliseconds(now)));
                 _lastEvent = now;
             }
         }
         return _native.CallNextHook(code, message, data);
+    }
+
+    private void RemoveTrailingPressedKeys()
+    {
+        while (_actions.Count > 0)
+        {
+            if (_actions[^1].Type != MacroActionType.KeyDown)
+                break;
+            _actions.RemoveAt(_actions.Count - 1);
+        }
     }
 
     private int ElapsedMilliseconds(DateTime now)
