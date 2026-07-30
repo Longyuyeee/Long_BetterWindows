@@ -186,6 +186,51 @@ public sealed class WindowInfoServiceTests
     }
 
     [Fact]
+    public void ApplyLayout_NormalizesMinimizedWindowBeforeMoving()
+    {
+        var native = new FakeWindowNativeApi
+        {
+            Placement = FakeWindowNativeApi.CreatePlacement(
+                showCommand: 2,
+                normalPosition: new NativeWindowRect(100, 120, 900, 720)),
+        };
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Right);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.Single(native.PlacementCalls);
+        Assert.Equal(9u, native.PlacementCalls[0].ShowCommand);
+        Assert.Equal(
+            WindowDisplayState.Minimized,
+            result.Data?.Before?.DisplayState);
+        Assert.Equal(
+            WindowDisplayState.Normal,
+            result.Data?.After?.DisplayState);
+    }
+
+    [Fact]
+    public void ApplyLayout_RestoresWhenLayoutRemainsMaximized()
+    {
+        var native = new FakeWindowNativeApi
+        {
+            PlacementShowCommandAfterPosition = 3,
+        };
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Left);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("display state", result.ErrorMessage);
+        Assert.True(result.Data?.RecoveryAttempted);
+        Assert.True(result.Data?.RecoverySucceeded);
+        Assert.Equal(
+            WindowDisplayState.Normal,
+            result.Data?.After?.DisplayState);
+        Assert.Equal(1u, native.Placement.ShowCommand);
+    }
+
+    [Fact]
     public void ApplyLayout_MaximizeUsesPlacementAndVerifiesDisplayState()
     {
         var native = new FakeWindowNativeApi();
@@ -415,6 +460,7 @@ public sealed class WindowInfoServiceTests
         public NativeWindowPlacement Placement { get; set; } =
             CreatePlacement(1, new NativeWindowRect(100, 120, 900, 720));
         public bool Topmost { get; set; }
+        public uint? PlacementShowCommandAfterPosition { get; set; }
         public IntPtr Monitor { get; set; } = new(7);
         public NativeWindowRect WorkArea { get; set; } =
             new(0, 0, 1920, 1080);
@@ -485,6 +531,12 @@ public sealed class WindowInfoServiceTests
             {
                 if ((flags & SwpNoMove) == 0 || (flags & SwpNoSize) == 0)
                     Rect = rect;
+                if (PlacementShowCommandAfterPosition is { } showCommand)
+                {
+                    var placement = Placement;
+                    placement.ShowCommand = showCommand;
+                    Placement = placement;
+                }
                 if (insertAfter == HwndTopmost)
                     Topmost = true;
                 else if (insertAfter == HwndNoTopmost)

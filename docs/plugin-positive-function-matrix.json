@@ -712,6 +712,16 @@
             "symbol": "ApplyLayout_AccessDeniedDuringRecoveryIsReportedSeparately"
           },
           {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_NormalizesMinimizedWindowBeforeMoving"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_RestoresWhenLayoutRemainsMaximized"
+          },
+          {
             "level": "integration",
             "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
             "symbol": "PluginStop_WindowManagerRetainsFailedHotkeyForRetry"

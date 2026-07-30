@@ -200,14 +200,15 @@ public sealed class WindowInfoService : IWindowInfoService
                 after.ErrorCode);
         }
         if (!RectEquals(after.Data.Rect, target)
-            || after.Data.Topmost != snapshot.Data.Topmost)
+            || after.Data.Topmost != snapshot.Data.Topmost
+            || after.Data.Info.DisplayState != WindowDisplayState.Normal)
         {
             return FailureWithRecovery(
                 window,
                 snapshot.Data,
                 "VerifyWindowState",
                 0,
-                "The target rectangle or topmost state did not match.");
+                "The target rectangle, display state, or topmost state did not match.");
         }
 
         return HostApiResponse<WindowOperationOutcome>.Success(new()

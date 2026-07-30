@@ -2,7 +2,7 @@ param(
     [string]$TestProject = "tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj",
     [string]$OutputPath,
     [string]$DotnetPath = "C:\Program Files\dotnet\dotnet.exe",
-    [int]$ExpectedCaseCount = 24
+    [int]$ExpectedCaseCount = 27
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,7 +32,7 @@ New-Item -ItemType Directory -Path $runRoot | Out-Null
 $trxPath = Join-Path $runRoot "desktop-side-effect-lifecycle.trx"
 
 try {
-    $filter = "FullyQualifiedName~MacroEngineTests|FullyQualifiedName~PluginStop_|FullyQualifiedName~PluginRestart_|FullyQualifiedName~ApplyLayout_Maximize|FullyQualifiedName~ApplyLayout_AccessDenied"
+    $filter = "FullyQualifiedName~MacroEngineTests|FullyQualifiedName~PluginStop_|FullyQualifiedName~PluginRestart_|FullyQualifiedName~ApplyLayout_Maximize|FullyQualifiedName~ApplyLayout_AccessDenied|FullyQualifiedName~ApplyLayout_Normalizes|FullyQualifiedName~ApplyLayout_RestoresWhenLayoutRemainsMaximized"
     $testOutput = @(& $DotnetPath test $projectPath `
         -c Release `
         --no-build `

@@ -1,6 +1,6 @@
 {
   "id": "com.long.window-manager",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "name": "窗口管理",
   "author": "Long",
   "entry_point": "WindowManagerPlugin.dll",
