@@ -523,6 +523,18 @@
       }
     }
 
+    function startFallbackPolling() {
+      if (fallbackTimer) return;
+      fallbackTimer = window.setInterval(function () {
+        captureClipboard({ announce: false });
+      }, fallbackIntervalMs);
+    }
+
+    function stopFallbackPolling() {
+      window.clearInterval(fallbackTimer);
+      fallbackTimer = 0;
+    }
+
     async function startMonitoring() {
       monitoringError = '';
       try {
@@ -535,9 +547,12 @@
           : t('error.monitor', '剪贴板监听启动失败');
       }
 
-      if (monitorStarted) monitorMode = 'active';
-      else {
+      if (monitorStarted) {
+        monitorMode = 'active';
+        stopFallbackPolling();
+      } else {
         monitorMode = 'fallback';
+        startFallbackPolling();
         setStatus(
           'status.monitorFallback',
           'warning',
@@ -545,12 +560,6 @@
           { detail: monitoringError });
       }
       renderMonitorState();
-
-      if (!fallbackTimer) {
-        fallbackTimer = window.setInterval(function () {
-          captureClipboard({ announce: false });
-        }, fallbackIntervalMs);
-      }
       await captureClipboard({ announce: false });
     }
 
@@ -660,7 +669,7 @@
       };
     });
     window.addEventListener('beforeunload', function () {
-      window.clearInterval(fallbackTimer);
+      stopFallbackPolling();
       if (monitorStarted) long.clipboard.stopMonitoring().catch(function () { });
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {

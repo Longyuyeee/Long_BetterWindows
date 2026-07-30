@@ -19,6 +19,7 @@
   "action.clear": "Clear",
   "action.copy": "Copy result",
   "status.connecting": "Connecting to the translation service",
+  "status.sourceChanged": "The source text or target language changed. Translate again.",
   "status.completed": "Translation complete",
   "status.copied": "Translation copied",
   "command.opened": "Translator opened",

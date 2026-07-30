@@ -19,6 +19,7 @@
   "action.clear": "清空",
   "action.copy": "复制结果",
   "status.connecting": "正在连接翻译服务",
+  "status.sourceChanged": "原文或目标语言已改变，请重新翻译",
   "status.completed": "翻译完成",
   "status.copied": "翻译结果已复制",
   "command.opened": "翻译工具已打开",

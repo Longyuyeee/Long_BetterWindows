@@ -61,6 +61,7 @@
     const copyButton = document.getElementById('copyButton');
     let strings = {};
     let isTranslating = false;
+    let requestGeneration = 0;
     let detectedLanguage = '';
     let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
 
@@ -128,6 +129,7 @@
         input.focus();
         return false;
       }
+      const generation = ++requestGeneration;
       isTranslating = true;
       window.LongUI?.setBusy(translateButton, true);
       renderRequestState();
@@ -142,6 +144,7 @@
         const data = JSON.parse(response.data);
         const translated = Array.isArray(data[0]) ? data[0].map(function (part) { return part[0] || ''; }).join('') : '';
         if (!translated) throw new Error(t('error.emptyResponse', '服务没有返回翻译内容'));
+        if (generation !== requestGeneration) return false;
         result.textContent = translated;
         result.hidden = false;
         copyButton.disabled = false;
@@ -150,6 +153,7 @@
         setStatus('status.completed', 'success', '翻译完成');
         return true;
       } catch (error) {
+        if (generation !== requestGeneration) return false;
         setStatus(
           'error.translate',
           'danger',
@@ -160,6 +164,21 @@
         isTranslating = false;
         window.LongUI?.setBusy(translateButton, false);
         renderRequestState();
+      }
+    }
+
+    function invalidateTranslation(showWarning) {
+      requestGeneration += 1;
+      result.textContent = '';
+      result.hidden = true;
+      copyButton.disabled = true;
+      detectedLanguage = '';
+      renderRequestState();
+      if (showWarning && isTranslating) {
+        setStatus(
+          'status.sourceChanged',
+          'warning',
+          '原文或目标语言已改变，请重新翻译');
       }
     }
 
@@ -180,8 +199,15 @@
     document.getElementById('translateButton').addEventListener('click', translate);
     document.getElementById('pasteButton').addEventListener('click', pasteAndTranslate);
     document.getElementById('copyButton').addEventListener('click', copyResult);
+    input.addEventListener('input', function () { invalidateTranslation(true); });
+    document.getElementById('targetLanguage').addEventListener(
+      'change',
+      function () { invalidateTranslation(true); });
     document.getElementById('clearButton').addEventListener('click', function () {
-      input.value = ''; result.textContent = ''; result.hidden = true; copyButton.disabled = true; detectedLanguage = ''; renderRequestState(); input.focus(); setStatus('', '', '');
+      input.value = '';
+      invalidateTranslation(false);
+      input.focus();
+      setStatus('', '', '');
     });
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); translate(); }

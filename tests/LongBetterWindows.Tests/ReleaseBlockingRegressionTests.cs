@@ -138,6 +138,41 @@ public sealed class ReleaseBlockingRegressionTests
             lifecycle);
     }
 
+    [Fact]
+    public void MediumRiskWebPluginsAvoidDuplicatePollingAndStaleNetworkResults()
+    {
+        var root = FindRepositoryRoot();
+        var clipboardHistory = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ClipboardHistory",
+            "index.html"));
+        var translate = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "TranslatePlugin",
+            "index.html"));
+
+        Assert.Contains("function startFallbackPolling()", clipboardHistory);
+        Assert.Contains("if (monitorStarted) {", clipboardHistory);
+        Assert.Contains("stopFallbackPolling();", clipboardHistory);
+        Assert.Contains("startFallbackPolling();", clipboardHistory);
+        Assert.DoesNotContain(
+            "if (!fallbackTimer) {\n        fallbackTimer = window.setInterval",
+            clipboardHistory);
+
+        Assert.Contains("let requestGeneration = 0;", translate);
+        Assert.Contains("const generation = ++requestGeneration;", translate);
+        Assert.Contains(
+            "if (generation !== requestGeneration) return false;",
+            translate);
+        Assert.Contains("function invalidateTranslation(showWarning)", translate);
+        Assert.Contains(
+            "input.addEventListener('input', function () { invalidateTranslation(true); });",
+            translate);
+        Assert.Contains("'status.sourceChanged'", translate);
+    }
+
     private static string ExtractColor(string source, string key)
     {
         var match = Regex.Match(
