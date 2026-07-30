@@ -527,10 +527,17 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains(
             "await Dispatcher.Yield(DispatcherPriority.ApplicationIdle)",
             selector);
+        Assert.Contains(
+            "VirtualScreenHelper.PlaceWindowOverPhysicalBounds(this)",
+            selector);
+        Assert.Contains("Keyboard.Focus(SelectionCanvas)", selector);
+        Assert.DoesNotContain("SystemParameters.VirtualScreen", selector);
         Assert.Contains("MonitorHelper.GetCursorPlacement(this)", colorPicker);
         Assert.Contains("_screenColorSampler.Sample(", colorPicker);
         Assert.Contains("finally", colorPicker);
-        Assert.Contains("GetSystemMetrics(SmXvirtualscreen)", captureService);
+        Assert.Contains(
+            "VirtualScreenHelper.GetPhysicalBounds()",
+            captureService);
         Assert.Contains("if (!BitBlt(", captureService);
         Assert.Contains("result.Freeze()", captureService);
     }

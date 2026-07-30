@@ -2,6 +2,7 @@ using System.Windows.Media.Imaging;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Services;
+using LongBetterWindows.PluginSdk.Wpf;
 
 namespace LongBetterWindows.Tests;
 
@@ -74,6 +75,14 @@ public sealed class ScreenCaptureServiceTests
         Assert.True(result.IsSuccess, result.ErrorMessage);
         Assert.NotNull(result.Data);
         Assert.Matches("^#[0-9A-F]{6}$", result.Data.Hex);
+    }
+
+    [Fact]
+    public void OverlayAndCaptureSharePhysicalVirtualScreenBounds()
+    {
+        Assert.Equal(
+            ScreenCaptureService.GetVirtualScreenBounds(),
+            VirtualScreenHelper.GetPhysicalBounds());
     }
 
     private sealed class RecordingClipboardService : IClipboardService

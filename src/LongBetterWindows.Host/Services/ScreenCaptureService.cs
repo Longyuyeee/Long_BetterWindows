@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Media.Imaging;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.PluginSdk.Wpf;
 
 namespace LongBetterWindows.Host.Services
 {
@@ -11,11 +12,6 @@ namespace LongBetterWindows.Host.Services
     {
         private const uint Srccopy = 0x00CC0020;
         private const uint Captureblt = 0x40000000;
-        private const int SmXvirtualscreen = 76;
-        private const int SmYvirtualscreen = 77;
-        private const int SmCxvirtualscreen = 78;
-        private const int SmCyvirtualscreen = 79;
-
         private readonly IClipboardService _clipboard;
 
         public ScreenCaptureService(IClipboardService clipboard)
@@ -89,16 +85,7 @@ namespace LongBetterWindows.Host.Services
         }
 
         public static Int32Rect GetVirtualScreenBounds()
-        {
-            var bounds = new Int32Rect(
-                GetSystemMetrics(SmXvirtualscreen),
-                GetSystemMetrics(SmYvirtualscreen),
-                GetSystemMetrics(SmCxvirtualscreen),
-                GetSystemMetrics(SmCyvirtualscreen));
-            if (bounds.Width <= 0 || bounds.Height <= 0)
-                throw new InvalidOperationException("Virtual screen bounds are unavailable.");
-            return bounds;
-        }
+            => VirtualScreenHelper.GetPhysicalBounds();
 
         private static Task<HostApiResponse<BitmapSource>> CaptureAsync(Int32Rect bounds)
             => Task.Run(() =>
@@ -189,9 +176,6 @@ namespace LongBetterWindows.Host.Services
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern int ReleaseDC(IntPtr window, IntPtr dc);
-
-        [DllImport("user32.dll")]
-        private static extern int GetSystemMetrics(int index);
 
         [DllImport("gdi32.dll", SetLastError = true)]
         private static extern bool BitBlt(

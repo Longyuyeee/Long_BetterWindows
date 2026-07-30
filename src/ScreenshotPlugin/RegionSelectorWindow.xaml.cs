@@ -4,6 +4,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using LongBetterWindows.PluginSdk.Wpf;
 
 namespace ScreenshotPlugin;
 
@@ -36,11 +37,23 @@ public partial class RegionSelectorWindow : Window
     public RegionSelectorWindow(RegionSelectorLocalization localization)
     {
         InitializeComponent();
-        Left = SystemParameters.VirtualScreenLeft;
-        Top = SystemParameters.VirtualScreenTop;
-        Width = SystemParameters.VirtualScreenWidth;
-        Height = SystemParameters.VirtualScreenHeight;
         ApplyLocalization(localization);
+    }
+
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            VirtualScreenHelper.PlaceWindowOverPhysicalBounds(this);
+            Activate();
+            Focus();
+            Keyboard.Focus(SelectionCanvas);
+        }
+        catch (Exception ex)
+        {
+            CaptureFailed?.Invoke(ex);
+            Close();
+        }
     }
 
     public void ApplyLocalization(RegionSelectorLocalization localization)

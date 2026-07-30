@@ -3,8 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="{DynamicResource OverlayDarkBrush}"
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize" Cursor="Cross"
+        Focusable="True" Loaded="Window_Loaded"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Canvas x:Name="SelectionCanvas"
+            Focusable="True"
             AutomationProperties.Name="截图区域选择器"
             MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
             MouseMove="Canvas_MouseMove"

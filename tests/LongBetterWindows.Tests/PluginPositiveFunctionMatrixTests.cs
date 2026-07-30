@@ -460,7 +460,7 @@ public sealed class PluginPositiveFunctionMatrixTests
                 .GetInt32(),
             commandCount);
         Assert.Equal(
-            42,
+            43,
             policy.GetProperty("high_risk_boundary_required_case_count")
                 .GetInt32());
         Assert.Contains("verify-high-risk-plugin-transactions.ps1", script);
