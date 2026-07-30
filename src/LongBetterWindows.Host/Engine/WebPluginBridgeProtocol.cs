@@ -1,6 +1,7 @@
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace LongBetterWindows.Host.Engine
@@ -14,6 +15,9 @@ namespace LongBetterWindows.Host.Engine
 
         internal static WebBridgeRequest? ParseRequest(string json) =>
             System.Text.Json.JsonSerializer.Deserialize<WebBridgeRequest>(json, MessageJsonOptions);
+
+        internal static bool IsWithinBridgeMessageLimit(string json) =>
+            Encoding.UTF8.GetByteCount(json) <= WebPluginBridgeContext.BridgeMessageLimitBytes;
 
         internal static string SerializeResult(int id, object? result) =>
             System.Text.Json.JsonSerializer.Serialize(new { id, result });
@@ -134,8 +138,12 @@ namespace LongBetterWindows.Host.Engine
             WebPluginBridgeContext context,
             string eventName,
             long sequence,
-            object? payload) =>
-            System.Text.Json.JsonSerializer.Serialize(new
+            object? payload)
+        {
+            if (!IsWidgetEventName(eventName))
+                throw new ArgumentException("Unknown Long Widget event.", nameof(eventName));
+
+            return System.Text.Json.JsonSerializer.Serialize(new
             {
                 type = eventName,
                 detail = new
@@ -148,6 +156,18 @@ namespace LongBetterWindows.Host.Engine
                     payload = payload ?? new { },
                 },
             });
+        }
+
+        internal static bool IsWidgetEventName(string eventName) =>
+            eventName is "long.widget-mounted"
+                or "long.widget-visibility-changed"
+                or "long.widget-resized"
+                or "long.widget-theme-changed"
+                or "long.widget-locale-changed"
+                or "long.widget-settings-changed"
+                or "long.widget-suspend"
+                or "long.widget-resume"
+                or "long.widget-unmount";
 
         internal static string? GetRequiredCapability(string method) => method switch
         {
@@ -480,6 +500,9 @@ window.chrome.webview.addEventListener('message',function(e){
       else console.log('[Long] key:',m.hotkey);
     }
     if(m.type==='clipboard.changed'&&typeof _clipboardChanged==='function')_clipboardChanged(m);
+    if(typeof m.type==='string'&&m.type.indexOf('long.widget-')===0&&m.detail){
+      window.dispatchEvent(new CustomEvent(m.type,{detail:m.detail}));
+    }
   }catch(ex){}
 });
 console.log('[Long] Bridge ready · __PLUGIN_ID__');

@@ -61,6 +61,15 @@ namespace LongBetterWindows.Host.Engine
             // 处理来自 JS 的异步消息
             try
             {
+                if (!WebPluginBridgeProtocol.IsWithinBridgeMessageLimit(json))
+                {
+                    Log.Warning(
+                        "[Web:{Id}] Bridge message rejected because it exceeds {Limit} bytes.",
+                        _manifest.Id,
+                        WebPluginBridgeContext.BridgeMessageLimitBytes);
+                    return;
+                }
+
                 if (_commands.TryHandle(json)) return;
                 var msg = WebPluginBridgeProtocol.ParseRequest(json);
                 if (msg == null) return;

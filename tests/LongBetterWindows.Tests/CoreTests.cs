@@ -474,6 +474,7 @@ public class CoreTests
         Assert.Contains("startMonitoring: function(callback)", script);
         Assert.Contains("compareExchange: function(k,e,v)", script);
         Assert.Contains("m.type==='clipboard.changed'", script);
+        Assert.Contains("window.dispatchEvent(new CustomEvent(m.type,{detail:m.detail}))", script);
         Assert.Contains("com.test.bridge", script);
     }
 
@@ -571,6 +572,31 @@ public class CoreTests
         Assert.Equal("instance-1", detail.GetProperty("instance_id").GetString());
         Assert.Equal(12, detail.GetProperty("sequence").GetInt64());
         Assert.Equal(320, detail.GetProperty("payload").GetProperty("width").GetInt32());
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_RejectsUnknownWidgetEventNames()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            WebPluginBridgeProtocol.SerializeWidgetEvent(
+                new WebPluginBridgeContext(
+                    "com.test.bridge",
+                    surface: "widget",
+                    widgetId: "system.status",
+                    instanceId: "instance-1"),
+                "long.widget-unknown",
+                1,
+                new { }));
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_EnforcesBridgeMessageLimit()
+    {
+        var smallMessage = "{\"id\":1,\"method\":\"host.getInfo\",\"args\":[]}";
+        var oversizedMessage = new string('x', WebPluginBridgeContext.BridgeMessageLimitBytes + 1);
+
+        Assert.True(WebPluginBridgeProtocol.IsWithinBridgeMessageLimit(smallMessage));
+        Assert.False(WebPluginBridgeProtocol.IsWithinBridgeMessageLimit(oversizedMessage));
     }
 
     [Fact]

@@ -276,17 +276,32 @@ export interface LongWidgetEventEnvelope<TPayload = Record<string, unknown>> {
   payload: TPayload;
 }
 
+export type LongWidgetEventType =
+  | "long.widget-mounted"
+  | "long.widget-visibility-changed"
+  | "long.widget-resized"
+  | "long.widget-theme-changed"
+  | "long.widget-locale-changed"
+  | "long.widget-settings-changed"
+  | "long.widget-suspend"
+  | "long.widget-resume"
+  | "long.widget-unmount";
+
+export interface LongWidgetSizePayload {
+  width: number;
+  height: number;
+  columns: number;
+  rows: number;
+  scale: number;
+}
+
+export interface LongWidgetVisibilityPayload {
+  visible: boolean;
+  reason?: string;
+}
+
 export interface LongWidgetHostMessage<TPayload = Record<string, unknown>> {
-  type:
-    | "long.widget-mounted"
-    | "long.widget-visibility-changed"
-    | "long.widget-resized"
-    | "long.widget-theme-changed"
-    | "long.widget-locale-changed"
-    | "long.widget-settings-changed"
-    | "long.widget-suspend"
-    | "long.widget-resume"
-    | "long.widget-unmount";
+  type: LongWidgetEventType;
   detail: LongWidgetEventEnvelope<TPayload>;
 }
 
@@ -599,5 +614,17 @@ declare global {
     chrome?: {
       webview?: LongWebView;
     };
+  }
+
+  interface WindowEventMap {
+    "long.widget-mounted": CustomEvent<LongWidgetEventEnvelope>;
+    "long.widget-visibility-changed": CustomEvent<LongWidgetEventEnvelope<LongWidgetVisibilityPayload>>;
+    "long.widget-resized": CustomEvent<LongWidgetEventEnvelope<LongWidgetSizePayload>>;
+    "long.widget-theme-changed": CustomEvent<LongWidgetEventEnvelope>;
+    "long.widget-locale-changed": CustomEvent<LongWidgetEventEnvelope>;
+    "long.widget-settings-changed": CustomEvent<LongWidgetEventEnvelope>;
+    "long.widget-suspend": CustomEvent<LongWidgetEventEnvelope>;
+    "long.widget-resume": CustomEvent<LongWidgetEventEnvelope>;
+    "long.widget-unmount": CustomEvent<LongWidgetEventEnvelope>;
   }
 }

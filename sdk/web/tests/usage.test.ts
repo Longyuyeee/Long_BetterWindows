@@ -18,6 +18,10 @@ async function exercise(api: LongApi): Promise<void> {
     await api.widget.setInstanceState({ view: "compact" });
     const widgetState = await api.widget.getInstanceState<{ view: string }>();
     widgetState.data?.view.toUpperCase();
+    window.addEventListener("long.widget-resized", event => {
+      event.detail.payload.width.toFixed();
+      event.detail.sequence.toFixed();
+    });
   }
 
   const clipboard: LongResult<string | null> = await api.clipboard.getText();

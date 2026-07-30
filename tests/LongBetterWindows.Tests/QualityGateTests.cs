@@ -2190,6 +2190,8 @@ public class QualityGateTests
         Assert.Contains("LongLanguageChangedMessage", types);
         Assert.Contains("LongHostInfo", types);
         Assert.Contains("LongWidgetApi", types);
+        Assert.Contains("interface WindowEventMap", types);
+        Assert.Contains("long.widget-resized", bridge);
         Assert.Contains("LongMockController", mockTypes);
         Assert.Contains("host.getInfo", mock);
         Assert.Contains("widget.setInstanceState", mock);
