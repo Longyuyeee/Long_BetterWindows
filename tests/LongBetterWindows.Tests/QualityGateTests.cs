@@ -1950,6 +1950,10 @@ public class QualityGateTests
         var widgetState = Read("src", "LongBetterWindows.Host", "Engine", "WidgetInstanceStateStore.cs");
         var widgetSurface = Read("src", "LongBetterWindows.Host", "Engine", "WebWidgetSurfaceSession.cs");
         var widgetSurfaceHost = Read("src", "LongBetterWindows.Host", "Views", "WebWidgetSurfaceHost.cs");
+        var widgetCatalog = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetCatalogProjection.cs");
+        var widgetLayoutStore = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetLayoutStore.cs");
+        var widgetLayoutCoordinator = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetLayoutCoordinator.cs");
+        var services = Read("src", "LongBetterWindows.Host", "Services", "ServicesInitializer.cs");
         var arguments = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginArguments.cs");
         var lifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
 
@@ -1992,6 +1996,18 @@ public class QualityGateTests
         Assert.Contains("_session.SetVisible(false, \"surface-unloaded\")", widgetSurfaceHost);
         Assert.DoesNotContain("PluginWindowHost", widgetSurfaceHost);
         Assert.DoesNotContain("PluginWorkspaceSession", widgetSurfaceHost);
+        Assert.Contains("entry.Manifest.Widgets", widgetCatalog);
+        Assert.Contains("ResolveIcon", widgetCatalog);
+        Assert.Contains("SchemaVersion = 1", widgetLayoutStore);
+        Assert.Contains("MaximumPlacements = 256", widgetLayoutStore);
+        Assert.Contains("FileOptions.WriteThrough", widgetLayoutStore);
+        Assert.Contains("File.Move(temporaryPath, _path, overwrite: true)", widgetLayoutStore);
+        Assert.Contains("FileAttributes.ReparsePoint", widgetLayoutStore);
+        Assert.Contains("MultipleInstancesNotAllowed", widgetLayoutCoordinator);
+        Assert.Contains("PlacementOccupied", widgetLayoutCoordinator);
+        Assert.Contains("Reconcile(", widgetLayoutCoordinator);
+        Assert.Contains("WidgetCatalogProjection.Build", services);
+        Assert.Contains("new WidgetLayoutStore", services);
         Assert.Contains("WidgetInstanceStateStore", dispatcher);
         Assert.Contains("WidgetGetInstanceState()", dispatcher);
         Assert.Contains("_widgetStateStore.SetAsync", dispatcher);
