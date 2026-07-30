@@ -1,6 +1,8 @@
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.PluginSdk.Testing;
 using QuickLaunchPlugin;
 
 namespace LongBetterWindows.Tests;
@@ -99,6 +101,33 @@ public sealed class QuickLaunchIsolationTests : IDisposable
         Assert.True(generation.IsCurrent(latestA));
         generation.Invalidate();
         Assert.False(generation.IsCurrent(latestA));
+    }
+
+    [Fact]
+    public async Task StoppedPlugin_RejectsLateSearchAndTargetExecution()
+    {
+        var plugin = new QuickLaunchPluginImpl();
+        await plugin.InitializeAsync(new PluginTestHost());
+        await plugin.StartAsync();
+        await plugin.StopAsync();
+
+        var invocation = new PluginCommandInvocation
+        {
+            CommandId = "launcher.open",
+            Text = "42",
+            Arguments = new Dictionary<string, string>
+            {
+                ["action"] = "open-result",
+                ["category"] = "calculation",
+            },
+        };
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            plugin.ExecuteCommandAsync(invocation));
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            plugin.SearchAsync(new PluginSearchRequest(
+                "Quick Launch: note",
+                5)));
     }
 
     [Fact]

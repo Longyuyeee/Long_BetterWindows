@@ -407,7 +407,7 @@ public sealed class PluginPositiveFunctionMatrixTests
         Assert.True(File.Exists(scriptPath));
         Assert.True(File.Exists(testPath));
         Assert.Equal(
-            6,
+            7,
             policy.GetProperty(
                 "quick_launch_isolation_required_case_count").GetInt32());
         Assert.Equal(
@@ -416,6 +416,60 @@ public sealed class PluginPositiveFunctionMatrixTests
         Assert.Equal(
             "LargeDirectorySearch_FindsNestedTargetWithoutMutation",
             evidence.GetProperty("symbol").GetString());
+    }
+
+    [Fact]
+    public void HighRiskBoundaryGate_CoversEveryDeclaredHighRiskPlugin()
+    {
+        var root = FindRepositoryRoot();
+        using var matrix = LoadMatrix(root);
+        var policy = matrix.RootElement.GetProperty("policy");
+        var scriptPath = Path.Combine(
+            root,
+            policy.GetProperty("high_risk_boundary_script").GetString()!);
+        var script = File.ReadAllText(scriptPath);
+        var declared = policy
+            .GetProperty("high_risk_boundary_plugin_ids")
+            .EnumerateArray()
+            .Select(item => item.GetString()!)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var highRisk = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Where(plugin => plugin.GetProperty("risk").GetString() == "high")
+            .Select(plugin => plugin.GetProperty("id").GetString()!)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var commandCount = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Where(plugin => declared.Contains(
+                plugin.GetProperty("id").GetString()!,
+                StringComparer.OrdinalIgnoreCase))
+            .Sum(plugin => plugin.GetProperty("commands").GetArrayLength());
+
+        Assert.True(File.Exists(scriptPath));
+        Assert.Equal(highRisk, declared);
+        Assert.Equal(
+            policy.GetProperty("high_risk_boundary_required_plugin_count")
+                .GetInt32(),
+            declared.Length);
+        Assert.Equal(
+            policy.GetProperty("high_risk_boundary_required_command_count")
+                .GetInt32(),
+            commandCount);
+        Assert.Equal(
+            42,
+            policy.GetProperty("high_risk_boundary_required_case_count")
+                .GetInt32());
+        Assert.Contains("verify-high-risk-plugin-transactions.ps1", script);
+        Assert.Contains("verify-capture-delivery-isolation.ps1", script);
+        Assert.Contains("verify-quick-launch-isolation.ps1", script);
+        Assert.Contains("FileSystemOrganizationTests", script);
+        Assert.Contains("AdsServiceTransactionTests", script);
+        Assert.Contains("ProcessServiceTests", script);
+        Assert.Contains("ScreenCaptureServiceTests", script);
     }
 
     private static JsonDocument LoadMatrix(string root)

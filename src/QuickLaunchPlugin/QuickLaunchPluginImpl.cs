@@ -18,6 +18,7 @@ public class QuickLaunchPluginImpl :
     private bool _isActive;
     private LaunchWindow? _window;
     private readonly QuickLaunchTargetPolicy _targetPolicy = new();
+    private CancellationTokenSource _operationLifetime = new();
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -36,12 +37,18 @@ public class QuickLaunchPluginImpl :
 
     public Task<bool> StartAsync()
     {
+        if (_operationLifetime.IsCancellationRequested)
+        {
+            _operationLifetime.Dispose();
+            _operationLifetime = new CancellationTokenSource();
+        }
         State = PluginState.Running;
         return Task.FromResult(true);
     }
 
     public Task<bool> StopAsync()
     {
+        _operationLifetime.Cancel();
         var application = Application.Current;
         if (application is not null)
             application.Dispatcher.Invoke(() => _window?.Close());
@@ -62,13 +69,17 @@ public class QuickLaunchPluginImpl :
             && action == "open-result"
             && !string.IsNullOrWhiteSpace(invocation.Text))
         {
+            using var linkedCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    _operationLifetime.Token);
             var category = invocation.Arguments.TryGetValue("category", out var value)
                 ? value
                 : "application";
             return await ExecuteTargetAsync(
                 category,
                 invocation.Text,
-                cancellationToken);
+                linkedCancellation.Token);
         }
 
         ShowLauncher(invocation.Text);
@@ -79,6 +90,12 @@ public class QuickLaunchPluginImpl :
         PluginSearchRequest request,
         CancellationToken cancellationToken = default)
     {
+        using var linkedCancellation =
+            CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                _operationLifetime.Token);
+        var operationToken = linkedCancellation.Token;
+        operationToken.ThrowIfCancellationRequested();
         var rawQuery = request.Query.Trim();
         var scopePrefix = new[]
             {
@@ -104,8 +121,8 @@ public class QuickLaunchPluginImpl :
 
         var applications = await Task.Run(
             () => LaunchWindow.GetApplications(),
-            cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
+            operationToken);
+        operationToken.ThrowIfCancellationRequested();
         var limit = Math.Min(scoped ? 10 : 5, request.MaxResults);
         List<SmartEntry> matches;
         if (recallingPreferences)
@@ -223,17 +240,24 @@ public class QuickLaunchPluginImpl :
         _isActive = false;
         if (entry?.Path is not { Length: > 0 } path || _host == null) return;
 
+        var operationToken = _operationLifetime.Token;
         try
         {
             var result = await ExecuteTargetAsync(
                 entry.Category,
                 path,
-                CancellationToken.None);
+                operationToken);
             if (!result.IsSuccess)
                 Log.Warning(
                     "[QuickLaunch] 目标执行被拒绝或失败: {Category}, {Error}",
                     entry.Category,
                     result.Message);
+        }
+        catch (OperationCanceledException)
+            when (operationToken.IsCancellationRequested)
+        {
+            Log.Information(
+                "[QuickLaunch] Cancelled target execution after plugin stop");
         }
         catch (Exception ex)
         {
