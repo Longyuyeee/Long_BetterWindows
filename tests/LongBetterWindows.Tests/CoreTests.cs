@@ -746,6 +746,50 @@ public class CoreTests
     }
 
     [Fact]
+    public void WidgetSurfaceLayout_ConvertsLogicalSizeToPhysicalPixels()
+    {
+        var created = WidgetSurfaceLayout.TryFromLogicalSize(
+            columns: 3,
+            rows: 2,
+            logicalWidth: 201.2,
+            logicalHeight: 100,
+            dpiScaleX: 1.25,
+            dpiScaleY: 1.5,
+            out var layout);
+
+        Assert.True(created);
+        Assert.True(layout.IsValid);
+        Assert.Equal(3, layout.Columns);
+        Assert.Equal(2, layout.Rows);
+        Assert.Equal(252, layout.Width);
+        Assert.Equal(150, layout.Height);
+        Assert.Equal(1.5, layout.DpiScale);
+    }
+
+    [Theory]
+    [InlineData(0, 1, 100, 100, 1, 1)]
+    [InlineData(1, 25, 100, 100, 1, 1)]
+    [InlineData(1, 1, 0, 100, 1, 1)]
+    [InlineData(1, 1, 100, 100, 0, 1)]
+    public void WidgetSurfaceLayout_RejectsInvalidSurfaceMetrics(
+        int columns,
+        int rows,
+        double width,
+        double height,
+        double scaleX,
+        double scaleY)
+    {
+        Assert.False(WidgetSurfaceLayout.TryFromLogicalSize(
+            columns,
+            rows,
+            width,
+            height,
+            scaleX,
+            scaleY,
+            out _));
+    }
+
+    [Fact]
     public void WebWidgetSurfaceSession_RejectsForeignDefinitionAndInvalidLayout()
     {
         var manifestWidget = new PluginWidgetDefinition

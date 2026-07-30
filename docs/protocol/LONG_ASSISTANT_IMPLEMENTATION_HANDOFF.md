@@ -33,7 +33,7 @@ Long助手审计基线：`Longyuyeee/Long_BetterWindows@0d1366f`
 当前尚缺：
 
 - Manifest `widgets` 定义；（PR-A 已完成）
-- Widget 实例、尺寸、可见性、暂停/恢复等生命周期；（PR-B 已完成生命周期协调器与独立 Surface Session，仍未接用户可见容器及 Long Grid/桌面的真实布局来源）
+- Widget 实例、尺寸、可见性、暂停/恢复等生命周期；（PR-B 已完成生命周期协调器、独立 Surface Session 以及 WPF 控件真实尺寸/DPI/可见性接线，仍未接产品级 Widget 目录/布局容器与 Long Grid）
 - `host.getInfo` 和 Widget Bridge；（PR-B 已完成 `host.getInfo`、基础 Widget 方法、受信上下文绑定、标准事件信封、注入脚本事件派发、Bridge 消息大小边界、虚拟 HTTPS 来源、响应头级 CSP 基础、基础 CSP meta、ready 回执和实例状态持久化基础）
 - 足够严格的 Widget 子资源沙箱；（PR-B 已完成虚拟 Host、虚拟来源外子资源阻断、HTML 文档响应头级 CSP 和基础 CSP meta；仍需真实 Widget Surface 下的端到端验收）
 - Long Grid 可调用的同用户 IPC Broker；
@@ -143,7 +143,7 @@ src/LongBetterWindows.Host/Broker/
 
 验收：生命周期、来源伪造、超大消息、导航、挂起与恢复测试通过。
 
-当前状态：部分完成。已完成 `host.getInfo`、宿主绑定身份上下文、基础 Widget 方法、实例状态大小限制、Widget 事件信封、注入脚本 `CustomEvent` 派发、1 MiB Bridge 消息入口限制、受控 `https://plugin-*.longplugin.local/` 虚拟来源、WebView2 子资源来源阻断、HTML 文档响应头级 CSP、基础 CSP meta、Widget 生命周期协调器、Widget 实例状态持久化、独立 `WebWidgetSurfaceSession`、Widget 专属入口、网格/像素/DPI 布局和可见性输入、隐藏策略计时、Web SDK 类型和 Mock Host；尚未完成用户可见 Widget 容器、Long Grid/桌面真实布局来源接入、参考 Widget `.lpak` 和端到端验收。
+当前状态：部分完成。已完成 `host.getInfo`、宿主绑定身份上下文、基础 Widget 方法、实例状态大小限制、Widget 事件信封、注入脚本 `CustomEvent` 派发、1 MiB Bridge 消息入口限制、受控 `https://plugin-*.longplugin.local/` 虚拟来源、WebView2 子资源来源阻断、HTML 文档响应头级 CSP、基础 CSP meta、Widget 生命周期协调器、Widget 实例状态持久化、独立 `WebWidgetSurfaceSession`、Widget 专属入口、网格/像素/DPI 布局和可见性输入、隐藏策略计时、专用 WPF `WebWidgetSurfaceHost` 的真实尺寸/DPI/加载/可见性接线、Web SDK 类型和 Mock Host；尚未完成产品级 Widget 目录与布局容器、Long Grid 跨进程接入、参考 Widget `.lpak` 和端到端验收。
 
 ### PR-C：Broker IPC
 

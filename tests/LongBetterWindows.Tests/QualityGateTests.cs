@@ -1946,8 +1946,10 @@ public class QualityGateTests
         var protocol = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginBridgeProtocol.cs");
         var dispatcher = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs");
         var widgetLifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WidgetLifecycleCoordinator.cs");
+        var widgetLayout = Read("src", "LongBetterWindows.Host", "Engine", "WidgetSurfaceLayout.cs");
         var widgetState = Read("src", "LongBetterWindows.Host", "Engine", "WidgetInstanceStateStore.cs");
         var widgetSurface = Read("src", "LongBetterWindows.Host", "Engine", "WebWidgetSurfaceSession.cs");
+        var widgetSurfaceHost = Read("src", "LongBetterWindows.Host", "Views", "WebWidgetSurfaceHost.cs");
         var arguments = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginArguments.cs");
         var lifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
 
@@ -1969,6 +1971,9 @@ public class QualityGateTests
         Assert.Contains("long.widget-resized", widgetLifecycle);
         Assert.Contains("long.widget-visibility-changed", widgetLifecycle);
         Assert.Contains("WidgetSurfaceLayout", widgetLifecycle);
+        Assert.Contains("TryFromLogicalSize", widgetLayout);
+        Assert.Contains("MidpointRounding.AwayFromZero", widgetLayout);
+        Assert.Contains("DpiScale", widgetLayout);
         Assert.Contains("new WebPluginBridgeContext(", widgetSurface);
         Assert.Contains("surface: \"widget\"", widgetSurface);
         Assert.Contains("declaredWidget.EntryPoint", widgetSurface);
@@ -1978,6 +1983,15 @@ public class QualityGateTests
         Assert.Contains("_runtime.NotifyWidgetVisibilityChanged", widgetSurface);
         Assert.Contains("_runtime.SuspendWidget", widgetSurface);
         Assert.Contains("_runtime.ResumeWidget", widgetSurface);
+        Assert.Contains("ActualWidth", widgetSurfaceHost);
+        Assert.Contains("ActualHeight", widgetSurfaceHost);
+        Assert.Contains("VisualTreeHelper.GetDpi(this)", widgetSurfaceHost);
+        Assert.Contains("OnDpiChanged", widgetSurfaceHost);
+        Assert.Contains("IsVisibleChanged +=", widgetSurfaceHost);
+        Assert.Contains("SizeChanged +=", widgetSurfaceHost);
+        Assert.Contains("_session.SetVisible(false, \"surface-unloaded\")", widgetSurfaceHost);
+        Assert.DoesNotContain("PluginWindowHost", widgetSurfaceHost);
+        Assert.DoesNotContain("PluginWorkspaceSession", widgetSurfaceHost);
         Assert.Contains("WidgetInstanceStateStore", dispatcher);
         Assert.Contains("WidgetGetInstanceState()", dispatcher);
         Assert.Contains("_widgetStateStore.SetAsync", dispatcher);

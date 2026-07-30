@@ -265,23 +265,4 @@ namespace LongBetterWindows.Host.Engine
                 payload));
     }
 
-    internal sealed record WidgetSurfaceLayout(
-        int Columns,
-        int Rows,
-        double Width,
-        double Height,
-        double DpiScale)
-    {
-        internal static WidgetSurfaceLayout Empty { get; } = new(0, 0, 0, 0, 1);
-
-        internal object ToPayload() => new
-        {
-            columns = Columns,
-            rows = Rows,
-            width = Width,
-            height = Height,
-            dpi_scale = DpiScale,
-            scale = DpiScale,
-        };
-    }
 }

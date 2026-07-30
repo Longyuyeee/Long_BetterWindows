@@ -195,14 +195,7 @@ namespace LongBetterWindows.Host.Engine
         private static void ValidateLayout(WidgetSurfaceLayout layout)
         {
             ArgumentNullException.ThrowIfNull(layout);
-            if (layout.Columns is < 1 or > 24
-                || layout.Rows is < 1 or > 24
-                || !double.IsFinite(layout.Width)
-                || !double.IsFinite(layout.Height)
-                || !double.IsFinite(layout.DpiScale)
-                || layout.Width <= 0
-                || layout.Height <= 0
-                || layout.DpiScale <= 0)
+            if (!layout.IsValid)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(layout),
