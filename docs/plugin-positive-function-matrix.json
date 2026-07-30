@@ -692,6 +692,16 @@
             "symbol": "ApplyLayout_WorksAgainstIsolatedNativeWindow"
           },
           {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_MaximizeUsesPlacementAndVerifiesDisplayState"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
+            "symbol": "ApplyLayout_MaximizeFailureRestoresOriginalPlacement"
+          },
+          {
             "level": "integration",
             "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
             "symbol": "PluginStop_WindowManagerRetainsFailedHotkeyForRetry"
@@ -714,7 +724,7 @@
             "window.third-left",
             "window.third-right"
           ],
-          "description": "Verify guide, topmost and every layout on normal/minimized/maximized windows across available monitors, including a denied high-integrity target.",
+          "description": "Verify guide, topmost and every layout on normal/minimized/maximized windows across available monitors. Confirm maximize enters the Windows maximized state, and include a denied high-integrity target.",
           "status": "pending",
           "required_for_release": true,
           "evidence_path": null,

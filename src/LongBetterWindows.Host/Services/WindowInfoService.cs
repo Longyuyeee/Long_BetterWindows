@@ -126,6 +126,9 @@ public sealed class WindowInfoService : IWindowInfoService
         if (!snapshot.IsSuccess || snapshot.Data is null)
             return SnapshotFailure(snapshot);
 
+        if (layout == WindowLayout.Maximize)
+            return Maximize(window, snapshot.Data);
+
         var monitor = _native.MonitorFromWindow(window);
         if (monitor == IntPtr.Zero)
         {
@@ -211,6 +214,63 @@ public sealed class WindowInfoService : IWindowInfoService
                 || snapshot.Data.Info.DisplayState
                     != after.Data.Info.DisplayState,
             Before = snapshot.Data.Info,
+            After = after.Data.Info,
+        });
+    }
+
+    private HostApiResponse<WindowOperationOutcome> Maximize(
+        IntPtr window,
+        WindowSnapshot snapshot)
+    {
+        if (snapshot.Info.DisplayState == WindowDisplayState.Maximized)
+        {
+            return HostApiResponse<WindowOperationOutcome>.Success(new()
+            {
+                Changed = false,
+                Before = snapshot.Info,
+                After = snapshot.Info,
+            });
+        }
+
+        var maximized = snapshot.Placement;
+        maximized.ShowCommand = SwShowMaximized;
+        if (!_native.TrySetWindowPlacement(
+                window,
+                maximized,
+                out var placementError))
+        {
+            return FailureWithRecovery(
+                window,
+                snapshot,
+                "SetWindowPlacement(maximize)",
+                placementError);
+        }
+
+        var after = CaptureSnapshot(window);
+        if (!after.IsSuccess || after.Data is null)
+        {
+            return FailureWithRecovery(
+                window,
+                snapshot,
+                "VerifyWindowState",
+                0,
+                after.ErrorMessage);
+        }
+        if (after.Data.Info.DisplayState != WindowDisplayState.Maximized
+            || after.Data.Topmost != snapshot.Topmost)
+        {
+            return FailureWithRecovery(
+                window,
+                snapshot,
+                "VerifyMaximizedState",
+                0,
+                "The window did not enter the maximized state.");
+        }
+
+        return HostApiResponse<WindowOperationOutcome>.Success(new()
+        {
+            Changed = true,
+            Before = snapshot.Info,
             After = after.Data.Info,
         });
     }

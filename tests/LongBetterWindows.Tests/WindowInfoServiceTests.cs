@@ -141,6 +141,71 @@ public sealed class WindowInfoServiceTests
     }
 
     [Fact]
+    public void ApplyLayout_MaximizeUsesPlacementAndVerifiesDisplayState()
+    {
+        var native = new FakeWindowNativeApi();
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Maximize);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.True(result.Data?.Changed);
+        Assert.Equal(WindowDisplayState.Normal, result.Data?.Before?.DisplayState);
+        Assert.Equal(
+            WindowDisplayState.Maximized,
+            result.Data?.After?.DisplayState);
+        Assert.Equal(3u, Assert.Single(native.PlacementCalls).ShowCommand);
+        Assert.Empty(native.PositionCalls);
+    }
+
+    [Fact]
+    public void ApplyLayout_MaximizeIsIdempotent()
+    {
+        var native = new FakeWindowNativeApi
+        {
+            Placement = FakeWindowNativeApi.CreatePlacement(
+                showCommand: 3,
+                normalPosition: new NativeWindowRect(100, 120, 900, 720)),
+        };
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Maximize);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.False(result.Data?.Changed);
+        Assert.Equal(
+            WindowDisplayState.Maximized,
+            result.Data?.After?.DisplayState);
+        Assert.Empty(native.PlacementCalls);
+        Assert.Empty(native.PositionCalls);
+    }
+
+    [Fact]
+    public void ApplyLayout_MaximizeFailureRestoresOriginalPlacement()
+    {
+        var native = new FakeWindowNativeApi();
+        native.PlacementResults.Enqueue(new NativeMutationResult(
+            Succeeded: false,
+            Error: 5,
+            Mutate: true));
+        native.PlacementResults.Enqueue(new NativeMutationResult(
+            Succeeded: true,
+            Error: 0,
+            Mutate: true));
+        var service = new WindowInfoService(native);
+
+        var result = service.ApplyLayout(TestWindow, WindowLayout.Maximize);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("SetWindowPlacement(maximize)", result.ErrorMessage);
+        Assert.True(result.Data?.RecoveryAttempted);
+        Assert.True(result.Data?.RecoverySucceeded);
+        Assert.Equal(3u, native.PlacementCalls[0].ShowCommand);
+        Assert.Equal(1u, native.PlacementCalls[1].ShowCommand);
+        Assert.Equal(1u, native.Placement.ShowCommand);
+    }
+
+    [Fact]
     public void ToggleTopmost_ChangesAndVerifiesState()
     {
         var native = new FakeWindowNativeApi { Topmost = false };

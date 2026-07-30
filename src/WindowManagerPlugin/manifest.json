@@ -1,6 +1,6 @@
 {
   "id": "com.long.window-manager",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "name": "窗口管理",
   "author": "Long",
   "entry_point": "WindowManagerPlugin.dll",
@@ -10,7 +10,7 @@
     {"id":"window.topmost","title":"切换窗口置顶","description":"置顶或取消置顶当前窗口","aliases":["置顶窗口","topmost"],"accepted_inputs":["none"],"view_mode":"none","priority":32},
     {"id":"window.left","title":"窗口移至左半屏","description":"将当前窗口排列到左半屏","aliases":["左半屏","snap left"],"accepted_inputs":["none"],"view_mode":"none","priority":25},
     {"id":"window.right","title":"窗口移至右半屏","description":"将当前窗口排列到右半屏","aliases":["右半屏","snap right"],"accepted_inputs":["none"],"view_mode":"none","priority":25},
-    {"id":"window.maximize","title":"窗口最大化布局","description":"将当前窗口填充显示器工作区","aliases":["最大化","maximize"],"accepted_inputs":["none"],"view_mode":"none","priority":24},
+    {"id":"window.maximize","title":"最大化当前窗口","description":"将当前窗口切换到 Windows 系统最大化状态","aliases":["最大化","maximize"],"accepted_inputs":["none"],"view_mode":"none","priority":24},
     {"id":"window.bottom","title":"窗口移至下半屏","description":"将当前窗口排列到下半屏","aliases":["下半屏","snap bottom"],"accepted_inputs":["none"],"view_mode":"none","priority":20},
     {"id":"window.top-left","title":"窗口移至左上四分屏","description":"将当前窗口排列到左上角","aliases":["左上窗口"],"accepted_inputs":["none"],"view_mode":"none","priority":18},
     {"id":"window.top-right","title":"窗口移至右上四分屏","description":"将当前窗口排列到右上角","aliases":["右上窗口"],"accepted_inputs":["none"],"view_mode":"none","priority":18},
