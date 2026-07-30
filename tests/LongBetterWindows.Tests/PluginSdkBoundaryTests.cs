@@ -1,6 +1,8 @@
 using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Xml.Linq;
 using ClipboardHistoryBackground;
 using ColorPickerPlugin;
 using FolderNotePlugin;
@@ -59,6 +61,104 @@ public sealed class PluginSdkBoundaryTests
         Assert.DoesNotContain(
             references,
             reference => reference.Name == "LongBetterWindows.Host");
+    }
+
+    [Fact]
+    public void NativeLoader_SharesOnlyProductionSdkAssemblies()
+    {
+        var sharedNames = PluginLoadContext.SharedSdkAssemblies
+            .Select(assembly => assembly.GetName().Name!)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "LongBetterWindows.PluginSdk",
+                "LongBetterWindows.PluginSdk.Wpf",
+            ],
+            sharedNames);
+        Assert.DoesNotContain(
+            "LongBetterWindows.PluginSdk.Testing",
+            sharedNames);
+    }
+
+    [Fact]
+    public void SdkVersionsAndDependencies_MatchApiVersion()
+    {
+        var root = FindRepositoryRoot();
+        var expectedVersion = ApiVersion.Current.ToString().TrimStart('v');
+        var expectedAssemblyVersion = expectedVersion + ".0";
+        var projects = new[]
+        {
+            (
+                Path.Combine(
+                    root,
+                    "src",
+                    "LongBetterWindows.PluginSdk",
+                    "LongBetterWindows.PluginSdk.csproj"),
+                "LongBetterWindows.PluginSdk",
+                Array.Empty<string>()),
+            (
+                Path.Combine(
+                    root,
+                    "src",
+                    "LongBetterWindows.PluginSdk.Wpf",
+                    "LongBetterWindows.PluginSdk.Wpf.csproj"),
+                "LongBetterWindows.PluginSdk.Wpf",
+                new[] { "LongBetterWindows.PluginSdk.csproj" }),
+            (
+                Path.Combine(
+                    root,
+                    "sdk",
+                    "dotnet",
+                    "LongBetterWindows.PluginSdk.Testing",
+                    "LongBetterWindows.PluginSdk.Testing.csproj"),
+                "LongBetterWindows.PluginSdk.Testing",
+                new[] { "LongBetterWindows.PluginSdk.csproj" }),
+        };
+
+        foreach (var (path, packageId, expectedReferences) in projects)
+        {
+            var project = XDocument.Load(path);
+            Assert.Equal(expectedVersion, ProjectValue(project, "Version"));
+            Assert.Equal(
+                expectedAssemblyVersion,
+                ProjectValue(project, "AssemblyVersion"));
+            Assert.Equal(packageId, ProjectValue(project, "PackageId"));
+            Assert.Equal(
+                expectedReferences,
+                project
+                    .Descendants("ProjectReference")
+                    .Select(element => Path.GetFileName(
+                        element.Attribute("Include")!.Value))
+                    .OrderBy(value => value, StringComparer.Ordinal)
+                    .ToArray());
+        }
+
+        using var webPackage = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "sdk",
+            "web",
+            "package.json")));
+        using var webLock = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "sdk",
+            "web",
+            "package-lock.json")));
+        using var boundaryAudit = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "docs",
+            "native-plugin-boundary-audit.json")));
+
+        Assert.Equal(
+            expectedVersion,
+            webPackage.RootElement.GetProperty("version").GetString());
+        Assert.Equal(
+            expectedVersion,
+            webLock.RootElement.GetProperty("version").GetString());
+        Assert.Equal(
+            expectedVersion,
+            boundaryAudit.RootElement.GetProperty("sdk_version").GetString());
     }
 
     [Fact]
@@ -276,4 +376,10 @@ public sealed class PluginSdkBoundaryTests
 
         throw new DirectoryNotFoundException("Repository root was not found.");
     }
+
+    private static string ProjectValue(XDocument project, string name)
+        => project
+            .Descendants(name)
+            .Select(element => element.Value)
+            .Single();
 }

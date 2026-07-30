@@ -1,0 +1,93 @@
+name: Repository CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore LongBetterWindows.sln
+
+      - name: Build release
+        run: dotnet build LongBetterWindows.sln --configuration Release --no-restore --nologo
+
+      - name: Run full test suite
+        run: dotnet test tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=repository-ci.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-test-results
+          path: tests/LongBetterWindows.Tests/TestResults/**/*.trx
+          if-no-files-found: ignore
+
+  plugin-platform:
+    name: Plugin platform
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: sdk/web/package-lock.json
+
+      - name: Restore .NET projects
+        run: dotnet restore LongBetterWindows.sln
+
+      - name: Verify SDK and loader boundaries
+        run: dotnet test tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj --configuration Release --no-restore --filter "FullyQualifiedName~PluginSdkBoundaryTests|FullyQualifiedName~PluginTestingSdkTests"
+
+      - name: Verify Web SDK
+        run: |
+          npm ci --prefix sdk/web
+          npm test --prefix sdk/web
+
+      - name: Verify four plugin runtimes
+        shell: pwsh
+        run: ./verify-plugin-runtime-matrix.ps1
+
+      - name: Pack .NET SDK artifacts
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP "plugin-sdk-packages"
+          dotnet pack src/LongBetterWindows.PluginSdk/LongBetterWindows.PluginSdk.csproj --configuration Release --no-build --output $output
+          dotnet pack src/LongBetterWindows.PluginSdk.Wpf/LongBetterWindows.PluginSdk.Wpf.csproj --configuration Release --no-build --output $output
+          dotnet pack sdk/dotnet/LongBetterWindows.PluginSdk.Testing/LongBetterWindows.PluginSdk.Testing.csproj --configuration Release --no-build --output $output
+
+      - name: Upload SDK packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-sdk-packages
+          path: ${{ runner.temp }}/plugin-sdk-packages/*.nupkg
+          if-no-files-found: error

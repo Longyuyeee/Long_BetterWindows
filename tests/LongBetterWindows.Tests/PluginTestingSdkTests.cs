@@ -200,6 +200,32 @@ public sealed class PluginTestingSdkTests
     }
 
     [Fact]
+    public void RepositoryWorkflow_CoversBuildTestsAndPluginPlatform()
+    {
+        var root = FindRepositoryRoot();
+        var workflowPath = Path.Combine(
+            root,
+            ".github",
+            "workflows",
+            "build.yml");
+
+        Assert.True(File.Exists(workflowPath));
+        var workflow = File.ReadAllText(workflowPath);
+        var gitIgnore = File.ReadAllText(Path.Combine(root, ".gitignore"));
+
+        Assert.Contains("permissions:", workflow);
+        Assert.Contains("contents: read", workflow);
+        Assert.Contains("dotnet build LongBetterWindows.sln", workflow);
+        Assert.Contains(
+            "dotnet test tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj",
+            workflow);
+        Assert.Contains("npm test --prefix sdk/web", workflow);
+        Assert.Contains("verify-plugin-runtime-matrix.ps1", workflow);
+        Assert.Equal(3, workflow.Split("dotnet pack ").Length - 1);
+        Assert.DoesNotContain(".github/workflows/", gitIgnore);
+    }
+
+    [Fact]
     public void ProductionHost_ConsumesSharedCapabilityCatalog()
     {
         var source = File.ReadAllText(Path.Combine(

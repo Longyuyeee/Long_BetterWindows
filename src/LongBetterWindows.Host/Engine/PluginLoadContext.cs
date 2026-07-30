@@ -7,7 +7,7 @@ namespace LongBetterWindows.Host.Engine
 {
     public class PluginLoadContext : AssemblyLoadContext
     {
-        private static readonly Assembly[] SharedSdkAssemblies =
+        internal static IReadOnlyList<Assembly> SharedSdkAssemblies { get; } =
         [
             typeof(ILongPlugin).Assembly,
             typeof(HotkeySettingsControl).Assembly,

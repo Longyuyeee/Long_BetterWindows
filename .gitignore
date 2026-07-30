@@ -46,9 +46,6 @@ artifacts/releases/
 # Plugin build output
 Plugins/
 
-# GitHub Actions (需要 workflow token 权限)
-.github/workflows/
-
 # Claude
 .claude/
 
