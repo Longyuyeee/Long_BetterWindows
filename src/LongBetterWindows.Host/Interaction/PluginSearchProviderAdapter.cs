@@ -1,3 +1,4 @@
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using Serilog;
 
@@ -6,12 +7,12 @@ namespace LongBetterWindows.Host.Interaction
     internal sealed class PluginSearchProviderAdapter : ISearchProvider
     {
         private readonly string _pluginId;
-        private readonly ISearchProvider _inner;
+        private readonly IPluginSearchProvider _inner;
         private readonly string? _iconPath;
 
         public PluginSearchProviderAdapter(
             string pluginId,
-            ISearchProvider inner,
+            IPluginSearchProvider inner,
             string? iconPath = null)
         {
             _pluginId = pluginId;
@@ -26,21 +27,19 @@ namespace LongBetterWindows.Host.Interaction
             SearchRequest request,
             CancellationToken cancellationToken = default)
         {
-            IReadOnlyList<SearchResultItem> results;
+            IReadOnlyList<PluginSearchResult> results;
             using (PluginAccessContext.Enter(_pluginId))
             {
                 var ownPrefix = _pluginId + ":";
                 results = await _inner.SearchAsync(
-                    request with
-                    {
-                        Context = request.Context.MetadataOnly(),
-                        PinnedResultIds = request.PinnedResultIds?
-                            .Where(id => id.StartsWith(ownPrefix, StringComparison.OrdinalIgnoreCase))
-                            .ToList(),
-                        RecentResultIds = request.RecentResultIds?
-                            .Where(id => id.StartsWith(ownPrefix, StringComparison.OrdinalIgnoreCase))
-                            .ToList(),
-                    },
+                    new PluginSearchRequest(
+                        request.Query,
+                        request.MaxResults,
+                        SelectOwnedIds(request.PinnedResultIds, ownPrefix),
+                        SelectOwnedIds(request.RecentResultIds, ownPrefix),
+                        SelectOwnedIds(
+                            request.AdditionalPreferredResultIds,
+                            ownPrefix)),
                     cancellationToken);
             }
 
@@ -56,26 +55,74 @@ namespace LongBetterWindows.Host.Interaction
                     continue;
                 }
 
-                accepted.Add(item with
+                accepted.Add(new SearchResultItem
                 {
                     Id = _pluginId + ":" + item.Id,
                     ProviderId = Id,
+                    Title = item.Title,
+                    Subtitle = item.Subtitle,
+                    Source = item.Source,
                     IconKind = SearchResultIconKind.Plugin,
                     IconPath = _iconPath,
+                    Score = item.Score,
+                    Kind = MapResultKind(item.Kind),
+                    PrimaryAction = MapAction(item.PrimaryAction),
+                    SecondaryActions = item.SecondaryActions
+                        .Select(MapAction)
+                        .ToList(),
+                    CanPin = item.CanPin,
+                    ContinuationToken = item.ContinuationToken,
                 });
             }
 
             return accepted;
         }
 
+        private static IReadOnlyList<string>? SelectOwnedIds(
+            IReadOnlyList<string>? ids,
+            string ownPrefix)
+            => ids?
+                .Where(id => id.StartsWith(
+                    ownPrefix,
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(id => id[ownPrefix.Length..])
+                .ToList();
+
+        private static SearchResultKind MapResultKind(
+            PluginSearchResultKind kind)
+            => kind switch
+            {
+                PluginSearchResultKind.Data => SearchResultKind.Data,
+                PluginSearchResultKind.Continuation =>
+                    SearchResultKind.Continuation,
+                _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+            };
+
+        private static SearchResultAction MapAction(PluginSearchAction action)
+            => new(
+                action.Kind switch
+                {
+                    PluginSearchActionKind.ExecuteCommand =>
+                        SearchActionKind.ExecuteCommand,
+                    PluginSearchActionKind.ContinueSearch =>
+                        SearchActionKind.ContinueSearch,
+                    _ => throw new ArgumentOutOfRangeException(
+                        nameof(action.Kind)),
+                },
+                action.Target,
+                action.Invocation,
+                action.Label);
+
         private static bool IsSafePluginAction(
-            SearchResultAction action,
+            PluginSearchAction action,
             string commandPrefix)
             => action.Kind switch
             {
-                SearchActionKind.ExecuteCommand => action.Target.StartsWith(
+                PluginSearchActionKind.ExecuteCommand =>
+                    action.Target.StartsWith(
                     commandPrefix, StringComparison.OrdinalIgnoreCase),
-                SearchActionKind.ContinueSearch => action.Target.Length <= 512,
+                PluginSearchActionKind.ContinueSearch =>
+                    action.Target.Length <= 512,
                 _ => false,
             };
     }

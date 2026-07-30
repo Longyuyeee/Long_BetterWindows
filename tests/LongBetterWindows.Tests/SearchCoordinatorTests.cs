@@ -167,7 +167,7 @@ public class SearchCoordinatorTests
     }
 
     [Fact]
-    public async Task PluginSearchLifecycle_SanitizesContextAndRejectsForeignCommands()
+    public async Task PluginSearchLifecycle_IsolatesRequestAndRejectsForeignCommands()
     {
         var coordinator = new SearchCoordinator(Array.Empty<ISearchProvider>());
         var registry = new PluginRegistry();
@@ -205,15 +205,24 @@ public class SearchCoordinatorTests
         });
 
         var result = Assert.Single(await coordinator.SearchIncrementalAsync(
-            new SearchRequest("demo", sensitiveContext)));
+            new SearchRequest(
+                "demo",
+                sensitiveContext,
+                PinnedResultIds:
+                [
+                    plugin.Id + ":owned",
+                    "com.other:foreign",
+                ],
+                RecentResultIds:
+                [
+                    plugin.Id + ":recent",
+                ])));
 
         Assert.StartsWith(plugin.Id + ":", result.Id);
         Assert.Equal(plugin.Id + ":open", result.PrimaryAction.Target);
-        var received = Assert.Single(plugin.LastContext!.Items);
-        Assert.Null(received.Text);
-        Assert.Null(received.ImagePng);
-        Assert.Empty(received.Paths);
-        Assert.DoesNotContain("secret", received.Label, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("demo", plugin.LastRequest!.Query);
+        Assert.Equal(["owned"], plugin.LastRequest.PinnedResultIds);
+        Assert.Equal(["recent"], plugin.LastRequest.RecentResultIds);
 
         registry.SetState(plugin.Id, PluginState.Background);
         Assert.Single(await coordinator.SearchIncrementalAsync(Request("demo")));
@@ -272,14 +281,16 @@ public class SearchCoordinatorTests
         }
     }
 
-    private sealed class FakePluginSearchProvider : ILongPlugin, ISearchProvider
+    private sealed class FakePluginSearchProvider :
+        ILongPlugin,
+        IPluginSearchProvider
     {
         public string Id => "com.long.fake-search";
         public string Name => "Fake Search";
         public string Version => "1.0.0";
         public PluginState State { get; private set; } = PluginState.Loaded;
         public int Priority => 100;
-        public ContextSnapshot? LastContext { get; private set; }
+        public PluginSearchRequest? LastRequest { get; private set; }
 
         public Task<bool> InitializeAsync(IHostApi host) => Task.FromResult(true);
         public Task<bool> StartAsync()
@@ -294,30 +305,40 @@ public class SearchCoordinatorTests
             return Task.FromResult(true);
         }
 
-        public Task<IReadOnlyList<SearchResultItem>> SearchAsync(
-            SearchRequest request,
+        public Task<IReadOnlyList<PluginSearchResult>> SearchAsync(
+            PluginSearchRequest request,
             CancellationToken cancellationToken = default)
         {
-            LastContext = request.Context;
-            return Task.FromResult<IReadOnlyList<SearchResultItem>>(new[]
+            LastRequest = request;
+            return Task.FromResult<IReadOnlyList<PluginSearchResult>>(new[]
             {
-                Result("owned", 300) with
+                new PluginSearchResult
                 {
-                    PrimaryAction = new SearchResultAction(
-                        SearchActionKind.ExecuteCommand,
+                    Id = "owned",
+                    Title = "Owned",
+                    Score = 300,
+                    PrimaryAction = new PluginSearchAction(
+                        PluginSearchActionKind.ExecuteCommand,
                         Id + ":open"),
                 },
-                Result("foreign", 500) with
+                new PluginSearchResult
                 {
-                    PrimaryAction = new SearchResultAction(
-                        SearchActionKind.ExecuteCommand,
+                    Id = "foreign",
+                    Title = "Foreign",
+                    Score = 500,
+                    PrimaryAction = new PluginSearchAction(
+                        PluginSearchActionKind.ExecuteCommand,
                         "com.other:open"),
                 },
-                Result("unsafe-host-action", 450) with
+                new PluginSearchResult
                 {
-                    PrimaryAction = new SearchResultAction(
-                        SearchActionKind.OpenUri,
-                        "ms-settings:display"),
+                    Id = "continuation",
+                    Title = "Continuation",
+                    Score = 450,
+                    Kind = PluginSearchResultKind.Continuation,
+                    PrimaryAction = new PluginSearchAction(
+                        PluginSearchActionKind.ContinueSearch,
+                        new string('x', 513)),
                 },
             });
         }

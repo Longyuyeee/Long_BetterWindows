@@ -11,6 +11,7 @@ using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.PluginSdk.Wpf;
 using MacroPlugin;
+using QuickLaunchPlugin;
 using ScreenshotPlugin;
 using WindowManagerPlugin;
 
@@ -67,6 +68,22 @@ public sealed class PluginSdkBoundaryTests
     }
 
     [Fact]
+    public void PluginSearchContracts_AreOwnedByStableSdk()
+    {
+        var sdkAssembly = typeof(ILongPlugin).Assembly;
+
+        Assert.Same(sdkAssembly, typeof(IPluginSearchProvider).Assembly);
+        Assert.Same(sdkAssembly, typeof(PluginSearchRequest).Assembly);
+        Assert.Same(sdkAssembly, typeof(PluginSearchResult).Assembly);
+        Assert.Same(sdkAssembly, typeof(PluginSearchAction).Assembly);
+        Assert.DoesNotContain(
+            typeof(PluginSearchRequest).GetProperties(),
+            property => property.Name.Contains(
+                "Context",
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void MigratedInteractivePlugins_DoNotReferenceHostAssembly()
     {
         var assemblies = new[]
@@ -74,6 +91,7 @@ public sealed class PluginSdkBoundaryTests
             typeof(ColorPickerPluginImpl).Assembly,
             typeof(FolderNotePluginImpl).Assembly,
             typeof(MacroPluginImpl).Assembly,
+            typeof(QuickLaunchPluginImpl).Assembly,
             typeof(ScreenshotPluginImpl).Assembly,
             typeof(WindowManagerPluginImpl).Assembly,
         };

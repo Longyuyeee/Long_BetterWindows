@@ -5,7 +5,8 @@ Long Assistant plugins. It contains:
 
 - plugin lifecycle and optional extension interfaces;
 - manifest, command, localization, and host response contracts;
-- capability interfaces and their data-transfer models.
+- capability interfaces and their data-transfer models;
+- context-free plugin search requests, results, and declarative actions;
 - the canonical service-to-capability map used by production and test hosts.
 
 The SDK intentionally excludes host services, windows, engine internals, and

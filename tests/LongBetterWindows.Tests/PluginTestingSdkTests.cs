@@ -240,6 +240,7 @@ public sealed class PluginTestingSdkTests
             .ToArray();
 
         Assert.Equal(audited, actual);
+        Assert.Empty(audited);
         Assert.Equal(
             "long_native_plugin_boundary_audit",
             document.RootElement.GetProperty("schema").GetString());

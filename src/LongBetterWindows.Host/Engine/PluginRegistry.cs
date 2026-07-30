@@ -234,7 +234,8 @@ namespace LongBetterWindows.Host.Engine
 
         private void SyncSearchProvider(PluginEntry entry)
         {
-            if (_searchCoordinator is null || entry.Instance is not ISearchProvider provider)
+            if (_searchCoordinator is null
+                || entry.Instance is not IPluginSearchProvider provider)
                 return;
 
             var providerId = "plugin:" + entry.Id;

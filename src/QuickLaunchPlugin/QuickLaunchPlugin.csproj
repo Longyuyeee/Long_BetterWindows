@@ -9,11 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LongBetterWindows.Host\LongBetterWindows.Host.csproj">
-      <Private>false</Private>
-      <ExcludeAssets>runtime</ExcludeAssets>
-    </ProjectReference>
     <ProjectReference Include="..\LongBetterWindows.PluginSdk.Wpf\LongBetterWindows.PluginSdk.Wpf.csproj" />
+    <PackageReference Include="Serilog" Version="4.0.0" />
     <PluginLocalization Include="i18n\*.json" />
   </ItemGroup>
 

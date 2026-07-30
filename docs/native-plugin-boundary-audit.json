@@ -7,18 +7,10 @@
     "ColorPickerPlugin",
     "FolderNotePlugin",
     "MacroPlugin",
+    "QuickLaunchPlugin",
     "SamplePlugin",
     "ScreenshotPlugin",
     "WindowManagerPlugin"
   ],
-  "host_coupled_projects": [
-    {
-      "project": "QuickLaunchPlugin",
-      "dependencies": [
-        "ISearchProvider",
-        "SearchModels"
-      ],
-      "target_boundary": "search-contracts"
-    }
-  ]
+  "host_coupled_projects": []
 }

@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using System.Text;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
-using LongBetterWindows.Host.Interaction;
 using Serilog;
 
 namespace QuickLaunchPlugin;
@@ -12,7 +11,7 @@ public class QuickLaunchPluginImpl :
     ILongPlugin,
     IHasMainUI,
     IPluginCommandHandler,
-    ISearchProvider,
+    IPluginSearchProvider,
     IPluginLanguageLifecycle
 {
     private IHostApi? _host;
@@ -76,8 +75,8 @@ public class QuickLaunchPluginImpl :
         return PluginCommandResult.Success();
     }
 
-    public async Task<IReadOnlyList<SearchResultItem>> SearchAsync(
-        SearchRequest request,
+    public async Task<IReadOnlyList<PluginSearchResult>> SearchAsync(
+        PluginSearchRequest request,
         CancellationToken cancellationToken = default)
     {
         var rawQuery = request.Query.Trim();
@@ -101,7 +100,7 @@ public class QuickLaunchPluginImpl :
             .ToList();
         var recallingPreferences = query.Length == 0 && preferredIds.Count > 0;
         if (!recallingPreferences && query.Length < (scoped ? 1 : 2))
-            return Array.Empty<SearchResultItem>();
+            return Array.Empty<PluginSearchResult>();
 
         var applications = await Task.Run(
             () => LaunchWindow.GetApplications(),
@@ -115,8 +114,8 @@ public class QuickLaunchPluginImpl :
                 .Select((id, index) => (id, index))
                 .ToDictionary(pair => pair.id, pair => pair.index, StringComparer.OrdinalIgnoreCase);
             matches = applications
-                .Where(entry => order.ContainsKey(Id + ":" + BuildResultId(entry)))
-                .OrderBy(entry => order[Id + ":" + BuildResultId(entry)])
+                .Where(entry => order.ContainsKey(BuildResultId(entry)))
+                .OrderBy(entry => order[BuildResultId(entry)])
                 .Take(limit)
                 .ToList();
         }
@@ -130,10 +129,9 @@ public class QuickLaunchPluginImpl :
                 .ToList();
         }
 
-        var results = matches.Select((entry, index) => new SearchResultItem
+        var results = matches.Select((entry, index) => new PluginSearchResult
         {
             Id = BuildResultId(entry),
-            ProviderId = Id,
             Title = entry.Name,
             Subtitle = recallingPreferences
                 ? Text(
@@ -148,9 +146,9 @@ public class QuickLaunchPluginImpl :
                 "search.applicationSource",
                 "快捷启动器 · 应用"),
             Score = (recallingPreferences ? 100 : scoped ? 900 : 720) - index,
-            Kind = SearchResultKind.Data,
-            PrimaryAction = new SearchResultAction(
-                SearchActionKind.ExecuteCommand,
+            Kind = PluginSearchResultKind.Data,
+            PrimaryAction = new PluginSearchAction(
+                PluginSearchActionKind.ExecuteCommand,
                 Id + ":launcher.open",
                 new PluginCommandInvocation
                 {
@@ -169,10 +167,9 @@ public class QuickLaunchPluginImpl :
         if (!recallingPreferences && !scoped && matches.Count > 0
             && results.Count < request.MaxResults)
         {
-            results.Add(new SearchResultItem
+            results.Add(new PluginSearchResult
             {
                 Id = "continue:" + query,
-                ProviderId = Id,
                 Title = string.Format(
                     Text(
                         "search.continueTitle",
@@ -183,9 +180,9 @@ public class QuickLaunchPluginImpl :
                     "进入插件数据源，显示更多开始菜单结果"),
                 Source = Text("search.source", "快捷启动器"),
                 Score = 520,
-                Kind = SearchResultKind.Continuation,
-                PrimaryAction = new SearchResultAction(
-                    SearchActionKind.ContinueSearch,
+                Kind = PluginSearchResultKind.Continuation,
+                PrimaryAction = new PluginSearchAction(
+                    PluginSearchActionKind.ContinueSearch,
                     Text("search.scopePrefix", "快捷启动：") + query),
                 ContinuationToken = query,
             });
