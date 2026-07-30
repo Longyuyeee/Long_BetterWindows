@@ -1,0 +1,72 @@
+{
+  "id": "com.long.hardware-monitor",
+  "version": "1.0.0",
+  "name": "Hardware Monitor",
+  "description": "LPWP 1.0 reference widget.",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "min_api_version": "1.1.0",
+  "capabilities": [
+    "system.performance"
+  ],
+  "commands": [
+    {
+      "id": "refresh",
+      "title": "刷新硬件状态",
+      "description": "立即刷新一次硬件状态",
+      "accepted_inputs": [
+        "none"
+      ]
+    }
+  ],
+  "widgets": [
+    {
+      "id": "system-status",
+      "title": "系统状态",
+      "description": "显示 CPU 和内存状态",
+      "entry_point": "widgets/system-status/index.html",
+      "icon": "assets/system-status.svg",
+      "multiple_instances": false,
+      "default_size": {
+        "columns": 4,
+        "rows": 3
+      },
+      "min_size": {
+        "columns": 2,
+        "rows": 2
+      },
+      "max_size": {
+        "columns": 8,
+        "rows": 6
+      },
+      "refresh": {
+        "mode": "event",
+        "hidden_behavior": "suspend"
+      },
+      "appearance": {
+        "transparent": true,
+        "host_chrome": true
+      },
+      "settings_schema": [
+        {
+          "key": "view",
+          "type": "enum",
+          "title": "默认视图",
+          "default": "summary",
+          "enum_values": [
+            "summary",
+            "cpu",
+            "memory"
+          ]
+        },
+        {
+          "key": "showPercentage",
+          "type": "boolean",
+          "title": "显示百分比",
+          "default": true
+        }
+      ]
+    }
+  ]
+}
