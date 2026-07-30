@@ -2168,7 +2168,7 @@ public class QualityGateTests
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(127, productionMethods.Length);
+        Assert.Equal(128, productionMethods.Length);
         Assert.Equal(productionMethods, mockMethods);
         Assert.Contains("\"name\": \"@long-assistant/plugin-sdk\"", package);
         using var packageDocument = System.Text.Json.JsonDocument.Parse(package);

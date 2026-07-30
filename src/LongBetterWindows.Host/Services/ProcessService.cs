@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 
@@ -61,6 +62,51 @@ namespace LongBetterWindows.Host.Services
                     return HostApiResponse.Success();
                 }
                 catch (Exception ex) { return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message); }
+            });
+        }
+
+        public Task<HostApiResponse> KillVerifiedAsync(
+            int processId,
+            string expectedName,
+            string expectedIdentity)
+        {
+            return Task.Run(() =>
+            {
+                if (string.IsNullOrWhiteSpace(expectedName) ||
+                    string.IsNullOrWhiteSpace(expectedIdentity))
+                {
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.InvalidArgument,
+                        "Process identity is required.");
+                }
+
+                try
+                {
+                    using var process = Process.GetProcessById(processId);
+                    var actualIdentity = process.StartTime
+                        .ToUniversalTime()
+                        .ToString("O", CultureInfo.InvariantCulture);
+                    if (!string.Equals(process.ProcessName, expectedName, StringComparison.OrdinalIgnoreCase) ||
+                        !string.Equals(actualIdentity, expectedIdentity, StringComparison.Ordinal))
+                    {
+                        return HostApiResponse.Failure(
+                            ApiErrorCode.InvalidArgument,
+                            "Process identity changed. Refresh the port list and try again.");
+                    }
+
+                    process.Kill();
+                    return HostApiResponse.Success();
+                }
+                catch (ArgumentException)
+                {
+                    return HostApiResponse.Failure(
+                        ApiErrorCode.InvalidArgument,
+                        "Process no longer exists.");
+                }
+                catch (Exception ex)
+                {
+                    return HostApiResponse.Failure(ApiErrorCode.Unknown, ex.Message);
+                }
             });
         }
     }

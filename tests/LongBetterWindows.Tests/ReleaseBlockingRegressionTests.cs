@@ -338,6 +338,8 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains("LongUI?.onCommand", developerToolkit);
         Assert.Contains("success: true", developerToolkit);
         Assert.Contains("long.networkPort.findPortOwner", portManager);
+        Assert.Contains("long.process.killVerified", portManager);
+        Assert.DoesNotContain("long.process.kill(target.id)", portManager);
         Assert.DoesNotContain("long.networkPort.findOwner", portManager);
         Assert.Contains("return true;", portManager);
         Assert.Contains("find.available", portManager);

@@ -185,7 +185,7 @@ namespace LongBetterWindows.Host.Engine
             "window.getVisible"
                 => "window.info",
 
-            "process.start" or "process.getList" or "process.kill"
+            "process.start" or "process.getList" or "process.kill" or "process.killVerified"
                 => "system.process",
             "fileOps.copy" or "fileOps.move" or "fileOps.delete" or "fileOps.exists"
                 => "file.ops",
@@ -305,7 +305,8 @@ window.long = {
   process: {
     start: function(path,args){return call('process.start',[path,args]);},
     getList: function(filter){return call('process.getList',[filter]);},
-    kill: function(id){return call('process.kill',[id]);}
+    kill: function(id){return call('process.kill',[id]);},
+    killVerified: function(id,name,identity){return call('process.killVerified',[id,name,identity]);}
   },
   fileOps: {
     copy: function(source,dest){return call('fileOps.copy',[source,dest]);},

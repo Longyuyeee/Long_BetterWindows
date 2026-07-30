@@ -99,6 +99,10 @@ namespace LongBetterWindows.Host.Engine
                 "process.start" => Ok(h.Process.StartAsync(WebPluginArguments.GetString(args, 0), WebPluginArguments.GetString(args, 1, null!))),
                 "process.getList" => OkList(h.Process.GetRunningProcessesAsync(WebPluginArguments.GetString(args, 0, null!))),
                 "process.kill" => Ok(h.Process.KillAsync(WebPluginArguments.GetInt(args, 0))),
+                "process.killVerified" => Ok(h.Process.KillVerifiedAsync(
+                    WebPluginArguments.GetInt(args, 0),
+                    WebPluginArguments.GetString(args, 1),
+                    WebPluginArguments.GetString(args, 2))),
 
                 // === long.fileOps ===
                 "fileOps.copy" => Ok(h.FileOps.CopyAsync(WebPluginArguments.GetString(args, 0), WebPluginArguments.GetString(args, 1))),

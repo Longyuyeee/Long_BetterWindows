@@ -13,6 +13,7 @@ test("exposes the complete bridge method ledger without duplicates", () => {
   assert.equal(new Set(BRIDGE_METHODS).size, BRIDGE_METHODS.length);
   assert.ok(BRIDGE_METHODS.includes("clipboard.getText"));
   assert.ok(BRIDGE_METHODS.includes("fileSystem.executeOrganization"));
+  assert.ok(BRIDGE_METHODS.includes("process.killVerified"));
   assert.ok(BRIDGE_METHODS.includes("window.getVisible"));
 });
 
@@ -77,6 +78,16 @@ test("keeps API aliases mapped to the production bridge method", async () => {
     "networkPort.isInUse",
     "power.getStatus"
   ]);
+});
+
+test("records the complete identity for verified process termination", async () => {
+  const mock = createLongMock();
+  await mock.long.process.killVerified(42, "demo", "identity-token");
+
+  assert.deepEqual(mock.getCalls("process.killVerified")[0], {
+    method: "process.killVerified",
+    args: [42, "demo", "identity-token"]
+  });
 });
 
 test("installs without browser globals and rejects unknown handlers", () => {

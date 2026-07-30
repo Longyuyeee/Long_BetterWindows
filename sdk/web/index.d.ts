@@ -78,6 +78,7 @@ export interface LongPortInfo {
   ProcessId: number;
   ProcessName: string;
   ProcessPath: string;
+  ProcessIdentity: string;
 }
 
 export interface LongPortSummary {
@@ -317,6 +318,11 @@ export interface LongProcessApi {
   start(path: string, args?: string): Promise<LongResult>;
   getList(filter?: string): Promise<LongResult<LongProcessInfo[]>>;
   kill(processId: number): Promise<LongResult>;
+  killVerified(
+    processId: number,
+    expectedName: string,
+    expectedIdentity: string
+  ): Promise<LongResult>;
 }
 
 export interface LongFileOpsApi {

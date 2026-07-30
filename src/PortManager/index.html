@@ -506,9 +506,17 @@
           '此端口没有可用的进程标识，无法终止');
         return;
       }
+      if (!port.ProcessName || !port.ProcessIdentity) {
+        setStatus(
+          'status.processIdentityUnavailable',
+          'warning',
+          '无法验证此端口对应的进程身份，请刷新后重试');
+        return;
+      }
       pendingProcess = {
         id: Number(port.ProcessId),
-        name: port.ProcessName || t('process.unknown', '未知进程')
+        name: port.ProcessName,
+        identity: port.ProcessIdentity
       };
       renderKillDialog();
       killDialog.showModal();
@@ -523,7 +531,7 @@
       renderKillDialog();
       try {
         unwrap(
-          await long.process.kill(target.id),
+          await long.process.killVerified(target.id, target.name, target.identity),
           t('error.kill', '终止进程失败'));
         killDialog.close();
         pendingProcess = null;

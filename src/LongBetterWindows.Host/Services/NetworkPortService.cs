@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using LongBetterWindows.Host.Capabilities;
@@ -38,6 +39,7 @@ namespace LongBetterWindows.Host.Services
                                 var process = Process.GetProcessById(info.ProcessId);
                                 info.ProcessName = process.ProcessName;
                                 info.ProcessPath = process.MainModule?.FileName ?? "";
+                                info.ProcessIdentity = GetProcessIdentity(process);
                             }
                             catch { }
                         }
@@ -81,6 +83,7 @@ namespace LongBetterWindows.Host.Services
                                 var process = Process.GetProcessById(info.ProcessId);
                                 info.ProcessName = process.ProcessName;
                                 info.ProcessPath = process.MainModule?.FileName ?? "";
+                                info.ProcessIdentity = GetProcessIdentity(process);
                             }
                             catch { }
                         }
@@ -124,6 +127,7 @@ namespace LongBetterWindows.Host.Services
                                 var process = Process.GetProcessById(info.ProcessId);
                                 info.ProcessName = process.ProcessName;
                                 info.ProcessPath = process.MainModule?.FileName ?? "";
+                                info.ProcessIdentity = GetProcessIdentity(process);
                             }
                             catch { }
                         }
@@ -241,6 +245,13 @@ namespace LongBetterWindows.Host.Services
             {
                 return 0;
             }
+        }
+
+        private static string GetProcessIdentity(Process process)
+        {
+            return process.StartTime
+                .ToUniversalTime()
+                .ToString("O", CultureInfo.InvariantCulture);
         }
 
         #region Win32 API for Port-Process Mapping

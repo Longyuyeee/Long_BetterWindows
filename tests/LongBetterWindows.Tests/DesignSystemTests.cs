@@ -529,7 +529,10 @@ public class DesignSystemTests
         Assert.Contains("long.networkPort.getUdpEndpoints()", page);
         Assert.Contains("long.networkPort.findPortOwner(port, protocol)", page);
         Assert.Contains("long.clipboard.setText(text)", page);
-        Assert.Contains("long.process.kill(target.id)", page);
+        Assert.Contains(
+            "long.process.killVerified(target.id, target.name, target.identity)",
+            page);
+        Assert.Contains("port.ProcessIdentity", page);
         Assert.Contains("killDialog.showModal()", page);
         Assert.Contains("LongUI?.onCommand", page);
         Assert.Contains("visibilitychange", page);

@@ -14,5 +14,9 @@ namespace LongBetterWindows.Host.Capabilities
         Task<HostApiResponse> StartAsync(string path, string? args = null);
         Task<HostApiResponse<List<ProcessInfo>>> GetRunningProcessesAsync(string? nameFilter = null);
         Task<HostApiResponse> KillAsync(int processId);
+        Task<HostApiResponse> KillVerifiedAsync(
+            int processId,
+            string expectedName,
+            string expectedIdentity);
     }
 }
