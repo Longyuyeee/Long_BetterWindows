@@ -89,6 +89,7 @@ public sealed class ReferenceWidgetTests
         Assert.Matches(
             "^[A-F0-9]{64} \\*com-long-reference-widgets-v1\\.1\\.0\\.lpak\\s*$",
             baseline);
+        Assert.Contains("& powershell @packerArguments", buildScript);
         Assert.Contains("确定性哈希不匹配", buildScript);
         Assert.Contains("Get-FileHash", buildScript);
     }

@@ -28,15 +28,18 @@ if (-not (Test-Path -LiteralPath $expectedHashFile -PathType Leaf)) {
     throw "参考 Widget 确定性哈希基线不存在：$expectedHashFile"
 }
 
-$arguments = @{
-    PluginDir = $pluginDirectory
-    OutputDir = $OutputDir
-}
+$packerArguments = @(
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-File", $packer,
+    "-PluginDir", $pluginDirectory,
+    "-OutputDir", $OutputDir
+)
 if ($Force) {
-    $arguments.Force = $true
+    $packerArguments += "-Force"
 }
 
-& $packer @arguments
+& powershell @packerArguments
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
