@@ -600,6 +600,98 @@ public class CoreTests
     }
 
     [Fact]
+    public void WidgetLifecycleCoordinator_MountsReadyAndUnmountsWithMonotonicSequence()
+    {
+        var messages = new List<string>();
+        var context = new WebPluginBridgeContext(
+            "com.test.bridge",
+            surface: "widget",
+            widgetId: "system.status",
+            instanceId: "instance-1");
+        using var coordinator = new WidgetLifecycleCoordinator(
+            context,
+            messages.Add,
+            TimeSpan.FromSeconds(10));
+
+        coordinator.Mount();
+        var ready = coordinator.MarkReady(2);
+        coordinator.Suspend();
+        coordinator.Resume();
+        coordinator.Unmount();
+        coordinator.Unmount();
+
+        Assert.True(coordinator.IsReady);
+        using var readyJson = JsonDocument.Parse(JsonSerializer.Serialize(ready));
+        Assert.True(readyJson.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal(2, readyJson.RootElement.GetProperty("content_version").GetInt32());
+
+        Assert.Equal(4, messages.Count);
+        AssertWidgetEvent(messages[0], "long.widget-mounted", 1);
+        AssertWidgetEvent(messages[1], "long.widget-suspend", 2);
+        AssertWidgetEvent(messages[2], "long.widget-resume", 3);
+        AssertWidgetEvent(messages[3], "long.widget-unmount", 4);
+    }
+
+    [Fact]
+    public void WidgetLifecycleCoordinator_ReadyTimeoutEmitsAuditableVisibilityEvent()
+    {
+        var messages = new List<string>();
+        var context = new WebPluginBridgeContext(
+            "com.test.bridge",
+            surface: "widget",
+            widgetId: "system.status",
+            instanceId: "instance-1");
+        using var coordinator = new WidgetLifecycleCoordinator(
+            context,
+            messages.Add,
+            TimeSpan.FromSeconds(10));
+
+        coordinator.Mount();
+        coordinator.MarkReadyTimeout();
+
+        Assert.Equal(2, messages.Count);
+        AssertWidgetEvent(messages[0], "long.widget-mounted", 1);
+        using var timeout = JsonDocument.Parse(messages[1]);
+        Assert.Equal("long.widget-visibility-changed", timeout.RootElement.GetProperty("type").GetString());
+        var detail = timeout.RootElement.GetProperty("detail");
+        Assert.Equal(2, detail.GetProperty("sequence").GetInt64());
+        Assert.False(detail.GetProperty("payload").GetProperty("ready").GetBoolean());
+        Assert.Equal("ready-timeout", detail.GetProperty("payload").GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task WebBridgeDispatcher_WidgetReadyNotifiesLifecycle()
+    {
+        var messages = new List<string>();
+        var context = new WebPluginBridgeContext(
+            "com.test.bridge",
+            surface: "widget",
+            widgetId: "system.status",
+            instanceId: "instance-1");
+        using var coordinator = new WidgetLifecycleCoordinator(
+            context,
+            messages.Add,
+            TimeSpan.FromSeconds(10));
+        using var dispatcher = new WebPluginHostDispatcher(
+            "com.test.bridge",
+            HostProvider.Instance,
+            _ => { },
+            context,
+            coordinator.MarkReady);
+
+        coordinator.Mount();
+        using var request = JsonDocument.Parse("""{"content_version":3}""");
+        var result = await dispatcher.DispatchAsync(
+            "widget.ready",
+            [request.RootElement.Clone()]);
+
+        using var resultJson = JsonDocument.Parse(JsonSerializer.Serialize(result));
+        Assert.True(resultJson.RootElement.GetProperty("success").GetBoolean());
+        Assert.True(coordinator.IsReady);
+        AssertWidgetEvent(Assert.Single(messages), "long.widget-mounted", 1);
+    }
+
+    [Fact]
     public void WebPluginArguments_NullableString_PreservesJsonNull()
     {
         using var document = JsonDocument.Parse("null");
@@ -793,6 +885,13 @@ public class CoreTests
     }
 
     // ===== helpers =====
+
+    private static void AssertWidgetEvent(string json, string eventName, long sequence)
+    {
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal(eventName, document.RootElement.GetProperty("type").GetString());
+        Assert.Equal(sequence, document.RootElement.GetProperty("detail").GetProperty("sequence").GetInt64());
+    }
 
     private static string CreateManifestDir(object content)
     {

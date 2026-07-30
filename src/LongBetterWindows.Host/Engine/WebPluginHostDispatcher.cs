@@ -13,6 +13,7 @@ namespace LongBetterWindows.Host.Engine
         private readonly WebPluginBridgeContext _context;
         private readonly IHostApi _host;
         private readonly Action<string> _postMessage;
+        private readonly Func<object?, object>? _widgetReady;
         private readonly SemaphoreSlim _clipboardGate = new(1, 1);
         private readonly object _clipboardStateLock = new();
         private Task<HostApiResponse>? _clipboardAcquireTask;
@@ -24,12 +25,14 @@ namespace LongBetterWindows.Host.Engine
             string pluginId,
             IHostApi host,
             Action<string> postMessage,
-            WebPluginBridgeContext? context = null)
+            WebPluginBridgeContext? context = null,
+            Func<object?, object>? widgetReady = null)
         {
             _pluginId = pluginId;
             _context = context ?? new WebPluginBridgeContext(pluginId);
             _host = host;
             _postMessage = postMessage;
+            _widgetReady = widgetReady;
         }
 
         internal async Task<object?> DispatchAsync(string method, object?[] args)
@@ -53,7 +56,7 @@ namespace LongBetterWindows.Host.Engine
                 "host.getInfo" => Task.FromResult<object?>(_context.ToHostInfo()),
 
                 // === long.widget ===
-                "widget.ready" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
+                "widget.ready" => Task.FromResult<object?>(WidgetReady(args)),
                 "widget.getInstanceState" => Task.FromResult<object?>(WidgetContextOnly(new { success = true, data = _widgetInstanceState })),
                 "widget.setInstanceState" => WidgetSetInstanceState(args),
                 "widget.openSettings" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
@@ -415,6 +418,24 @@ namespace LongBetterWindows.Host.Engine
                 success = false,
                 error = "Widget API 仅在 Widget 上下文中可用",
             };
+        }
+
+        private object WidgetReady(object?[] args)
+        {
+            if (!_context.IsWidget)
+                return WidgetContextOnly(OkObj());
+
+            var contentVersion = 1;
+            if (args.Length > 0
+                && args[0] is JsonElement element
+                && element.ValueKind == JsonValueKind.Object
+                && element.TryGetProperty("content_version", out var contentVersionProperty)
+                && contentVersionProperty.TryGetInt32(out var parsedContentVersion))
+            {
+                contentVersion = parsedContentVersion;
+            }
+
+            return _widgetReady?.Invoke(contentVersion) ?? OkObj();
         }
 
         private Task<object?> WidgetSetInstanceState(object?[] args)

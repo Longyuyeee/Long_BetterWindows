@@ -25,21 +25,38 @@ namespace LongBetterWindows.Host.Engine
         private readonly WebPluginViewLifecycle _viewLifecycle;
         private readonly WebPluginHostDispatcher _hostDispatcher;
         private readonly WebPluginCommandCoordinator _commands;
+        private readonly WebPluginBridgeContext _bridgeContext;
+        private readonly WidgetLifecycleCoordinator? _widgetLifecycle;
 
         public WebView2? WebView => _viewLifecycle.View;
         public PluginManifest Manifest => _manifest;
 
         public WebPluginRuntime(PluginManifest manifest, string pluginDir)
+            : this(manifest, pluginDir, new WebPluginBridgeContext(manifest.Id))
+        {
+        }
+
+        internal WebPluginRuntime(
+            PluginManifest manifest,
+            string pluginDir,
+            WebPluginBridgeContext bridgeContext)
         {
             _manifest = manifest;
+            _bridgeContext = bridgeContext;
             _viewLifecycle = new WebPluginViewLifecycle(
                 manifest,
                 pluginDir,
                 HandleJsMessage);
+            _widgetLifecycle = _bridgeContext.IsWidget
+                ? new WidgetLifecycleCoordinator(_bridgeContext, PostWebMessage)
+                : null;
             _hostDispatcher = new WebPluginHostDispatcher(
                 manifest.Id,
                 HostProvider.Instance,
-                PostWebMessage);
+                PostWebMessage,
+                _bridgeContext,
+                contentVersion => _widgetLifecycle?.MarkReady(contentVersion)
+                    ?? new { success = true });
             _commands = new WebPluginCommandCoordinator(
                 manifest.Id,
                 message => _viewLifecycle.SendMessageAsync(message));
@@ -48,10 +65,17 @@ namespace LongBetterWindows.Host.Engine
 
         public WebView2 EnsureView() => _viewLifecycle.EnsureView();
 
-        public Task<bool> InitializeAsync() => _viewLifecycle.InitializeAsync();
+        public async Task<bool> InitializeAsync()
+        {
+            var initialized = await _viewLifecycle.InitializeAsync();
+            if (initialized)
+                _widgetLifecycle?.Mount();
+            return initialized;
+        }
 
         public void Dispose()
         {
+            _widgetLifecycle?.Dispose();
             _commands.Dispose();
             _hostDispatcher.Dispose();
             _viewLifecycle.Dispose();

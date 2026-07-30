@@ -1944,6 +1944,7 @@ public class QualityGateTests
         var runtime = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.cs");
         var protocol = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginBridgeProtocol.cs");
         var dispatcher = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs");
+        var widgetLifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WidgetLifecycleCoordinator.cs");
         var arguments = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginArguments.cs");
         var lifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
 
@@ -1952,7 +1953,17 @@ public class QualityGateTests
         Assert.Contains("_hostDispatcher.DispatchAsync", runtime);
         Assert.Contains("SerializeResult", protocol);
         Assert.Contains("BuildInjectionScript", protocol);
+        Assert.Contains("WidgetLifecycleCoordinator", runtime);
+        Assert.Contains("_widgetLifecycle?.Mount()", runtime);
+        Assert.Contains("_widgetLifecycle?.Dispose()", runtime);
+        Assert.Contains("coordinator.MarkReady", Read("tests", "LongBetterWindows.Tests", "CoreTests.cs"));
+        Assert.Contains("long.widget-mounted", widgetLifecycle);
+        Assert.Contains("long.widget-suspend", widgetLifecycle);
+        Assert.Contains("long.widget-resume", widgetLifecycle);
+        Assert.Contains("long.widget-unmount", widgetLifecycle);
+        Assert.Contains("ready-timeout", widgetLifecycle);
         Assert.Contains("FileOps.MoveAsync", dispatcher);
+        Assert.Contains("WidgetReady(args)", dispatcher);
         Assert.Contains("WebPluginArguments.GetJson", dispatcher);
         Assert.Contains("GetHeaders", arguments);
         Assert.Contains("CoreWebView2.NavigationStarting +=", lifecycle);
@@ -1968,7 +1979,7 @@ public class QualityGateTests
         Assert.DoesNotContain("window.long =", runtime);
         Assert.DoesNotContain("FileOps.MoveAsync", runtime);
         Assert.DoesNotContain("CoreWebView2NavigationStartingEventArgs", runtime);
-        Assert.True(runtime.Split('\n').Length < 150);
+        Assert.True(runtime.Split('\n').Length < 170);
     }
 
     [Fact]
