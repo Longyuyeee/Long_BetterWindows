@@ -78,7 +78,6 @@
     <Message Importance="high" Text="复制插件到 $(OutputPath)Plugins..." />
 
     <!-- 原生插件仅发布运行所需的 Manifest 与 DLL，不携带源码和项目文件。 -->
-    <RemoveDir Directories="$(OutputPath)Plugins\SamplePlugin;$(OutputPath)Plugins\FolderNotePlugin;$(OutputPath)Plugins\QuickLaunchPlugin;$(OutputPath)Plugins\MacroPlugin;$(OutputPath)Plugins\ColorPickerPlugin;$(OutputPath)Plugins\ScreenshotPlugin;$(OutputPath)Plugins\WindowManagerPlugin" />
     <MakeDir Directories="$(OutputPath)Plugins\SamplePlugin;$(OutputPath)Plugins\FolderNotePlugin;$(OutputPath)Plugins\QuickLaunchPlugin;$(OutputPath)Plugins\MacroPlugin;$(OutputPath)Plugins\ColorPickerPlugin;$(OutputPath)Plugins\ScreenshotPlugin;$(OutputPath)Plugins\WindowManagerPlugin" />
 
     <Copy SourceFiles="$(RepoRoot)src\SamplePlugin\manifest.json" DestinationFolder="$(OutputPath)Plugins\SamplePlugin" />

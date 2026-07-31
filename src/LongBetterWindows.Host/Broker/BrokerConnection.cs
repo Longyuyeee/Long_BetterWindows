@@ -80,13 +80,16 @@ internal sealed class BrokerConnection(
         {
             disconnected.Cancel();
             foreach (var invocation in _invocations.Values)
-                invocation.Cancel();
+                CancelSafely(invocation);
             Task[] pending;
             lock (requests) pending = requests.ToArray();
             try { await Task.WhenAll(pending).ConfigureAwait(false); }
             catch (Exception ex) when (ex is OperationCanceledException or IOException) { }
             foreach (var invocation in _invocations.Values)
-                invocation.Dispose();
+            {
+                try { invocation.Dispose(); }
+                catch (ObjectDisposedException) { }
+            }
             _invocations.Clear();
             _writeGate.Dispose();
         }
@@ -234,7 +237,7 @@ internal sealed class BrokerConnection(
         {
             var cancel = Deserialize<CommandCancelRequest>(request);
             var accepted = _invocations.TryGetValue(cancel.RequestId, out var invocation);
-            if (accepted) invocation!.Cancel();
+            if (accepted) CancelSafely(invocation!);
             await WriteResultAsync(request.Id, new CommandCancelResponse(accepted), cancellationToken).ConfigureAwait(false);
         }
         catch (JsonException)
@@ -313,5 +316,11 @@ internal sealed class BrokerConnection(
         {
             _writeGate.Release();
         }
+    }
+
+    private static void CancelSafely(CancellationTokenSource source)
+    {
+        try { source.Cancel(); }
+        catch (ObjectDisposedException) { }
     }
 }
