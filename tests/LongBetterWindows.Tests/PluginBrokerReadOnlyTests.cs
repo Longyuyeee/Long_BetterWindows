@@ -193,10 +193,13 @@ public sealed class PluginBrokerReadOnlyTests
         await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(handler));
         await using var client = new LongPluginBrokerClient(fixture.PipeName);
         await client.ConnectAsync(Hello());
-        var error = await Assert.ThrowsAsync<IpcRemoteException>(() =>
-            client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
-                BrokerMethods.CommandInvoke, CommandRequest(), 100));
-        Assert.Equal(IpcErrorCodes.Timeout, error.Code);
+        for (var iteration = 0; iteration < 12; iteration++)
+        {
+            var error = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+                client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+                    BrokerMethods.CommandInvoke, CommandRequest(), 100));
+            Assert.Equal(IpcErrorCodes.Timeout, error.Code);
+        }
     }
 
     [Fact]

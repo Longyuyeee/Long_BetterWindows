@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "protocol": "long.plugin.ipc/1.0",
+  "lpwp_version": "1.0",
+  "plugin_api_current": "1.1.0",
+  "plugin_api_legacy_minimum": "1.0.0",
+  "maximum_frame_bytes": 1048576,
+  "deadline_ms": {
+    "minimum": 100,
+    "default": 10000,
+    "maximum": 120000
+  },
+  "maximum_concurrent_commands_per_plugin": 4,
+  "required_methods": [
+    "host.hello",
+    "health.ping",
+    "plugin.catalog.list",
+    "plugin.catalog.get",
+    "command.invoke",
+    "command.cancel",
+    "plugin.open"
+  ],
+  "security_invariants": {
+    "current_user_only_pipe": true,
+    "same_sid": true,
+    "same_session": true,
+    "same_integrity_level": true,
+    "first_frame_host_hello": true,
+    "catalog_is_sanitized": true,
+    "command_uses_existing_executor": true,
+    "disconnect_cancels_commands": true,
+    "diagnostics_exclude_payloads": true,
+    "long_grid_loads_native_plugin_code": false
+  },
+  "fixture_files": [
+    "command-invoke.request.json",
+    "command-invoke.response.json",
+    "error.response.json",
+    "host-hello.request.json",
+    "host-hello.response.json",
+    "plugin-open.request.json"
+  ]
+}
