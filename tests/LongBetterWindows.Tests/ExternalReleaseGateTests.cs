@@ -88,6 +88,11 @@ public sealed class ExternalReleaseGateTests : IDisposable
             root.GetProperty("evidence_contract")
                 .GetProperty("marketplace_rehearsal_schema_version")
                 .GetInt32());
+        Assert.Equal(
+            5,
+            root.GetProperty("product_acceptance")
+                .GetProperty("approved_validation_count")
+                .GetInt32());
         Assert.All(
             root.GetProperty("inputs").EnumerateObject(),
             input => Assert.Matches("^[0-9a-f]{64}$", input.Value.GetString()));
@@ -109,6 +114,21 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.True(preflight.RootElement.GetProperty("passed").GetBoolean());
         Assert.True(preflight.RootElement.GetProperty("preflight_only").GetBoolean());
         Assert.Empty(Directory.GetFiles(_root, "*decision*.json"));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsIncompleteProductAcceptance()
+    {
+        var paths = WriteFixture(PackageHash);
+        var json = await File.ReadAllTextAsync(paths.ProductAcceptance);
+        await File.WriteAllTextAsync(
+            paths.ProductAcceptance,
+            json.Replace("\"approved_validation_count\":5", "\"approved_validation_count\":4"));
+
+        var result = await RunVerifierAsync(paths, Path.Combine(_root, "product-rejected.json"));
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("product-acceptance gate contract is incomplete", result.Error);
     }
 
     [Fact]
@@ -766,6 +786,60 @@ public sealed class ExternalReleaseGateTests : IDisposable
                 rollback_verification = EvidenceEntry("rollback-verification.json"),
             },
         });
+        var validationIds = new[]
+        {
+            "taskbar-visual-grouping",
+            "native-performance",
+            "lpwp-long-grid-e2e",
+            "lpwp-widget-desktop",
+            "lpwp-signed-reference",
+        };
+        var productApprovals = validationIds.Select(id =>
+        {
+            var relativePath = $"product.sources/{id}.json";
+            WritePortableSource(relativePath, new
+            {
+                schema_version = 1,
+                classification = "final_validation_approval",
+                validation_id = id,
+                source_commit = Commit,
+                status = "passed",
+                reviewer = "product-reviewer",
+            });
+            return new
+            {
+                validation_id = id,
+                source_commit = Commit,
+                source_manifest = EvidenceEntry(relativePath),
+            };
+        }).ToArray();
+        const string pluginMatrixRelative = "product.sources/plugin-positive-matrix.json";
+        WritePortableSource(pluginMatrixRelative, new
+        {
+            schema_version = 1,
+            classification = "plugin_positive_matrix",
+            source_commit = Commit,
+            source_dirty = false,
+            plugin_count = 25,
+            command_count = 42,
+            approval_receipt_count = 25,
+            contract_valid = true,
+            release_eligible = true,
+        });
+        var productAcceptance = WriteJson("product.json", new
+        {
+            schema_version = 1,
+            classification = "approved_final_product_acceptance",
+            passed = true,
+            source_commit = Commit,
+            plugin_count = 25,
+            command_count = 42,
+            plugin_approval_receipt_count = 25,
+            required_validation_ids = validationIds,
+            approved_validation_count = 5,
+            plugin_matrix = EvidenceEntry(pluginMatrixRelative),
+            approvals = productApprovals,
+        });
         return new FixturePaths(
             release,
             download,
@@ -773,6 +847,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
             dpi,
             accessibility,
             marketplace,
+            productAcceptance,
             marketplaceEvidence,
             packagePath,
             frameworkPackagePath,
@@ -945,6 +1020,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
             "-PhysicalDpiGatePath", paths.Dpi,
             "-AccessibilityGatePath", paths.Accessibility,
             "-MarketplaceRehearsalPath", paths.Marketplace,
+            "-ProductAcceptanceGatePath", paths.ProductAcceptance,
             "-ExpectedSourceCommit", Commit,
             "-ExpectedDistributionChannel", "unsigned",
         })
@@ -993,6 +1069,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
         string Dpi,
         string Accessibility,
         string Marketplace,
+        string ProductAcceptance,
         string MarketplaceDeploymentEvidence,
         string Package,
         string FrameworkPackage,
