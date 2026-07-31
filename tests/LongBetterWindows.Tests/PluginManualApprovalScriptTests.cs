@@ -32,6 +32,7 @@ public sealed class PluginManualApprovalScriptTests
 
         Assert.Contains("plugin-manual-approvals", source);
         Assert.Contains("approval_receipt_count", source);
+        Assert.DoesNotContain("Path]::GetRelativePath", source);
         Assert.Contains("manifest_sha256", source);
         Assert.Contains("subject_executable_sha256", source);
         Assert.Contains("git -C $PSScriptRoot diff", source);

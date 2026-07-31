@@ -369,6 +369,7 @@ $releaseEligible = $errors.Count -eq 0 -and
     -not $sourceDirty
 $report = [ordered]@{
     schema_version = 1
+    classification = "plugin_positive_matrix"
     generated_at = [DateTimeOffset]::Now.ToString("o")
     matrix_path = $matrixFile
     matrix_sha256 = $matrixSha256
