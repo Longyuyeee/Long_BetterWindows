@@ -214,6 +214,7 @@ Long助手提交设计 PR 时，需要明确回答：
 - [ ] Bridge 生命周期 Fixtures
 - [ ] 签名参考 `.lpak`
 - [x] Long Grid 最小互操作测试说明与 `long-ipc-probe`
+- [x] Broker 开关与脱敏诊断导出
 - [ ] 安全威胁模型
 - [ ] 性能基线与资源回收结果
 - [ ] 兼容、升级、回滚和卸载测试报告

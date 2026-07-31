@@ -41,6 +41,7 @@ namespace LongBetterWindows.Host.Views
                 ThemeButton,
                 MotionToggle,
                 UpdateActionButton,
+                BrokerActions,
                 ClearPreferencesButton,
             ];
             InitializeLanguageSelector();
@@ -49,6 +50,7 @@ namespace LongBetterWindows.Host.Views
                 == Wpf.Ui.Appearance.ApplicationTheme.Light;
             RefreshThemeButton();
             RefreshMouseGestureControls();
+            RefreshBrokerControls();
             RenderUpdateState();
             SizeChanged += OnSizeChanged;
             Loaded += OnLoaded;
@@ -132,6 +134,7 @@ namespace LongBetterWindows.Host.Views
                 InitializeLanguageSelector();
                 RefreshThemeButton();
                 RefreshMouseGestureControls();
+                RefreshBrokerControls();
                 RenderUpdateState();
             });
         }
@@ -223,6 +226,61 @@ namespace LongBetterWindows.Host.Views
             {
                 if (!_disposed)
                     ClearPreferencesButton.IsEnabled = true;
+            }
+        }
+
+        private void RefreshBrokerControls(string? status = null)
+        {
+            var enabled = (Application.Current as App)?.IsPluginBrokerEnabled == true;
+            BrokerToggle.IsChecked = enabled;
+            AutomationProperties.SetName(
+                BrokerToggle,
+                I18n(enabled
+                    ? "settings.broker.action.disable"
+                    : "settings.broker.action.enable"));
+            BrokerStatusText.Text = status ?? I18n(enabled
+                ? "settings.broker.status.enabled"
+                : "settings.broker.status.disabled");
+        }
+
+        private async void BrokerToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current is not App app) return;
+            BrokerActions.IsEnabled = false;
+            try
+            {
+                await app.SetPluginBrokerEnabledAsync(BrokerToggle.IsChecked == true);
+                RefreshBrokerControls();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(exception, "Plugin broker setting update failed");
+                RefreshBrokerControls(I18n("settings.broker.status.failed"));
+            }
+            finally
+            {
+                if (!_disposed) BrokerActions.IsEnabled = true;
+            }
+        }
+
+        private async void ExportBrokerDiagnostics_Click(object sender, RoutedEventArgs e)
+        {
+            if (Application.Current is not App app) return;
+            BrokerActions.IsEnabled = false;
+            try
+            {
+                var path = await app.ExportPluginBrokerDiagnosticsAsync();
+                RefreshBrokerControls(string.Format(
+                    I18n("settings.broker.status.exported"), path));
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(exception, "Plugin broker diagnostics export failed");
+                RefreshBrokerControls(I18n("settings.broker.status.failed"));
+            }
+            finally
+            {
+                if (!_disposed) BrokerActions.IsEnabled = true;
             }
         }
 

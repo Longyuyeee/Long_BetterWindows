@@ -1163,7 +1163,9 @@ public class QualityGateTests
         Assert.DoesNotContain("<local:SettingsPageControl", xaml);
         Assert.Contains("SettingsHost.Content is null", code);
         Assert.Contains("new SettingsPageControl()", code);
-        Assert.Equal(6, settingsXaml.Split("Style=\"{StaticResource SettingsCard}\"").Length - 1);
+        Assert.Equal(7, settingsXaml.Split("Style=\"{StaticResource SettingsCard}\"").Length - 1);
+        Assert.Contains("x:Name=\"BrokerToggle\"", settingsXaml);
+        Assert.Contains("ExportBrokerDiagnostics_Click", settingsCode);
         Assert.Contains("VerticalAlignment=\"Top\"", settingsXaml);
         Assert.Contains("IDisposable", settingsCode);
         Assert.Contains("UpdateUiState", settingsCode);

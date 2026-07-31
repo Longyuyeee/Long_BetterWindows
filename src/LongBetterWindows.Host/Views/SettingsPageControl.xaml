@@ -134,6 +134,41 @@
             </StackPanel>
         </Border>
 
+        <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="{DynamicResource i18n.settings.broker.title}"
+                               FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="{DynamicResource i18n.settings.broker.desc}"
+                               Margin="0,5,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    <TextBlock x:Name="BrokerStatusText" Margin="0,8,0,0"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                               automation:AutomationProperties.LiveSetting="Polite" />
+                </StackPanel>
+                <StackPanel x:Name="BrokerActions" Grid.Column="1"
+                            VerticalAlignment="Center">
+                    <ToggleButton x:Name="BrokerToggle"
+                                  Style="{StaticResource LongToggle}"
+                                  HorizontalAlignment="Right"
+                                  Click="BrokerToggle_Click" />
+                    <Button Content="{DynamicResource i18n.settings.broker.export}"
+                            Style="{StaticResource LongButton}"
+                            Margin="0,8,0,0"
+                            Click="ExportBrokerDiagnostics_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <Border Style="{StaticResource SettingsCard}">
             <Grid>
                 <Grid.RowDefinitions>

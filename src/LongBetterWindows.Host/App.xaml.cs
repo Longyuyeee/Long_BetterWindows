@@ -43,6 +43,10 @@ namespace LongBetterWindows.Host
         private int _pluginRuntimeStarted;
         private PluginRuntimeCoordinator? _pluginRuntime;
         private LongPluginBrokerService? _pluginBroker;
+        private readonly BrokerSettingsStore _brokerSettingsStore = new();
+        private readonly SemaphoreSlim _brokerControlGate = new(1, 1);
+        private BrokerSettings _brokerSettings = BrokerSettings.Default;
+        private BrokerDiagnosticsSnapshot? _lastBrokerDiagnostics;
         private static bool _currentIsLight;
         private static bool _forceHighContrast;
         private static bool _forceReduceMotion;
@@ -83,6 +87,8 @@ namespace LongBetterWindows.Host
                 .CreateLogger();
 
             Log.Information("Long助手 正在启动...");
+
+            _brokerSettings = _brokerSettingsStore.Load();
 
             _startupOptions = AppStartupOptions.Parse(e.Args);
             if (!string.IsNullOrWhiteSpace(
@@ -224,10 +230,8 @@ namespace LongBetterWindows.Host
                     return;
                 }
 
-                _pluginBroker = new LongPluginBrokerService(
-                    HostProvider.Instance.PluginStore);
-                _pluginBroker.Start();
-                Log.Information("Long Plugin Broker 已启动（同用户、同会话、同完整性级别）");
+                if (_brokerSettings.Enabled)
+                    StartPluginBroker();
 
                 if (MainWindow is Window qualityWindow
                     && (_startupOptions.QualityCaptureWidth > 0
@@ -579,6 +583,55 @@ namespace LongBetterWindows.Host
                         ServicesInitializer.I18n.T(
                             "folderNote.hud.modifiedHint")));
             });
+        }
+
+        internal bool IsPluginBrokerEnabled => _brokerSettings.Enabled;
+
+        internal async Task SetPluginBrokerEnabledAsync(bool enabled)
+        {
+            await _brokerControlGate.WaitAsync();
+            try
+            {
+                if (_brokerSettings.Enabled == enabled) return;
+                var updated = new BrokerSettings(enabled);
+                await _brokerSettingsStore.SaveAsync(updated);
+                _brokerSettings = updated;
+                if (enabled)
+                {
+                    if (_pluginRuntime is not null && _pluginBroker is null)
+                        StartPluginBroker();
+                }
+                else if (_pluginBroker is not null)
+                {
+                    _lastBrokerDiagnostics = _pluginBroker.GetDiagnostics() with
+                    {
+                        Running = false,
+                        CapturedUtc = DateTimeOffset.UtcNow,
+                    };
+                    await _pluginBroker.DisposeAsync();
+                    _pluginBroker = null;
+                    Log.Information("Long Plugin Broker 已由用户停用");
+                }
+            }
+            finally
+            {
+                _brokerControlGate.Release();
+            }
+        }
+
+        internal Task<string> ExportPluginBrokerDiagnosticsAsync()
+        {
+            var snapshot = _pluginBroker?.GetDiagnostics()
+                ?? _lastBrokerDiagnostics
+                ?? new BrokerDiagnostics().Snapshot(false);
+            return BrokerDiagnosticsExporter.ExportAsync(snapshot);
+        }
+
+        private void StartPluginBroker()
+        {
+            _pluginBroker = new LongPluginBrokerService(HostProvider.Instance.PluginStore);
+            _pluginBroker.Start();
+            Log.Information("Long Plugin Broker 已启动（同用户、同会话、同完整性级别）");
         }
 
         protected override void OnExit(ExitEventArgs e)

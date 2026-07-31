@@ -12,6 +12,7 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
     private readonly PluginCatalogProjection _catalog;
     private readonly PluginCommandEndpoint _commands;
     private readonly PluginOpenEndpoint _pluginOpen;
+    private readonly BrokerDiagnostics _diagnostics = new();
     private readonly IBrokerClientIdentityProbe _identityProbe;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly object _connectionsLock = new();
@@ -36,6 +37,9 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
             throw new InvalidOperationException("Plugin broker has already started.");
         _acceptLoop = AcceptLoopAsync(_shutdown.Token);
     }
+
+    public BrokerDiagnosticsSnapshot GetDiagnostics()
+        => _diagnostics.Snapshot(_acceptLoop is { IsCompleted: false });
 
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
@@ -76,6 +80,7 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
 
     private async Task HandleConnectionAsync(NamedPipeServerStream pipe, CancellationToken cancellationToken)
     {
+        var accepted = false;
         await using (pipe)
         {
             try
@@ -84,17 +89,27 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
                 var client = _identityProbe.GetClientIdentity(pipe);
                 if (!BrokerClientAuthentication.IsSameSecurityBoundary(server, client))
                 {
+                    _diagnostics.ConnectionRejected();
                     Log.Warning("Plugin broker rejected a client outside the host security boundary");
                     return;
                 }
 
+                _diagnostics.ConnectionAccepted();
+                accepted = true;
                 await new BrokerConnection(
-                    pipe, _catalog, _commands, _pluginOpen, App.ProductVersion)
+                    pipe, _catalog, _commands, _pluginOpen, _diagnostics, App.ProductVersion)
                     .RunAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                if (!accepted && ex is UnauthorizedAccessException)
+                    _diagnostics.ConnectionRejected();
                 Log.Debug(ex, "Plugin broker connection closed");
+            }
+            finally
+            {
+                if (accepted)
+                    _diagnostics.ConnectionClosed();
             }
         }
     }
