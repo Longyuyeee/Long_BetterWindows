@@ -436,11 +436,28 @@ public class CoreTests
         Assert.Equal(capability, WebPluginBridgeProtocol.GetRequiredCapability(method));
     }
 
+    [Theory]
+    [InlineData("host.getInfo")]
+    [InlineData("widget.ready")]
+    [InlineData("widget.getInstanceState")]
+    [InlineData("widget.setInstanceState")]
+    [InlineData("widget.openSettings")]
+    [InlineData("widget.invalidate")]
+    [InlineData("widget.setBadge")]
+    public void WebBridgeWidgetMethods_DoNotRequireManifestCapabilities(string method)
+    {
+        Assert.Null(WebPluginBridgeProtocol.GetRequiredCapability(method));
+    }
+
     [Fact]
     public void WebBridgeScript_ContainsPlatformApisAndPromiseResolution()
     {
         var script = WebPluginBridgeProtocol.BuildInjectionScript("com.test.bridge");
 
+        Assert.Contains("host:", script);
+        Assert.Contains("getInfo: function", script);
+        Assert.Contains("widget:", script);
+        Assert.Contains("setInstanceState: function", script);
         Assert.Contains("process:", script);
         Assert.Contains("performance:", script);
         Assert.Contains("networkPort:", script);
@@ -457,7 +474,419 @@ public class CoreTests
         Assert.Contains("startMonitoring: function(callback)", script);
         Assert.Contains("compareExchange: function(k,e,v)", script);
         Assert.Contains("m.type==='clipboard.changed'", script);
+        Assert.Contains("window.dispatchEvent(new CustomEvent(m.type,{detail:m.detail}))", script);
         Assert.Contains("com.test.bridge", script);
+    }
+
+    [Fact]
+    public async Task WebBridgeDispatcher_ReturnsBoundHostInfo()
+    {
+        using var dispatcher = new WebPluginHostDispatcher(
+            "com.test.bridge",
+            HostProvider.Instance,
+            _ => { },
+            new WebPluginBridgeContext(
+                "com.test.bridge",
+                surface: "widget",
+                widgetId: "system.status",
+                instanceId: "instance-1",
+                hostVersion: "9.9.9"));
+
+        var result = await dispatcher.DispatchAsync("host.getInfo", []);
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        Assert.Equal("1.0", root.GetProperty("protocol_version").GetString());
+        Assert.Equal("1.1.0", root.GetProperty("api_version").GetString());
+        Assert.Equal("long-assistant", root.GetProperty("host").GetProperty("id").GetString());
+        Assert.Equal("9.9.9", root.GetProperty("host").GetProperty("version").GetString());
+        Assert.Equal("com.test.bridge", root.GetProperty("plugin_id").GetString());
+        Assert.Equal("widget", root.GetProperty("surface").GetString());
+        Assert.Equal("system.status", root.GetProperty("widget_id").GetString());
+        Assert.Equal("instance-1", root.GetProperty("instance_id").GetString());
+        Assert.Contains(
+            root.GetProperty("features").EnumerateArray(),
+            item => item.GetString() == "widget.instance-state");
+    }
+
+    [Fact]
+    public async Task WebBridgeDispatcher_WidgetStateRequiresWidgetContext()
+    {
+        var stateRoot = Path.Combine(Path.GetTempPath(), $"long-widget-state-{Guid.NewGuid():N}");
+        var store = new WidgetInstanceStateStore(stateRoot);
+        using var pluginDispatcher = new WebPluginHostDispatcher(
+            "com.test.bridge",
+            HostProvider.Instance,
+            _ => { });
+
+        var denied = await pluginDispatcher.DispatchAsync("widget.getInstanceState", []);
+        using var deniedJson = JsonDocument.Parse(JsonSerializer.Serialize(denied));
+        Assert.False(deniedJson.RootElement.GetProperty("success").GetBoolean());
+
+        try
+        {
+            var firstContext = new WebPluginBridgeContext(
+                "com.test.bridge",
+                surface: "widget",
+                widgetId: "system.status",
+                instanceId: "instance-1");
+            using var widgetDispatcher = new WebPluginHostDispatcher(
+                "com.test.bridge",
+                HostProvider.Instance,
+                _ => { },
+                firstContext,
+                widgetStateStore: store);
+
+            using var state = JsonDocument.Parse("""{"state":{"selectedView":"cpu"}}""");
+            var saved = await widgetDispatcher.DispatchAsync(
+                "widget.setInstanceState",
+                [state.RootElement.Clone()]);
+            using var savedJson = JsonDocument.Parse(JsonSerializer.Serialize(saved));
+            Assert.True(savedJson.RootElement.GetProperty("success").GetBoolean());
+
+            using var restoredDispatcher = new WebPluginHostDispatcher(
+                "com.test.bridge",
+                HostProvider.Instance,
+                _ => { },
+                firstContext,
+                widgetStateStore: store);
+            var loaded = await restoredDispatcher.DispatchAsync("widget.getInstanceState", []);
+            using var loadedJson = JsonDocument.Parse(JsonSerializer.Serialize(loaded));
+            Assert.Equal(
+                "cpu",
+                loadedJson.RootElement
+                    .GetProperty("data")
+                    .GetProperty("selectedView")
+                    .GetString());
+
+            using var otherInstanceDispatcher = new WebPluginHostDispatcher(
+                "com.test.bridge",
+                HostProvider.Instance,
+                _ => { },
+                new WebPluginBridgeContext(
+                    "com.test.bridge",
+                    surface: "widget",
+                    widgetId: "system.status",
+                    instanceId: "instance-2"),
+                widgetStateStore: store);
+            var isolated = await otherInstanceDispatcher.DispatchAsync("widget.getInstanceState", []);
+            using var isolatedJson = JsonDocument.Parse(JsonSerializer.Serialize(isolated));
+            Assert.Equal(JsonValueKind.Null, isolatedJson.RootElement.GetProperty("data").ValueKind);
+        }
+        finally
+        {
+            try { Directory.Delete(stateRoot, true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_SerializesWidgetEventEnvelope()
+    {
+        var message = WebPluginBridgeProtocol.SerializeWidgetEvent(
+            new WebPluginBridgeContext(
+                "com.test.bridge",
+                surface: "widget",
+                widgetId: "system.status",
+                instanceId: "instance-1"),
+            "long.widget-resized",
+            12,
+            new { width = 320, height = 160 });
+
+        using var document = JsonDocument.Parse(message);
+        var detail = document.RootElement.GetProperty("detail");
+
+        Assert.Equal("long.widget-resized", document.RootElement.GetProperty("type").GetString());
+        Assert.Equal("1.0", detail.GetProperty("protocol_version").GetString());
+        Assert.Equal("com.test.bridge", detail.GetProperty("plugin_id").GetString());
+        Assert.Equal("system.status", detail.GetProperty("widget_id").GetString());
+        Assert.Equal("instance-1", detail.GetProperty("instance_id").GetString());
+        Assert.Equal(12, detail.GetProperty("sequence").GetInt64());
+        Assert.Equal(320, detail.GetProperty("payload").GetProperty("width").GetInt32());
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_RejectsUnknownWidgetEventNames()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            WebPluginBridgeProtocol.SerializeWidgetEvent(
+                new WebPluginBridgeContext(
+                    "com.test.bridge",
+                    surface: "widget",
+                    widgetId: "system.status",
+                    instanceId: "instance-1"),
+                "long.widget-unknown",
+                1,
+                new { }));
+    }
+
+    [Fact]
+    public void WebBridgeProtocol_EnforcesBridgeMessageLimit()
+    {
+        var smallMessage = "{\"id\":1,\"method\":\"host.getInfo\",\"args\":[]}";
+        var oversizedMessage = new string('x', WebPluginBridgeContext.BridgeMessageLimitBytes + 1);
+
+        Assert.True(WebPluginBridgeProtocol.IsWithinBridgeMessageLimit(smallMessage));
+        Assert.False(WebPluginBridgeProtocol.IsWithinBridgeMessageLimit(oversizedMessage));
+    }
+
+    [Fact]
+    public void WidgetLifecycleCoordinator_MountsReadyAndUnmountsWithMonotonicSequence()
+    {
+        var messages = new List<string>();
+        var context = new WebPluginBridgeContext(
+            "com.test.bridge",
+            surface: "widget",
+            widgetId: "system.status",
+            instanceId: "instance-1");
+        using var coordinator = new WidgetLifecycleCoordinator(
+            context,
+            messages.Add,
+            TimeSpan.FromSeconds(10));
+
+        coordinator.Mount();
+        var ready = coordinator.MarkReady(2);
+        coordinator.Suspend();
+        coordinator.Resume();
+        coordinator.Unmount();
+        coordinator.Unmount();
+
+        Assert.True(coordinator.IsReady);
+        using var readyJson = JsonDocument.Parse(JsonSerializer.Serialize(ready));
+        Assert.True(readyJson.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal(2, readyJson.RootElement.GetProperty("content_version").GetInt32());
+
+        Assert.Equal(4, messages.Count);
+        AssertWidgetEvent(messages[0], "long.widget-mounted", 1);
+        AssertWidgetEvent(messages[1], "long.widget-suspend", 2);
+        AssertWidgetEvent(messages[2], "long.widget-resume", 3);
+        AssertWidgetEvent(messages[3], "long.widget-unmount", 4);
+    }
+
+    [Fact]
+    public void WidgetLifecycleCoordinator_UsesSurfaceLayoutAndPublishesRealChanges()
+    {
+        var messages = new List<string>();
+        var context = new WebPluginBridgeContext(
+            "com.test.bridge",
+            surface: "widget",
+            widgetId: "system.status",
+            instanceId: "instance-1");
+        var initialLayout = new WidgetSurfaceLayout(2, 1, 320, 160, 1.25);
+        using var coordinator = new WidgetLifecycleCoordinator(
+            context,
+            messages.Add,
+            TimeSpan.FromSeconds(10),
+            initialLayout);
+
+        coordinator.Mount();
+        coordinator.Resize(initialLayout);
+        coordinator.Resize(new WidgetSurfaceLayout(3, 2, 480, 320, 1.5));
+        coordinator.SetVisibility(false, "surface-hidden");
+        coordinator.SetVisibility(false, "duplicate-hidden");
+        coordinator.SetVisibility(true, "surface-visible");
+
+        Assert.Equal(4, messages.Count);
+        using var mounted = JsonDocument.Parse(messages[0]);
+        var mountedSize = mounted.RootElement
+            .GetProperty("detail")
+            .GetProperty("payload")
+            .GetProperty("size");
+        Assert.Equal(320, mountedSize.GetProperty("width").GetDouble());
+        Assert.Equal(1.25, mountedSize.GetProperty("dpi_scale").GetDouble());
+
+        using var resized = JsonDocument.Parse(messages[1]);
+        var resizedPayload = resized.RootElement
+            .GetProperty("detail")
+            .GetProperty("payload");
+        Assert.Equal(3, resizedPayload.GetProperty("columns").GetInt32());
+        Assert.Equal(480, resizedPayload.GetProperty("width").GetDouble());
+        Assert.Equal(1.5, resizedPayload.GetProperty("scale").GetDouble());
+
+        AssertWidgetEvent(messages[0], "long.widget-mounted", 1);
+        AssertWidgetEvent(messages[1], "long.widget-resized", 2);
+        AssertWidgetEvent(messages[2], "long.widget-visibility-changed", 3);
+        AssertWidgetEvent(messages[3], "long.widget-visibility-changed", 4);
+    }
+
+    [Fact]
+    public void WebWidgetSurfaceSession_BindsWidgetEntryPointAndInstanceIdentity()
+    {
+        var widget = new PluginWidgetDefinition
+        {
+            Id = "system.status",
+            Title = "System status",
+            EntryPoint = "widgets/system-status.html",
+            DefaultSize = new PluginWidgetSize { Columns = 2, Rows = 1 },
+        };
+        var manifest = new PluginManifest
+        {
+            Id = "com.test.widgets",
+            Name = "Test widgets",
+            Version = "1.0.0",
+            Runtime = "webview",
+            EntryPoint = "index.html",
+            Widgets = [widget],
+        };
+
+        using var surface = new WebWidgetSurfaceSession(
+            manifest,
+            ".",
+            widget,
+            "instance-42",
+            new WidgetSurfaceLayout(2, 1, 320, 160, 1.25));
+
+        Assert.Equal("com.test.widgets", surface.PluginId);
+        Assert.Equal("system.status", surface.WidgetId);
+        Assert.Equal("instance-42", surface.InstanceId);
+        Assert.Equal("widgets/system-status.html", surface.EntryPoint);
+        Assert.Equal(
+            TimeSpan.FromSeconds(30),
+            WebWidgetSurfaceSession.DefaultHiddenSuspendDelay);
+    }
+
+    [Fact]
+    public void WidgetSurfaceLayout_ConvertsLogicalSizeToPhysicalPixels()
+    {
+        var created = WidgetSurfaceLayout.TryFromLogicalSize(
+            columns: 3,
+            rows: 2,
+            logicalWidth: 201.2,
+            logicalHeight: 100,
+            dpiScaleX: 1.25,
+            dpiScaleY: 1.5,
+            out var layout);
+
+        Assert.True(created);
+        Assert.True(layout.IsValid);
+        Assert.Equal(3, layout.Columns);
+        Assert.Equal(2, layout.Rows);
+        Assert.Equal(252, layout.Width);
+        Assert.Equal(150, layout.Height);
+        Assert.Equal(1.5, layout.DpiScale);
+    }
+
+    [Theory]
+    [InlineData(0, 1, 100, 100, 1, 1)]
+    [InlineData(1, 25, 100, 100, 1, 1)]
+    [InlineData(1, 1, 0, 100, 1, 1)]
+    [InlineData(1, 1, 100, 100, 0, 1)]
+    public void WidgetSurfaceLayout_RejectsInvalidSurfaceMetrics(
+        int columns,
+        int rows,
+        double width,
+        double height,
+        double scaleX,
+        double scaleY)
+    {
+        Assert.False(WidgetSurfaceLayout.TryFromLogicalSize(
+            columns,
+            rows,
+            width,
+            height,
+            scaleX,
+            scaleY,
+            out _));
+    }
+
+    [Fact]
+    public void WebWidgetSurfaceSession_RejectsForeignDefinitionAndInvalidLayout()
+    {
+        var manifestWidget = new PluginWidgetDefinition
+        {
+            Id = "system.status",
+            Title = "System status",
+            EntryPoint = "widgets/system-status.html",
+            DefaultSize = new PluginWidgetSize { Columns = 2, Rows = 1 },
+        };
+        var manifest = new PluginManifest
+        {
+            Id = "com.test.widgets",
+            Name = "Test widgets",
+            Version = "1.0.0",
+            Runtime = "webview",
+            EntryPoint = "index.html",
+            Widgets = [manifestWidget],
+        };
+        var foreignWidget = new PluginWidgetDefinition
+        {
+            Id = "other",
+            Title = "Other",
+            EntryPoint = "widgets/other.html",
+            DefaultSize = new PluginWidgetSize { Columns = 1, Rows = 1 },
+        };
+
+        Assert.Throws<ArgumentException>(() => new WebWidgetSurfaceSession(
+            manifest,
+            ".",
+            foreignWidget,
+            "instance-1",
+            new WidgetSurfaceLayout(1, 1, 160, 160, 1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new WebWidgetSurfaceSession(
+            manifest,
+            ".",
+            manifestWidget,
+            "instance-1",
+            new WidgetSurfaceLayout(0, 1, 160, 160, 1)));
+    }
+
+    [Fact]
+    public void WidgetLifecycleCoordinator_ReadyTimeoutEmitsAuditableVisibilityEvent()
+    {
+        var messages = new List<string>();
+        var context = new WebPluginBridgeContext(
+            "com.test.bridge",
+            surface: "widget",
+            widgetId: "system.status",
+            instanceId: "instance-1");
+        using var coordinator = new WidgetLifecycleCoordinator(
+            context,
+            messages.Add,
+            TimeSpan.FromSeconds(10));
+
+        coordinator.Mount();
+        coordinator.MarkReadyTimeout();
+
+        Assert.Equal(2, messages.Count);
+        AssertWidgetEvent(messages[0], "long.widget-mounted", 1);
+        using var timeout = JsonDocument.Parse(messages[1]);
+        Assert.Equal("long.widget-visibility-changed", timeout.RootElement.GetProperty("type").GetString());
+        var detail = timeout.RootElement.GetProperty("detail");
+        Assert.Equal(2, detail.GetProperty("sequence").GetInt64());
+        Assert.False(detail.GetProperty("payload").GetProperty("ready").GetBoolean());
+        Assert.Equal("ready-timeout", detail.GetProperty("payload").GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task WebBridgeDispatcher_WidgetReadyNotifiesLifecycle()
+    {
+        var messages = new List<string>();
+        var context = new WebPluginBridgeContext(
+            "com.test.bridge",
+            surface: "widget",
+            widgetId: "system.status",
+            instanceId: "instance-1");
+        using var coordinator = new WidgetLifecycleCoordinator(
+            context,
+            messages.Add,
+            TimeSpan.FromSeconds(10));
+        using var dispatcher = new WebPluginHostDispatcher(
+            "com.test.bridge",
+            HostProvider.Instance,
+            _ => { },
+            context,
+            coordinator.MarkReady);
+
+        coordinator.Mount();
+        using var request = JsonDocument.Parse("""{"content_version":3}""");
+        var result = await dispatcher.DispatchAsync(
+            "widget.ready",
+            [request.RootElement.Clone()]);
+
+        using var resultJson = JsonDocument.Parse(JsonSerializer.Serialize(result));
+        Assert.True(resultJson.RootElement.GetProperty("success").GetBoolean());
+        Assert.True(coordinator.IsReady);
+        AssertWidgetEvent(Assert.Single(messages), "long.widget-mounted", 1);
     }
 
     [Fact]
@@ -654,6 +1083,13 @@ public class CoreTests
     }
 
     // ===== helpers =====
+
+    private static void AssertWidgetEvent(string json, string eventName, long sequence)
+    {
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal(eventName, document.RootElement.GetProperty("type").GetString());
+        Assert.Equal(sequence, document.RootElement.GetProperty("detail").GetProperty("sequence").GetInt64());
+    }
 
     private static string CreateManifestDir(object content)
     {

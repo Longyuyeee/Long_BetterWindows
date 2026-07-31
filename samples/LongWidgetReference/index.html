@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Long Widget Reference</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="long-page reference-page">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">LPWP 1.0 REFERENCE</div>
+        <h1 class="long-page-title" data-i18n="page.title">Long Widget Reference</h1>
+        <p class="long-page-description" data-i18n="page.description">
+          一个可安装、可打包、可测试的 Web Widget 参考实现。
+        </p>
+      </div>
+      <span class="long-badge">API 1.1</span>
+    </header>
+
+    <section class="reference-grid" aria-label="Reference widget capabilities">
+      <article class="long-card reference-card">
+        <span class="reference-glyph">◌</span>
+        <h2 data-i18n="focus.title">专注脉搏</h2>
+        <p data-i18n="focus.description">单实例、手动刷新、状态保存和布局事件。</p>
+      </article>
+      <article class="long-card reference-card">
+        <span class="reference-glyph">＋</span>
+        <h2 data-i18n="counter.title">灵感计数</h2>
+        <p data-i18n="counter.description">多实例以及每个实例独立的持久化状态。</p>
+      </article>
+    </section>
+
+    <section class="long-card reference-checklist">
+      <h2 data-i18n="checklist.title">参考实现覆盖</h2>
+      <ul>
+        <li data-i18n="checklist.identity">宿主、插件、Widget 和实例身份协商</li>
+        <li data-i18n="checklist.lifecycle">mounted / ready / resize / visibility / suspend 生命周期</li>
+        <li data-i18n="checklist.state">有界实例状态读写与重启恢复</li>
+        <li data-i18n="checklist.package">生产验证、确定性 .lpak 与文件 SHA-256 总账</li>
+      </ul>
+    </section>
+  </main>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

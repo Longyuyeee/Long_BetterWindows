@@ -19,14 +19,19 @@ namespace LongBetterWindows.Host.Engine
         internal WebPluginViewLifecycle(
             PluginManifest manifest,
             string pluginDirectory,
-            Action<string> messageReceived)
+            Action<string> messageReceived,
+            string? entryPoint = null)
         {
             _manifest = manifest;
             _navigationPolicy = new WebPluginNavigationPolicy(pluginDirectory);
             _messageReceived = messageReceived;
+            EntryPoint = string.IsNullOrWhiteSpace(entryPoint)
+                ? manifest.EntryPoint
+                : entryPoint;
         }
 
         internal WebView2? View => _webView;
+        internal string EntryPoint { get; }
 
         internal WebView2 EnsureView()
         {
@@ -52,11 +57,22 @@ namespace LongBetterWindows.Host.Engine
                 webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
                 webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    _navigationPolicy.VirtualHostName,
+                    _navigationPolicy.PluginRoot,
+                    CoreWebView2HostResourceAccessKind.DenyCors);
                 webView.CoreWebView2.NavigationStarting += OnNavigationStarting;
                 webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
                 webView.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
                 webView.CoreWebView2.DownloadStarting += OnDownloadStarting;
+                webView.CoreWebView2.AddWebResourceRequestedFilter(
+                    "*",
+                    CoreWebView2WebResourceContext.All);
+                webView.CoreWebView2.WebResourceRequested += OnWebResourceRequested;
                 webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                    _navigationPolicy.BuildContentSecurityPolicyInjectionScript());
 
                 var uiKitScript = BuildUiKitInjectionScript();
                 if (!string.IsNullOrEmpty(uiKitScript))
@@ -75,9 +91,9 @@ namespace LongBetterWindows.Host.Engine
                 }
 
                 // 加载插件 HTML
-                if (!_navigationPolicy.TryResolveEntryPoint(_manifest.EntryPoint, out var entryUri))
+                if (!_navigationPolicy.TryResolveEntryPoint(EntryPoint, out var entryUri))
                     throw new InvalidDataException(
-                        $"Web 插件入口不存在或越出插件目录：{_manifest.EntryPoint}");
+                        $"Web 插件入口不存在或越出插件目录：{EntryPoint}");
 
                 _navigationCompletion = new TaskCompletionSource<bool>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
@@ -179,7 +195,7 @@ namespace LongBetterWindows.Host.Engine
             object? sender,
             CoreWebView2NavigationStartingEventArgs args)
         {
-            if (_navigationPolicy.IsTrustedLocalUri(args.Uri))
+            if (_navigationPolicy.IsTrustedWebViewUri(args.Uri))
             {
                 _languageMessages.BeginNavigation();
                 return;
@@ -216,11 +232,53 @@ namespace LongBetterWindows.Host.Engine
             Log.Warning("[Web:{Id}] 已阻止浏览器下载；插件应使用 long.http.download", _manifest.Id);
         }
 
+        private void OnWebResourceRequested(
+            object? sender,
+            CoreWebView2WebResourceRequestedEventArgs args)
+        {
+            var requestUri = args.Request.Uri;
+            if (_navigationPolicy.ShouldBlockWebResourceRequest(requestUri))
+            {
+                args.Response = CreateTextResponse(
+                    403,
+                    "Forbidden",
+                    "Long Assistant blocked a plugin subresource outside the trusted virtual origin.");
+                Log.Warning("[Web:{Id}] 已阻止越界子资源请求：{Uri}", _manifest.Id, requestUri);
+                return;
+            }
+
+            if (args.ResourceContext != CoreWebView2WebResourceContext.Document)
+                return;
+
+            if (!_navigationPolicy.TryResolveVirtualUriToLocalPath(requestUri, out var localPath)
+                || localPath is null
+                || !WebPluginNavigationPolicy.IsHtmlDocumentPath(localPath))
+            {
+                return;
+            }
+
+            try
+            {
+                args.Response = CreateFileResponse(
+                    localPath,
+                    "text/html; charset=utf-8",
+                    _navigationPolicy.BuildContentSecurityPolicyResponseHeader());
+            }
+            catch (Exception ex)
+            {
+                args.Response = CreateTextResponse(
+                    500,
+                    "Internal Server Error",
+                    "Long Assistant could not load the plugin document.");
+                Log.Warning(ex, "[Web:{Id}] Web 插件 HTML 文档响应创建失败：{Uri}", _manifest.Id, requestUri);
+            }
+        }
+
         private void OnWebMessageReceived(
             object? sender,
             CoreWebView2WebMessageReceivedEventArgs args)
         {
-            if (!_navigationPolicy.IsTrustedLocalUri(args.Source))
+            if (!_navigationPolicy.IsTrustedWebViewUri(args.Source))
             {
                 Log.Warning("[Web:{Id}] 已拒绝非插件页面的 Bridge 消息：{Source}",
                     _manifest.Id, args.Source);
@@ -253,6 +311,7 @@ namespace LongBetterWindows.Host.Engine
                 _webView.CoreWebView2.NavigationCompleted -= OnNavigationCompleted;
                 _webView.CoreWebView2.NewWindowRequested -= OnNewWindowRequested;
                 _webView.CoreWebView2.DownloadStarting -= OnDownloadStarting;
+                _webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
                 _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
             }
 
@@ -314,6 +373,39 @@ namespace LongBetterWindows.Host.Engine
             }
 
             coreWebView.PostWebMessageAsJson(json);
+        }
+
+        private CoreWebView2WebResourceResponse CreateFileResponse(
+            string path,
+            string contentType,
+            string extraHeaders)
+        {
+            var stream = File.OpenRead(path);
+            var headers = $"Content-Type: {contentType}\r\n"
+                + "X-Content-Type-Options: nosniff\r\n"
+                + extraHeaders;
+            return _webView!.CoreWebView2.Environment.CreateWebResourceResponse(
+                stream,
+                200,
+                "OK",
+                headers);
+        }
+
+        private CoreWebView2WebResourceResponse CreateTextResponse(
+            int statusCode,
+            string reasonPhrase,
+            string message)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(message);
+            var stream = new MemoryStream(bytes);
+            var headers = "Content-Type: text/plain; charset=utf-8\r\n"
+                + "X-Content-Type-Options: nosniff\r\n"
+                + _navigationPolicy.BuildContentSecurityPolicyResponseHeader();
+            return _webView!.CoreWebView2.Environment.CreateWebResourceResponse(
+                stream,
+                statusCode,
+                reasonPhrase,
+                headers);
         }
     }
 }

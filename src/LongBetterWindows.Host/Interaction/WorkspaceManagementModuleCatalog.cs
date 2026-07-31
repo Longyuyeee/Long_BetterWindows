@@ -5,6 +5,7 @@ namespace LongBetterWindows.Host.Interaction
         Overview,
         Workflows,
         Plugins,
+        Widgets,
         Market,
         System,
         Diagnostics,
@@ -34,6 +35,10 @@ namespace LongBetterWindows.Host.Interaction
                     "plugins",
                     Text(localize, "page.plugins.title", "插件管理"),
                     searchScopeId: "plugins"),
+                WorkspaceManagementPage.Widgets => Create(
+                    "widgets",
+                    "root",
+                    Text(localize, "page.widgets.title", "桌面组件")),
                 WorkspaceManagementPage.Market => Create(
                     "marketplace",
                     "catalog",
@@ -67,6 +72,7 @@ namespace LongBetterWindows.Host.Interaction
                 ("management", "root") => WorkspaceManagementPage.Overview,
                 ("management-page", "workflows") => WorkspaceManagementPage.Workflows,
                 ("management-page", "plugins") => WorkspaceManagementPage.Plugins,
+                ("widgets", "root") => WorkspaceManagementPage.Widgets,
                 ("marketplace", "catalog") => WorkspaceManagementPage.Market,
                 ("management-page", "system") => WorkspaceManagementPage.System,
                 ("diagnostics", "root") => WorkspaceManagementPage.Diagnostics,

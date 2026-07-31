@@ -1190,12 +1190,12 @@ public class QualityGateTests
         Assert.Contains("x:Name=\"ManagementDestinationGrid\"", toolCenter);
         Assert.Contains("ManagementDestination_Click", code);
         Assert.Equal(
-            8,
+            9,
             toolCenter.Split(
                 "automation:AutomationProperties.AutomationId=\"Long.Management.Destination.",
                 StringSplitOptions.None).Length - 1);
         Assert.Equal(
-            8,
+            9,
             toolCenter.Split(
                 "KeyboardNavigation.TabIndex=\"",
                 StringSplitOptions.None).Length - 1);
@@ -1942,8 +1942,22 @@ public class QualityGateTests
     public void WebBridgeProtocolAndHostDispatch_AreSeparatedFromWebViewRuntime()
     {
         var runtime = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.cs");
+        var widgetRuntime = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.Widget.cs");
         var protocol = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginBridgeProtocol.cs");
         var dispatcher = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginHostDispatcher.cs");
+        var widgetLifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WidgetLifecycleCoordinator.cs");
+        var widgetLayout = Read("src", "LongBetterWindows.Host", "Engine", "WidgetSurfaceLayout.cs");
+        var widgetState = Read("src", "LongBetterWindows.Host", "Engine", "WidgetInstanceStateStore.cs");
+        var widgetSurface = Read("src", "LongBetterWindows.Host", "Engine", "WebWidgetSurfaceSession.cs");
+        var widgetSurfaceHost = Read("src", "LongBetterWindows.Host", "Views", "WebWidgetSurfaceHost.cs");
+        var widgetCatalog = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetCatalogProjection.cs");
+        var widgetLayoutStore = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetLayoutStore.cs");
+        var widgetLayoutCoordinator = Read("src", "LongBetterWindows.Host", "Interaction", "WidgetLayoutCoordinator.cs");
+        var widgetDashboard = Read("src", "LongBetterWindows.Host", "Views", "WidgetDashboardControl.xaml.cs");
+        var widgetDashboardView = Read("src", "LongBetterWindows.Host", "Views", "WidgetDashboardControl.xaml");
+        var workspaceAddress = Read("src", "LongBetterWindows.Host", "Interaction", "WorkspaceModuleAddress.cs");
+        var toolCenter = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml");
+        var services = Read("src", "LongBetterWindows.Host", "Services", "ServicesInitializer.cs");
         var arguments = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginArguments.cs");
         var lifecycle = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
 
@@ -1952,17 +1966,86 @@ public class QualityGateTests
         Assert.Contains("_hostDispatcher.DispatchAsync", runtime);
         Assert.Contains("SerializeResult", protocol);
         Assert.Contains("BuildInjectionScript", protocol);
+        Assert.Contains("WidgetLifecycleCoordinator", runtime);
+        Assert.Contains("NotifyWidgetLayoutChanged", widgetRuntime);
+        Assert.Contains("_widgetLifecycle?.Mount()", runtime);
+        Assert.Contains("_widgetLifecycle?.Dispose()", runtime);
+        Assert.Contains("coordinator.MarkReady", Read("tests", "LongBetterWindows.Tests", "CoreTests.cs"));
+        Assert.Contains("long.widget-mounted", widgetLifecycle);
+        Assert.Contains("long.widget-suspend", widgetLifecycle);
+        Assert.Contains("long.widget-resume", widgetLifecycle);
+        Assert.Contains("long.widget-unmount", widgetLifecycle);
+        Assert.Contains("ready-timeout", widgetLifecycle);
+        Assert.Contains("long.widget-resized", widgetLifecycle);
+        Assert.Contains("long.widget-visibility-changed", widgetLifecycle);
+        Assert.Contains("WidgetSurfaceLayout", widgetLifecycle);
+        Assert.Contains("TryFromLogicalSize", widgetLayout);
+        Assert.Contains("MidpointRounding.AwayFromZero", widgetLayout);
+        Assert.Contains("DpiScale", widgetLayout);
+        Assert.Contains("new WebPluginBridgeContext(", widgetSurface);
+        Assert.Contains("surface: \"widget\"", widgetSurface);
+        Assert.Contains("declaredWidget.EntryPoint", widgetSurface);
+        Assert.Contains("DefaultHiddenSuspendDelay", widgetSurface);
+        Assert.Contains("PluginWidgetHiddenBehavior.Suspend", widgetSurface);
+        Assert.Contains("_runtime.NotifyWidgetLayoutChanged", widgetSurface);
+        Assert.Contains("_runtime.NotifyWidgetVisibilityChanged", widgetSurface);
+        Assert.Contains("_runtime.SuspendWidget", widgetSurface);
+        Assert.Contains("_runtime.ResumeWidget", widgetSurface);
+        Assert.Contains("ActualWidth", widgetSurfaceHost);
+        Assert.Contains("ActualHeight", widgetSurfaceHost);
+        Assert.Contains("VisualTreeHelper.GetDpi(this)", widgetSurfaceHost);
+        Assert.Contains("OnDpiChanged", widgetSurfaceHost);
+        Assert.Contains("IsVisibleChanged +=", widgetSurfaceHost);
+        Assert.Contains("SizeChanged +=", widgetSurfaceHost);
+        Assert.Contains("_session.SetVisible(false, \"surface-unloaded\")", widgetSurfaceHost);
+        Assert.DoesNotContain("PluginWindowHost", widgetSurfaceHost);
+        Assert.DoesNotContain("PluginWorkspaceSession", widgetSurfaceHost);
+        Assert.Contains("entry.Manifest.Widgets", widgetCatalog);
+        Assert.Contains("ResolveIcon", widgetCatalog);
+        Assert.Contains("SchemaVersion = 1", widgetLayoutStore);
+        Assert.Contains("MaximumPlacements = 256", widgetLayoutStore);
+        Assert.Contains("FileOptions.WriteThrough", widgetLayoutStore);
+        Assert.Contains("File.Move(temporaryPath, _path, overwrite: true)", widgetLayoutStore);
+        Assert.Contains("FileAttributes.ReparsePoint", widgetLayoutStore);
+        Assert.Contains("MultipleInstancesNotAllowed", widgetLayoutCoordinator);
+        Assert.Contains("PlacementOccupied", widgetLayoutCoordinator);
+        Assert.Contains("Reconcile(", widgetLayoutCoordinator);
+        Assert.Contains("new WebWidgetSurfaceSession", widgetDashboard);
+        Assert.Contains("if (!_cards.TryGetValue", widgetDashboard);
+        Assert.Contains("card.Host.SetGridSize", widgetDashboard);
+        Assert.Contains("ServicesInitializer.Widgets.MoveResizeAsync", widgetDashboard);
+        Assert.Contains("ServicesInitializer.Widgets.RemoveAsync", widgetDashboard);
+        Assert.Contains("for (var column = 0; column < 24; column++)", widgetDashboard);
+        Assert.Contains("AutomationProperties.SetAutomationId", widgetDashboard);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", widgetDashboardView);
+        Assert.Contains("x:Name=\"PanelWidgets\"", toolCenter);
+        Assert.Contains("\"widgets\" => WorkspaceModuleAddressKind.Widgets", workspaceAddress);
+        Assert.Contains("WidgetCatalogProjection.Build", services);
+        Assert.Contains("new WidgetLayoutStore", services);
+        Assert.Contains("WidgetInstanceStateStore", dispatcher);
+        Assert.Contains("WidgetGetInstanceState()", dispatcher);
+        Assert.Contains("_widgetStateStore.SetAsync", dispatcher);
+        Assert.Contains("HashIdentity", widgetState);
+        Assert.Contains("File.Replace", widgetState);
+        Assert.Contains("LocalApplicationData", widgetState);
         Assert.Contains("FileOps.MoveAsync", dispatcher);
+        Assert.Contains("WidgetReady(args)", dispatcher);
         Assert.Contains("WebPluginArguments.GetJson", dispatcher);
         Assert.Contains("GetHeaders", arguments);
         Assert.Contains("CoreWebView2.NavigationStarting +=", lifecycle);
-        Assert.Contains("_navigationPolicy.IsTrustedLocalUri", lifecycle);
+        Assert.Contains("_navigationPolicy.IsTrustedWebViewUri", lifecycle);
+        Assert.Contains("SetVirtualHostNameToFolderMapping", lifecycle);
+        Assert.Contains("AddWebResourceRequestedFilter", lifecycle);
+        Assert.Contains("WebResourceRequested += OnWebResourceRequested", lifecycle);
+        Assert.Contains("ShouldBlockWebResourceRequest", lifecycle);
+        Assert.Contains("BuildContentSecurityPolicyResponseHeader", lifecycle);
+        Assert.Contains("BuildContentSecurityPolicyInjectionScript", lifecycle);
         Assert.Contains("dispatcher.Invoke(Dispose)", lifecycle);
         Assert.Contains("dispatcher.InvokeAsync(() => PostMessageCore(json))", lifecycle);
         Assert.DoesNotContain("window.long =", runtime);
         Assert.DoesNotContain("FileOps.MoveAsync", runtime);
         Assert.DoesNotContain("CoreWebView2NavigationStartingEventArgs", runtime);
-        Assert.True(runtime.Split('\n').Length < 150);
+        Assert.True(runtime.Split('\n').Length < 170);
     }
 
     [Fact]
@@ -2168,7 +2251,7 @@ public class QualityGateTests
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(128, productionMethods.Length);
+        Assert.Equal(135, productionMethods.Length);
         Assert.Equal(productionMethods, mockMethods);
         Assert.Contains("\"name\": \"@long-assistant/plugin-sdk\"", package);
         using var packageDocument = System.Text.Json.JsonDocument.Parse(package);
@@ -2188,7 +2271,13 @@ public class QualityGateTests
         Assert.Contains("interface Window", types);
         Assert.Contains("LongClipboardChangedEvent", types);
         Assert.Contains("LongLanguageChangedMessage", types);
+        Assert.Contains("LongHostInfo", types);
+        Assert.Contains("LongWidgetApi", types);
+        Assert.Contains("interface WindowEventMap", types);
+        Assert.Contains("long.widget-resized", bridge);
         Assert.Contains("LongMockController", mockTypes);
+        Assert.Contains("host.getInfo", mock);
+        Assert.Contains("widget.setInstanceState", mock);
         Assert.Contains("storage.compareExchange", mock);
         Assert.Contains("@ts-expect-error", typeTest);
         Assert.Contains("node:test", behaviorTest);

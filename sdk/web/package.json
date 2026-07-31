@@ -22,7 +22,7 @@
   "scripts": {
     "test": "npm run test:types && npm run test:mock",
     "test:types": "tsc -p tests/tsconfig.json",
-    "test:mock": "node --test tests/mock.test.mjs"
+    "test:mock": "node --test tests/mock.test.mjs tests/reference-widget.test.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

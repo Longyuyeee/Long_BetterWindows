@@ -1,0 +1,133 @@
+:root {
+  color-scheme: light dark;
+  font-family: "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-width: 0;
+  min-height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  color: var(--long-text-primary, #f7f5ff);
+}
+
+.widget-shell {
+  min-height: 100vh;
+  padding: 16px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 85% 5%, color-mix(in srgb, var(--long-accent, #8877ff) 22%, transparent), transparent 44%),
+    var(--long-surface-card, rgba(23, 22, 32, .96));
+}
+
+.widget-header,
+.widget-actions,
+.widget-value-row {
+  display: flex;
+  align-items: center;
+}
+
+.widget-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.widget-header h1 {
+  margin: 2px 0 0;
+  font-size: clamp(16px, 5vw, 21px);
+}
+
+.widget-eyebrow,
+.widget-meta,
+.widget-status {
+  margin: 0;
+  color: var(--long-text-muted, #a9a4bc);
+  font-size: 11px;
+}
+
+.widget-eyebrow {
+  letter-spacing: .12em;
+}
+
+.widget-badge {
+  flex: none;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: var(--long-accent, #a99dff);
+  background: var(--long-accent-soft, rgba(136, 119, 255, .16));
+  font-size: 11px;
+}
+
+.widget-value-row {
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.widget-value-row strong {
+  font-size: clamp(30px, 11vw, 50px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.widget-value-row span {
+  color: var(--long-text-secondary, #cbc7d8);
+}
+
+.widget-actions {
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+button {
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 10px;
+  color: white;
+  background: var(--long-accent, #7565ef);
+  font: inherit;
+  cursor: pointer;
+}
+
+button.secondary {
+  color: var(--long-text-primary, #f7f5ff);
+  background: var(--long-surface-hover, rgba(255, 255, 255, .08));
+}
+
+button:focus-visible {
+  outline: 2px solid var(--long-focus, #b7abff);
+  outline-offset: 2px;
+}
+
+.widget-status {
+  margin-top: 10px;
+}
+
+body[data-mode="calm"] .widget-meta,
+body[data-mode="calm"] .widget-status,
+body[data-mode="calm"] #refreshButton {
+  display: none;
+}
+
+@media (max-width: 360px) {
+  .widget-shell {
+    padding: 12px;
+  }
+
+  .widget-actions {
+    gap: 6px;
+  }
+
+  button {
+    padding-inline: 10px;
+  }
+}

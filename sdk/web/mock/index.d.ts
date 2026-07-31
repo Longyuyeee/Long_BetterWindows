@@ -1,6 +1,8 @@
 import type {
   LongApi,
   LongClipboardChangedEvent,
+  LongHostInfo,
+  LongHostSurface,
   LongResult
 } from "../index.js";
 
@@ -14,6 +16,14 @@ export interface LongMockCall {
 
 export interface LongMockOptions {
   version?: string;
+  hostId?: string;
+  hostInfo?: Partial<LongHostInfo>;
+  pluginId?: string;
+  surface?: LongHostSurface;
+  widgetId?: string | null;
+  instanceId?: string | null;
+  features?: string[];
+  widgetState?: unknown;
   clipboardText?: string | null;
   storage?: Record<string, string>;
   handlers?: Record<string, LongMockHandler>;

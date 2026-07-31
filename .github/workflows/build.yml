@@ -67,7 +67,7 @@ jobs:
         run: dotnet restore LongBetterWindows.sln
 
       - name: Verify SDK and loader boundaries
-        run: dotnet test tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj --configuration Release --no-restore --filter "FullyQualifiedName~PluginSdkBoundaryTests|FullyQualifiedName~PluginTestingSdkTests"
+        run: dotnet test tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj --configuration Release --no-restore --filter "FullyQualifiedName~PluginSdkBoundaryTests|FullyQualifiedName~PluginTestingSdkTests|FullyQualifiedName~PluginIpcFoundationTests"
 
       - name: Verify Web SDK
         run: |
@@ -78,11 +78,18 @@ jobs:
         shell: pwsh
         run: ./verify-plugin-runtime-matrix.ps1
 
+      - name: Build LPWP reference widget
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP "reference-widget-package"
+          ./build-reference-widget.ps1 -OutputDir $output
+
       - name: Pack .NET SDK artifacts
         shell: pwsh
         run: |
           $output = Join-Path $env:RUNNER_TEMP "plugin-sdk-packages"
           dotnet pack src/LongBetterWindows.PluginSdk/LongBetterWindows.PluginSdk.csproj --configuration Release --no-build --output $output
+          dotnet pack src/LongBetterWindows.PluginIpc/LongBetterWindows.PluginIpc.csproj --configuration Release --no-build --output $output
           dotnet pack src/LongBetterWindows.PluginSdk.Wpf/LongBetterWindows.PluginSdk.Wpf.csproj --configuration Release --no-build --output $output
           dotnet pack sdk/dotnet/LongBetterWindows.PluginSdk.Testing/LongBetterWindows.PluginSdk.Testing.csproj --configuration Release --no-build --output $output
 
@@ -91,4 +98,11 @@ jobs:
         with:
           name: plugin-sdk-packages
           path: ${{ runner.temp }}/plugin-sdk-packages/*.nupkg
+          if-no-files-found: error
+
+      - name: Upload LPWP reference widget
+        uses: actions/upload-artifact@v7
+        with:
+          name: lpwp-reference-widget
+          path: ${{ runner.temp }}/reference-widget-package/*.lpak
           if-no-files-found: error

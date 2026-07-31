@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
@@ -9,8 +10,11 @@ namespace LongBetterWindows.Host.Engine
     internal sealed class WebPluginHostDispatcher : IDisposable
     {
         private readonly string _pluginId;
+        private readonly WebPluginBridgeContext _context;
         private readonly IHostApi _host;
         private readonly Action<string> _postMessage;
+        private readonly Func<object?, object>? _widgetReady;
+        private readonly WidgetInstanceStateStore _widgetStateStore;
         private readonly SemaphoreSlim _clipboardGate = new(1, 1);
         private readonly object _clipboardStateLock = new();
         private Task<HostApiResponse>? _clipboardAcquireTask;
@@ -20,11 +24,17 @@ namespace LongBetterWindows.Host.Engine
         internal WebPluginHostDispatcher(
             string pluginId,
             IHostApi host,
-            Action<string> postMessage)
+            Action<string> postMessage,
+            WebPluginBridgeContext? context = null,
+            Func<object?, object>? widgetReady = null,
+            WidgetInstanceStateStore? widgetStateStore = null)
         {
             _pluginId = pluginId;
+            _context = context ?? new WebPluginBridgeContext(pluginId);
             _host = host;
             _postMessage = postMessage;
+            _widgetReady = widgetReady;
+            _widgetStateStore = widgetStateStore ?? new WidgetInstanceStateStore();
         }
 
         internal async Task<object?> DispatchAsync(string method, object?[] args)
@@ -45,6 +55,15 @@ namespace LongBetterWindows.Host.Engine
                 "app.showNotification" => Task.FromResult<object?>(UIToast(WebPluginArguments.GetString(args, 0) + "\n" + WebPluginArguments.GetString(args, 1))),
                 "app.getVersion" => Task.FromResult<object?>(new { version = App.ProductVersion }),
                 "app.log" => Task.FromResult<object?>(PluginLog(args)),
+                "host.getInfo" => Task.FromResult<object?>(_context.ToHostInfo()),
+
+                // === long.widget ===
+                "widget.ready" => Task.FromResult<object?>(WidgetReady(args)),
+                "widget.getInstanceState" => WidgetGetInstanceState(),
+                "widget.setInstanceState" => WidgetSetInstanceState(args),
+                "widget.openSettings" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
+                "widget.invalidate" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
+                "widget.setBadge" => Task.FromResult<object?>(WidgetContextOnly(OkObj())),
 
                 // === long.clipboard ===
                 "clipboard.getText" => Ok(h.Clipboard.GetTextAsync()),
@@ -388,6 +407,73 @@ namespace LongBetterWindows.Host.Engine
         private object PluginLog(object?[] args)
         {
             Log.Information("[Web:{PluginId}] {Message}", _pluginId, string.Join(" ", args.Select(a => a?.ToString())));
+            return OkObj();
+        }
+
+        private object WidgetContextOnly(object result)
+        {
+            if (_context.IsWidget)
+                return result;
+
+            return new
+            {
+                success = false,
+                error = "Widget API 仅在 Widget 上下文中可用",
+            };
+        }
+
+        private object WidgetReady(object?[] args)
+        {
+            if (!_context.IsWidget)
+                return WidgetContextOnly(OkObj());
+
+            var contentVersion = 1;
+            if (args.Length > 0
+                && args[0] is JsonElement element
+                && element.ValueKind == JsonValueKind.Object
+                && element.TryGetProperty("content_version", out var contentVersionProperty)
+                && contentVersionProperty.TryGetInt32(out var parsedContentVersion))
+            {
+                contentVersion = parsedContentVersion;
+            }
+
+            return _widgetReady?.Invoke(contentVersion) ?? OkObj();
+        }
+
+        private async Task<object?> WidgetGetInstanceState()
+        {
+            if (!_context.IsWidget)
+                return WidgetContextOnly(OkObj());
+
+            var state = await _widgetStateStore.GetAsync(_context).ConfigureAwait(false);
+            return new { success = true, data = state };
+        }
+
+        private async Task<object?> WidgetSetInstanceState(object?[] args)
+        {
+            if (!_context.IsWidget)
+                return WidgetContextOnly(OkObj());
+
+            var stateEnvelope = args.Length > 0 ? args[0] : null;
+            object? state = stateEnvelope;
+            if (stateEnvelope is JsonElement element
+                && element.ValueKind == JsonValueKind.Object
+                && element.TryGetProperty("state", out var stateProperty))
+            {
+                state = stateProperty.Clone();
+            }
+
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(state);
+            if (bytes.Length > WebPluginBridgeContext.InstanceStateLimitBytes)
+            {
+                return new
+                {
+                    success = false,
+                    error = "Widget 实例状态超过 256 KiB",
+                };
+            }
+
+            await _widgetStateStore.SetAsync(_context, state).ConfigureAwait(false);
             return OkObj();
         }
 

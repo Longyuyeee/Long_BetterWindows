@@ -1,0 +1,50 @@
+.reference-page {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.reference-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.reference-card {
+  min-height: 170px;
+}
+
+.reference-card h2,
+.reference-checklist h2 {
+  margin: 14px 0 8px;
+  font-size: 18px;
+}
+
+.reference-card p,
+.reference-checklist li {
+  color: var(--long-text-secondary);
+  line-height: 1.65;
+}
+
+.reference-glyph {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  color: var(--long-accent);
+  background: var(--long-accent-soft);
+  font-size: 22px;
+}
+
+.reference-checklist ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+}
+
+@media (max-width: 700px) {
+  .reference-grid {
+    grid-template-columns: 1fr;
+  }
+}

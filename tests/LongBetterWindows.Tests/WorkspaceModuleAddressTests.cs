@@ -20,6 +20,7 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
     [InlineData("settings:root", "settings:root")]
     [InlineData("diagnostics:root", "diagnostics:root")]
     [InlineData("developer:root", "developer:root")]
+    [InlineData("WIDGETS:ROOT", "widgets:root")]
     [InlineData("workflow:workflow.safe", "workflow:workflow.safe")]
     [InlineData("plugin-settings:plugin.safe", "plugin-settings:plugin.safe")]
     [InlineData(

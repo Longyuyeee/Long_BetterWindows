@@ -1,0 +1,107 @@
+{
+  "id": "com.long.reference-widgets",
+  "version": "1.1.0",
+  "name": "Long Widget Reference",
+  "description": "LPWP 1.0 reference plugin with deterministic, stateful Web Widgets.",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "min_api_version": "1.1.0",
+  "capabilities": [],
+  "commands": [],
+  "widgets": [
+    {
+      "id": "focus-pulse",
+      "title": "专注脉搏",
+      "description": "演示单实例、状态保存、布局事件与手动刷新。",
+      "entry_point": "widgets/focus/index.html",
+      "icon": "assets/widget.svg",
+      "multiple_instances": false,
+      "default_size": {
+        "columns": 8,
+        "rows": 3
+      },
+      "min_size": {
+        "columns": 5,
+        "rows": 2
+      },
+      "max_size": {
+        "columns": 12,
+        "rows": 5
+      },
+      "refresh": {
+        "mode": "manual",
+        "hidden_behavior": "suspend"
+      },
+      "appearance": {
+        "transparent": true,
+        "host_chrome": true
+      },
+      "settings_schema": [
+        {
+          "key": "mode",
+          "type": "enum",
+          "title": "显示模式",
+          "description": "在简洁与详细视图之间切换。",
+          "default": "calm",
+          "enum_values": [
+            "calm",
+            "detail"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tiny-counter",
+      "title": "灵感计数",
+      "description": "演示多实例及实例间完全隔离的状态。",
+      "entry_point": "widgets/counter/index.html",
+      "icon": "assets/widget.svg",
+      "multiple_instances": true,
+      "default_size": {
+        "columns": 5,
+        "rows": 2
+      },
+      "min_size": {
+        "columns": 4,
+        "rows": 2
+      },
+      "max_size": {
+        "columns": 8,
+        "rows": 4
+      },
+      "refresh": {
+        "mode": "event",
+        "hidden_behavior": "throttle"
+      },
+      "appearance": {
+        "transparent": true,
+        "host_chrome": true
+      },
+      "settings_schema": []
+    }
+  ],
+  "window": {
+    "mode": "standard",
+    "preferred_width": 720,
+    "preferred_height": 620,
+    "min_width": 600,
+    "min_height": 480
+  },
+  "lifecycle": {
+    "start_with_host": false,
+    "close_behavior": "stop",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
+  "localization": {
+    "default_language": "zh-CN",
+    "resources": {
+      "zh-CN": "i18n/zh-CN.json",
+      "en-US": "i18n/en-US.json"
+    }
+  },
+  "default_settings": {
+    "auto_start": false
+  }
+}

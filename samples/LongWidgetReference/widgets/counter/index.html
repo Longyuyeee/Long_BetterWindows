@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN" data-widget-kind="counter">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>灵感计数</title>
+  <link rel="stylesheet" href="../shared/widget.css">
+</head>
+<body>
+  <main class="widget-shell" aria-labelledby="widgetTitle">
+    <header class="widget-header">
+      <div>
+        <p class="widget-eyebrow">IDEA COUNTER</p>
+        <h1 id="widgetTitle" data-i18n="widget.counter.title">灵感计数</h1>
+      </div>
+      <span id="lifecycleBadge" class="widget-badge" data-i18n="widget.connecting">连接中</span>
+    </header>
+    <section class="widget-value-row">
+      <strong id="value">0</strong>
+      <span id="unit" data-i18n="widget.counter.unit">个灵感</span>
+    </section>
+    <p id="identity" class="widget-meta">正在协商实例身份…</p>
+    <div class="widget-actions">
+      <button id="incrementButton" type="button" class="long-button long-button--primary" data-i18n="widget.counter.increment">记录一个</button>
+      <button id="modeButton" type="button" class="long-button long-button--secondary secondary">切换视图</button>
+      <button id="refreshButton" type="button" class="long-button long-button--secondary secondary" data-i18n="widget.refresh">请求刷新</button>
+    </div>
+    <p id="status" class="widget-status" role="status" aria-live="polite"></p>
+  </main>
+  <script type="module" src="../shared/widget-app.js"></script>
+</body>
+</html>

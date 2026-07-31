@@ -7,7 +7,7 @@ namespace LongBetterWindows.Tests;
 public class WorkspaceLauncherSearchProviderTests
 {
     [Fact]
-    public async Task EmptyQuery_ExposesManagementMarketAndSettingsWithoutPluginFlood()
+    public async Task EmptyQuery_ExposesCoreDestinationsWithoutPluginFlood()
     {
         var registry = new PluginRegistry();
         Register(registry, "sample", "Sample");
@@ -22,6 +22,7 @@ public class WorkspaceLauncherSearchProviderTests
             [
                 "workspace:management:root",
                 "workspace:marketplace:catalog",
+                "workspace:widgets:root",
                 "workspace:settings:root",
             ],
             results.Select(item => item.Id));

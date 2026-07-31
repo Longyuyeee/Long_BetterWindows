@@ -109,6 +109,14 @@ public sealed class PluginSdkBoundaryTests
             (
                 Path.Combine(
                     root,
+                    "src",
+                    "LongBetterWindows.PluginIpc",
+                    "LongBetterWindows.PluginIpc.csproj"),
+                "LongBetterWindows.PluginIpc",
+                Array.Empty<string>()),
+            (
+                Path.Combine(
+                    root,
                     "sdk",
                     "dotnet",
                     "LongBetterWindows.PluginSdk.Testing",

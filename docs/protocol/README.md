@@ -17,6 +17,8 @@
 
 - [long-widget.schema.json](long-widget.schema.json)：`widgets` 字段的 Draft 2020-12 JSON Schema。
 - [hardware-monitor-widget.manifest.json](examples/hardware-monitor-widget.manifest.json)：参考插件 Manifest。
+- [LongWidgetReference](../../samples/LongWidgetReference/README.md)：仓库内可运行的双 Widget 参考插件；根目录
+  `build-reference-widget.ps1` 会用生产规则生成确定性 unsigned `.lpak`。
 
 机器文件不是独立规范；如果它们与 `LONG_WIDGET_PROTOCOL_V1.md` 冲突，应先修正文档和 Schema，再开发代码。
 

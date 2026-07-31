@@ -226,7 +226,9 @@ public sealed class PluginTestingSdkTests
         Assert.Contains("actions/upload-artifact@v7", workflow);
         Assert.Contains("npm test --prefix sdk/web", workflow);
         Assert.Contains("verify-plugin-runtime-matrix.ps1", workflow);
-        Assert.Equal(3, workflow.Split("dotnet pack ").Length - 1);
+        Assert.Contains("PluginIpcFoundationTests", workflow);
+        Assert.Contains("LongBetterWindows.PluginIpc.csproj", workflow);
+        Assert.Equal(4, workflow.Split("dotnet pack ").Length - 1);
         Assert.DoesNotContain(".github/workflows/", gitIgnore);
     }
 
