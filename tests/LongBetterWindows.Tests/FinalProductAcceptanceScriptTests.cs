@@ -17,6 +17,9 @@ public sealed class FinalProductAcceptanceScriptTests
         Assert.Contains("long.plugin.ipc/1.0", source);
         Assert.Contains("lpwp_signed_reference", source);
         Assert.Contains("ExpectedPublicKeyFingerprint", source);
+        Assert.Contains("[Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit", source);
+        Assert.Contains("merge-base --is-ancestor $sourceCommit HEAD", source);
+        Assert.Contains("Product files changed after ExpectedSourceCommit", source);
         Assert.Contains("Write-NewJsonFileAtomically", source);
         Assert.DoesNotContain("ExportPkcs8PrivateKey", source);
         Assert.DoesNotContain("Path]::GetRelativePath", source);
@@ -28,6 +31,10 @@ public sealed class FinalProductAcceptanceScriptTests
         var source = Read("verify-final-product-acceptance.ps1");
 
         Assert.Contains("-RequireReleaseEligible", source);
+        Assert.Contains("[Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit", source);
+        Assert.Contains("merge-base --is-ancestor $sourceCommit HEAD", source);
+        Assert.Contains("plugin-manual-approvals|final-validation-approvals", source);
+        Assert.Contains("[string]$matrix.source_commit -ne $currentHead", source);
         Assert.Contains("ls-files --error-unmatch", source);
         Assert.Contains("Exactly $($requiredIds.Count)", source);
         Assert.Contains("plugin_approval_receipt_count = 25", source);
