@@ -210,10 +210,10 @@ Long助手提交设计 PR 时，需要明确回答：
 - [ ] TypeScript Web SDK
 - [ ] Mock Host
 - [ ] 合法/非法 Manifest Fixtures
-- [ ] IPC 请求/响应 Golden Fixtures
+- [x] IPC 请求/响应 Golden Fixtures（同时打入 IPC NuGet）
 - [ ] Bridge 生命周期 Fixtures
 - [ ] 签名参考 `.lpak`
-- [ ] Long Grid 最小互操作测试说明
+- [x] Long Grid 最小互操作测试说明与 `long-ipc-probe`
 - [ ] 安全威胁模型
 - [ ] 性能基线与资源回收结果
 - [ ] 兼容、升级、回滚和卸载测试报告

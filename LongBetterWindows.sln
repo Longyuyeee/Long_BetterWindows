@@ -41,6 +41,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.PluginSdk
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.PluginSdk.Wpf", "src\LongBetterWindows.PluginSdk.Wpf\LongBetterWindows.PluginSdk.Wpf.csproj", "{80311E10-2AC3-4CBB-9A5F-9A5CA0B2965B}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{07C2787E-EAC7-C090-1BA3-A61EC2A24D84}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LongBetterWindows.PluginIpcProbe", "tools\LongBetterWindows.PluginIpcProbe\LongBetterWindows.PluginIpcProbe.csproj", "{A0675CC1-C857-4666-BC2B-E915D13E9D8F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -243,6 +247,18 @@ Global
 		{80311E10-2AC3-4CBB-9A5F-9A5CA0B2965B}.Release|x64.Build.0 = Release|Any CPU
 		{80311E10-2AC3-4CBB-9A5F-9A5CA0B2965B}.Release|x86.ActiveCfg = Release|Any CPU
 		{80311E10-2AC3-4CBB-9A5F-9A5CA0B2965B}.Release|x86.Build.0 = Release|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Debug|x64.Build.0 = Debug|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Debug|x86.Build.0 = Debug|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Release|x64.ActiveCfg = Release|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Release|x64.Build.0 = Release|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Release|x86.ActiveCfg = Release|Any CPU
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -262,5 +278,6 @@ Global
 		{D2EE21F8-9328-4610-A2E6-617430D4A842} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
 		{5D63AC19-F680-423E-8041-5F94D2BF3E04} = {6B6BD141-1A0A-4926-8C72-B6EDBD14E0E5}
 		{80311E10-2AC3-4CBB-9A5F-9A5CA0B2965B} = {D4EA538B-BEFC-4AC4-885D-7B291607E8D6}
+		{A0675CC1-C857-4666-BC2B-E915D13E9D8F} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 EndGlobal

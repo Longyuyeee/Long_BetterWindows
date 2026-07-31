@@ -1,0 +1,14 @@
+{
+  "protocol": "long.plugin.ipc/1.0",
+  "id": "22222222-2222-2222-2222-222222222222",
+  "kind": "request",
+  "method": "command.invoke",
+  "deadline_ms": 10000,
+  "payload": {
+    "plugin_id": "com.long.hardware-monitor",
+    "command_id": "refresh",
+    "arguments": {},
+    "input_type": "none",
+    "paths": []
+  }
+}

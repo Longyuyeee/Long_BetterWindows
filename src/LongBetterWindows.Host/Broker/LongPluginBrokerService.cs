@@ -11,6 +11,7 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
     private readonly string _pipeName;
     private readonly PluginCatalogProjection _catalog;
     private readonly PluginCommandEndpoint _commands;
+    private readonly PluginOpenEndpoint _pluginOpen;
     private readonly IBrokerClientIdentityProbe _identityProbe;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly object _connectionsLock = new();
@@ -25,6 +26,7 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
         _pipeName = pipeName ?? BrokerPipeName.ForCurrentUser();
         _catalog = new PluginCatalogProjection(registry);
         _commands = new PluginCommandEndpoint(registry);
+        _pluginOpen = new PluginOpenEndpoint(registry);
         _identityProbe = identityProbe ?? new WindowsBrokerClientIdentityProbe();
     }
 
@@ -86,7 +88,8 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
                     return;
                 }
 
-                await new BrokerConnection(pipe, _catalog, _commands, App.ProductVersion)
+                await new BrokerConnection(
+                    pipe, _catalog, _commands, _pluginOpen, App.ProductVersion)
                     .RunAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

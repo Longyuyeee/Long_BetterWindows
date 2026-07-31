@@ -1,0 +1,10 @@
+{
+  "protocol": "long.plugin.ipc/1.0",
+  "id": "33333333-3333-3333-3333-333333333333",
+  "kind": "response",
+  "error": {
+    "code": "plugin_not_found",
+    "message": "The requested plugin is not installed.",
+    "retryable": false
+  }
+}

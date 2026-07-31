@@ -10,6 +10,7 @@ public static class BrokerMethods
     public const string PluginCatalogGet = "plugin.catalog.get";
     public const string CommandInvoke = "command.invoke";
     public const string CommandCancel = "command.cancel";
+    public const string PluginOpen = "plugin.open";
 }
 
 public sealed record HealthPingRequest(
@@ -83,3 +84,9 @@ public sealed record CommandCancelRequest(
 
 public sealed record CommandCancelResponse(
     [property: JsonPropertyName("accepted")] bool Accepted);
+
+public sealed record PluginOpenRequest(
+    [property: JsonPropertyName("plugin_id")] string PluginId);
+
+public sealed record PluginOpenResponse(
+    [property: JsonPropertyName("status")] string Status);
