@@ -3,7 +3,8 @@ param(
     [string] $ApprovalDirectory = 'docs/final-validation-approvals',
     [string] $SubjectExecutable =
         'src/LongBetterWindows.Host/bin/Release/net8.0-windows/LongBetterWindows.Host.exe',
-    [Parameter(Mandatory=$true)] [string] $OutputPath
+    [Parameter(Mandatory=$true)] [string] $OutputPath,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,10 +24,28 @@ $requiredIds = @(
     'lpwp-long-grid-e2e',
     'lpwp-widget-desktop',
     'lpwp-signed-reference')
-$sourceCommit = (& git -C $PSScriptRoot rev-parse HEAD).Trim().ToLowerInvariant()
+$currentHead = (& git -C $PSScriptRoot rev-parse HEAD).Trim().ToLowerInvariant()
+$sourceCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($sourceCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit.'
+}
+& git -C $PSScriptRoot merge-base --is-ancestor $sourceCommit HEAD 2>$null
+if ($LASTEXITCODE -ne 0) {
+    throw 'ExpectedSourceCommit must be an ancestor of HEAD.'
+}
 $trackedStatus = @(& git -C $PSScriptRoot status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -ne 0 -or $trackedStatus.Count -ne 0) {
     throw 'Final product acceptance requires a clean tracked worktree.'
+}
+$postCandidateChanges = @(& git -C $PSScriptRoot diff --name-only $sourceCommit HEAD --)
+if ($LASTEXITCODE -ne 0) {
+    throw 'Unable to compare HEAD with ExpectedSourceCommit.'
+}
+$unexpectedChanges = @($postCandidateChanges | Where-Object {
+    $_ -notmatch '^docs/(plugin-manual-approvals|final-validation-approvals)/[^/]+\.json$'
+})
+if ($unexpectedChanges.Count -ne 0) {
+    throw ('Product files changed after ExpectedSourceCommit: ' + ($unexpectedChanges -join ', '))
 }
 $hostPath = Resolve-RepositoryPath $SubjectExecutable
 if (-not (Test-Path -LiteralPath $hostPath -PathType Leaf)) {
@@ -43,7 +62,7 @@ try { $matrix = ($matrixOutput -join [Environment]::NewLine) | ConvertFrom-Json 
 if ($matrixExitCode -ne 0 -or $null -eq $matrix `
     -or -not [bool]$matrix.contract_valid `
     -or -not [bool]$matrix.release_eligible `
-    -or [string]$matrix.source_commit -ne $sourceCommit `
+    -or [string]$matrix.source_commit -ne $currentHead `
     -or [bool]$matrix.source_dirty `
     -or [int]$matrix.plugin_count -ne 25 `
     -or [int]$matrix.command_count -ne 42 `

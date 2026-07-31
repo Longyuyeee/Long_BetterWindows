@@ -11,6 +11,7 @@ param(
     [Parameter(Mandatory=$true)] [string] $Reviewer,
     [Parameter(Mandatory=$true)] [string] $Notes,
     [Parameter(Mandatory=$true)] [string[]] $EvidenceFiles,
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [string] $SubjectExecutable =
         'src/LongBetterWindows.Host/bin/Release/net8.0-windows/LongBetterWindows.Host.exe',
     [string] $ExpectedPublisherKeyId,
@@ -49,7 +50,24 @@ $trackedStatus = @(& git -C $PSScriptRoot status --porcelain --untracked-files=n
 if ($LASTEXITCODE -ne 0 -or $trackedStatus.Count -ne 0) {
     throw 'Final validation approval requires a clean tracked worktree.'
 }
-$sourceCommit = (& git -C $PSScriptRoot rev-parse HEAD).Trim().ToLowerInvariant()
+$sourceCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($sourceCommit -notmatch '^[0-9a-f]{40}$') {
+    throw 'ExpectedSourceCommit must be a full 40-character Git commit.'
+}
+& git -C $PSScriptRoot merge-base --is-ancestor $sourceCommit HEAD 2>$null
+if ($LASTEXITCODE -ne 0) {
+    throw 'ExpectedSourceCommit must be an ancestor of HEAD.'
+}
+$postCandidateChanges = @(& git -C $PSScriptRoot diff --name-only $sourceCommit HEAD --)
+if ($LASTEXITCODE -ne 0) {
+    throw 'Unable to compare HEAD with ExpectedSourceCommit.'
+}
+$unexpectedChanges = @($postCandidateChanges | Where-Object {
+    $_ -notmatch '^docs/(plugin-manual-approvals|final-validation-approvals)/[^/]+\.json$'
+})
+if ($unexpectedChanges.Count -ne 0) {
+    throw ('Product files changed after ExpectedSourceCommit: ' + ($unexpectedChanges -join ', '))
+}
 $subjectPath = Resolve-RepositoryPath $SubjectExecutable
 if (-not (Test-Path -LiteralPath $subjectPath -PathType Leaf)) {
     throw "Reviewed subject executable was not found: $subjectPath"
