@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Text.Json;
 using LongBetterWindows.Host.Broker;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.PluginIpc.Client;
 using LongBetterWindows.PluginIpc.Contracts;
@@ -142,6 +143,132 @@ public sealed class PluginBrokerReadOnlyTests
         Assert.Equal(0, await pipe.ReadAsync(buffer, timeout.Token));
     }
 
+    [Fact]
+    public async Task Broker_invokes_existing_command_executor_with_normalized_input()
+    {
+        var handler = new RecordingCommandHandler();
+        await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(handler));
+        await using var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+
+        var response = await client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+            BrokerMethods.CommandInvoke,
+            new CommandInvokeRequest(
+                "command.plugin", "run",
+                new Dictionary<string, string> { ["count"] = "3" },
+                "text", "hello"));
+
+        Assert.Equal("completed", response.Status);
+        Assert.Equal("done", response.Message);
+        Assert.Equal("hello", handler.LastInvocation?.Text);
+        Assert.Equal("3", handler.LastInvocation?.Arguments["count"]);
+    }
+
+    [Fact]
+    public async Task Broker_cancels_active_command_on_same_connection()
+    {
+        var handler = new BlockingCommandHandler();
+        await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(handler));
+        await using var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+        var requestId = Guid.NewGuid().ToString();
+        var invocation = client.RequestWithIdAsync<CommandInvokeRequest, CommandInvokeResponse>(
+            requestId,
+            BrokerMethods.CommandInvoke,
+            CommandRequest(),
+            10_000);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var cancel = await client.CancelCommandAsync(requestId);
+        Assert.True(cancel.Accepted);
+        var error = await Assert.ThrowsAsync<IpcRemoteException>(() => invocation);
+        Assert.Equal(IpcErrorCodes.Cancelled, error.Code);
+        await handler.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Broker_enforces_command_deadline()
+    {
+        var handler = new BlockingCommandHandler();
+        await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(handler));
+        await using var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+        var error = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+            client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+                BrokerMethods.CommandInvoke, CommandRequest(), 100));
+        Assert.Equal(IpcErrorCodes.Timeout, error.Code);
+    }
+
+    [Fact]
+    public async Task Broker_limits_each_plugin_to_four_concurrent_commands()
+    {
+        var handler = new ConcurrentCommandHandler();
+        await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(handler));
+        await using var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+        var requests = Enumerable.Range(0, 5).Select(_ =>
+            client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+                BrokerMethods.CommandInvoke, CommandRequest(), 10_000)).ToArray();
+        await handler.FourStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(4, handler.MaximumConcurrent);
+        handler.Release.TrySetResult();
+        await Task.WhenAll(requests);
+        Assert.Equal(4, handler.MaximumConcurrent);
+    }
+
+    [Fact]
+    public async Task Broker_cancels_commands_when_client_disconnects()
+    {
+        var handler = new BlockingCommandHandler();
+        await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(handler));
+        var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+        _ = client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+            BrokerMethods.CommandInvoke, CommandRequest(), 10_000);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await client.DisposeAsync();
+        await handler.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Client_local_wait_cancellation_does_not_poison_connection()
+    {
+        var handler = new DelayedCommandHandler();
+        await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(handler));
+        await using var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+        using var localCancellation = new CancellationTokenSource(20);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+                BrokerMethods.CommandInvoke,
+                CommandRequest(),
+                1_000,
+                localCancellation.Token));
+        await handler.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.Delay(50);
+        var ping = await client.RequestAsync<HealthPingRequest, HealthPingResponse>(
+            BrokerMethods.HealthPing, new HealthPingRequest("still-connected"));
+        Assert.Equal("still-connected", ping.Nonce);
+    }
+
+    [Fact]
+    public async Task Broker_maps_missing_plugin_and_command_errors()
+    {
+        await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(new RecordingCommandHandler()));
+        await using var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+        var missingPlugin = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+            client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+                BrokerMethods.CommandInvoke,
+                CommandRequest() with { PluginId = "missing.plugin" }));
+        Assert.Equal(IpcErrorCodes.PluginNotFound, missingPlugin.Code);
+        var missingCommand = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+            client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+                BrokerMethods.CommandInvoke,
+                CommandRequest() with { CommandId = "missing" }));
+        Assert.Equal(IpcErrorCodes.CommandNotFound, missingCommand.Code);
+    }
+
     private static HostHelloRequest Hello() => new(
         "broker-tests", "1.0.0", [IpcProtocol.Name], []);
 
@@ -162,6 +289,33 @@ public sealed class PluginBrokerReadOnlyTests
             Commands = [new PluginCommand { Id = "open", Title = "Open", AcceptedInputs = [AcceptedInputType.Text] }],
             Widgets = [new PluginWidgetDefinition { Id = "summary", Title = "Summary", EntryPoint = "secret/widget.html" }],
         }, new object(), null, @"C:\secret\plugin");
+        return registry;
+    }
+
+    private static CommandInvokeRequest CommandRequest() => new(
+        "command.plugin", "run", new Dictionary<string, string>());
+
+    private static PluginRegistry CreateCommandRegistry(IPluginCommandHandler handler)
+    {
+        var registry = new PluginRegistry();
+        registry.Register(new PluginManifest
+        {
+            Id = "command.plugin",
+            Name = "Command plugin",
+            Version = "1.0.0",
+            Commands = [new PluginCommand
+            {
+                Id = "run",
+                Title = "Run",
+                AcceptedInputs = [AcceptedInputType.None, AcceptedInputType.Text],
+                ArgumentSchema = [new PluginCommandArgumentDeclaration
+                {
+                    Key = "count",
+                    Type = PluginCommandArgumentType.Integer,
+                    Required = false,
+                }],
+            }],
+        }, handler, null, @"C:\test\command-plugin");
         return registry;
     }
 
@@ -206,5 +360,85 @@ public sealed class PluginBrokerReadOnlyTests
     {
         public BrokerClientIdentity GetServerIdentity() => server;
         public BrokerClientIdentity GetClientIdentity(NamedPipeServerStream pipe) => client;
+    }
+
+    private sealed class RecordingCommandHandler : IPluginCommandHandler
+    {
+        public PluginCommandInvocation? LastInvocation { get; private set; }
+        public Task<PluginCommandResult> ExecuteCommandAsync(
+            PluginCommandInvocation invocation,
+            CancellationToken cancellationToken = default)
+        {
+            LastInvocation = invocation;
+            return Task.FromResult(PluginCommandResult.Success("done"));
+        }
+    }
+
+    private sealed class BlockingCommandHandler : IPluginCommandHandler
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<PluginCommandResult> ExecuteCommandAsync(
+            PluginCommandInvocation invocation,
+            CancellationToken cancellationToken = default)
+        {
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return PluginCommandResult.Success();
+            }
+            catch (OperationCanceledException)
+            {
+                Cancelled.TrySetResult();
+                throw;
+            }
+        }
+    }
+
+    private sealed class ConcurrentCommandHandler : IPluginCommandHandler
+    {
+        private int _current;
+        private int _maximum;
+        public int MaximumConcurrent => Volatile.Read(ref _maximum);
+        public TaskCompletionSource FourStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<PluginCommandResult> ExecuteCommandAsync(
+            PluginCommandInvocation invocation,
+            CancellationToken cancellationToken = default)
+        {
+            var current = Interlocked.Increment(ref _current);
+            int observed;
+            do
+            {
+                observed = Volatile.Read(ref _maximum);
+            } while (current > observed && Interlocked.CompareExchange(ref _maximum, current, observed) != observed);
+            if (current >= 4) FourStarted.TrySetResult();
+            try
+            {
+                await Release.Task.WaitAsync(cancellationToken);
+                return PluginCommandResult.Success();
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _current);
+            }
+        }
+    }
+
+    private sealed class DelayedCommandHandler : IPluginCommandHandler
+    {
+        public TaskCompletionSource Completed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<PluginCommandResult> ExecuteCommandAsync(
+            PluginCommandInvocation invocation,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(100, cancellationToken);
+            Completed.TrySetResult();
+            return PluginCommandResult.Success();
+        }
     }
 }

@@ -8,6 +8,8 @@ public static class BrokerMethods
     public const string HealthPing = "health.ping";
     public const string PluginCatalogList = "plugin.catalog.list";
     public const string PluginCatalogGet = "plugin.catalog.get";
+    public const string CommandInvoke = "command.invoke";
+    public const string CommandCancel = "command.cancel";
 }
 
 public sealed record HealthPingRequest(
@@ -56,3 +58,28 @@ public sealed record PluginCatalogWidget(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("description")] string Description,
     [property: JsonPropertyName("multiple_instances")] bool MultipleInstances);
+
+public sealed record CommandInvokeRequest(
+    [property: JsonPropertyName("plugin_id")] string PluginId,
+    [property: JsonPropertyName("command_id")] string CommandId,
+    [property: JsonPropertyName("arguments")] IReadOnlyDictionary<string, string> Arguments,
+    [property: JsonPropertyName("input_type")] string InputType = "none",
+    [property: JsonPropertyName("text")] string? Text = null,
+    [property: JsonPropertyName("paths")] IReadOnlyList<string>? Paths = null,
+    [property: JsonPropertyName("image_png")] byte[]? ImagePng = null);
+
+public sealed record CommandInvokeResponse(
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("message")] string? Message,
+    [property: JsonPropertyName("keep_palette_open")] bool KeepPaletteOpen,
+    [property: JsonPropertyName("outputs")] IReadOnlyDictionary<string, CommandOutput> Outputs);
+
+public sealed record CommandOutput(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("value")] string Value);
+
+public sealed record CommandCancelRequest(
+    [property: JsonPropertyName("request_id")] string RequestId);
+
+public sealed record CommandCancelResponse(
+    [property: JsonPropertyName("accepted")] bool Accepted);
