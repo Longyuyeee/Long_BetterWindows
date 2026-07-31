@@ -1,6 +1,6 @@
 {
   "name": "@long-assistant/plugin-sdk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "TypeScript contracts and a deterministic Mock Host for Long Assistant Web plugins.",
   "license": "MIT",
   "type": "module",

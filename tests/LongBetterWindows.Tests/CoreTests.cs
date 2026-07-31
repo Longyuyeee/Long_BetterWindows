@@ -23,6 +23,7 @@ public class CoreTests
         Assert.Equal(2002, (int)ManifestValidationCode.InvalidWindow);
         Assert.Equal(2003, (int)ManifestValidationCode.IncompatibleApiVersion);
         Assert.Equal(2004, (int)ManifestValidationCode.InvalidLocalization);
+        Assert.Equal(2005, (int)ManifestValidationCode.InvalidWidget);
     }
 
     [Fact]
@@ -201,6 +202,157 @@ public class CoreTests
 
             Assert.False(result.IsSuccess);
             Assert.Contains(result.Issues, issue => issue.Path == "background");
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ManifestReader_WebWidgetDefinition_ReturnsSuccess()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.widget",
+            version = "1.0.0",
+            name = "Widget",
+            runtime = "webview",
+            min_api_version = "1.1.0",
+            entry_point = "index.html",
+            widgets = new object[]
+            {
+                new
+                {
+                    id = "system.status",
+                    title = "System Status",
+                    description = "Small status card",
+                    entry_point = "widgets/status/index.html",
+                    icon = "assets/status.png",
+                    multiple_instances = true,
+                    default_size = new { columns = 4, rows = 2 },
+                    min_size = new { columns = 2, rows = 1 },
+                    max_size = new { columns = 8, rows = 4 },
+                    refresh = new
+                    {
+                        mode = "interval",
+                        interval_seconds = 30,
+                        hidden_behavior = "throttle",
+                    },
+                    appearance = new
+                    {
+                        transparent = true,
+                        host_chrome = false,
+                    },
+                    settings_schema = new object[]
+                    {
+                        new
+                        {
+                            key = "accent",
+                            type = "enum",
+                            title = "Accent",
+                            enum_values = new[] { "auto", "blue" },
+                        },
+                    },
+                },
+            },
+        });
+
+        try
+        {
+            var result = await ManifestReader.ReadAsync(dir);
+
+            Assert.True(result.IsSuccess, result.Error);
+            var widget = Assert.Single(result.Manifest!.Widgets);
+            Assert.Equal("system.status", widget.Id);
+            Assert.Equal(4, widget.DefaultSize!.Columns);
+            Assert.Equal(PluginWidgetRefreshMode.Interval, widget.Refresh!.Mode);
+            Assert.Equal(PluginWidgetHiddenBehavior.Throttle, widget.Refresh.HiddenBehavior);
+            Assert.Equal(PluginWidgetSettingType.Enum, widget.SettingsSchema[0].Type);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("native", "1.1.0")]
+    [InlineData("webview", null)]
+    [InlineData("webview", "1.0.0")]
+    public async Task ManifestReader_InvalidWidgetContract_ReturnsFailure(
+        string runtime,
+        string? minApiVersion)
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.widget",
+            version = "1.0.0",
+            name = "Widget",
+            runtime,
+            min_api_version = minApiVersion,
+            entry_point = "index.html",
+            widgets = new object[]
+            {
+                new
+                {
+                    id = "system.status",
+                    title = "System Status",
+                    entry_point = "widgets/status/index.html",
+                    default_size = new { columns = 4, rows = 2 },
+                },
+            },
+        });
+
+        try
+        {
+            var result = await ManifestReader.ReadAsync(dir);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains(result.Issues, issue =>
+                issue.Code == ManifestValidationCode.InvalidWidget
+                && issue.Path == "widgets");
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ManifestReader_InvalidWidgetRefresh_ReturnsFailure()
+    {
+        var dir = CreateManifestDir(new
+        {
+            id = "com.test.widget",
+            version = "1.0.0",
+            name = "Widget",
+            runtime = "webview",
+            min_api_version = "1.1.0",
+            entry_point = "index.html",
+            widgets = new object[]
+            {
+                new
+                {
+                    id = "system.status",
+                    title = "System Status",
+                    entry_point = "widgets/status/index.html",
+                    default_size = new { columns = 4, rows = 2 },
+                    refresh = new
+                    {
+                        mode = "manual",
+                        interval_seconds = 30,
+                    },
+                },
+            },
+        });
+
+        try
+        {
+            var result = await ManifestReader.ReadAsync(dir);
+
+            Assert.False(result.IsSuccess);
+            Assert.Contains("interval_seconds", result.Error);
         }
         finally
         {

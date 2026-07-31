@@ -18,6 +18,7 @@ namespace LongBetterWindows.Host.Engine
         InvalidWindow = 2002,
         IncompatibleApiVersion = 2003,
         InvalidLocalization = 2004,
+        InvalidWidget = 2005,
     }
 
     public sealed record ManifestValidationIssue(

@@ -11,7 +11,7 @@ namespace LongBetterWindows.Host.Engine
     {
         public const int MaximumEntryCount = 2048;
         public const long MaximumUncompressedBytes = 256L * 1024 * 1024;
-        public static readonly Version CurrentUiKitVersion = new(1, 0, 0);
+        public static readonly Version CurrentUiKitVersion = new(1, 1, 0);
 
         private readonly Version _hostVersion;
         private readonly Version _uiKitVersion;
@@ -266,6 +266,17 @@ namespace LongBetterWindows.Host.Engine
                     {
                         return $"插件语言资源不存在或越出插件根目录：{resource.Key}。";
                     }
+                }
+            }
+
+            foreach (var widget in manifest.Widgets ?? new List<PluginWidgetDefinition>())
+            {
+                if (!IsExistingFileWithin(root, widget.EntryPoint))
+                    return $"插件 Widget 入口不存在或越出插件根目录：{widget.Id}。";
+                if (!string.IsNullOrWhiteSpace(widget.Icon)
+                    && !IsExistingFileWithin(root, widget.Icon!))
+                {
+                    return $"插件 Widget 图标不存在或越出插件根目录：{widget.Id}。";
                 }
             }
 

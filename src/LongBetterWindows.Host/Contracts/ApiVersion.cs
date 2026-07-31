@@ -13,7 +13,7 @@ namespace LongBetterWindows.Host.Contracts
             Patch = patch;
         }
 
-        public static ApiVersion Current => new(1, 0, 0);
+        public static ApiVersion Current => new(1, 1, 0);
 
         public bool IsCompatibleWith(ApiVersion requested)
             => Major == requested.Major && Minor >= requested.Minor;

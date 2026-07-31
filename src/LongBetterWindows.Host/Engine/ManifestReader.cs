@@ -147,6 +147,14 @@ namespace LongBetterWindows.Host.Engine
                     ManifestValidationCode.InvalidManifestValue,
                     "background",
                     error)));
+
+            var widgetErrors = new List<string>();
+            ValidateWidgets(manifest, widgetErrors);
+            issues.AddRange(widgetErrors.Select(error =>
+                new ManifestValidationIssue(
+                    ManifestValidationCode.InvalidWidget,
+                    "widgets",
+                    error)));
             errors.Clear();
 
             // ApiVersion 兼容性检查
@@ -295,6 +303,170 @@ namespace LongBetterWindows.Host.Engine
             }
         }
 
+        private static void ValidateWidgets(PluginManifest manifest, List<string> errors)
+        {
+            var widgets = manifest.Widgets ?? new List<PluginWidgetDefinition>();
+            if (widgets.Count == 0)
+                return;
+
+            if (widgets.Count > 32)
+                errors.Add("widgets 不能声明超过 32 个小组件");
+            if (!string.Equals(
+                    manifest.Runtime?.Trim(),
+                    "webview",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("widgets 仅可用于 webview 插件");
+            }
+
+            if (!TryParseVersion(manifest.MinApiVersion ?? string.Empty, out var major, out var minor, out var patch)
+                || new ApiVersion(major, minor, patch) < new ApiVersion(1, 1, 0))
+            {
+                errors.Add("声明 widgets 的插件必须设置 min_api_version 为 1.1.0 或更高");
+            }
+
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var widget in widgets)
+            {
+                if (widget is null)
+                {
+                    errors.Add("widgets 中存在空小组件定义");
+                    continue;
+                }
+
+                var label = string.IsNullOrWhiteSpace(widget.Id)
+                    ? "<empty>"
+                    : widget.Id;
+                if (!IsWidgetId(widget.Id))
+                    errors.Add($"widget id 无效: '{widget.Id}'");
+                else if (!ids.Add(widget.Id))
+                    errors.Add($"widgets 中存在重复 id: '{widget.Id}'");
+
+                if (string.IsNullOrWhiteSpace(widget.Title) || widget.Title.Length > 80)
+                    errors.Add($"widget '{label}' 的 title 必须为 1 到 80 个字符");
+                if ((widget.Description?.Length ?? 0) > 240)
+                    errors.Add($"widget '{label}' 的 description 不能超过 240 个字符");
+                if (!IsSafeHtmlResourcePath(widget.EntryPoint))
+                    errors.Add($"widget '{label}' 的 entry_point 必须是插件目录内的相对 HTML 路径");
+                if (!string.IsNullOrWhiteSpace(widget.Icon)
+                    && !IsSafeRelativeResourcePath(widget.Icon!))
+                {
+                    errors.Add($"widget '{label}' 的 icon 必须是插件目录内的相对路径");
+                }
+
+                ValidateWidgetSize($"widget '{label}' default_size", widget.DefaultSize, required: true, errors);
+                ValidateWidgetSize($"widget '{label}' min_size", widget.MinSize, required: false, errors);
+                ValidateWidgetSize($"widget '{label}' max_size", widget.MaxSize, required: false, errors);
+                ValidateWidgetSizeBounds(label, widget, errors);
+                ValidateWidgetRefresh(label, widget.Refresh, errors);
+                ValidateWidgetSettings(label, widget.SettingsSchema, errors);
+            }
+        }
+
+        private static void ValidateWidgetSize(
+            string label,
+            PluginWidgetSize? size,
+            bool required,
+            List<string> errors)
+        {
+            if (size is null)
+            {
+                if (required) errors.Add($"{label} 必须声明");
+                return;
+            }
+
+            if (size.Columns is < 1 or > 24 || size.Rows is < 1 or > 24)
+                errors.Add($"{label} 的 columns/rows 必须在 1 到 24 之间");
+        }
+
+        private static void ValidateWidgetSizeBounds(
+            string widgetId,
+            PluginWidgetDefinition widget,
+            List<string> errors)
+        {
+            if (widget.DefaultSize is null)
+                return;
+            if (widget.MinSize is not null
+                && (widget.DefaultSize.Columns < widget.MinSize.Columns
+                    || widget.DefaultSize.Rows < widget.MinSize.Rows))
+            {
+                errors.Add($"widget '{widgetId}' 的 default_size 不能小于 min_size");
+            }
+            if (widget.MaxSize is not null
+                && (widget.DefaultSize.Columns > widget.MaxSize.Columns
+                    || widget.DefaultSize.Rows > widget.MaxSize.Rows))
+            {
+                errors.Add($"widget '{widgetId}' 的 default_size 不能大于 max_size");
+            }
+            if (widget.MinSize is not null
+                && widget.MaxSize is not null
+                && (widget.MinSize.Columns > widget.MaxSize.Columns
+                    || widget.MinSize.Rows > widget.MaxSize.Rows))
+            {
+                errors.Add($"widget '{widgetId}' 的 min_size 不能大于 max_size");
+            }
+        }
+
+        private static void ValidateWidgetRefresh(
+            string widgetId,
+            PluginWidgetRefreshPolicy? refresh,
+            List<string> errors)
+        {
+            if (refresh is null)
+                return;
+            if (!Enum.IsDefined(refresh.Mode))
+                errors.Add($"widget '{widgetId}' 的 refresh.mode 无效");
+            if (!Enum.IsDefined(refresh.HiddenBehavior))
+                errors.Add($"widget '{widgetId}' 的 refresh.hidden_behavior 无效");
+            if (refresh.Mode == PluginWidgetRefreshMode.Interval)
+            {
+                if (refresh.IntervalSeconds is < 5 or > 86400)
+                    errors.Add($"widget '{widgetId}' 的 refresh.interval_seconds 必须在 5 到 86400 之间");
+            }
+            else if (refresh.IntervalSeconds.HasValue)
+            {
+                errors.Add($"widget '{widgetId}' 只有 interval 刷新模式可声明 interval_seconds");
+            }
+        }
+
+        private static void ValidateWidgetSettings(
+            string widgetId,
+            List<PluginWidgetSettingDeclaration>? settings,
+            List<string> errors)
+        {
+            settings ??= new List<PluginWidgetSettingDeclaration>();
+            if (settings.Count > 64)
+                errors.Add($"widget '{widgetId}' 不能声明超过 64 个 settings_schema 项");
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var setting in settings)
+            {
+                if (setting is null)
+                {
+                    errors.Add($"widget '{widgetId}' 包含空设置声明");
+                    continue;
+                }
+                if (!IsWidgetSettingKey(setting.Key))
+                    errors.Add($"widget '{widgetId}' 的 setting key 无效: '{setting.Key}'");
+                else if (!keys.Add(setting.Key))
+                    errors.Add($"widget '{widgetId}' 存在重复 setting key: '{setting.Key}'");
+                if (!Enum.IsDefined(setting.Type))
+                    errors.Add($"widget '{widgetId}' 的 setting '{setting.Key}' type 无效");
+                if (string.IsNullOrWhiteSpace(setting.Title) || setting.Title.Length > 80)
+                    errors.Add($"widget '{widgetId}' 的 setting '{setting.Key}' title 必须为 1 到 80 个字符");
+                if ((setting.Description?.Length ?? 0) > 240)
+                    errors.Add($"widget '{widgetId}' 的 setting '{setting.Key}' description 不能超过 240 个字符");
+                if (setting.Type == PluginWidgetSettingType.Enum)
+                {
+                    if (setting.EnumValues.Count is < 1 or > 64)
+                        errors.Add($"widget '{widgetId}' 的 enum setting '{setting.Key}' 必须声明 1 到 64 个 enum_values");
+                }
+                else if (setting.EnumValues.Count > 0)
+                {
+                    errors.Add($"widget '{widgetId}' 只有 enum setting 可声明 enum_values");
+                }
+            }
+        }
+
         private static void ValidateArgumentSchema(PluginCommand command, List<string> errors)
         {
             const int maximumTextLength = 65536;
@@ -422,6 +594,21 @@ namespace LongBetterWindows.Host.Engine
                 && value.All(character => char.IsAsciiLetterOrDigit(character)
                     || character is '.' or '_' or '-');
 
+        private static bool IsWidgetId(string value)
+            => !string.IsNullOrWhiteSpace(value)
+                && value.Length is >= 2 and <= 64
+                && char.IsAsciiLetterLower(value[0])
+                && value.All(character => char.IsAsciiLetterLower(character)
+                    || char.IsAsciiDigit(character)
+                    || character is '.' or '_' or '-');
+
+        private static bool IsWidgetSettingKey(string value)
+            => !string.IsNullOrWhiteSpace(value)
+                && value.Length <= 64
+                && char.IsAsciiLetterLower(value[0])
+                && value.All(character => char.IsAsciiLetterOrDigit(character)
+                    || character is '.' or '_' or '-');
+
         private static void ValidateWindowPreference(
             PluginWindowPreference? window,
             List<string> errors)
@@ -493,17 +680,27 @@ namespace LongBetterWindows.Host.Engine
         }
 
         private static bool IsSafeLocalizationResourcePath(string value)
+            => IsSafeRelativeResourcePath(value)
+                && string.Equals(
+                    Path.GetExtension(value),
+                    ".json",
+                    StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsSafeHtmlResourcePath(string value)
+            => IsSafeRelativeResourcePath(value)
+                && string.Equals(
+                    Path.GetExtension(value),
+                    ".html",
+                    StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsSafeRelativeResourcePath(string value)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(value)
                     || value.Length > 260
                     || value.IndexOfAny(Path.GetInvalidPathChars()) >= 0
-                    || Path.IsPathRooted(value)
-                    || !string.Equals(
-                        Path.GetExtension(value),
-                        ".json",
-                        StringComparison.OrdinalIgnoreCase))
+                    || Path.IsPathRooted(value))
                     return false;
 
                 var segments = value

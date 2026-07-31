@@ -307,6 +307,31 @@ public sealed class PluginPackageValidatorTests : IDisposable
     }
 
     [Fact]
+    public async Task ValidateDirectoryAsync_WidgetResourcesMustExistWithinPluginRoot()
+    {
+        var directory = CreateWidgetPluginDirectory(includeWidgetEntry: false);
+
+        var result = await new PluginPackageValidator()
+            .ValidateDirectoryAsync(directory);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Widget 入口不存在", result.Error);
+    }
+
+    [Fact]
+    public async Task ValidateDirectoryAsync_WidgetResourcesAreAccepted()
+    {
+        var directory = CreateWidgetPluginDirectory(includeWidgetEntry: true);
+
+        var result = await new PluginPackageValidator()
+            .ValidateDirectoryAsync(directory);
+
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal("dev.long.widget", result.Manifest!.Id);
+        Assert.Single(result.Manifest.Widgets);
+    }
+
+    [Fact]
     public async Task ValidateAsync_ValidFileManifest_IsAccepted()
     {
         var package = CreatePackageWithFileManifest();
@@ -434,6 +459,46 @@ public sealed class PluginPackageValidatorTests : IDisposable
         File.WriteAllText(
             Path.Combine(directory, "i18n", "zh-CN.json"),
             """{"title":"测试"}""");
+        return directory;
+    }
+
+    private string CreateWidgetPluginDirectory(bool includeWidgetEntry)
+    {
+        var directory = Path.Combine(_tempDir, $"widget-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(directory, "widgets", "status"));
+        Directory.CreateDirectory(Path.Combine(directory, "assets"));
+        File.WriteAllText(
+            Path.Combine(directory, "manifest.json"),
+            JsonSerializer.Serialize(new
+            {
+                id = "dev.long.widget",
+                version = "1.0.0",
+                name = "Widget Plugin",
+                runtime = "webview",
+                min_api_version = "1.1.0",
+                entry_point = "index.html",
+                capabilities = Array.Empty<string>(),
+                widgets = new object[]
+                {
+                    new
+                    {
+                        id = "system.status",
+                        title = "System Status",
+                        entry_point = "widgets/status/index.html",
+                        icon = "assets/status.png",
+                        default_size = new { columns = 4, rows = 2 },
+                    },
+                },
+            }));
+        File.WriteAllText(Path.Combine(directory, "index.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(directory, "assets", "status.png"), "png");
+        if (includeWidgetEntry)
+        {
+            File.WriteAllText(
+                Path.Combine(directory, "widgets", "status", "index.html"),
+                "<html></html>");
+        }
+
         return directory;
     }
 

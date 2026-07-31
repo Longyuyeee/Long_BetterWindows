@@ -7,9 +7,9 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>LongBetterWindows.PluginSdk.Wpf</AssemblyName>
     <RootNamespace>LongBetterWindows.PluginSdk.Wpf</RootNamespace>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
     <PackageId>LongBetterWindows.PluginSdk.Wpf</PackageId>
     <Title>Long Assistant .NET Plugin WPF UI Kit</Title>
     <Description>Theme-aware WPF controls and multi-monitor helpers for Long Assistant native plugins.</Description>
