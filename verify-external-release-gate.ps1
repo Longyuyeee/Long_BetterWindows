@@ -14,6 +14,7 @@ param(
     [Parameter(Mandatory=$true)] [string] $PhysicalDpiGatePath,
     [Parameter(Mandatory=$true)] [string] $AccessibilityGatePath,
     [Parameter(Mandatory=$true)] [string] $MarketplaceRehearsalPath,
+    [Parameter(Mandatory=$true)] [string] $ProductAcceptanceGatePath,
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)]
     [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
@@ -162,6 +163,60 @@ function Assert-AccessibilityContract($gate, [string] $sourceCommit) {
             -or [string]$source.human_review.status -ne 'approved') {
             throw 'Accessibility portable source content does not match its summary.'
         }
+    }
+}
+
+function Assert-ProductAcceptanceContract($gate, [string] $sourceCommit) {
+    $document = $gate.document
+    $required = @(
+        'taskbar-visual-grouping',
+        'native-performance',
+        'lpwp-long-grid-e2e',
+        'lpwp-widget-desktop',
+        'lpwp-signed-reference')
+    if ([int]$document.schema_version -ne 1 `
+        -or [string]$document.source_commit -ne $sourceCommit `
+        -or [int]$document.plugin_count -ne 25 `
+        -or [int]$document.command_count -ne 42 `
+        -or [int]$document.plugin_approval_receipt_count -ne 25 `
+        -or [int]$document.approved_validation_count -ne 5) {
+        throw 'Final product-acceptance gate contract is incomplete.'
+    }
+    Assert-ExactSet @($document.required_validation_ids | ForEach-Object { [string]$_ }) `
+        $required 'Final product-acceptance validation IDs'
+    $approvals = @($document.approvals)
+    if ($approvals.Count -ne 5) {
+        throw 'Final product-acceptance gate must contain exactly five approvals.'
+    }
+    Assert-ExactSet @($approvals | ForEach-Object { [string]$_.validation_id }) `
+        $required 'Final product-acceptance approvals'
+    foreach ($entry in $approvals) {
+        if ([string]$entry.source_commit -ne $sourceCommit) {
+            throw 'Final product-acceptance approval does not match the candidate.'
+        }
+        $source = Read-PortableMatrixSource `
+            $gate $entry.source_manifest 'Final product-acceptance approval'
+        if ([int]$source.schema_version -ne 1 `
+            -or [string]$source.classification -ne 'final_validation_approval' `
+            -or [string]$source.validation_id -ne [string]$entry.validation_id `
+            -or [string]$source.source_commit -ne $sourceCommit `
+            -or [string]$source.status -ne 'passed' `
+            -or [string]::IsNullOrWhiteSpace([string]$source.reviewer)) {
+            throw 'Final product-acceptance portable approval content is invalid.'
+        }
+    }
+    $pluginMatrix = Read-PortableMatrixSource `
+        $gate $document.plugin_matrix 'Plugin positive matrix'
+    if ([int]$pluginMatrix.schema_version -ne 1 `
+        -or [string]$pluginMatrix.classification -ne 'plugin_positive_matrix' `
+        -or [string]$pluginMatrix.source_commit -ne $sourceCommit `
+        -or [bool]$pluginMatrix.source_dirty `
+        -or [int]$pluginMatrix.plugin_count -ne 25 `
+        -or [int]$pluginMatrix.command_count -ne 42 `
+        -or [int]$pluginMatrix.approval_receipt_count -ne 25 `
+        -or -not [bool]$pluginMatrix.contract_valid `
+        -or -not [bool]$pluginMatrix.release_eligible) {
+        throw 'Plugin positive matrix portable source is not release eligible.'
     }
 }
 
@@ -544,12 +599,14 @@ $clean = Read-GateJson $CleanEnvironmentGatePath 'Clean-environment gate'
 $dpi = Read-GateJson $PhysicalDpiGatePath 'Physical DPI gate'
 $accessibility = Read-GateJson $AccessibilityGatePath 'Accessibility gate'
 $marketplace = Read-GateJson $MarketplaceRehearsalPath 'Marketplace rehearsal'
+$productAcceptance = Read-GateJson $ProductAcceptanceGatePath 'Final product-acceptance gate'
 
 Assert-Classification $download 'approved_release_download_gate' 'Release-download gate'
 Assert-Classification $clean 'approved_clean_windows_release_gate' 'Clean-environment gate'
 Assert-Classification $dpi 'approved_physical_device_dpi_matrix' 'Physical DPI gate'
 Assert-Classification $accessibility 'approved_physical_accessibility_matrix' 'Accessibility gate'
 Assert-Classification $marketplace 'marketplace_https_rehearsal' 'Marketplace rehearsal'
+Assert-Classification $productAcceptance 'approved_final_product_acceptance' 'Final product-acceptance gate'
 
 if ([string]$release.document.commit -ne $expectedCommit) {
     throw 'Release Manifest source commit does not match ExpectedSourceCommit.'
@@ -575,6 +632,7 @@ Assert-DownloadContract $download
 Assert-CleanEnvironmentContract $clean $ExpectedDistributionChannel
 Assert-PhysicalDpiContract $dpi $expectedCommit
 Assert-AccessibilityContract $accessibility $expectedCommit
+Assert-ProductAcceptanceContract $productAcceptance $expectedCommit
 foreach ($gate in @($download, $clean)) {
     if ([string]$gate.document.distribution_channel -ne $ExpectedDistributionChannel) {
         throw "External gate distribution channel mismatch: $($gate.document.classification)"
@@ -667,6 +725,14 @@ $decision = [ordered]@{
         deployment_verified = [bool]$rehearsal.deployment_verified
         rollback_verified = [bool]$rehearsal.rollback_verified
     }
+    product_acceptance = [ordered]@{
+        plugin_count = [int]$productAcceptance.document.plugin_count
+        command_count = [int]$productAcceptance.document.command_count
+        plugin_approval_receipt_count =
+            [int]$productAcceptance.document.plugin_approval_receipt_count
+        approved_validation_count =
+            [int]$productAcceptance.document.approved_validation_count
+    }
     evidence_contract = [ordered]@{
         physical_dpi_schema_version = [int]$dpi.document.schema_version
         physical_dpi_capture_count = [int]$dpi.document.capture_count
@@ -676,6 +742,7 @@ $decision = [ordered]@{
         download_schema_version = [int]$download.document.schema_version
         clean_environment_schema_version = [int]$clean.document.schema_version
         marketplace_rehearsal_schema_version = [int]$marketplace.document.schema_version
+        product_acceptance_schema_version = [int]$productAcceptance.document.schema_version
     }
     inputs = [ordered]@{
         release_manifest_sha256 = $release.sha256
@@ -684,6 +751,7 @@ $decision = [ordered]@{
         physical_dpi_gate_sha256 = $dpi.sha256
         accessibility_gate_sha256 = $accessibility.sha256
         marketplace_rehearsal_sha256 = $marketplace.sha256
+        product_acceptance_sha256 = $productAcceptance.sha256
     }
 }
 
