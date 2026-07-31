@@ -65,6 +65,51 @@ public sealed class MarketplacePublisherTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyBundleAsync_Uses_exported_trust_root_and_writes_sanitized_report()
+    {
+        var fixture = await CreateFixtureAsync();
+        var published = await new MarketplacePublishingPipeline().PublishAsync(fixture.Options);
+        var reportPath = Path.Combine(_tempDir, "bundle-verification.json");
+
+        var report = await new MarketplaceBundleVerificationPipeline().VerifyAsync(
+            new MarketplaceBundleVerificationOptions
+            {
+                BundleDirectory = published.OutputDirectory,
+                ExpectedPublisherKeyId = published.PublisherKeyId,
+                ExpectedPublicKeyFingerprint = published.PublicKeyFingerprint,
+                ReportPath = reportPath,
+            });
+
+        Assert.Equal(1, report.PackageCount);
+        Assert.Equal("publisher-test-root", report.PublisherKeyId);
+        Assert.Equal(64, report.PublicKeyFingerprint.Length);
+        var json = await File.ReadAllTextAsync(reportPath);
+        Assert.DoesNotContain("Signature", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("PublicKeyPem", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("PRIVATE KEY", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task VerifyBundleAsync_Rejects_registry_publisher_outside_exported_trust_root()
+    {
+        var fixture = await CreateFixtureAsync();
+        var published = await new MarketplacePublishingPipeline().PublishAsync(fixture.Options);
+        var trustPath = Path.Combine(published.OutputDirectory, "trusted-publisher.fragment.json");
+        var trust = await File.ReadAllTextAsync(trustPath);
+        await File.WriteAllTextAsync(trustPath, trust.Replace(
+            "publisher-test-root", "unrelated-root", StringComparison.Ordinal));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            new MarketplaceBundleVerificationPipeline().VerifyAsync(
+                new MarketplaceBundleVerificationOptions
+                {
+                    BundleDirectory = published.OutputDirectory,
+                    ExpectedPublisherKeyId = published.PublisherKeyId,
+                    ExpectedPublicKeyFingerprint = published.PublicKeyFingerprint,
+                }));
+    }
+
+    [Fact]
     public async Task PublishAsync_ExistingOutputRequiresForceAndPreservesOldOutputOnRejection()
     {
         var fixture = await CreateFixtureAsync();
