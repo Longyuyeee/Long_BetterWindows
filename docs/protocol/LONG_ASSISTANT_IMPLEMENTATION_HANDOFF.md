@@ -205,7 +205,8 @@ Long助手提交设计 PR 时，需要明确回答：
 - [ ] C# Contracts NuGet 或项目包
 - [x] IPC Client 包
 - [x] 只读 Host Broker（同用户/同会话/同完整性级别、hello、ping、脱敏 catalog）
-- [ ] Broker 命令调用/取消与 `plugin.open`
+- [x] Broker 命令调用/取消（并发、deadline、断线回收）
+- [ ] Broker `plugin.open`
 - [ ] TypeScript Web SDK
 - [ ] Mock Host
 - [ ] 合法/非法 Manifest Fixtures

@@ -1,138 +1,257 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Text.Json;
 using LongBetterWindows.PluginIpc.Contracts;
 using LongBetterWindows.PluginIpc.Framing;
+using Serilog;
 
 namespace LongBetterWindows.Host.Broker;
 
 internal sealed class BrokerConnection(
     Stream stream,
     PluginCatalogProjection catalog,
+    PluginCommandEndpoint commands,
     string hostVersion)
 {
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _invocations =
+        new(StringComparer.Ordinal);
+
     internal static readonly string[] Features =
     [
         BrokerMethods.HealthPing,
         BrokerMethods.PluginCatalogList,
         BrokerMethods.PluginCatalogGet,
+        BrokerMethods.CommandInvoke,
+        BrokerMethods.CommandCancel,
     ];
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
-        var helloCompleted = false;
-        while (!cancellationToken.IsCancellationRequested)
+        using var disconnected = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var requests = new HashSet<Task>();
+        try
         {
-            IpcEnvelope request;
-            try
-            {
-                request = await LengthPrefixedJsonFraming.ReadAsync(stream, cancellationToken);
-            }
-            catch (Exception ex) when (ex is EndOfStreamException or IOException or OperationCanceledException)
-            {
+            var hello = await ReadAsync(disconnected.Token).ConfigureAwait(false);
+            if (hello is null || !await CompleteHelloAsync(hello, disconnected.Token).ConfigureAwait(false))
                 return;
-            }
 
-            if (request.Protocol != IpcProtocol.Name)
+            while (!disconnected.IsCancellationRequested)
             {
-                await WriteErrorAsync(
-                    request.Id,
-                    IpcErrorCodes.IncompatibleProtocol,
-                    "Unsupported IPC protocol.",
-                    cancellationToken);
-                return;
-            }
+                var request = await ReadAsync(disconnected.Token).ConfigureAwait(false);
+                if (request is null)
+                    break;
 
-            if (!IsValidRequest(request, out var validationError))
-            {
-                await WriteErrorAsync(request.Id, IpcErrorCodes.InvalidRequest, validationError, cancellationToken);
-                continue;
-            }
-
-            if (!helloCompleted && request.Method != BrokerMethods.HostHello)
-            {
-                await WriteErrorAsync(
-                    request.Id,
-                    IpcErrorCodes.Unauthenticated,
-                    "host.hello must be the first request.",
-                    cancellationToken);
-                return;
-            }
-
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline.CancelAfter(IpcProtocol.NormalizeDeadline(request.DeadlineMilliseconds));
-            try
-            {
-                if (request.Method == BrokerMethods.HostHello)
+                if (!ValidateEnvelope(request, out var errorCode, out var error))
                 {
-                    if (helloCompleted)
-                    {
-                        await WriteErrorAsync(request.Id, IpcErrorCodes.InvalidRequest, "host.hello was already completed.", deadline.Token);
-                        continue;
-                    }
-
-                    var hello = Deserialize<HostHelloRequest>(request);
-                    if (!hello.Protocols.Contains(IpcProtocol.Name, StringComparer.Ordinal))
-                    {
-                        await WriteErrorAsync(request.Id, IpcErrorCodes.IncompatibleProtocol, "No compatible IPC protocol was offered.", deadline.Token);
-                        return;
-                    }
-
-                    await WriteResultAsync(request.Id, new HostHelloResponse(
-                        "Long助手",
-                        hostVersion,
-                        IpcProtocol.Name,
-                        Features,
-                        IpcProtocol.MaximumFrameBytes,
-                        IpcProtocol.MaximumDeadlineMilliseconds), deadline.Token);
-                    helloCompleted = true;
+                    await WriteErrorAsync(request.Id, errorCode, error, disconnected.Token).ConfigureAwait(false);
+                    if (errorCode == IpcErrorCodes.IncompatibleProtocol)
+                        break;
                     continue;
                 }
 
-                switch (request.Method)
+                if (request.Method == BrokerMethods.HostHello)
                 {
-                    case BrokerMethods.HealthPing:
-                        var ping = Deserialize<HealthPingRequest>(request);
-                        await WriteResultAsync(request.Id, new HealthPingResponse(ping.Nonce, DateTimeOffset.UtcNow), deadline.Token);
-                        break;
-                    case BrokerMethods.PluginCatalogList:
-                        await WriteResultAsync(request.Id, catalog.List(Deserialize<PluginCatalogListRequest>(request)), deadline.Token);
-                        break;
-                    case BrokerMethods.PluginCatalogGet:
-                        var result = catalog.Get(Deserialize<PluginCatalogGetRequest>(request));
-                        if (result is null)
-                            await WriteErrorAsync(request.Id, IpcErrorCodes.PluginNotFound, "The requested plugin is not installed.", deadline.Token);
-                        else
-                            await WriteResultAsync(request.Id, result, deadline.Token);
-                        break;
-                    default:
-                        await WriteErrorAsync(request.Id, IpcErrorCodes.SurfaceNotSupported, "The requested broker surface is not available.", deadline.Token);
-                        break;
+                    await WriteErrorAsync(request.Id, IpcErrorCodes.InvalidRequest, "host.hello was already completed.", disconnected.Token).ConfigureAwait(false);
+                    continue;
                 }
+
+                if (request.Method == BrokerMethods.CommandCancel)
+                {
+                    await CancelAsync(request, disconnected.Token).ConfigureAwait(false);
+                    continue;
+                }
+
+                var task = ProcessAsync(request, disconnected.Token);
+                lock (requests) requests.Add(task);
+                _ = task.ContinueWith(
+                    completed => { lock (requests) requests.Remove(completed); },
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
             }
-            catch (JsonException)
-            {
-                await WriteErrorAsync(request.Id, IpcErrorCodes.InvalidRequest, "The request payload has an invalid shape.", cancellationToken);
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                await WriteErrorAsync(request.Id, IpcErrorCodes.Timeout, "The request deadline elapsed.", cancellationToken);
-            }
+        }
+        finally
+        {
+            disconnected.Cancel();
+            foreach (var invocation in _invocations.Values)
+                invocation.Cancel();
+            Task[] pending;
+            lock (requests) pending = requests.ToArray();
+            try { await Task.WhenAll(pending).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is OperationCanceledException or IOException) { }
+            foreach (var invocation in _invocations.Values)
+                invocation.Dispose();
+            _invocations.Clear();
+            _writeGate.Dispose();
         }
     }
 
-    private static bool IsValidRequest(IpcEnvelope request, out string error)
+    private async Task<IpcEnvelope?> ReadAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            return await LengthPrefixedJsonFraming.ReadAsync(stream, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is EndOfStreamException or IOException or OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<bool> CompleteHelloAsync(IpcEnvelope request, CancellationToken cancellationToken)
+    {
+        if (!ValidateEnvelope(request, out var errorCode, out var error))
+        {
+            await WriteErrorAsync(request.Id, errorCode, error, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+        if (request.Method != BrokerMethods.HostHello)
+        {
+            await WriteErrorAsync(request.Id, IpcErrorCodes.Unauthenticated, "host.hello must be the first request.", cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        try
+        {
+            var hello = Deserialize<HostHelloRequest>(request);
+            if (!hello.Protocols.Contains(IpcProtocol.Name, StringComparer.Ordinal))
+            {
+                await WriteErrorAsync(request.Id, IpcErrorCodes.IncompatibleProtocol, "No compatible IPC protocol was offered.", cancellationToken).ConfigureAwait(false);
+                return false;
+            }
+            await WriteResultAsync(request.Id, new HostHelloResponse(
+                "Long助手", hostVersion, IpcProtocol.Name, Features,
+                IpcProtocol.MaximumFrameBytes,
+                IpcProtocol.MaximumDeadlineMilliseconds), cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (JsonException)
+        {
+            await WriteErrorAsync(request.Id, IpcErrorCodes.InvalidRequest, "The request payload has an invalid shape.", cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+    }
+
+    private async Task ProcessAsync(IpcEnvelope request, CancellationToken connectionToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(connectionToken);
+        deadline.CancelAfter(IpcProtocol.NormalizeDeadline(request.DeadlineMilliseconds));
+        try
+        {
+            switch (request.Method)
+            {
+                case BrokerMethods.HealthPing:
+                    var ping = Deserialize<HealthPingRequest>(request);
+                    await WriteResultAsync(request.Id, new HealthPingResponse(ping.Nonce, DateTimeOffset.UtcNow), deadline.Token).ConfigureAwait(false);
+                    break;
+                case BrokerMethods.PluginCatalogList:
+                    await WriteResultAsync(request.Id, catalog.List(Deserialize<PluginCatalogListRequest>(request)), deadline.Token).ConfigureAwait(false);
+                    break;
+                case BrokerMethods.PluginCatalogGet:
+                    var catalogResult = catalog.Get(Deserialize<PluginCatalogGetRequest>(request));
+                    if (catalogResult is null)
+                        await WriteErrorAsync(request.Id, IpcErrorCodes.PluginNotFound, "The requested plugin is not installed.", deadline.Token).ConfigureAwait(false);
+                    else
+                        await WriteResultAsync(request.Id, catalogResult, deadline.Token).ConfigureAwait(false);
+                    break;
+                case BrokerMethods.CommandInvoke:
+                    await InvokeCommandAsync(request, deadline, connectionToken).ConfigureAwait(false);
+                    break;
+                default:
+                    await WriteErrorAsync(request.Id, IpcErrorCodes.SurfaceNotSupported, "The requested broker surface is not available.", deadline.Token).ConfigureAwait(false);
+                    break;
+            }
+        }
+        catch (JsonException)
+        {
+            await TryWriteErrorAsync(request.Id, IpcErrorCodes.InvalidRequest, "The request payload has an invalid shape.", connectionToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!connectionToken.IsCancellationRequested)
+        {
+            await TryWriteErrorAsync(request.Id, IpcErrorCodes.Timeout, "The request deadline elapsed.", connectionToken).ConfigureAwait(false);
+        }
+        catch (IOException) { }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Plugin broker request {RequestId} failed", request.Id);
+            await TryWriteErrorAsync(request.Id, IpcErrorCodes.InternalError, "The broker request failed.", connectionToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task InvokeCommandAsync(
+        IpcEnvelope request,
+        CancellationTokenSource deadline,
+        CancellationToken connectionToken)
+    {
+        using var invocation = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
+        if (!_invocations.TryAdd(request.Id, invocation))
+        {
+            await WriteErrorAsync(request.Id, IpcErrorCodes.InvalidRequest, "A request with this id is already active.", connectionToken).ConfigureAwait(false);
+            return;
+        }
+        try
+        {
+            var outcome = await commands.InvokeAsync(
+                Deserialize<CommandInvokeRequest>(request), invocation.Token).ConfigureAwait(false);
+            if (outcome.Error is not null)
+                await WriteErrorAsync(request.Id, outcome.Error.Code, outcome.Error.Message, invocation.Token).ConfigureAwait(false);
+            else
+                await WriteResultAsync(request.Id, outcome.Result!, invocation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!connectionToken.IsCancellationRequested)
+        {
+            var code = deadline.IsCancellationRequested
+                ? IpcErrorCodes.Timeout
+                : IpcErrorCodes.Cancelled;
+            var message = code == IpcErrorCodes.Timeout
+                ? "The request deadline elapsed."
+                : "The command was cancelled.";
+            await TryWriteErrorAsync(request.Id, code, message, connectionToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _invocations.TryRemove(request.Id, out _);
+        }
+    }
+
+    private async Task CancelAsync(IpcEnvelope request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var cancel = Deserialize<CommandCancelRequest>(request);
+            var accepted = _invocations.TryGetValue(cancel.RequestId, out var invocation);
+            if (accepted) invocation!.Cancel();
+            await WriteResultAsync(request.Id, new CommandCancelResponse(accepted), cancellationToken).ConfigureAwait(false);
+        }
+        catch (JsonException)
+        {
+            await WriteErrorAsync(request.Id, IpcErrorCodes.InvalidRequest, "The request payload has an invalid shape.", cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static bool ValidateEnvelope(IpcEnvelope request, out string errorCode, out string error)
+    {
+        if (request.Protocol != IpcProtocol.Name)
+        {
+            errorCode = IpcErrorCodes.IncompatibleProtocol;
+            error = "Unsupported IPC protocol.";
+            return false;
+        }
         if (request.Kind != "request" || !Guid.TryParse(request.Id, out _) || string.IsNullOrWhiteSpace(request.Method))
         {
+            errorCode = IpcErrorCodes.InvalidRequest;
             error = "The request envelope is invalid.";
             return false;
         }
         try { _ = IpcProtocol.NormalizeDeadline(request.DeadlineMilliseconds); }
         catch (ArgumentOutOfRangeException)
         {
+            errorCode = IpcErrorCodes.InvalidRequest;
             error = "The request deadline is outside the allowed range.";
             return false;
         }
+        errorCode = string.Empty;
         error = string.Empty;
         return true;
     }
@@ -145,19 +264,38 @@ internal sealed class BrokerConnection(
                ?? throw new JsonException("Request payload is empty.");
     }
 
-    private ValueTask WriteResultAsync<T>(string id, T result, CancellationToken cancellationToken)
-        => LengthPrefixedJsonFraming.WriteAsync(stream, new IpcEnvelope
+    private async Task WriteResultAsync<T>(string id, T result, CancellationToken cancellationToken)
+        => await WriteAsync(new IpcEnvelope
         {
             Id = id,
             Kind = "response",
             Result = JsonSerializer.SerializeToElement(result, IpcJson.Options),
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
 
-    private ValueTask WriteErrorAsync(string id, string code, string message, CancellationToken cancellationToken)
-        => LengthPrefixedJsonFraming.WriteAsync(stream, new IpcEnvelope
+    private async Task WriteErrorAsync(string id, string code, string message, CancellationToken cancellationToken)
+        => await WriteAsync(new IpcEnvelope
         {
             Id = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString() : id,
             Kind = "response",
             Error = new IpcError(code, message),
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
+
+    private async Task TryWriteErrorAsync(string id, string code, string message, CancellationToken cancellationToken)
+    {
+        try { await WriteErrorAsync(id, code, message, cancellationToken).ConfigureAwait(false); }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException) { }
+    }
+
+    private async Task WriteAsync(IpcEnvelope envelope, CancellationToken cancellationToken)
+    {
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await LengthPrefixedJsonFraming.WriteAsync(stream, envelope, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
 }
