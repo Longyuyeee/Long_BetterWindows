@@ -27,6 +27,15 @@ function Resolve-RepositoryPath([string]$PathValue) {
     return [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot $PathValue))
 }
 
+function Get-RepositoryRelativePath([string]$FullPath) {
+    $prefix = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd(
+        [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    if (-not $FullPath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Path is outside the repository: $FullPath"
+    }
+    return $FullPath.Substring($prefix.Length).Replace("\", "/")
+}
+
 if (-not $ConfirmPassed) {
     throw "Manual approval requires -ConfirmPassed after the reviewer inspects every evidence file."
 }
@@ -92,8 +101,7 @@ $evidence = @($EvidenceFiles | ForEach-Object {
         throw "Manual evidence must be stored under artifacts/quality: $path"
     }
     [ordered]@{
-        relative_path = [IO.Path]::GetRelativePath($PSScriptRoot, $path).
-            Replace("\", "/")
+        relative_path = Get-RepositoryRelativePath $path
         sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).
             Hash.ToLowerInvariant()
         size_bytes = (Get-Item -LiteralPath $path).Length

@@ -97,6 +97,8 @@ try {
     $verification = Get-Content -LiteralPath $verificationPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $summary = [ordered]@{
         schema_version = 1
+        classification = 'lpwp_signed_reference'
+        passed = $true
         generated_utc = [DateTimeOffset]::UtcNow.ToString('O')
         source_commit = (& git -C $repoRoot rev-parse HEAD).Trim()
         plugin_id = [string]$manifest.id
