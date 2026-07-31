@@ -15,6 +15,8 @@ public sealed class FinalProductAcceptanceScriptTests
         Assert.Contains("verify-native-performance-evidence.ps1", source);
         Assert.Contains("lpwp_long_grid_e2e", source);
         Assert.Contains("long.plugin.ipc/1.0", source);
+        Assert.Contains("Long Grid E2E raw evidence is missing or does not match", source);
+        Assert.Contains("$document.operator -eq $Reviewer.Trim()", source);
         Assert.Contains("lpwp_signed_reference", source);
         Assert.Contains("ExpectedPublicKeyFingerprint", source);
         Assert.Contains("[Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit", source);
@@ -23,6 +25,21 @@ public sealed class FinalProductAcceptanceScriptTests
         Assert.Contains("Write-NewJsonFileAtomically", source);
         Assert.DoesNotContain("ExportPkcs8PrivateKey", source);
         Assert.DoesNotContain("Path]::GetRelativePath", source);
+    }
+
+    [Fact]
+    public void Long_grid_e2e_producer_requires_all_methods_two_commits_and_raw_evidence()
+    {
+        var source = Read("new-lpwp-long-grid-e2e-evidence.ps1");
+
+        Assert.Contains("[Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit", source);
+        Assert.Contains("[Parameter(Mandatory=$true)] [string] $LongGridCommit", source);
+        Assert.Contains("Every LPWP core method must be explicitly confirmed", source);
+        Assert.Contains("'command.cancel'", source);
+        Assert.Contains("'plugin.open'", source);
+        Assert.Contains("At least one raw Long Grid E2E evidence file is required", source);
+        Assert.Contains("Write-NewJsonFileAtomically", source);
+        Assert.Contains("classification = 'lpwp_long_grid_e2e'", source);
     }
 
     [Fact]
