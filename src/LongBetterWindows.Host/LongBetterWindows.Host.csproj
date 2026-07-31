@@ -51,6 +51,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\LongBetterWindows.PluginIpc\LongBetterWindows.PluginIpc.csproj" />
     <ProjectReference Include="..\LongBetterWindows.PluginSdk\LongBetterWindows.PluginSdk.csproj" />
     <ProjectReference Include="..\LongBetterWindows.PluginSdk.Wpf\LongBetterWindows.PluginSdk.Wpf.csproj" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.8.0" />

@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using LongBetterWindows.Host.Broker;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
@@ -41,6 +42,7 @@ namespace LongBetterWindows.Host
         private int _qualityManagementCardShadowCount;
         private int _pluginRuntimeStarted;
         private PluginRuntimeCoordinator? _pluginRuntime;
+        private LongPluginBrokerService? _pluginBroker;
         private static bool _currentIsLight;
         private static bool _forceHighContrast;
         private static bool _forceReduceMotion;
@@ -221,6 +223,11 @@ namespace LongBetterWindows.Host
                     Shutdown(exitCode);
                     return;
                 }
+
+                _pluginBroker = new LongPluginBrokerService(
+                    HostProvider.Instance.PluginStore);
+                _pluginBroker.Start();
+                Log.Information("Long Plugin Broker 已启动（同用户、同会话、同完整性级别）");
 
                 if (MainWindow is Window qualityWindow
                     && (_startupOptions.QualityCaptureWidth > 0
@@ -577,6 +584,8 @@ namespace LongBetterWindows.Host
         protected override void OnExit(ExitEventArgs e)
         {
             SystemParameters.StaticPropertyChanged -= SystemParameters_StaticPropertyChanged;
+            if (_pluginBroker is not null)
+                _pluginBroker.DisposeAsync().AsTask().GetAwaiter().GetResult();
             HostProvider.Instance.PluginStore.ShutdownAllAsync().GetAwaiter().GetResult();
             _pluginRuntime?.Dispose();
             // 清理服务资源

@@ -203,7 +203,9 @@ Long助手提交设计 PR 时，需要明确回答：
 - [ ] 协议文档副本及版本号
 - [ ] 合并后的完整 Manifest Schema
 - [ ] C# Contracts NuGet 或项目包
-- [x] IPC Client 包（PR-C 基础版；服务端业务端点未完成）
+- [x] IPC Client 包
+- [x] 只读 Host Broker（同用户/同会话/同完整性级别、hello、ping、脱敏 catalog）
+- [ ] Broker 命令调用/取消与 `plugin.open`
 - [ ] TypeScript Web SDK
 - [ ] Mock Host
 - [ ] 合法/非法 Manifest Fixtures
