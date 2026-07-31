@@ -20,6 +20,15 @@ try
         Console.WriteLine($"Trusted publisher keys: {verification.TrustedPublisherKeyCount}");
         return 0;
     }
+    if (args.Length > 0 && string.Equals(args[0], "verify-bundle", StringComparison.OrdinalIgnoreCase))
+    {
+        var verification = await new MarketplaceBundleVerificationPipeline().VerifyAsync(
+            BundleVerificationArguments.Parse(args[1..]));
+        Console.WriteLine($"Marketplace bundle verified: {verification.BundleDirectory}");
+        Console.WriteLine($"Packages: {verification.PackageCount}");
+        Console.WriteLine($"Publisher key: {verification.PublisherKeyId} ({verification.PublicKeyFingerprint})");
+        return 0;
+    }
     if (args.Length > 0 && string.Equals(args[0], "deploy", StringComparison.OrdinalIgnoreCase))
     {
         var deployment = await new MarketplaceDeploymentPipeline().DeployAsync(

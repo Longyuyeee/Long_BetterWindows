@@ -87,6 +87,21 @@ public sealed class LpwpCompatibilityGateTests
         Assert.Contains("lpwp-compatibility-report.json", gate);
     }
 
+    [Fact]
+    public void Signed_reference_workflow_requires_existing_ignored_key_and_independent_root_identity()
+    {
+        var publisher = Read("publish-signed-reference-widget.ps1");
+        var verifier = Read("verify-marketplace-bundle.ps1");
+        Assert.Contains("check-ignore", publisher);
+        Assert.Contains("--untracked-files=no", publisher);
+        Assert.Contains("PrivateKeyPath", publisher);
+        Assert.Contains("ExpectedPublicKeyFingerprint", publisher);
+        Assert.Contains("release_eligible = $false", publisher);
+        Assert.DoesNotContain("RSA]::Create", publisher, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("--fingerprint", verifier);
+        Assert.Contains("--key-id", verifier);
+    }
+
     private static string Read(params string[] parts) => File.ReadAllText(Path(parts));
 
     private static string Path(params string[] parts)
