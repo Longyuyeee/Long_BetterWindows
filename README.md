@@ -18,7 +18,8 @@
 [下载最新版本](https://github.com/Longyuyeee/Long_BetterWindows/releases) ·
 [用户指南](docs/USER_GUIDE.md) ·
 [插件开发](docs/插件开发指南.md) ·
-[开发状态](docs/当前开发状态.md)
+[开发状态](docs/当前开发状态.md) ·
+[收口执行交接](docs/收口执行交接_2026-08-01.md)
 
 </div>
 
