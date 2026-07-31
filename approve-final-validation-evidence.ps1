@@ -122,6 +122,9 @@ elseif ($ValidationId -eq 'lpwp-long-grid-e2e') {
         'command.invoke', 'command.cancel', 'plugin.open')
     $actualMethods = @($document.verified_methods | ForEach-Object { [string]$_ } | Sort-Object -Unique)
     if (-not [bool]$document.passed `
+        -or [int]$document.schema_version -ne 1 `
+        -or [string]::IsNullOrWhiteSpace([string]$document.operator) `
+        -or [string]$document.operator -eq $Reviewer.Trim() `
         -or [string]$document.source_commit -ne $sourceCommit `
         -or [string]$document.protocol -ne 'long.plugin.ipc/1.0' `
         -or [string]$document.long_grid_commit -notmatch '^[0-9a-fA-F]{40}$' `
@@ -129,8 +132,23 @@ elseif ($ValidationId -eq 'lpwp-long-grid-e2e') {
         -or (Compare-Object ($requiredMethods | Sort-Object) $actualMethods).Count -ne 0) {
         throw 'Long Grid E2E evidence contract is incomplete.'
     }
+    $reportEvidence = @($document.evidence_files)
+    if ($reportEvidence.Count -eq 0) {
+        throw 'Long Grid E2E report has no hash-locked raw evidence.'
+    }
+    foreach ($item in $reportEvidence) {
+        $match = @($resolvedEvidence | Where-Object {
+            $_.relative_path -eq [string]$item.relative_path `
+                -and $_.sha256 -eq [string]$item.sha256 `
+                -and $_.size_bytes -eq [long]$item.size_bytes
+        })
+        if ($match.Count -ne 1) {
+            throw 'Long Grid E2E raw evidence is missing or does not match its report.'
+        }
+    }
     $contract.long_grid_commit = ([string]$document.long_grid_commit).ToLowerInvariant()
     $contract.protocol = 'long.plugin.ipc/1.0'
+    $contract.operator = ([string]$document.operator).Trim()
 }
 elseif ($ValidationId -eq 'lpwp-signed-reference') {
     if ([string]::IsNullOrWhiteSpace($ExpectedPublisherKeyId) `

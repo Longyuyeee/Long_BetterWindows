@@ -63,3 +63,23 @@ dotnet run --project tools/LongBetterWindows.PluginIpcProbe -- --open <plugin-id
 无参数时执行握手并输出脱敏目录。退出码 `0` 表示成功，`2` 表示稳定 Broker 错误，`3`
 表示宿主离线或连接失败。Long Grid 接入验收至少复现 ping、catalog、一个无副作用命令、
 显式取消、宿主退出后的离线态和宿主重启后的重新连接。
+
+## 5. 生成跨仓库验收证据
+
+Long Grid 侧保留测试日志、截图或录像到 Long助手仓库的 `artifacts/quality/` 后，由实际操作者生成
+哈希锁定摘要。六个确认开关只能在相应方法真实通过后填写：
+
+```powershell
+.\new-lpwp-long-grid-e2e-evidence.ps1 `
+  -ExpectedSourceCommit "<Long助手冻结候选的完整提交>" `
+  -LongGridCommit "<Long Grid 受测版本的完整提交>" `
+  -Operator "<实际操作者>" -Notes "<环境和观察结论>" `
+  -EvidenceFiles "artifacts/quality/<原始日志或录像>" `
+  -OutputPath "artifacts/quality/lpwp-long-grid-e2e/lpwp-long-grid-e2e.json" `
+  -ConfirmHostHello -ConfirmCatalogList -ConfirmCatalogGet `
+  -ConfirmCommandInvoke -ConfirmCommandCancel -ConfirmPluginOpen
+```
+
+随后由不同审核人把摘要及摘要引用的全部原始证据一起传给
+`approve-final-validation-evidence.ps1 -ValidationId lpwp-long-grid-e2e`。批准器会复算每份原始证据的
+SHA-256、核对两个提交、协议和六个精确方法，并拒绝操作者自审。
