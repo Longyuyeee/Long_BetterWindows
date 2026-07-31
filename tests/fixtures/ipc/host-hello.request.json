@@ -1,0 +1,13 @@
+{
+  "protocol": "long.plugin.ipc/1.0",
+  "id": "11111111-1111-1111-1111-111111111111",
+  "kind": "request",
+  "method": "host.hello",
+  "deadline_ms": 10000,
+  "payload": {
+    "client_name": "Long Grid Fixture",
+    "client_version": "1.0.0",
+    "protocols": ["long.plugin.ipc/1.0"],
+    "features": ["command.invoke", "plugin.open"]
+  }
+}

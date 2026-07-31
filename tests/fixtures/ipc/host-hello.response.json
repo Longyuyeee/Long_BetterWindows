@@ -1,0 +1,13 @@
+{
+  "protocol": "long.plugin.ipc/1.0",
+  "id": "11111111-1111-1111-1111-111111111111",
+  "kind": "response",
+  "result": {
+    "host_name": "Long助手",
+    "host_version": "1.11.0-rc.2",
+    "protocol": "long.plugin.ipc/1.0",
+    "features": ["health.ping", "plugin.catalog.list", "plugin.catalog.get", "command.invoke", "command.cancel", "plugin.open"],
+    "maximum_frame_bytes": 1048576,
+    "maximum_deadline_ms": 120000
+  }
+}

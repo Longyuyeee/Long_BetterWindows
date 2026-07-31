@@ -11,6 +11,7 @@ internal sealed class BrokerConnection(
     Stream stream,
     PluginCatalogProjection catalog,
     PluginCommandEndpoint commands,
+    PluginOpenEndpoint pluginOpen,
     string hostVersion)
 {
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -24,6 +25,7 @@ internal sealed class BrokerConnection(
         BrokerMethods.PluginCatalogGet,
         BrokerMethods.CommandInvoke,
         BrokerMethods.CommandCancel,
+        BrokerMethods.PluginOpen,
     ];
 
     public async Task RunAsync(CancellationToken cancellationToken)
@@ -157,6 +159,14 @@ internal sealed class BrokerConnection(
                     break;
                 case BrokerMethods.CommandInvoke:
                     await InvokeCommandAsync(request, deadline, connectionToken).ConfigureAwait(false);
+                    break;
+                case BrokerMethods.PluginOpen:
+                    var open = await pluginOpen.OpenAsync(
+                        Deserialize<PluginOpenRequest>(request), deadline.Token).ConfigureAwait(false);
+                    if (open.Error is not null)
+                        await WriteErrorAsync(request.Id, open.Error.Code, open.Error.Message, deadline.Token).ConfigureAwait(false);
+                    else
+                        await WriteResultAsync(request.Id, open.Result!, deadline.Token).ConfigureAwait(false);
                     break;
                 default:
                     await WriteErrorAsync(request.Id, IpcErrorCodes.SurfaceNotSupported, "The requested broker surface is not available.", deadline.Token).ConfigureAwait(false);

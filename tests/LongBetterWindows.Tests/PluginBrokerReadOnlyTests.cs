@@ -269,6 +269,44 @@ public sealed class PluginBrokerReadOnlyTests
         Assert.Equal(IpcErrorCodes.CommandNotFound, missingCommand.Code);
     }
 
+    [Fact]
+    public async Task Broker_opens_plugin_through_existing_main_ui_launcher()
+    {
+        var mainUi = new RecordingMainUi();
+        var registry = new PluginRegistry();
+        registry.Register(new PluginManifest
+        {
+            Id = "ui.plugin",
+            Name = "UI plugin",
+            Version = "1.0.0",
+        }, mainUi, null, @"C:\test\ui-plugin");
+        await using var fixture = await BrokerFixture.StartAsync(registry);
+        await using var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+
+        var response = await client.RequestAsync<PluginOpenRequest, PluginOpenResponse>(
+            BrokerMethods.PluginOpen, new PluginOpenRequest("ui.plugin"));
+        Assert.Equal("opened", response.Status);
+        Assert.Equal(1, mainUi.OpenCount);
+        Assert.Equal(PluginState.Running, registry.Get("ui.plugin")?.State);
+    }
+
+    [Fact]
+    public async Task Broker_maps_plugin_open_failures()
+    {
+        await using var fixture = await BrokerFixture.StartAsync(CreateRegistry());
+        await using var client = new LongPluginBrokerClient(fixture.PipeName);
+        await client.ConnectAsync(Hello());
+        var missing = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+            client.RequestAsync<PluginOpenRequest, PluginOpenResponse>(
+                BrokerMethods.PluginOpen, new PluginOpenRequest("missing.plugin")));
+        Assert.Equal(IpcErrorCodes.PluginNotFound, missing.Code);
+        var unsupported = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+            client.RequestAsync<PluginOpenRequest, PluginOpenResponse>(
+                BrokerMethods.PluginOpen, new PluginOpenRequest("test.plugin")));
+        Assert.Equal(IpcErrorCodes.SurfaceNotSupported, unsupported.Code);
+    }
+
     private static HostHelloRequest Hello() => new(
         "broker-tests", "1.0.0", [IpcProtocol.Name], []);
 
@@ -440,5 +478,11 @@ public sealed class PluginBrokerReadOnlyTests
             Completed.TrySetResult();
             return PluginCommandResult.Success();
         }
+    }
+
+    private sealed class RecordingMainUi : IHasMainUI
+    {
+        public int OpenCount { get; private set; }
+        public void ShowMainUI() => OpenCount++;
     }
 }
