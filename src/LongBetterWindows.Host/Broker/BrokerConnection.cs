@@ -12,6 +12,7 @@ internal sealed class BrokerConnection(
     PluginCatalogProjection catalog,
     PluginCommandEndpoint commands,
     PluginOpenEndpoint pluginOpen,
+    BrokerDiagnostics diagnostics,
     string hostVersion)
 {
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -35,6 +36,7 @@ internal sealed class BrokerConnection(
         try
         {
             var hello = await ReadAsync(disconnected.Token).ConfigureAwait(false);
+            diagnostics.Request(hello?.Method);
             if (hello is null || !await CompleteHelloAsync(hello, disconnected.Token).ConfigureAwait(false))
                 return;
 
@@ -43,6 +45,7 @@ internal sealed class BrokerConnection(
                 var request = await ReadAsync(disconnected.Token).ConfigureAwait(false);
                 if (request is null)
                     break;
+                diagnostics.Request(request.Method);
 
                 if (!ValidateEnvelope(request, out var errorCode, out var error))
                 {
@@ -283,12 +286,15 @@ internal sealed class BrokerConnection(
         }, cancellationToken).ConfigureAwait(false);
 
     private async Task WriteErrorAsync(string id, string code, string message, CancellationToken cancellationToken)
-        => await WriteAsync(new IpcEnvelope
+    {
+        diagnostics.Error(code);
+        await WriteAsync(new IpcEnvelope
         {
             Id = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString() : id,
             Kind = "response",
             Error = new IpcError(code, message),
         }, cancellationToken).ConfigureAwait(false);
+    }
 
     private async Task TryWriteErrorAsync(string id, string code, string message, CancellationToken cancellationToken)
     {
