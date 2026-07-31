@@ -83,6 +83,33 @@ if ($nativePreflightExitCode -eq 0) {
         $nativePreflightOutput -join "`n") | ConvertFrom-Json
 }
 
+$lpwp = $null
+$lpwpFailure = ""
+$lpwpExitCode = $null
+$lpwpOutputRoot = $null
+if (-not $SkipBuildAndTests) {
+    $lpwpOutputRoot = Join-Path ([IO.Path]::GetTempPath()) (
+        "long-lpwp-final-" + [Guid]::NewGuid().ToString("N"))
+    try {
+        $lpwpOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass `
+            -File (Join-Path $PSScriptRoot "verify-lpwp-compatibility.ps1") `
+            -OutputDirectory $lpwpOutputRoot -NoBuild 2>&1)
+        $lpwpExitCode = $LASTEXITCODE
+        $lpwpReportPath = Join-Path $lpwpOutputRoot "lpwp-compatibility-report.json"
+        if ($lpwpExitCode -eq 0 -and (Test-Path -LiteralPath $lpwpReportPath -PathType Leaf)) {
+            $lpwp = Get-Content -LiteralPath $lpwpReportPath -Raw -Encoding UTF8 |
+                ConvertFrom-Json
+        } else {
+            $lpwpFailure = Get-CommandFailureSummary $lpwpOutput
+        }
+    }
+    finally {
+        if ($null -ne $lpwpOutputRoot -and (Test-Path -LiteralPath $lpwpOutputRoot)) {
+            Remove-Item -LiteralPath $lpwpOutputRoot -Recurse -Force
+        }
+    }
+}
+
 $projectPath = Join-Path $PSScriptRoot `
     "src\LongBetterWindows.Host\LongBetterWindows.Host.csproj"
 $projectText = Get-Content -LiteralPath $projectPath -Raw -Encoding UTF8
@@ -102,6 +129,7 @@ $hostSha256 = if ($hostExists) {
 $machineBlockers = [Collections.Generic.List[string]]::new()
 if ($SkipBuildAndTests) {
     $machineBlockers.Add("Release build and full tests were skipped.")
+    $machineBlockers.Add("LPWP compatibility verification was skipped.")
 }
 if (-not $buildPassed) {
     $machineBlockers.Add("Release build failed.")
@@ -112,6 +140,16 @@ if (-not $testPassed) {
 if ($matrixExitCode -ne 0 -or $null -eq $matrix `
     -or -not [bool]$matrix.contract_valid) {
     $machineBlockers.Add("Plugin positive-function contract is invalid.")
+}
+$lpwpValid = $null -ne $lpwp `
+    -and [string]$lpwp.source_commit -eq $sourceCommit.ToLowerInvariant() `
+    -and [string]$lpwp.protocol -eq "long.plugin.ipc/1.0" `
+    -and [bool]$lpwp.dotnet_contract_tests `
+    -and [bool]$lpwp.web_sdk_tests `
+    -and [bool]$lpwp.runtime_matrix `
+    -and [int]$lpwp.fixture_count -eq 6
+if (-not $SkipBuildAndTests -and ($lpwpExitCode -ne 0 -or -not $lpwpValid)) {
+    $machineBlockers.Add("LPWP compatibility contract is invalid.")
 }
 if (-not $hostExists) {
     $machineBlockers.Add("Release host executable is missing.")
@@ -177,6 +215,24 @@ $humanValidation = @(
         status = "blocked_requires_controlled_credentials"
         scope = "real HTTPS Registry/CDN deploy and rollback"
         guide_id = "marketplace-registry-release"
+    },
+    [ordered]@{
+        id = "lpwp-long-grid-e2e"
+        status = "blocked_requires_long_grid_repository"
+        scope = "Long Grid handshake, catalog, command cancellation and plugin.open cross-repository E2E"
+        guide_id = "lpwp-integration"
+    },
+    [ordered]@{
+        id = "lpwp-widget-desktop"
+        status = "pending"
+        scope = "Reference Widget install, dual instance, move, resize, restart restore, pause and help"
+        guide_id = "user-final-validation"
+    },
+    [ordered]@{
+        id = "lpwp-signed-reference"
+        status = "blocked_requires_publisher_identity"
+        scope = "Approved Marketplace publisher key, signed reference bundle and independent fingerprint review"
+        guide_id = "lpwp-signed-reference-release"
     }
 )
 
@@ -227,6 +283,23 @@ $report = [ordered]@{
         }
     }
     native_performance_preflight = $nativePreflight
+    lpwp_compatibility = if ($null -eq $lpwp) {
+        $null
+    } else {
+        [ordered]@{
+            protocol = [string]$lpwp.protocol
+            lpwp_version = [string]$lpwp.lpwp_version
+            source_commit = [string]$lpwp.source_commit
+            dotnet_contract_tests = [bool]$lpwp.dotnet_contract_tests
+            web_sdk_tests = [bool]$lpwp.web_sdk_tests
+            runtime_matrix = [bool]$lpwp.runtime_matrix
+            fixture_count = [int]$lpwp.fixture_count
+            ipc_package_sha256 = [string]$lpwp.ipc_package_sha256
+            reference_widget_sha256 = [string]$lpwp.reference_widget_sha256
+            valid = $lpwpValid
+        }
+    }
+    lpwp_failure = $lpwpFailure
     machine_blockers = @($machineBlockers)
     ready_for_human_validation = $readyForHumanValidation
     remaining_human_validation_count = $remainingHumanCount

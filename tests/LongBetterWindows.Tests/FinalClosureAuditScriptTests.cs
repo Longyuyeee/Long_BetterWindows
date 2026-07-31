@@ -60,9 +60,13 @@ public sealed class FinalClosureAuditScriptTests
                 .GetProperty("command_count")
                 .GetInt32());
         Assert.Equal(
-            7,
+            10,
             document.GetProperty("human_validation")
                 .GetArrayLength());
+        Assert.Equal(JsonValueKind.Null, document.GetProperty("lpwp_compatibility").ValueKind);
+        Assert.Contains(
+            document.GetProperty("machine_blockers").EnumerateArray(),
+            item => item.GetString() == "LPWP compatibility verification was skipped.");
     }
 
     [Fact]
@@ -77,6 +81,9 @@ public sealed class FinalClosureAuditScriptTests
         Assert.Contains("ready_for_human_validation", source);
         Assert.Contains("remaining_human_validation_count", source);
         Assert.Contains("blocked_requires_controlled_credentials", source);
+        Assert.Contains("verify-lpwp-compatibility.ps1", source);
+        Assert.Contains("blocked_requires_long_grid_repository", source);
+        Assert.Contains("blocked_requires_publisher_identity", source);
         Assert.DoesNotContain("-ConfirmPassed", source);
         Assert.DoesNotContain("Start-Process -Verb RunAs", source);
     }
