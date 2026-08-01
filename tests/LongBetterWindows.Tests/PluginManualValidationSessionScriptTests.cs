@@ -37,6 +37,21 @@ public sealed class PluginManualValidationSessionScriptTests
         Assert.Contains("selected plugin has no pending", source);
     }
 
+    [Fact]
+    public void SessionStarter_ResumesOnlyTheExactPreparedSessionAtomically()
+    {
+        var source = Read("start-plugin-validation.ps1");
+
+        Assert.Contains("$resumePreparedSession", source);
+        Assert.Contains("launch_status -ne \"prepared_only\"", source);
+        Assert.Contains("Existing validation session cannot be resumed safely", source);
+        Assert.Contains("launch_status = if ($PrepareOnly)", source);
+        Assert.Contains("\"launching\"", source);
+        Assert.Contains("Update-JsonFileAtomically", source);
+        Assert.Contains("$existingSessionHash", source);
+        Assert.Contains("$launchingSessionHash", source);
+    }
+
     private static string Read(string relativePath)
         => File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
