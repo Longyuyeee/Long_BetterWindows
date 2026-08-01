@@ -13,7 +13,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $OutputDirectory,
 
-    [string] $Version = '1.11.0-rc.2',
+    [string] $Version = '1.11.0-rc.3',
 
     [string] $NumericVersion = '1.11.0.0'
 )
