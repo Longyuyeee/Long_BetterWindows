@@ -12,6 +12,7 @@ namespace LongBetterWindows.Host.Services
         public IReadOnlyList<string> RequestedCommandPaths { get; private init; } =
             Array.Empty<string>();
         public string? RequestedPluginsDirectory { get; private init; }
+        public string? RequestedPluginId { get; private init; }
         public bool ExitAfterCommand { get; private init; }
         public string? QualityCommandReportPath { get; private init; }
         public string? QualityCommandFixturePath { get; private init; }
@@ -95,6 +96,7 @@ namespace LongBetterWindows.Host.Services
                     arguments,
                     "--command-path"),
                 RequestedPluginsDirectory = ReadArgument(arguments, "--plugins-dir"),
+                RequestedPluginId = ReadArgument(arguments, "--open-plugin"),
                 ExitAfterCommand = HasSwitch(arguments, "--exit-after-command"),
                 QualityCommandReportPath = ReadArgument(
                     arguments,

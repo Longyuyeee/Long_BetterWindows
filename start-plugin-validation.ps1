@@ -130,6 +130,7 @@ $session = [ordered]@{
     evidence_directory = Get-RepositoryRelativePath $evidencePath
     subject_executable = Get-RepositoryRelativePath $subjectPath
     subject_executable_sha256 = $actualSubjectHash
+    launch_arguments = @("--open-plugin", [string]$plan.next.plugin_id)
     launch_status = if ($PrepareOnly) { "prepared_only" } else { "launching" }
     launched_at = $null
     process_id = $null
@@ -164,6 +165,7 @@ if ($PrepareOnly) {
     try {
         $process = Start-Process `
             -FilePath $subjectPath `
+            -ArgumentList @($session.launch_arguments) `
             -WorkingDirectory (Split-Path -Parent $subjectPath) `
             -PassThru
         $session.launch_status = "started"

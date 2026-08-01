@@ -16,6 +16,8 @@ public sealed class PluginManualValidationSessionScriptTests
         Assert.Contains("Get-Process -Name \"LongBetterWindows.Host\"", source);
         Assert.Contains("Start-Process", source);
         Assert.Contains("-FilePath $subjectPath", source);
+        Assert.Contains("--open-plugin", source);
+        Assert.Contains("-ArgumentList @($session.launch_arguments)", source);
         Assert.Contains("-WorkingDirectory", source);
         Assert.Contains("validation-session.json", source);
         Assert.Contains("pending_human_observation", source);
