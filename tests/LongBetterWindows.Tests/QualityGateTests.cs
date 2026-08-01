@@ -946,7 +946,7 @@ public class QualityGateTests
         Assert.Contains("<RemoveDir Directories=\"$(OutputPath)Plugins", project);
         Assert.Contains("CopyPluginsToPublish", project);
         Assert.Contains("$(PublishDir)Plugins", project);
-        Assert.Contains("<Version>1.11.0-rc.2</Version>", project);
+        Assert.Contains("<Version>1.11.0-rc.3</Version>", project);
         Assert.Contains("<AssemblyVersion>1.11.0.0</AssemblyVersion>", project);
     }
 
@@ -962,6 +962,24 @@ public class QualityGateTests
         Assert.Contains("App.ProductVersion", webDispatcher);
         Assert.Contains("App.ProductVersion", developerPage);
         Assert.Contains("developer.about.version", developerPage);
+    }
+
+    [Fact]
+    public void ReleaseCandidateVersion_IsConsistentAcrossPackagingAndIpcFixture()
+    {
+        const string version = "1.11.0-rc.3";
+        var project = Read("src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj");
+        var release = Read("release.ps1");
+        var installerBuild = Read("build-installer.ps1");
+        var installer = Read("installer", "LongAssistant.iss");
+        var helloFixture = Read("tests", "fixtures", "ipc", "host-hello.response.json");
+
+        Assert.Contains($"<Version>{version}</Version>", project);
+        Assert.Contains($"<InformationalVersion>{version}</InformationalVersion>", project);
+        Assert.Contains($"[string] $Version = '{version}'", release);
+        Assert.Contains($"[string] $Version = '{version}'", installerBuild);
+        Assert.Contains($"#define AppVersion \"{version}\"", installer);
+        Assert.Contains($"\"host_version\": \"{version}\"", helloFixture);
     }
 
     [Fact]
