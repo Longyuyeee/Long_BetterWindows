@@ -16,6 +16,7 @@ public class AppStartupOptionsTests
             "--command-path", @"C:\quality\one.txt",
             "--command-path", @"C:\quality\two.txt",
             "--plugins-dir", "test-plugins",
+            "--open-plugin", "com.long.json",
             "--exit-after-command",
             "--quality-command-report", "command-report.json",
             "--quality-command-fixture", "command-fixture.json",
@@ -62,6 +63,7 @@ public class AppStartupOptionsTests
             [@"C:\quality\one.txt", @"C:\quality\two.txt"],
             options.RequestedCommandPaths);
         Assert.Equal("test-plugins", options.RequestedPluginsDirectory);
+        Assert.Equal("com.long.json", options.RequestedPluginId);
         Assert.True(options.ExitAfterCommand);
         Assert.Equal("command-report.json", options.QualityCommandReportPath);
         Assert.Equal("command-fixture.json", options.QualityCommandFixturePath);
@@ -162,5 +164,13 @@ public class AppStartupOptionsTests
             ["--quality-capture-view", "settings"]).OpenSettingsForQuality);
         Assert.True(AppStartupOptions.Parse(
             ["--quality-capture-view", "developer"]).OpenDeveloperForQuality);
+    }
+
+    [Fact]
+    public void Parse_MissingOpenPluginValueDoesNotCreateARequest()
+    {
+        var options = AppStartupOptions.Parse(["--open-plugin"]);
+
+        Assert.Null(options.RequestedPluginId);
     }
 }

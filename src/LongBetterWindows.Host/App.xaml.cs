@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using LongBetterWindows.Host.Broker;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 using LongBetterWindows.Host.Views;
 using Serilog;
@@ -232,6 +233,19 @@ namespace LongBetterWindows.Host
 
                 if (_brokerSettings.Enabled)
                     StartPluginBroker();
+
+                if (!string.IsNullOrWhiteSpace(_startupOptions.RequestedPluginId))
+                {
+                    var openStatus = await PluginMainUiLauncher.OpenAsync(
+                        HostProvider.Instance.PluginStore,
+                        _startupOptions.RequestedPluginId);
+                    if (openStatus != PluginMainUiOpenStatus.Opened)
+                    {
+                        throw new InvalidOperationException(
+                            $"Requested plugin could not open: " +
+                            $"{_startupOptions.RequestedPluginId} ({openStatus})");
+                    }
+                }
 
                 if (MainWindow is Window qualityWindow
                     && (_startupOptions.QualityCaptureWidth > 0
