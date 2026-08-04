@@ -39,25 +39,36 @@ if ($LASTEXITCODE -ne 0) {
 }
 $sourceDirty = $trackedStatus.Count -gt 0
 
+$restorePassed = $true
 $buildPassed = $true
 $testPassed = $true
+$restoreFailure = ""
 $buildFailure = ""
 $testFailure = ""
 if (-not $SkipBuildAndTests) {
-    $buildOutput = @(& $dotnet build `
-        (Join-Path $PSScriptRoot "LongBetterWindows.sln") `
-        -c Release --no-restore 2>&1)
-    $buildPassed = $LASTEXITCODE -eq 0
-    if (-not $buildPassed) {
-        $buildFailure = Get-CommandFailureSummary $buildOutput
+    $solutionPath = Join-Path $PSScriptRoot "LongBetterWindows.sln"
+    $restoreOutput = @(& $dotnet restore $solutionPath --nologo 2>&1)
+    $restorePassed = $LASTEXITCODE -eq 0
+    if (-not $restorePassed) {
+        $restoreFailure = Get-CommandFailureSummary $restoreOutput
+        $buildPassed = $false
+        $testPassed = $false
     } else {
-        $testOutput = @(& $dotnet test `
-            (Join-Path $PSScriptRoot `
-                "tests\LongBetterWindows.Tests\LongBetterWindows.Tests.csproj") `
-            -c Release --no-build --no-restore 2>&1)
-        $testPassed = $LASTEXITCODE -eq 0
-        if (-not $testPassed) {
-            $testFailure = Get-CommandFailureSummary $testOutput
+        $buildOutput = @(& $dotnet build $solutionPath `
+            -c Release --no-restore 2>&1)
+        $buildPassed = $LASTEXITCODE -eq 0
+        if (-not $buildPassed) {
+            $buildFailure = Get-CommandFailureSummary $buildOutput
+            $testPassed = $false
+        } else {
+            $testOutput = @(& $dotnet test `
+                (Join-Path $PSScriptRoot `
+                    "tests\LongBetterWindows.Tests\LongBetterWindows.Tests.csproj") `
+                -c Release --no-build --no-restore 2>&1)
+            $testPassed = $LASTEXITCODE -eq 0
+            if (-not $testPassed) {
+                $testFailure = Get-CommandFailureSummary $testOutput
+            }
         }
     }
 }
@@ -131,10 +142,11 @@ if ($SkipBuildAndTests) {
     $machineBlockers.Add("Release build and full tests were skipped.")
     $machineBlockers.Add("LPWP compatibility verification was skipped.")
 }
-if (-not $buildPassed) {
+if (-not $SkipBuildAndTests -and -not $restorePassed) {
+    $machineBlockers.Add("Dependency restore failed.")
+} elseif (-not $buildPassed) {
     $machineBlockers.Add("Release build failed.")
-}
-if (-not $testPassed) {
+} elseif (-not $testPassed) {
     $machineBlockers.Add("Full automated tests failed.")
 }
 if ($matrixExitCode -ne 0 -or $null -eq $matrix `
@@ -249,6 +261,11 @@ $report = [ordered]@{
     allow_dirty = [bool]$AllowDirty
     version = $version
     checks_skipped = [bool]$SkipBuildAndTests
+    restore_passed = if ($SkipBuildAndTests) {
+        $null
+    } else {
+        $restorePassed
+    }
     release_build_passed = if ($SkipBuildAndTests) {
         $null
     } else {
@@ -259,6 +276,7 @@ $report = [ordered]@{
     } else {
         $testPassed
     }
+    restore_failure = $restoreFailure
     build_failure = $buildFailure
     test_failure = $testFailure
     release_host = [ordered]@{

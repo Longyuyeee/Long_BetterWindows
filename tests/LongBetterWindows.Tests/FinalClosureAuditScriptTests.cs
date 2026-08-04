@@ -46,6 +46,12 @@ public sealed class FinalClosureAuditScriptTests
             "final_closure_readiness",
             document.GetProperty("classification").GetString());
         Assert.True(document.GetProperty("checks_skipped").GetBoolean());
+        Assert.Equal(
+            JsonValueKind.Null,
+            document.GetProperty("restore_passed").ValueKind);
+        Assert.Equal(
+            string.Empty,
+            document.GetProperty("restore_failure").GetString());
         Assert.False(
             document.GetProperty("ready_for_human_validation").GetBoolean());
         Assert.False(document.GetProperty("release_eligible").GetBoolean());
@@ -84,6 +90,16 @@ public sealed class FinalClosureAuditScriptTests
         Assert.Contains("verify-lpwp-compatibility.ps1", source);
         Assert.Contains("blocked_requires_long_grid_repository", source);
         Assert.Contains("blocked_requires_publisher_identity", source);
+        var restoreIndex = source.IndexOf(
+            "& $dotnet restore",
+            StringComparison.Ordinal);
+        var buildIndex = source.IndexOf(
+            "& $dotnet build",
+            StringComparison.Ordinal);
+        Assert.True(restoreIndex >= 0 && restoreIndex < buildIndex);
+        Assert.Contains("Dependency restore failed.", source);
+        Assert.Contains("restore_passed", source);
+        Assert.Contains("restore_failure", source);
         Assert.DoesNotContain("-ConfirmPassed", source);
         Assert.DoesNotContain("Start-Process -Verb RunAs", source);
     }
