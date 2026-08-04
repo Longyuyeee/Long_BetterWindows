@@ -3,6 +3,7 @@ using System.Windows.Automation;
 using System.Windows.Input;
 using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Engine;
 using Serilog;
 
 namespace LongBetterWindows.Host.Views
@@ -117,6 +118,11 @@ namespace LongBetterWindows.Host.Views
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key != Key.Escape) return;
+            if (WebPluginUiModalState.IsOpen(
+                    PluginContent.Content as DependencyObject))
+            {
+                return;
+            }
             ReturnToOwner();
             e.Handled = true;
         }

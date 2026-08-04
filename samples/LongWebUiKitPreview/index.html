@@ -25,6 +25,7 @@
         </div>
         <div class="long-toolbar">
           <button class="long-button long-button--primary" id="primaryButton" type="button">主要操作</button>
+          <button class="long-button" id="toastButton" type="button">显示反馈</button>
           <button class="long-button long-button--secondary" id="dialogButton" type="button">打开确认</button>
           <button class="long-button" type="button" disabled>不可用</button>
           <span class="long-kbd">Ctrl Enter</span>
@@ -76,17 +77,6 @@
       </article>
     </section>
   </main>
-
-  <dialog class="long-dialog" id="confirmDialog" aria-labelledby="dialogTitle">
-    <div class="long-dialog__header">
-      <h2 class="long-dialog__title" id="dialogTitle">确认示例操作</h2>
-    </div>
-    <div class="long-dialog__body">此对话框只演示公开样式和原生焦点行为。</div>
-    <div class="long-dialog__actions">
-      <button class="long-button long-button--secondary" id="cancelButton" type="button">取消</button>
-      <button class="long-button long-button--primary" id="confirmButton" type="button">确认</button>
-    </div>
-  </dialog>
 
   <script type="module" src="main.js"></script>
 </body>

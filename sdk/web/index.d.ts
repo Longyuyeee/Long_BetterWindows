@@ -1,5 +1,5 @@
 export type LongApiVersion = "1.1.0";
-export type LongUiKitVersion = "1.2.0";
+export type LongUiKitVersion = "1.3.0";
 
 export interface LongUiLanguageContext {
   requestedLanguage: string;
@@ -20,6 +20,25 @@ export interface LongUiStateOptions {
   onAction?: () => void;
 }
 
+export type LongUiToastKind = "info" | "success" | "warning" | "error";
+
+export interface LongUiToastOptions {
+  message: string;
+  kind?: LongUiToastKind;
+  duration?: number;
+  actionLabel?: string;
+  onAction?: () => void;
+  dismissLabel?: string;
+}
+
+export interface LongUiConfirmOptions {
+  title?: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+}
+
 export interface LongUiKit {
   readonly version: LongUiKitVersion;
   readonly language: LongUiLanguageContext | null;
@@ -29,6 +48,8 @@ export interface LongUiKit {
   setReducedMotion(reduced: boolean): void;
   setBusy(element: HTMLElement | null, busy: boolean): void;
   announce(message: string): void;
+  showToast(options: string | LongUiToastOptions): () => void;
+  confirm(options: string | LongUiConfirmOptions): Promise<boolean>;
   clearState(container: HTMLElement | null): void;
   renderState(
     container: HTMLElement | null,

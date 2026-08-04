@@ -224,7 +224,8 @@ public sealed class PluginPackageValidatorTests : IDisposable
     [Theory]
     [InlineData("1.1.0", true)]
     [InlineData("1.2.0", true)]
-    [InlineData("1.3.0", false)]
+    [InlineData("1.3.0", true)]
+    [InlineData("1.4.0", false)]
     public async Task ValidateAsync_UiKitMinorVersion_PreservesBackwardCompatibility(
         string minimumUiKitVersion,
         bool expectedSuccess)

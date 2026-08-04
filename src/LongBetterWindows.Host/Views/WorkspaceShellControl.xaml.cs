@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
 using Serilog;
 
@@ -50,6 +51,10 @@ namespace LongBetterWindows.Host.Views
 
         internal ObservableCollection<WorkspaceModuleTabState> ModuleTabs { get; } = [];
         internal ToolCenterControl ToolCenter => ToolCenterContent;
+        internal bool HasOpenPluginUiModal
+            => _runtimeContent is not null
+                && ReferenceEquals(PluginRuntimeContent.Content, _runtimeContent)
+                && WebPluginUiModalState.IsOpen(_runtimeContent);
 
         internal event Action<WorkspaceModuleKey>? ModuleActivationRequested;
         internal event Action<WorkspaceModuleKey>? ModuleCloseRequested;

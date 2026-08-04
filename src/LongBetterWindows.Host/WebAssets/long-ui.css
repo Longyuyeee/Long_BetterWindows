@@ -18,6 +18,7 @@
   --long-success: #47d18c;
   --long-warning: #ffb84d;
   --long-danger: #ff647c;
+  --long-on-danger: #ffffff;
   --long-shadow-1: 0 4px 16px rgba(0, 0, 0, .18);
   --long-shadow-2: 0 10px 30px rgba(0, 0, 0, .28);
   --long-radius-control: 10px;
@@ -48,6 +49,7 @@
   --long-success: #148a57;
   --long-warning: #b56500;
   --long-danger: #d93652;
+  --long-on-danger: #ffffff;
   --long-shadow-1: 0 4px 16px rgba(28, 35, 52, .08);
   --long-shadow-2: 0 10px 30px rgba(28, 35, 52, .14);
 }
@@ -93,6 +95,7 @@ button.btn-primary, .long-button--primary { background: var(--long-accent) !impo
 button.btn-primary:hover, .long-button--primary:hover { background: var(--long-accent-hover) !important; }
 button.btn-primary:active, .long-button--primary:active { background: var(--long-accent-pressed) !important; border-color: var(--long-accent-pressed) !important; }
 button.btn-secondary, .long-button--secondary { background: var(--long-surface-card) !important; color: var(--long-text-primary) !important; }
+button.long-button--danger { background: var(--long-danger) !important; border-color: var(--long-danger) !important; color: var(--long-on-danger) !important; }
 
 input:not([type="checkbox"]):not([type="radio"]), textarea, select, .long-input {
   background: var(--long-bg-raised) !important;
@@ -135,6 +138,7 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
   --long-success: #00ff00;
   --long-warning: #ffff00;
   --long-danger: #ff8080;
+  --long-on-danger: #000000;
   --long-shadow-1: none;
   --long-shadow-2: none;
 }
@@ -156,6 +160,7 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
     --long-accent-pressed: Highlight;
     --long-accent-soft: Canvas;
     --long-on-accent: HighlightText;
+    --long-on-danger: HighlightText;
     --long-shadow-1: none;
     --long-shadow-2: none;
   }
@@ -273,6 +278,15 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
 .long-dialog__title { margin: 0; font-size: 16px; font-weight: 600; }
 .long-dialog__body { padding: 18px 20px; color: var(--long-text-secondary); font-size: 13px; line-height: 1.6; }
 .long-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 18px; }
+.long-toast-region { position: fixed; z-index: 10000; top: 16px; right: 16px; display: grid; width: min(380px, calc(100vw - 32px)); gap: 8px; pointer-events: none; }
+.long-toast { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; min-height: 52px; padding: 10px 10px 10px 14px; border: 1px solid var(--long-stroke); border-left: 3px solid var(--long-accent); border-radius: var(--long-radius-control); background: var(--long-surface-card); color: var(--long-text-primary); box-shadow: var(--long-shadow-2); pointer-events: auto; animation: long-toast-in var(--long-motion-normal) ease-out; }
+.long-toast--success { border-left-color: var(--long-success); }
+.long-toast--warning { border-left-color: var(--long-warning); }
+.long-toast--error { border-left-color: var(--long-danger); }
+.long-toast--closing { opacity: 0; transform: translateY(-4px); transition: opacity var(--long-motion-normal), transform var(--long-motion-normal); }
+.long-toast__message { min-width: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.long-toast__action { white-space: nowrap; }
+button.long-toast__close { width: 32px; min-height: 32px; padding: 0 !important; border-color: transparent !important; background: transparent !important; color: var(--long-text-secondary) !important; font-size: 20px !important; line-height: 1 !important; }
 .long-result { padding: 16px; border: 1px solid var(--long-stroke); border-radius: var(--long-radius-control); background: var(--long-bg-raised); color: var(--long-text-primary); font: 600 17px/1.55 "Cascadia Code", Consolas, monospace; overflow-wrap: anywhere; }
 .long-option-list { display: grid; gap: 4px; }
 .long-option { display: flex; align-items: center; gap: 10px; min-height: 38px; color: var(--long-text-secondary); font-size: 13px; cursor: pointer; }
@@ -316,6 +330,7 @@ button.long-list-item__content { min-height: 0; padding: 0 !important; border: 0
 
 @keyframes long-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes long-state-spin { to { transform: rotate(360deg); } }
+@keyframes long-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 :root[data-long-reduced-motion="true"] .long-state--loading .long-state__indicator { animation: none; border-color: var(--long-accent); }
 :root[data-long-reduced-motion="true"] *,
 :root[data-long-reduced-motion="true"] *::before,

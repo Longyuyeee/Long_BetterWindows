@@ -9,7 +9,8 @@
 - 完成 Launcher / Workspace 双模式统一工作区，统一管理中心、市场、插件设置、插件运行、工作流与诊断导航。
 - 保持 25 个内置插件、42 条命令和 27 项宿主能力，完善三运行时脚手架、SDK、确定性打包和人工正向回执矩阵。
 - 完成 Long助手侧 LPWP 1.0 Widget、生命周期、布局、IPC Broker、Golden Fixtures、参考 Widget 与 Long Grid 接入工具。
-- Long Web UI Kit 升至 `1.2.0`，公开语言上下文与 viewport 快照/订阅合同，并保持 `1.1.x` 插件兼容。
+- Long Web UI Kit 升至 `1.3.0`，在语言与 viewport 环境桥基础上新增内容区 Toast、串行确认框及焦点恢复，并保持 `1.1.x`、`1.2.x` 插件兼容。
+- 修复 Web 确认框按 `Esc` 时同时关闭宿主模块的问题，嵌入与分离窗口现在均优先交由活动模态层处理。
 
 ### 质量与发布
 

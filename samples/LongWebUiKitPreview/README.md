@@ -1,6 +1,6 @@
 # Long Web UI Kit Preview
 
-Reference WebView plugin for UI Kit `1.2.0`. The sample relies entirely on the
+Reference WebView plugin for UI Kit `1.3.0`. The sample relies entirely on the
 CSS and `window.LongUI` helpers injected by Long Assistant. It intentionally
 contains no copied stylesheet, remote resource, or host capability request.
 
@@ -12,7 +12,7 @@ Validate it with the production validator:
 
 Open the validated directory as a local plugin to inspect light/dark themes,
 keyboard focus, reduced motion, high contrast, responsive layout, content
-states, progress semantics, and dialog focus behavior.
+states, progress semantics, in-plugin toast feedback, and dialog focus behavior.
 
 Capture the engineering visual regression matrix:
 

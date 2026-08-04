@@ -1,7 +1,6 @@
 const ui = window.LongUI;
 const versionBadge = document.getElementById('versionBadge');
 const statePreview = document.getElementById('statePreview');
-const dialog = document.getElementById('confirmDialog');
 const progress = document.getElementById('progress');
 const progressFill = document.getElementById('progressFill');
 const progressValue = document.getElementById('progressValue');
@@ -43,10 +42,24 @@ document.getElementById('primaryButton').addEventListener('click', () => {
   progressFill.style.width = `${next}%`;
   progressValue.textContent = `${next}%`;
   ui?.announce(`完成度 ${next}%`);
+  ui?.showToast({ message: `完成度已更新为 ${next}%`, kind: 'success' });
 });
 
-document.getElementById('dialogButton').addEventListener('click', () => dialog.showModal());
-document.getElementById('cancelButton').addEventListener('click', () => dialog.close('cancel'));
-document.getElementById('confirmButton').addEventListener('click', () => dialog.close('confirm'));
+document.getElementById('toastButton').addEventListener('click', () => {
+  ui?.showToast({ message: '插件内容区反馈已就绪。', kind: 'info', duration: 0 });
+});
+
+document.getElementById('dialogButton').addEventListener('click', async () => {
+  const accepted = await ui?.confirm({
+    title: '确认示例操作',
+    message: '确认框会串行显示，并在关闭后恢复触发按钮焦点。',
+    confirmLabel: '确认',
+    cancelLabel: '取消'
+  });
+  ui?.showToast({
+    message: accepted ? '已确认示例操作。' : '已取消示例操作。',
+    kind: accepted ? 'success' : 'info'
+  });
+});
 
 renderState('empty');

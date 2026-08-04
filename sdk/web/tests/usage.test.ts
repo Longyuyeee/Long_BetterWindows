@@ -5,6 +5,8 @@ import type {
   LongHostInfo,
   LongResult,
   LongUiLanguageContext,
+  LongUiConfirmOptions,
+  LongUiToastOptions,
   LongUiViewport,
   LongUiKitVersion
 } from "@long-assistant/plugin-sdk";
@@ -75,6 +77,18 @@ void exercise(controller.long);
 window.long = controller.long;
 const uiKitVersion: LongUiKitVersion | undefined = window.LongUI?.version;
 uiKitVersion?.toString();
+const toastOptions: LongUiToastOptions = {
+  message: "Saved",
+  kind: "success",
+  duration: 3000
+};
+window.LongUI?.showToast(toastOptions)();
+const confirmOptions: LongUiConfirmOptions = {
+  title: "Delete item",
+  message: "This cannot be undone.",
+  danger: true
+};
+void window.LongUI?.confirm(confirmOptions);
 const stopLanguage = window.LongUI?.onLanguageChanged((context: LongUiLanguageContext) => {
   context.resolvedLanguage.toLowerCase();
   Object.keys(context.resources);

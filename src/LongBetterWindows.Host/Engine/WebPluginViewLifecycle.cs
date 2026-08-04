@@ -262,6 +262,8 @@ namespace LongBetterWindows.Host.Engine
         {
             if (_navigationPolicy.IsTrustedWebViewUri(args.Uri))
             {
+                if (_webView is not null)
+                    WebPluginUiModalState.SetOpen(_webView, false);
                 _languageMessages.BeginNavigation();
                 return;
             }
@@ -350,6 +352,15 @@ namespace LongBetterWindows.Host.Engine
                 return;
             }
 
+            if (_webView is not null
+                && WebPluginUiModalState.TryRead(
+                    args.WebMessageAsJson,
+                    out var isOpen))
+            {
+                WebPluginUiModalState.SetOpen(_webView, isOpen);
+                return;
+            }
+
             _messageReceived(args.WebMessageAsJson);
         }
 
@@ -389,6 +400,9 @@ namespace LongBetterWindows.Host.Engine
                 _webView.CoreWebView2.WebResourceRequested -= OnWebResourceRequested;
                 _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
             }
+
+            if (_webView is not null)
+                WebPluginUiModalState.SetOpen(_webView, false);
 
             _webView?.Dispose();
             _webView = null;

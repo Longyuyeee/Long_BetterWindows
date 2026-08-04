@@ -170,6 +170,45 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void WebUiKit_ExposesAccessibleFeedbackComponents()
+    {
+        var root = FindRepositoryRoot();
+        var css = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "WebAssets", "long-ui.css"));
+        var script = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "WebAssets", "long-ui.js"));
+        var types = File.ReadAllText(Path.Combine(root, "sdk", "web", "index.d.ts"));
+
+        Assert.Contains(".long-toast-region", css);
+        Assert.Contains(".long-toast--error", css);
+        Assert.Contains(".long-button--danger", css);
+        Assert.Contains("LongUI.showToast", script);
+        Assert.Contains("LongUI.confirm", script);
+        Assert.Contains("kind === 'error' ? 'alert' : 'status'", script);
+        Assert.Contains("toast.addEventListener('pointerenter', pauseTimer)", script);
+        Assert.Contains("toast.addEventListener('focusin', pauseTimer)", script);
+        Assert.Contains("dialog.setAttribute('aria-labelledby'", script);
+        Assert.Contains("previousFocus.focus()", script);
+        Assert.Contains("confirmQueue", script);
+        Assert.Contains("long.ui-modal-state", script);
+        Assert.DoesNotContain("innerHTML", script);
+        Assert.Contains("LongUiToastOptions", types);
+        Assert.Contains("LongUiConfirmOptions", types);
+        Assert.Contains("showToast(options: string | LongUiToastOptions)", types);
+        Assert.Contains("confirm(options: string | LongUiConfirmOptions)", types);
+
+        var lifecycle = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs"));
+        var mainWindow = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "MainWindow.xaml.cs"));
+        var detachedWindow = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "PluginWindowHost.xaml.cs"));
+        Assert.Contains("WebPluginUiModalState.TryRead", lifecycle);
+        Assert.Contains("WorkspaceShell.HasOpenPluginUiModal", mainWindow);
+        Assert.Contains("WebPluginUiModalState.IsOpen", detachedWindow);
+    }
+
+    [Fact]
     public void RepresentativeWebPlugins_UseUnifiedContentStates()
     {
         var root = FindRepositoryRoot();

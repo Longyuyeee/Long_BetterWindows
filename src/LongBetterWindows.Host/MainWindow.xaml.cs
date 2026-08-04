@@ -914,6 +914,11 @@ namespace LongBetterWindows.Host
             if (key != Key.Escape)
                 return;
 
+            if (WorkspaceShell.HasOpenPluginUiModal)
+            {
+                return;
+            }
+
             var state = ServicesInitializer.Workspace.State;
             var action = WorkspaceEscapeRouter.Route(
                 new WorkspaceEscapeContext(

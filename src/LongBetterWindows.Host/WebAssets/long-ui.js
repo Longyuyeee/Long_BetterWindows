@@ -28,6 +28,197 @@
     requestAnimationFrame(function () { region.textContent = message || ''; });
   };
 
+  function appendSurface(element) {
+    (document.body || document.documentElement).appendChild(element);
+  }
+
+  function getToastRegion() {
+    let region = document.querySelector('[data-long-toast-region]');
+    if (region) return region;
+    region = document.createElement('div');
+    region.className = 'long-toast-region';
+    region.dataset.longToastRegion = '';
+    region.setAttribute('role', 'region');
+    region.setAttribute('aria-label', 'Notifications');
+    appendSurface(region);
+    return region;
+  }
+
+  LongUI.showToast = function (options) {
+    const settings = typeof options === 'string' ? { message: options } : (options || {});
+    if (typeof settings.message !== 'string' || !settings.message.trim()) return function () {};
+    const supportedKinds = new Set(['info', 'success', 'warning', 'error']);
+    const kind = supportedKinds.has(settings.kind) ? settings.kind : 'info';
+    const region = getToastRegion();
+    const toast = document.createElement('div');
+    toast.className = 'long-toast long-toast--' + kind;
+    toast.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+
+    const message = document.createElement('div');
+    message.className = 'long-toast__message';
+    message.textContent = settings.message;
+    toast.appendChild(message);
+
+    const requestedDuration = Number(settings.duration);
+    const duration = settings.duration === 0 ? 0
+      : (Number.isFinite(requestedDuration) ? Math.min(30000, Math.max(1000, requestedDuration)) : 4000);
+    let remaining = duration;
+    let timer = 0;
+    let timerStartedAt = 0;
+    let dismissed = false;
+    function dismiss(immediate) {
+      if (dismissed) return;
+      dismissed = true;
+      if (timer) window.clearTimeout(timer);
+      if (immediate === true) {
+        toast.remove();
+        return;
+      }
+      toast.classList.add('long-toast--closing');
+      window.setTimeout(function () {
+        toast.remove();
+        if (!region.childElementCount) region.remove();
+      }, 200);
+    }
+    toast._longDismiss = dismiss;
+
+    function startTimer() {
+      if (!remaining || timer || dismissed) return;
+      timerStartedAt = performance.now();
+      timer = window.setTimeout(dismiss, remaining);
+    }
+
+    function pauseTimer() {
+      if (!timer) return;
+      window.clearTimeout(timer);
+      timer = 0;
+      remaining = Math.max(0, remaining - (performance.now() - timerStartedAt));
+    }
+
+    if (typeof settings.actionLabel === 'string' &&
+        settings.actionLabel.trim() &&
+        typeof settings.onAction === 'function') {
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.className = 'long-button long-button--small long-toast__action';
+      action.textContent = settings.actionLabel;
+      action.addEventListener('click', function () {
+        try { settings.onAction(); } finally { dismiss(); }
+      });
+      toast.appendChild(action);
+    }
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'long-toast__close';
+    close.setAttribute('aria-label', typeof settings.dismissLabel === 'string'
+      ? settings.dismissLabel : 'Dismiss');
+    close.textContent = '\u00d7';
+    close.addEventListener('click', dismiss);
+    toast.appendChild(close);
+    toast.addEventListener('pointerenter', pauseTimer);
+    toast.addEventListener('pointerleave', startTimer);
+    toast.addEventListener('focusin', pauseTimer);
+    toast.addEventListener('focusout', function (event) {
+      if (!toast.contains(event.relatedTarget)) startTimer();
+    });
+    region.appendChild(toast);
+
+    while (region.childElementCount > 4) {
+      const oldest = region.firstElementChild;
+      if (oldest && typeof oldest._longDismiss === 'function') oldest._longDismiss(true);
+      else oldest?.remove();
+    }
+
+    startTimer();
+    return dismiss;
+  };
+
+  let confirmQueue = Promise.resolve();
+  let confirmId = 0;
+
+  function notifyHostModalState(open) {
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.postMessage({ type: 'long.ui-modal-state', open: !!open });
+    }
+  }
+
+  function showConfirm(options) {
+    const settings = typeof options === 'string' ? { message: options } : (options || {});
+    if (typeof settings.message !== 'string' || !settings.message.trim()) return Promise.resolve(false);
+    return new Promise(function (resolve) {
+      const previousFocus = document.activeElement;
+      const dialog = document.createElement('dialog');
+      const titleId = 'long-confirm-title-' + (++confirmId);
+      dialog.className = 'long-dialog';
+      dialog.setAttribute('aria-labelledby', titleId);
+
+      const header = document.createElement('div');
+      header.className = 'long-dialog__header';
+      const title = document.createElement('h2');
+      title.className = 'long-dialog__title';
+      title.id = titleId;
+      title.textContent = typeof settings.title === 'string' && settings.title.trim()
+        ? settings.title : 'Confirm';
+      header.appendChild(title);
+      dialog.appendChild(header);
+
+      const body = document.createElement('div');
+      body.className = 'long-dialog__body';
+      body.textContent = settings.message;
+      dialog.appendChild(body);
+
+      const actions = document.createElement('div');
+      actions.className = 'long-dialog__actions';
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'long-button long-button--secondary';
+      cancel.textContent = settings.cancelLabel || 'Cancel';
+      cancel.addEventListener('click', function () { dialog.close('cancel'); });
+      const confirm = document.createElement('button');
+      confirm.type = 'button';
+      confirm.className = settings.danger
+        ? 'long-button long-button--danger' : 'long-button long-button--primary';
+      confirm.textContent = settings.confirmLabel || 'Confirm';
+      confirm.addEventListener('click', function () { dialog.close('confirm'); });
+      actions.append(cancel, confirm);
+      dialog.appendChild(actions);
+
+      dialog.addEventListener('cancel', function (event) {
+        event.preventDefault();
+        dialog.close('cancel');
+      });
+      dialog.addEventListener('click', function (event) {
+        if (event.target === dialog) dialog.close('cancel');
+      });
+      dialog.addEventListener('close', function () {
+        const accepted = dialog.returnValue === 'confirm';
+        notifyHostModalState(false);
+        dialog.remove();
+        if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+        resolve(accepted);
+      }, { once: true });
+
+      appendSurface(dialog);
+      notifyHostModalState(true);
+      try {
+        dialog.showModal();
+      } catch (error) {
+        notifyHostModalState(false);
+        dialog.remove();
+        resolve(false);
+        return;
+      }
+      cancel.focus();
+    });
+  }
+
+  LongUI.confirm = function (options) {
+    const result = confirmQueue.then(function () { return showConfirm(options); });
+    confirmQueue = result.then(function () {}, function () {});
+    return result;
+  };
+
   LongUI.setHighContrast = function (enabled) {
     document.documentElement.dataset.longHighContrast = enabled ? 'true' : 'false';
   };

@@ -42,6 +42,8 @@ public sealed class WebUiKitReferenceTests
         Assert.Contains("ui?.version", script);
         Assert.Contains("ui?.renderState", script);
         Assert.Contains("ui?.announce", script);
+        Assert.Contains("ui?.showToast", script);
+        Assert.Contains("ui?.confirm", script);
         Assert.Contains("ui?.onLanguageChanged", script);
         Assert.Contains("ui?.onViewportChanged", script);
         Assert.Contains("ui?.language?.resolvedLanguage", script);
@@ -59,13 +61,14 @@ public sealed class WebUiKitReferenceTests
             "long-badge",
             "long-progress",
             "long-list",
-            "long-dialog",
         };
 
         Assert.All(requiredClasses, name => Assert.Contains(name, html));
         Assert.Contains("role=\"progressbar\"", html);
         Assert.Contains("aria-valuenow=\"64\"", html);
-        Assert.Contains("aria-labelledby=\"dialogTitle\"", html);
+        Assert.Contains("id=\"toastButton\"", html);
+        Assert.Contains("id=\"dialogButton\"", html);
+        Assert.DoesNotContain("<dialog", html, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-state=\"empty\"", html);
         Assert.Contains("data-state=\"loading\"", html);
         Assert.Contains("data-state=\"error\"", html);
