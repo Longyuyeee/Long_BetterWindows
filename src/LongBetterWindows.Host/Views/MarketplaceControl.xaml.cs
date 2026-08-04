@@ -207,7 +207,10 @@ namespace LongBetterWindows.Host.Views
                 CatalogStatusText.Text = I18n(
                     MarketplacePresentation.GetErrorResourceKey(result.ErrorCode));
                 MarketSourceBadge.Text = I18n("market.source.offline");
-                CategoryBox.ItemsSource = new[] { I18n("market.allCategories") };
+                CategoryBox.ItemsSource = new[]
+                {
+                    new MarketplaceCategoryOption(null, I18n("market.allCategories")),
+                };
                 CategoryBox.SelectedIndex = 0;
                 ApplyCatalogViewState(
                     MarketplaceCatalogViewStatePresenter.FromLoad(result));
@@ -220,16 +223,28 @@ namespace LongBetterWindows.Host.Views
             MarketSourceBadge.Text = catalog.Source == MarketplaceSourceKind.RemoteRegistry
                 ? I18n("market.source.remote")
                 : I18n("market.source.local");
-            CategoryBox.ItemsSource = new[] { I18n("market.allCategories") }
-                .Concat(MarketplacePresentation.GetCategories(catalog))
+            CategoryBox.ItemsSource = new[]
+                {
+                    new MarketplaceCategoryOption(null, I18n("market.allCategories")),
+                }
+                .Concat(MarketplacePresentation.GetCategories(catalog).Select(category =>
+                    new MarketplaceCategoryOption(
+                        category,
+                        MarketplacePresentation.LocalizeCategory(category, I18n))))
                 .ToArray();
             CategoryBox.SelectedIndex = 0;
             CatalogStatusText.Text = result.IsFallback
                 ? I18n("market.status.catalogFallback")
-                : string.Format(
-                    I18n("market.status.generated"),
-                    catalog.GeneratedAt.ToString("yyyy-MM-dd"),
-                    catalog.SchemaVersion);
+                : catalog.GeneratedAt == default
+                    ? string.Format(
+                        I18n(catalog.Source == MarketplaceSourceKind.LocalPackage
+                            ? "market.status.bundled"
+                            : "market.status.ready"),
+                        catalog.SchemaVersion)
+                    : string.Format(
+                        I18n("market.status.generated"),
+                        catalog.GeneratedAt.ToString("yyyy-MM-dd"),
+                        catalog.SchemaVersion);
             await ApplyFiltersAsync();
             _ = Dispatcher.BeginInvoke(
                 new Action(() => BringIntoView(new Rect(0, 0, 1, 1))),
@@ -242,13 +257,16 @@ namespace LongBetterWindows.Host.Views
             if (catalog == null) return Task.CompletedTask;
             var category = CategoryBox.SelectedIndex <= 0
                 ? null
-                : CategoryBox.SelectedItem?.ToString();
+                : (CategoryBox.SelectedItem as MarketplaceCategoryOption)?.Value;
             var cards = MarketplacePresentation.ProjectEntries(
                 catalog,
                 _workspaceQuery,
                 category,
                 pluginId => HostProvider.Instance.PluginStore
-                    .Get(pluginId)?.Manifest.Version);
+                    .Get(pluginId)?.Manifest.Version,
+                categoryValue => MarketplacePresentation.LocalizeCategory(
+                    categoryValue,
+                    I18n));
             MarketList.ItemsSource = cards;
             ApplyCatalogViewState(MarketplaceCatalogViewStatePresenter.FromFilter(
                 cards.Count,
@@ -333,7 +351,7 @@ namespace LongBetterWindows.Host.Views
             }
             DetailMonogram.Text = card.Monogram;
             DetailName.Text = card.Name;
-            DetailPublisher.Text = $"{card.Entry.Publisher} · {card.Entry.Category}";
+            DetailPublisher.Text = $"{card.Entry.Publisher} · {card.CategoryLabel}";
             DetailDescription.Text = string.IsNullOrWhiteSpace(card.Entry.Description)
                 ? card.Entry.Summary
                 : card.Entry.Description;

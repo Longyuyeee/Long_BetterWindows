@@ -29,6 +29,29 @@ public class MarketplacePresentationTests
     }
 
     [Fact]
+    public void ProjectEntries_KeepsMachineCategoryForFilteringAndLocalizesDisplay()
+    {
+        var catalog = new MarketplaceCatalog
+        {
+            Entries = [Entry("dev.long.color", "Color Lab", "design", "1.0.0")],
+        };
+
+        var cards = MarketplacePresentation.ProjectEntries(
+            catalog,
+            query: null,
+            category: "design",
+            _ => null,
+            category => category == "design" ? "设计工具" : category);
+
+        var card = Assert.Single(cards);
+        Assert.Equal("design", card.Entry.Category);
+        Assert.Equal("设计工具", card.CategoryLabel);
+        Assert.Equal("设计工具 · Long", card.Meta);
+        Assert.Equal("market.category.design", MarketplacePresentation.GetCategoryResourceKey("design"));
+        Assert.Equal("custom", MarketplacePresentation.LocalizeCategory("custom", _ => "unused"));
+    }
+
+    [Fact]
     public void Compatibility_RejectsNewerHostAndFormatsRequirements()
     {
         var compatibility = MarketplacePresentation.GetCompatibility(

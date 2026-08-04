@@ -9,7 +9,8 @@ namespace LongBetterWindows.Host.Interaction
             MarketplaceCatalog catalog,
             string? query,
             string? category,
-            Func<string, string?> getInstalledVersion)
+            Func<string, string?> getInstalledVersion,
+            Func<string, string>? localizeCategory = null)
             => MarketplaceCatalogCodec.Search(catalog.Entries, query, category)
                 .Select(entry =>
                 {
@@ -18,7 +19,8 @@ namespace LongBetterWindows.Host.Interaction
                         entry,
                         LocalMarketplaceRepository.GetInstallState(
                             entry, installedVersion),
-                        installedVersion);
+                        installedVersion,
+                        localizeCategory?.Invoke(entry.Category) ?? entry.Category);
                 })
                 .ToArray();
 
@@ -29,6 +31,28 @@ namespace LongBetterWindows.Host.Interaction
                 .Distinct(StringComparer.CurrentCultureIgnoreCase)
                 .OrderBy(category => category)
                 .ToArray();
+
+        public static string GetCategoryResourceKey(string category)
+            => category.ToLowerInvariant() switch
+            {
+                "automation" => "market.category.automation",
+                "design" => "market.category.design",
+                "developer" => "market.category.developer",
+                "file" => "market.category.file",
+                "productivity" => "market.category.productivity",
+                "security" => "market.category.security",
+                "system" => "market.category.system",
+                "text" => "market.category.text",
+                _ => string.Empty,
+            };
+
+        public static string LocalizeCategory(
+            string category,
+            Func<string, string> localize)
+        {
+            var resourceKey = GetCategoryResourceKey(category);
+            return string.IsNullOrEmpty(resourceKey) ? category : localize(resourceKey);
+        }
 
         public static MarketplaceCompatibility GetCompatibility(
             MarketplacePackageVersion version,
@@ -164,21 +188,31 @@ namespace LongBetterWindows.Host.Interaction
         public MarketCardModel(
             MarketplaceEntry entry,
             MarketplaceInstallState state,
-            string? installedVersion)
+            string? installedVersion,
+            string? categoryLabel = null)
         {
             Entry = entry;
             State = state;
             InstalledVersion = installedVersion;
+            CategoryLabel = string.IsNullOrWhiteSpace(categoryLabel)
+                ? entry.Category
+                : categoryLabel;
         }
 
         public MarketplaceEntry Entry { get; }
         public MarketplaceInstallState State { get; }
         public string? InstalledVersion { get; }
+        public string CategoryLabel { get; }
         public string Name => Entry.Name;
         public string Summary => Entry.Summary;
         public string Monogram => string.IsNullOrWhiteSpace(Name)
             ? "L"
             : Name[..1].ToUpperInvariant();
-        public string Meta => $"{Entry.Category} · {Entry.Publisher}";
+        public string Meta => $"{CategoryLabel} · {Entry.Publisher}";
+    }
+
+    internal sealed record MarketplaceCategoryOption(string? Value, string Label)
+    {
+        public override string ToString() => Label;
     }
 }

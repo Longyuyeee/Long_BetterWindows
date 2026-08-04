@@ -75,13 +75,13 @@ public sealed class MarketplaceRepositoryTests : IDisposable
         var result = await new LocalMarketplaceRepository(path).LoadAsync();
 
         Assert.True(result.IsSuccess, result.Error);
-        Assert.True(result.Catalog!.Entries.Count >= 8);
+        Assert.Equal(8, result.Catalog!.Entries.Count);
         Assert.All(result.Catalog.Entries, entry =>
         {
             Assert.False(string.IsNullOrWhiteSpace(entry.Category));
             Assert.NotEmpty(entry.Versions);
             Assert.All(entry.Versions, version =>
-                Assert.False(string.IsNullOrWhiteSpace(version.MinApiVersion)));
+                Assert.False(string.IsNullOrWhiteSpace(version.Version)));
         });
     }
 

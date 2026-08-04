@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\src\QuickLaunchPlugin\QuickLaunchPlugin.csproj" />
     <ProjectReference Include="..\..\src\WindowManagerPlugin\WindowManagerPlugin.csproj" />
     <ProjectReference Include="..\..\tools\LongBetterWindows.MarketplacePublisher\LongBetterWindows.MarketplacePublisher.csproj" />
+    <ProjectReference Include="..\..\tools\LongBetterWindows.PluginCatalogGenerator\LongBetterWindows.PluginCatalogGenerator.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
