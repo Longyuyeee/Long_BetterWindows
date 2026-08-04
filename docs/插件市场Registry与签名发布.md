@@ -112,6 +112,28 @@ HTTPS Registry
 
 产物目录中的 `packages/`、Registry、信任片段和报告可以进入部署步骤。私钥不会复制到产物，仓库也通过 `.gitignore` 排除常见私钥文件名。信任片段仍需由发布负责人审查后合并，不能自动修改客户端根信任库。
 
+### 一键发布准备
+
+PX5C-1 提供只读发布准备入口，把签名生成、独立 Bundle 复核和部署 Dry Run 串成一个不可覆盖批次：
+
+```powershell
+.\prepare-marketplace-release.ps1 `
+  -SourceCatalog .\marketplace-source.json `
+  -PackagesDir .\dist `
+  -BundleDir C:\release\marketplace-bundle `
+  -EvidenceDir C:\release\marketplace-preparation `
+  -PrivateKeyPath C:\secure\publisher.private.pem `
+  -PublisherKeyId long-labs-2026-01 `
+  -PublisherName "Long Labs" `
+  -BasePackageUri https://packages.example.com/ `
+  -Target Https `
+  -Destination https://market.example.com/
+```
+
+该命令不会上传或修改目标，也不读取部署凭据。Bundle 与证据目录必须不存在且与包源目录隔离；任一步失败会清理本批新产物。证据目录包含 `bundle-verification.json`、`deployment-dry-run.json` 和 `preparation-summary.json`，摘要绑定 Release ID、发布者公钥指纹、Registry 哈希、两份底层报告哈希和完整部署文件计划。
+
+这里的 RSA 私钥只用于插件包和 Registry 信任链，与 Windows Authenticode 代码签名证书无关。应用继续采用 unsigned 分发通道不会阻断本地开发；只有正式远程市场包需要该独立的发布者信任链。
+
 ## 6. 部署适配器
 
 发布工具生成的包使用 `{插件ID}-v{版本}-{SHA256前12位}.lpak` 不可变文件名。部署前会重新校验 `publish-report.json`、Registry 引用以及每个包的大小和 SHA-256，产物被篡改或 Registry 指向报告外文件时立即终止。

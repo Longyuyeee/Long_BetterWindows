@@ -74,6 +74,28 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void MarketplaceReleasePreparation_BindsSigningVerificationAndDryRun()
+    {
+        var wrapper = Read("prepare-marketplace-release.ps1");
+        var pipeline = Read(
+            "tools", "LongBetterWindows.MarketplacePublisher",
+            "MarketplaceReleasePreparationPipeline.cs");
+        var program = Read(
+            "tools", "LongBetterWindows.MarketplacePublisher", "Program.cs");
+
+        Assert.Contains("--private-key", wrapper);
+        Assert.DoesNotContain("--force", wrapper);
+        Assert.Contains("new MarketplacePublishingPipeline()", pipeline);
+        Assert.Contains("new MarketplaceBundleVerificationPipeline()", pipeline);
+        Assert.Contains("new MarketplaceDeploymentPipeline()", pipeline);
+        Assert.Contains("DryRun = true", pipeline);
+        Assert.Contains("preparation-summary.json", pipeline);
+        Assert.Contains("BundleVerificationReportSha256", pipeline);
+        Assert.Contains("DeploymentDryRunReportSha256", pipeline);
+        Assert.Contains("args[0], \"prepare\"", program);
+    }
+
+    [Fact]
     public void MarketplaceDeployer_CommitsRegistryLastAndReadsCredentialFromEnvironment()
     {
         var wrapper = Read("deploy-marketplace.ps1");

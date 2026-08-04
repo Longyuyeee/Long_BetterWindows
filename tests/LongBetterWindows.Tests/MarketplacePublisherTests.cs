@@ -110,6 +110,109 @@ public sealed class MarketplacePublisherTests : IDisposable
     }
 
     [Fact]
+    public async Task PrepareReleaseAsync_SignsVerifiesAndDryRunsWithoutDeploying()
+    {
+        var fixture = await CreateFixtureAsync();
+        var evidenceDirectory = Path.Combine(_tempDir, $"evidence-{Guid.NewGuid():N}");
+        var deploymentTarget = Path.Combine(_tempDir, $"target-{Guid.NewGuid():N}");
+
+        var report = await new MarketplaceReleasePreparationPipeline().PrepareAsync(
+            new MarketplaceReleasePreparationOptions
+            {
+                SourceCatalogPath = fixture.Options.SourceCatalogPath,
+                PackagesDirectory = fixture.Options.PackagesDirectory,
+                BundleDirectory = fixture.Options.OutputDirectory,
+                EvidenceDirectory = evidenceDirectory,
+                PrivateKeyPath = fixture.Options.PrivateKeyPath,
+                PublisherKeyId = fixture.Options.PublisherKeyId,
+                PublisherName = fixture.Options.PublisherName,
+                BasePackageUri = fixture.Options.BasePackageUri,
+                TargetKind = MarketplaceDeploymentTargetKind.LocalDirectory,
+                Destination = deploymentTarget,
+            });
+
+        Assert.False(Directory.Exists(deploymentTarget));
+        Assert.True(Directory.Exists(fixture.Options.OutputDirectory));
+        Assert.Equal(1, report.PackageCount);
+        Assert.Equal(fixture.Options.PublisherKeyId, report.PublisherKeyId);
+        Assert.Equal(64, report.RegistrySha256.Length);
+        Assert.Equal(64, report.BundleVerificationReportSha256.Length);
+        Assert.Equal(64, report.DeploymentDryRunReportSha256.Length);
+        Assert.Equal("RegistryCommit", report.Files[^1].Kind);
+
+        var verificationPath = Path.Combine(evidenceDirectory, "bundle-verification.json");
+        var dryRunPath = Path.Combine(evidenceDirectory, "deployment-dry-run.json");
+        var summaryPath = Path.Combine(evidenceDirectory, "preparation-summary.json");
+        Assert.True(File.Exists(verificationPath));
+        Assert.True(File.Exists(dryRunPath));
+        Assert.True(File.Exists(summaryPath));
+        using var dryRun = JsonDocument.Parse(await File.ReadAllTextAsync(dryRunPath));
+        Assert.Equal("dry_run", dryRun.RootElement.GetProperty("Mode").GetString());
+        Assert.Equal(
+            report.ReleaseId,
+            dryRun.RootElement.GetProperty("ReleaseId").GetString());
+        var summary = await File.ReadAllTextAsync(summaryPath);
+        Assert.DoesNotContain("PRIVATE KEY", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(await File.ReadAllTextAsync(fixture.PrivateKeyPath), summary);
+    }
+
+    [Fact]
+    public async Task PrepareReleaseAsync_ExistingEvidenceRejectsBeforeBundleCreation()
+    {
+        var fixture = await CreateFixtureAsync();
+        var evidenceDirectory = Path.Combine(_tempDir, $"evidence-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(evidenceDirectory);
+        await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "keep.txt"), "keep");
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            new MarketplaceReleasePreparationPipeline().PrepareAsync(
+                new MarketplaceReleasePreparationOptions
+                {
+                    SourceCatalogPath = fixture.Options.SourceCatalogPath,
+                    PackagesDirectory = fixture.Options.PackagesDirectory,
+                    BundleDirectory = fixture.Options.OutputDirectory,
+                    EvidenceDirectory = evidenceDirectory,
+                    PrivateKeyPath = fixture.Options.PrivateKeyPath,
+                    PublisherKeyId = fixture.Options.PublisherKeyId,
+                    PublisherName = fixture.Options.PublisherName,
+                    BasePackageUri = fixture.Options.BasePackageUri,
+                    TargetKind = MarketplaceDeploymentTargetKind.LocalDirectory,
+                    Destination = Path.Combine(_tempDir, "target"),
+                }));
+
+        Assert.False(Directory.Exists(fixture.Options.OutputDirectory));
+        Assert.Equal(
+            "keep",
+            await File.ReadAllTextAsync(Path.Combine(evidenceDirectory, "keep.txt")));
+    }
+
+    [Fact]
+    public async Task PrepareReleaseAsync_RejectsOutputsInsidePackageSource()
+    {
+        var fixture = await CreateFixtureAsync();
+        var unsafeBundle = Path.Combine(fixture.Options.PackagesDirectory, "release-output");
+
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            new MarketplaceReleasePreparationPipeline().PrepareAsync(
+                new MarketplaceReleasePreparationOptions
+                {
+                    SourceCatalogPath = fixture.Options.SourceCatalogPath,
+                    PackagesDirectory = fixture.Options.PackagesDirectory,
+                    BundleDirectory = unsafeBundle,
+                    EvidenceDirectory = Path.Combine(_tempDir, $"evidence-{Guid.NewGuid():N}"),
+                    PrivateKeyPath = fixture.Options.PrivateKeyPath,
+                    PublisherKeyId = fixture.Options.PublisherKeyId,
+                    PublisherName = fixture.Options.PublisherName,
+                    BasePackageUri = fixture.Options.BasePackageUri,
+                    TargetKind = MarketplaceDeploymentTargetKind.LocalDirectory,
+                    Destination = Path.Combine(_tempDir, "target"),
+                }));
+
+        Assert.Contains("must not contain each other", error.Message);
+        Assert.False(Directory.Exists(unsafeBundle));
+    }
+
+    [Fact]
     public async Task PublishAsync_ExistingOutputRequiresForceAndPreservesOldOutputOnRejection()
     {
         var fixture = await CreateFixtureAsync();

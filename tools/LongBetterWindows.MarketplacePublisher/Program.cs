@@ -2,6 +2,16 @@ using LongBetterWindows.MarketplacePublisher;
 
 try
 {
+    if (args.Length > 0 && string.Equals(args[0], "prepare", StringComparison.OrdinalIgnoreCase))
+    {
+        var preparation = await new MarketplaceReleasePreparationPipeline().PrepareAsync(
+            ReleasePreparationArguments.Parse(args[1..]));
+        Console.WriteLine($"Release prepared: {preparation.ReleaseId}");
+        Console.WriteLine($"Packages: {preparation.PackageCount}");
+        Console.WriteLine($"Publisher key: {preparation.PublisherKeyId} ({preparation.PublicKeyFingerprint})");
+        Console.WriteLine("Mode: signed bundle verified; deployment dry-run only");
+        return 0;
+    }
     if (args.Length > 0 && string.Equals(args[0], "rollback", StringComparison.OrdinalIgnoreCase))
     {
         var rollback = await new MarketplaceRollbackPipeline().RollbackAsync(

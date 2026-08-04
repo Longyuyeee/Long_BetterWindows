@@ -70,6 +70,24 @@ public sealed class MarketplaceDeploymentTests : IDisposable
     }
 
     [Fact]
+    public async Task DryRun_RejectsTargetThatRealHttpsDeploymentWouldReject()
+    {
+        var bundle = await CreateBundleAsync();
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() =>
+            new MarketplaceDeploymentPipeline().DeployAsync(
+                new MarketplaceDeploymentOptions
+                {
+                    BundleDirectory = bundle,
+                    TargetKind = MarketplaceDeploymentTargetKind.Https,
+                    RemoteBaseUri = new Uri("http://market.example/"),
+                    DryRun = true,
+                }));
+
+        Assert.Contains("HTTPS deployment base URI", error.Message);
+    }
+
+    [Fact]
     public async Task LocalDeployment_RequiresForceThenAtomicallyReplacesTarget()
     {
         var bundle = await CreateBundleAsync();

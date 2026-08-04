@@ -21,6 +21,7 @@ public sealed class MarketplaceDeploymentPipeline
         IMarketplaceDeploymentTarget? target = null,
         CancellationToken cancellationToken = default)
     {
+        ValidateTargetOptions(options);
         var plan = await CreatePlanAsync(options.BundleDirectory, cancellationToken);
         if (options.DryRun)
         {
@@ -51,6 +52,29 @@ public sealed class MarketplaceDeploymentPipeline
         {
             if (ownsTarget && target is IDisposable disposable) disposable.Dispose();
         }
+    }
+
+    private static void ValidateTargetOptions(MarketplaceDeploymentOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.TargetKind == MarketplaceDeploymentTargetKind.LocalDirectory)
+        {
+            _ = Path.GetFullPath(Required(
+                options.LocalTargetDirectory,
+                nameof(options.LocalTargetDirectory)));
+            return;
+        }
+
+        var uri = options.RemoteBaseUri
+            ?? throw new ArgumentException(
+                "RemoteBaseUri is required for HTTPS deployment.",
+                nameof(options.RemoteBaseUri));
+        if (!uri.IsAbsoluteUri
+            || uri.Scheme != Uri.UriSchemeHttps
+            || !uri.AbsolutePath.EndsWith('/'))
+            throw new ArgumentException(
+                "HTTPS deployment base URI must end with '/'.",
+                nameof(options.RemoteBaseUri));
     }
 
     private static async Task WriteExecutionReportAsync(
