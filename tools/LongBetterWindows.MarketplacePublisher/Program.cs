@@ -12,6 +12,15 @@ try
         Console.WriteLine("Mode: signed bundle verified; deployment dry-run only");
         return 0;
     }
+    if (args.Length > 0 && string.Equals(
+        args[0], "verify-preparation", StringComparison.OrdinalIgnoreCase))
+    {
+        var preparation = await new MarketplaceReleasePreparationValidator().ValidateAsync(
+            ReleasePreparationValidationArguments.Parse(args[1..]));
+        Console.WriteLine($"Release preparation verified: {preparation.ReleaseId}");
+        Console.WriteLine($"Packages: {preparation.PackageCount}");
+        return 0;
+    }
     if (args.Length > 0 && string.Equals(args[0], "rollback", StringComparison.OrdinalIgnoreCase))
     {
         var rollback = await new MarketplaceRollbackPipeline().RollbackAsync(

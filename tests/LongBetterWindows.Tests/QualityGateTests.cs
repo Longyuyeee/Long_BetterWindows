@@ -96,6 +96,37 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void MarketplaceProductionRelease_RequiresApprovedPreparationAndFailureRollback()
+    {
+        var release = Read("release-marketplace.ps1");
+        var validator = Read(
+            "tools", "LongBetterWindows.MarketplacePublisher",
+            "MarketplaceReleasePreparationValidator.cs");
+        var wrapper = Read("verify-marketplace-preparation.ps1");
+
+        Assert.Contains("ConfirmReleaseId", release);
+        Assert.Equal(2, release.Split("& $verifyPreparation").Length - 1);
+        Assert.Contains("preparation_summary_sha256", release);
+        Assert.Contains("baseline-verification.json", release);
+        Assert.Contains("deployed-verification.json", release);
+        Assert.Contains("deployed_matches_preparation", release);
+        Assert.Contains("Public marketplace package set differs", release);
+        Assert.True(
+            release.IndexOf("Public marketplace package set differs", StringComparison.Ordinal) <
+            release.IndexOf("$summary.deployment_verified = $true", StringComparison.Ordinal),
+            "The release must not be marked verified before the public package set matches the approved preparation.");
+        Assert.Contains("finally", release);
+        Assert.Contains("& $rollback", release);
+        Assert.Contains("baseline_restored", release);
+        Assert.Contains("release-summary.json", release);
+        Assert.Contains("verify-preparation", wrapper);
+        Assert.Contains("FixedTimeEquals", validator);
+        Assert.Contains("MarketplaceBundleVerificationPipeline().VerifyAsync", validator);
+        Assert.Contains("MarketplaceDeploymentPipeline.CreatePlanAsync", validator);
+        Assert.Contains("Confirmed Release ID must exactly match", validator);
+    }
+
+    [Fact]
     public void MarketplaceDeployer_CommitsRegistryLastAndReadsCredentialFromEnvironment()
     {
         var wrapper = Read("deploy-marketplace.ps1");

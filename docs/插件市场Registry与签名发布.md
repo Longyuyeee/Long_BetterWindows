@@ -187,6 +187,26 @@ $env:LONG_MARKETPLACE_DEPLOY_TOKEN = '<由受控凭据系统注入>'
 
 `trusted-publisher.fragment.json` 不会自动部署，仍须由发布负责人审查后进入宿主根信任配置。HTTPS 目标只允许同源地址且拒绝重定向；提交 Registry 前会读取旧版本，提交或复核失败时恢复旧 Registry，原先不存在时删除失败的新提交。包阶段失败不会改变线上 Registry；已经上传但尚未被 Registry 引用的不可变包是安全孤儿，可由后续保留策略清理。
 
+### 批准并执行正式发布
+
+PX5C-2 的正式入口只接受 PX5C-1 生成且未被修改的 Bundle 与准备证据，并要求人工输入完全相同的 Release ID：
+
+```powershell
+$env:LONG_MARKETPLACE_DEPLOY_TOKEN = '<由受控凭据系统注入>'
+.\release-marketplace.ps1 `
+  -BundleDir C:\release\marketplace-bundle `
+  -PreparationEvidenceDir C:\release\marketplace-preparation `
+  -Destination https://market.example.com/ `
+  -TrustStorePath C:\secure\trusted-publishers.json `
+  -AllowedPackageHosts packages.example.com `
+  -ExecutionEvidenceDir C:\release\marketplace-execution `
+  -ConfirmReleaseId 20260804093000-ABCDEF123456
+```
+
+执行器会先重新计算准备摘要、Registry、Bundle 验证报告、Dry Run 报告和完整文件计划，再从无上传凭据路径验证当前公开基线；上传前会再次复核准备证据。部署后公开验证必须同时通过签名信任链，并且包 ID、版本、SHA-256、发布者 Key ID 和字节数与批准候选完全一致。成功时保留新 Registry；上传或公开验证失败时使用同一 Release ID 回滚，再验证公开包集合已恢复到发布前基线。
+
+正式入口要求目标已有可公开验证的 Registry 基线，因此不承担首次市场引导发布。首次引导仍需独立审批，不得伪造“可回滚”保证。执行证据目录不可覆盖，`release-summary.json` 会记录准备摘要哈希、生命周期状态、失败与回滚结果以及底层报告哈希。
+
 ## 7. 部署后公开端到端验收
 
 部署完成后必须从无上传凭据的公开客户端路径重新拉取 Registry 和全部版本包。验收器不会复用发布目录，也不会读取部署 Bearer Token：

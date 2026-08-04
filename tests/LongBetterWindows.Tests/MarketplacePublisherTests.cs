@@ -154,6 +154,55 @@ public sealed class MarketplacePublisherTests : IDisposable
         var summary = await File.ReadAllTextAsync(summaryPath);
         Assert.DoesNotContain("PRIVATE KEY", summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(await File.ReadAllTextAsync(fixture.PrivateKeyPath), summary);
+
+        var validated = await new MarketplaceReleasePreparationValidator().ValidateAsync(
+            new MarketplaceReleasePreparationValidationOptions
+            {
+                BundleDirectory = fixture.Options.OutputDirectory,
+                EvidenceDirectory = evidenceDirectory,
+                TargetKind = MarketplaceDeploymentTargetKind.LocalDirectory,
+                Destination = deploymentTarget,
+                ConfirmReleaseId = report.ReleaseId,
+            });
+        Assert.Equal(report.ReleaseId, validated.ReleaseId);
+    }
+
+    [Fact]
+    public async Task ValidatePreparationAsync_RejectsTamperedDryRunEvidence()
+    {
+        var fixture = await CreateFixtureAsync();
+        var evidenceDirectory = Path.Combine(_tempDir, $"evidence-{Guid.NewGuid():N}");
+        var destination = Path.Combine(_tempDir, "target");
+        var report = await new MarketplaceReleasePreparationPipeline().PrepareAsync(
+            new MarketplaceReleasePreparationOptions
+            {
+                SourceCatalogPath = fixture.Options.SourceCatalogPath,
+                PackagesDirectory = fixture.Options.PackagesDirectory,
+                BundleDirectory = fixture.Options.OutputDirectory,
+                EvidenceDirectory = evidenceDirectory,
+                PrivateKeyPath = fixture.Options.PrivateKeyPath,
+                PublisherKeyId = fixture.Options.PublisherKeyId,
+                PublisherName = fixture.Options.PublisherName,
+                BasePackageUri = fixture.Options.BasePackageUri,
+                TargetKind = MarketplaceDeploymentTargetKind.LocalDirectory,
+                Destination = destination,
+            });
+        await File.AppendAllTextAsync(
+            Path.Combine(evidenceDirectory, "deployment-dry-run.json"),
+            " ");
+
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            new MarketplaceReleasePreparationValidator().ValidateAsync(
+                new MarketplaceReleasePreparationValidationOptions
+                {
+                    BundleDirectory = fixture.Options.OutputDirectory,
+                    EvidenceDirectory = evidenceDirectory,
+                    TargetKind = MarketplaceDeploymentTargetKind.LocalDirectory,
+                    Destination = destination,
+                    ConfirmReleaseId = report.ReleaseId,
+                }));
+
+        Assert.Contains("changed after release preparation", error.Message);
     }
 
     [Fact]
