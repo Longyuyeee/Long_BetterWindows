@@ -22,9 +22,18 @@ public class QualityGateTests
         Assert.Contains("_workspaceQuery", source);
         Assert.Contains("VersionBox", xaml);
         Assert.Contains("PermissionDiffItems", xaml);
+        Assert.Contains("ConfirmRecoveryText", xaml);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml);
+        Assert.Contains("<RowDefinition Height=\"*\" />", xaml);
+        Assert.Contains("VerticalAlignment=\"Top\"", xaml);
         Assert.Contains("HighTrustWarning", xaml);
         Assert.Contains("ConfirmOverlay", xaml);
         Assert.Contains("_session.PrepareLocalPackageAsync", source);
+        Assert.Contains("MarketplaceOperationPresenter.CreateInstallReview", source);
+        Assert.Contains("GetPreviewInstalledVersion(version.Version)", source);
+        Assert.DoesNotContain(
+            "ConfirmCard.VerticalAlignment = VerticalAlignment.Center",
+            source);
         Assert.Contains("installer.InstallAsync(pending.PackagePath!, pending.Metadata)", source);
         Assert.Contains("installer.UninstallAsync(pending.PluginId!)", source);
         Assert.Contains("runtime.ValidatePackageAsync", session);

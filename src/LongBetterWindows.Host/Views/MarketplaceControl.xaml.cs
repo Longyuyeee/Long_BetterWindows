@@ -162,7 +162,7 @@ namespace LongBetterWindows.Host.Views
                 CatalogStatePanel.VerticalAlignment = VerticalAlignment.Center;
                 CatalogStatePanel.Margin = new Thickness(20);
                 ConfirmCard.Padding = new Thickness(26);
-                ConfirmCard.VerticalAlignment = VerticalAlignment.Center;
+                ConfirmCard.VerticalAlignment = VerticalAlignment.Top;
                 MarketHeroTextColumn.Width = new GridLength(1, GridUnitType.Star);
                 MarketHeroActionColumn.Width = GridLength.Auto;
                 Grid.SetRow(ImportLocalPackageButton, 0);
@@ -442,22 +442,51 @@ namespace LongBetterWindows.Host.Views
             RememberConfirmationFocus();
             var validation = pending.Validation!;
             var manifest = validation.Manifest!;
-            _pendingOperationPresentation = MarketplaceOperationPresenter.ForInstall(
-                HostProvider.Instance.PluginStore.Get(manifest.Id)?.Manifest.Version,
-                manifest.Version);
+            var installedManifest = HostProvider.Instance.PluginStore.Get(manifest.Id)?.Manifest;
+            var review = MarketplaceOperationPresenter.CreateInstallReview(
+                validation,
+                installedManifest,
+                pending.Metadata,
+                App.ProductVersion);
+            _pendingOperationPresentation = review.Operation;
             ConfirmTitle.Text = I18n(
                 _pendingOperationPresentation.ReviewTitleResourceKey);
-            ConfirmSubtitle.Text = $"{manifest.Name} · v{manifest.Version}";
-            ConfirmTrustText.Text = validation.TrustLevel == PackageTrustLevel.PublisherSigned
-                ? I18n("market.confirm.publisherVerified")
-                : I18n("market.confirm.localUnsigned");
+            ConfirmSubtitle.Text = review.InstalledVersion == null
+                ? string.Format(
+                    I18n("market.confirm.versionFresh"),
+                    review.PluginName,
+                    review.TargetVersion)
+                : string.Format(
+                    I18n("market.confirm.versionTransition"),
+                    review.PluginName,
+                    review.InstalledVersion,
+                    review.TargetVersion);
+            var publisher = review.DeclaredPublisher ?? I18n("market.publisher.unknown");
+            ConfirmTrustText.Text = review.TrustLevel == PackageTrustLevel.PublisherSigned
+                ? string.Format(
+                    I18n("market.confirm.publisherSignedIdentity"),
+                    publisher,
+                    review.PublisherKeyId ?? I18n("market.publisher.unknownKey"))
+                : string.Format(
+                    I18n("market.confirm.publisherUnsignedIdentity"),
+                    publisher);
             AutomationProperties.SetItemStatus(
-                ConfirmTrustText, validation.TrustLevel.ToString());
-            ConfirmHashText.Text = $"SHA-256  {validation.Sha256}";
-            ConfirmCompatibilityText.Text = I18n("market.confirm.compatibilityPassed");
+                ConfirmTrustText, review.TrustLevel.ToString());
+            ConfirmHashText.Text = $"SHA-256  {review.Sha256}";
+            ConfirmCompatibilityText.Text = review.Compatibility.Requirements.Count == 0
+                ? I18n("market.confirm.compatibilityPassed")
+                : string.Format(
+                    I18n("market.confirm.compatibilityRequirements"),
+                    string.Join(" · ", review.Compatibility.Requirements));
+            ConfirmRecoveryText.Text = review.RecoveryStrategy
+                == MarketplaceRecoveryStrategy.RemovePartialInstall
+                    ? I18n("market.confirm.recoveryFreshInstall")
+                    : string.Format(
+                        I18n("market.confirm.recoveryReplace"),
+                        review.InstalledVersion);
             PermissionDiffItems.ItemsSource = FormatPermissionDiff(
-                validation.PermissionDiff);
-            HighTrustWarning.Visibility = validation.RequiresHighTrustWarning
+                review.PermissionDiff);
+            HighTrustWarning.Visibility = review.RequiresHighTrustWarning
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             ConfirmErrorText.Text = string.Empty;
@@ -494,6 +523,9 @@ namespace LongBetterWindows.Host.Views
             ConfirmTrustText.Text = I18n("market.confirm.rollbackRemoval");
             ConfirmHashText.Text = installed.Id;
             ConfirmCompatibilityText.Text = I18n("market.confirm.rollbackGuarantee");
+            ConfirmRecoveryText.Text = string.Format(
+                I18n("market.confirm.recoveryUninstall"),
+                installed.Version);
             PermissionDiffItems.ItemsSource = installed.Capabilities.Count == 0
                 ? new[] { I18n("market.permission.noAuthorized") }
                 : installed.Capabilities
@@ -531,6 +563,7 @@ namespace LongBetterWindows.Host.Views
                 MarketplacePresentation.GetErrorAutomationStatus(errorCode));
             ConfirmHashText.Text = string.Empty;
             ConfirmCompatibilityText.Text = message;
+            ConfirmRecoveryText.Text = string.Empty;
             PermissionDiffItems.ItemsSource = Array.Empty<string>();
             HighTrustWarning.Visibility = Visibility.Collapsed;
             ConfirmErrorText.Text = message;
@@ -823,20 +856,39 @@ namespace LongBetterWindows.Host.Views
             MarketList.SelectedItem = first;
             ShowEntry(first);
             RememberConfirmationFocus();
+            var previewInstalledVersion = GetPreviewInstalledVersion(version.Version);
             var operation = MarketplaceOperationPresenter.ForInstall(
-                "0.0.0",
+                previewInstalledVersion,
                 version.Version);
             _pendingOperationPresentation = operation;
             ConfirmTitle.Text = I18n(operation.ReviewTitleResourceKey);
-            ConfirmSubtitle.Text = $"{first.Name} · v{version.Version}";
+            ConfirmSubtitle.Text = string.Format(
+                I18n("market.confirm.versionTransition"),
+                first.Name,
+                previewInstalledVersion,
+                version.Version);
             ConfirmTrustText.Text = !string.IsNullOrWhiteSpace(version.PublisherKeyId)
-                ? I18n("market.confirm.publisherVerified")
-                : I18n("market.confirm.localUnsigned");
+                ? string.Format(
+                    I18n("market.confirm.publisherSignedIdentity"),
+                    first.Entry.Publisher,
+                    version.PublisherKeyId)
+                : string.Format(
+                    I18n("market.confirm.publisherUnsignedIdentity"),
+                    first.Entry.Publisher);
             ConfirmHashText.Text = string.IsNullOrWhiteSpace(version.Sha256)
                 ? "SHA-256"
                 : $"SHA-256  {version.Sha256}";
-            ConfirmCompatibilityText.Text = I18n(
-                "market.confirm.compatibilityPassed");
+            var compatibility = MarketplacePresentation.GetCompatibility(
+                version,
+                App.ProductVersion);
+            ConfirmCompatibilityText.Text = compatibility.Requirements.Count == 0
+                ? I18n("market.confirm.compatibilityPassed")
+                : string.Format(
+                    I18n("market.confirm.compatibilityRequirements"),
+                    string.Join(" · ", compatibility.Requirements));
+            ConfirmRecoveryText.Text = string.Format(
+                I18n("market.confirm.recoveryReplace"),
+                previewInstalledVersion);
             PermissionDiffItems.ItemsSource = version.Capabilities.Count == 0
                 ? new[] { I18n("market.permission.none") }
                 : version.Capabilities.Select(capability => string.Format(
@@ -857,6 +909,21 @@ namespace LongBetterWindows.Host.Views
             ConfirmOverlay.Visibility = Visibility.Visible;
             FocusConfirmationAction();
             return true;
+        }
+
+        private static string GetPreviewInstalledVersion(string targetVersion)
+        {
+            if (!System.Version.TryParse(targetVersion, out var parsed))
+                return targetVersion;
+
+            if (parsed.Build > 0)
+                return $"{parsed.Major}.{parsed.Minor}.{parsed.Build - 1}";
+            if (parsed.Minor > 0)
+                return $"{parsed.Major}.{parsed.Minor - 1}.0";
+            if (parsed.Major > 0)
+                return $"{parsed.Major - 1}.0.0";
+
+            return targetVersion;
         }
 
         private void MarketplaceControl_PreviewKeyDown(object sender, KeyEventArgs e)

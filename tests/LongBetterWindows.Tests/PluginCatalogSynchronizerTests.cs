@@ -70,7 +70,7 @@ public sealed class PluginCatalogSynchronizerTests : IDisposable
         var screenshot = Assert.Single(
             result.Catalog.Entries,
             entry => entry.Id == "com.long.screenshot");
-        Assert.Equal("1.1.2", screenshot.Versions[0].Version);
+        Assert.Equal("1.1.3", screenshot.Versions[0].Version);
         Assert.Contains("system.screenshot", screenshot.Versions[0].Capabilities);
 
         using var document = JsonDocument.Parse(generated.RegistryJson);

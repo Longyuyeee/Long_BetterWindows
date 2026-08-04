@@ -9,6 +9,6 @@ Generated from `catalog/plugin-catalog.json` and plugin manifests. Do not edit t
 | 批量重命名 | `com.long.file-renamer` | `1.1.1` | `remote` | `webview` | `file` | `file.ops`, `shell.selection` | [manifest.json](../src/FileRenamerPlugin/manifest.json) |
 | Markdown 预览 | `com.long.markdown-preview` | `1.1.0` | `remote` | `webview` | `text` | `system.clipboard` | [manifest.json](../src/MarkdownPreview/manifest.json) |
 | 快速便签 | `com.long.quick-note` | `1.1.0` | `remote` | `webview` | `productivity` | `storage.local`, `system.notification` | [manifest.json](../src/QuickNotePlugin/manifest.json) |
-| 截图工具 | `com.long.screenshot` | `1.1.2` | `local` | `native` | `design` | `system.clipboard`, `system.hotkey`, `system.screenshot` | [manifest.json](../src/ScreenshotPlugin/manifest.json) |
+| 截图工具 | `com.long.screenshot` | `1.1.3` | `local` | `native` | `design` | `system.clipboard`, `system.hotkey`, `system.notification`, `system.screenshot` | [manifest.json](../src/ScreenshotPlugin/manifest.json) |
 | 翻译工具 | `com.long.translate` | `1.1.0` | `remote` | `webview` | `text` | `network.http`, `system.clipboard` | [manifest.json](../src/TranslatePlugin/manifest.json) |
-| 窗口管理 | `com.long.window-manager` | `2.1.7` | `local` | `native` | `system` | `system.hotkey`, `window.info` | [manifest.json](../src/WindowManagerPlugin/manifest.json) |
+| 窗口管理 | `com.long.window-manager` | `2.1.8` | `local` | `native` | `system` | `system.hotkey`, `system.notification`, `window.info` | [manifest.json](../src/WindowManagerPlugin/manifest.json) |

@@ -32,7 +32,7 @@ public class ScreenshotPluginImpl :
 
     public string Id => "com.long.screenshot";
     public string Name => Text("plugin.name", "截图工具");
-    public string Version => "1.1.1";
+    public string Version => "1.1.3";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)

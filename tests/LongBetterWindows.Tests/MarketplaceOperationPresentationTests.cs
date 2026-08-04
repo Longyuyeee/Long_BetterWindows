@@ -1,5 +1,7 @@
 using System.IO;
 using System.Text.Json;
+using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
 
 namespace LongBetterWindows.Tests;
@@ -38,6 +40,92 @@ public sealed class MarketplaceOperationPresentationTests
         Assert.Equal(
             "market.operation.uninstall.success",
             presentation.SuccessResourceKey);
+    }
+
+    [Fact]
+    public void CreateInstallReview_UpdateCarriesVerifiedFactsAndRestoreVersion()
+    {
+        var permissionDiff = new PermissionDiff
+        {
+            Added = ["system.screenshot"],
+            Unchanged = ["system.clipboard"],
+        };
+        var validation = PackageValidationResult.Ok(
+            new PluginManifest
+            {
+                Id = "com.long.screenshot",
+                Name = "Screenshot",
+                Version = "1.1.2",
+                Author = "Long",
+                EntryPoint = "ScreenshotPlugin.dll",
+                MinHostVersion = "1.10.0",
+            },
+            "ABC123",
+            PackageTrustLevel.PublisherSigned,
+            permissionDiff,
+            highTrust: true);
+
+        var review = MarketplaceOperationPresenter.CreateInstallReview(
+            validation,
+            new PluginManifest { Version = "1.1.1" },
+            new MarketplacePackageMetadata { PublisherKeyId = "long-release" },
+            "1.11.0-rc.3");
+
+        Assert.Equal(MarketplaceOperationIntent.Update, review.Operation.Intent);
+        Assert.Equal("1.1.1", review.InstalledVersion);
+        Assert.Equal("1.1.2", review.TargetVersion);
+        Assert.Equal("Long", review.DeclaredPublisher);
+        Assert.Equal("long-release", review.PublisherKeyId);
+        Assert.Equal("ABC123", review.Sha256);
+        Assert.Same(permissionDiff, review.PermissionDiff);
+        Assert.True(review.RequiresHighTrustWarning);
+        Assert.True(review.Compatibility.IsCompatible);
+        Assert.Contains("Host >= 1.10.0", review.Compatibility.Requirements);
+        Assert.Equal(
+            MarketplaceRecoveryStrategy.RestoreInstalledVersion,
+            review.RecoveryStrategy);
+    }
+
+    [Fact]
+    public void CreateInstallReview_FreshUnsignedInstallUsesCleanupStrategy()
+    {
+        var validation = PackageValidationResult.Ok(
+            new PluginManifest
+            {
+                Id = "dev.long.note",
+                Name = "Note",
+                Version = "1.0.0",
+                EntryPoint = "index.html",
+            },
+            "DEF456",
+            PackageTrustLevel.LocalUnsigned,
+            new PermissionDiff(),
+            highTrust: false);
+
+        var review = MarketplaceOperationPresenter.CreateInstallReview(
+            validation,
+            installedManifest: null,
+            metadata: null,
+            hostVersion: "1.11.0");
+
+        Assert.Equal(MarketplaceOperationIntent.Install, review.Operation.Intent);
+        Assert.Null(review.InstalledVersion);
+        Assert.Null(review.DeclaredPublisher);
+        Assert.Null(review.PublisherKeyId);
+        Assert.Equal(
+            MarketplaceRecoveryStrategy.RemovePartialInstall,
+            review.RecoveryStrategy);
+    }
+
+    [Fact]
+    public void CreateInstallReview_RejectsUnvalidatedPackage()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            MarketplaceOperationPresenter.CreateInstallReview(
+                PackageValidationResult.Fail("invalid"),
+                installedManifest: null,
+                metadata: null,
+                hostVersion: "1.11.0"));
     }
 
     [Fact]
@@ -86,6 +174,8 @@ public sealed class MarketplaceOperationPresentationTests
         Assert.Contains("ConfirmCloseButton.IsEnabled = !busy", view);
         Assert.Contains("AutomationProperties.SetName", view);
         Assert.Contains("preferredFocus", view);
+        Assert.Contains("CreateInstallReview", view);
+        Assert.Contains("ConfirmRecoveryText", view);
         Assert.Contains("element.IsVisible", view);
         var successBlock = view[view.IndexOf(
             "var status = FormatOperationSuccess",
