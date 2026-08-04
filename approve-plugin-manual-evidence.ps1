@@ -139,9 +139,8 @@ $receipt = [ordered]@{
     notes = $Notes.Trim()
     source_commit = $sourceCommit
     plugin_version = [string]$manifest.version
-    manifest_sha256 = (
-        Get-FileHash -LiteralPath $manifestFile.FullName -Algorithm SHA256
-    ).Hash.ToLowerInvariant()
+    manifest_hash_format = "utf8-lf-v1"
+    manifest_sha256 = Get-NormalizedTextSha256 $manifestFile.FullName
     subject_executable = [IO.Path]::GetFileName($subjectPath)
     subject_executable_sha256 = (
         Get-FileHash -LiteralPath $subjectPath -Algorithm SHA256

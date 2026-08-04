@@ -8,7 +8,8 @@
     "notes":  "用户在冻结候选中完成中英文混合文本 Base64 编码与解码，确认解码结果 Long助手 Base64 Test 123 与原文完全一致。",
     "source_commit":  "220eb06d6f48027b3f08515fc923e8dd9fb49499",
     "plugin_version":  "1.1.0",
-    "manifest_sha256":  "610f867f79d23496a1c65145753862f7aac4fd672b15aa4b7d779e08ef02377e",
+    "manifest_hash_format":  "utf8-lf-v1",
+    "manifest_sha256":  "ba12212ef57d19316208937ec3a55a9f6598a33a070d38fafdf5a6b89be666b4",
     "subject_executable":  "LongBetterWindows.Host.exe",
     "subject_executable_sha256":  "cef274e8826752a0a228869947aea3a285c9c59b2b4adc1fd7c42b9edb02d3e6",
     "commands":  [

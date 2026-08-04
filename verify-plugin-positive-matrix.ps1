@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot "release-evidence-io.ps1")
 
 function Resolve-RepositoryPath([string]$PathValue) {
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
@@ -62,9 +63,9 @@ function Test-ApprovalReceipt(
             Add-MatrixError $Errors "Product source changed after manual approval: $label"
             return $false
         }
-        $manifestHash = (Get-FileHash -LiteralPath $ManifestPath `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ([string]$receipt.manifest_sha256 -ne $manifestHash) {
+        $manifestHash = Get-NormalizedTextSha256 $ManifestPath
+        if ([string]$receipt.manifest_hash_format -ne "utf8-lf-v1" `
+            -or [string]$receipt.manifest_sha256 -ne $manifestHash) {
             Add-MatrixError $Errors "Manual approval manifest hash mismatch: $label"
             return $false
         }

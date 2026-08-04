@@ -1,3 +1,22 @@
+function Get-NormalizedTextSha256 {
+    param(
+        [Parameter(Mandatory=$true)] [string] $Path
+    )
+
+    $resolvedPath = [IO.Path]::GetFullPath($Path)
+    $text = [IO.File]::ReadAllText($resolvedPath)
+    $normalized = $text.Replace("`r`n", "`n").Replace("`r", "`n")
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes($normalized)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString(
+            $algorithm.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        $algorithm.Dispose()
+    }
+}
+
 function Write-NewJsonFileAtomically {
     param(
         [Parameter(Mandatory=$true)] $Value,

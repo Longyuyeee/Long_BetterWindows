@@ -13,6 +13,9 @@ public sealed class PluginManualApprovalScriptTests
         Assert.Contains("clean tracked worktree", source);
         Assert.Contains("artifacts\\quality", source);
         Assert.Contains("manifest_sha256", source);
+        Assert.Contains("manifest_hash_format", source);
+        Assert.Contains("utf8-lf-v1", source);
+        Assert.Contains("Get-NormalizedTextSha256", source);
         Assert.Contains("subject_executable_sha256", source);
         Assert.Contains("source_commit", source);
         Assert.Contains("evidence_files", source);
@@ -34,6 +37,9 @@ public sealed class PluginManualApprovalScriptTests
         Assert.Contains("approval_receipt_count", source);
         Assert.DoesNotContain("Path]::GetRelativePath", source);
         Assert.Contains("manifest_sha256", source);
+        Assert.Contains("manifest_hash_format", source);
+        Assert.Contains("utf8-lf-v1", source);
+        Assert.Contains("Get-NormalizedTextSha256", source);
         Assert.Contains("subject_executable_sha256", source);
         Assert.Contains("git -C $PSScriptRoot diff", source);
         Assert.Contains("-- src", source);
@@ -41,6 +47,17 @@ public sealed class PluginManualApprovalScriptTests
         Assert.Contains(
             "Manual approval receipt has no matching matrix check",
             source);
+    }
+
+    [Fact]
+    public void EvidenceIo_NormalizesTextLineEndingsBeforeHashing()
+    {
+        var source = Read("release-evidence-io.ps1");
+
+        Assert.Contains("function Get-NormalizedTextSha256", source);
+        Assert.Contains("Replace(\"`r`n\", \"`n\")", source);
+        Assert.Contains("Replace(\"`r\", \"`n\")", source);
+        Assert.Contains("UTF8Encoding]::new($false)", source);
     }
 
     private static string Read(string relativePath)
