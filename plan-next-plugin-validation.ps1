@@ -170,15 +170,16 @@ if (-not [bool]$matrixVerification.contract_valid) {
 }
 
 $approvedKeys = @{}
+$staleApprovalReceipts = [System.Collections.Generic.List[string]]::new()
 if (Test-Path -LiteralPath $approvalRoot -PathType Container) {
     foreach ($receiptFile in Get-ChildItem -LiteralPath $approvalRoot `
             -Filter "*.json" -File) {
         $receipt = Get-Content -LiteralPath $receiptFile.FullName `
             -Raw -Encoding UTF8 | ConvertFrom-Json
         if ([string]$receipt.subject_executable_sha256 -ne $subjectHash) {
-            throw (
-                "Approval receipt targets a different candidate executable: " +
-                "$($receiptFile.FullName)")
+            $staleApprovalReceipts.Add(
+                (Get-RepositoryRelativePath $receiptFile.FullName))
+            continue
         }
         $approvedKeys["$([string]$receipt.plugin_id)/$([string]$receipt.manual_check_id)"] = $true
     }
@@ -264,7 +265,9 @@ $plan = [ordered]@{
     self_contained_package_sha256 = $packageHash
     subject_executable_sha256 = $subjectHash
     required_manual_check_count = [int]$matrixVerification.required_manual_check_count
-    approval_receipt_count = [int]$matrixVerification.approval_receipt_count
+    approval_receipt_count = $approvedKeys.Count
+    stale_approval_receipt_count = $staleApprovalReceipts.Count
+    stale_approval_receipts = @($staleApprovalReceipts)
     pending_manual_check_count = $pending.Count
     selected_plugin_id = if ([string]::IsNullOrWhiteSpace($PluginId)) {
         $null

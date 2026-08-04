@@ -23,8 +23,10 @@ public sealed class PluginManualValidationPlannerScriptTests
         Assert.Contains("approval_command", source);
         Assert.Contains("-SubjectExecutable", source);
         Assert.Contains(
-            "Approval receipt targets a different candidate executable",
+            "$staleApprovalReceipts.Add(",
             source);
+        Assert.Contains("stale_approval_receipt_count", source);
+        Assert.Contains("continue", source);
         Assert.Contains("Write-NewJsonFileAtomically", source);
         Assert.DoesNotContain("ConfirmPassed = $true", source);
         Assert.DoesNotContain("approve-plugin-manual-evidence.ps1'", source);
