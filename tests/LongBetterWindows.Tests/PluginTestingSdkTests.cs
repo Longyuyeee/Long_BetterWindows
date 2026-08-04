@@ -221,6 +221,7 @@ public sealed class PluginTestingSdkTests
             workflow);
         Assert.Contains("shell: powershell", workflow);
         Assert.Contains("actions/checkout@v7", workflow);
+        Assert.Equal(2, workflow.Split("fetch-depth: 0").Length - 1);
         Assert.Contains("actions/setup-dotnet@v6", workflow);
         Assert.Contains("actions/setup-node@v7", workflow);
         Assert.Contains("actions/upload-artifact@v7", workflow);

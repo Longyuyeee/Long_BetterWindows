@@ -177,7 +177,7 @@ public sealed class PluginPositiveFunctionMatrixTests
     }
 
     [Fact]
-    public async Task Verifier_ValidatesContractButBlocksReleaseEligibility()
+    public async Task Verifier_ValidatesContractAndEnforcesReleaseEligibility()
     {
         var root = FindRepositoryRoot();
         var normal = await RunVerifierAsync(
@@ -188,24 +188,33 @@ public sealed class PluginPositiveFunctionMatrixTests
         using var report = JsonDocument.Parse(normal.StandardOutput);
         Assert.True(
             report.RootElement.GetProperty("contract_valid").GetBoolean());
-        Assert.False(
-            report.RootElement.GetProperty("release_eligible").GetBoolean());
+        var releaseEligible = report.RootElement
+            .GetProperty("release_eligible")
+            .GetBoolean();
         Assert.Equal(
             25,
             report.RootElement.GetProperty("plugin_count").GetInt32());
         Assert.Equal(
             42,
             report.RootElement.GetProperty("command_count").GetInt32());
+        var approvalCount = report.RootElement
+            .GetProperty("approval_receipt_count")
+            .GetInt32();
+        var pendingCount = report.RootElement
+            .GetProperty("pending_or_blocked_manual_count")
+            .GetInt32();
+        var failedCount = report.RootElement
+            .GetProperty("failed_manual_count")
+            .GetInt32();
+        Assert.Equal(25, approvalCount + pendingCount + failedCount);
         Assert.Equal(
-            25,
-            report.RootElement
-                .GetProperty("pending_or_blocked_manual_count")
-                .GetInt32());
+            approvalCount == 25 && pendingCount == 0 && failedCount == 0,
+            releaseEligible);
 
         var release = await RunVerifierAsync(
             root,
             requireReleaseEligible: true);
-        Assert.Equal(2, release.ExitCode);
+        Assert.Equal(releaseEligible ? 0 : 2, release.ExitCode);
     }
 
     [Fact]
