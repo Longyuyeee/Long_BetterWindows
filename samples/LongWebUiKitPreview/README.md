@@ -13,3 +13,13 @@ Validate it with the production validator:
 Open the validated directory as a local plugin to inspect light/dark themes,
 keyboard focus, reduced motion, high contrast, responsive layout, content
 states, progress semantics, and dialog focus behavior.
+
+Capture the engineering visual regression matrix:
+
+```powershell
+.\capture-web-ui-kit-matrix.ps1 -OutputDirectory artifacts\quality\web-ui-kit-<commit>
+```
+
+The matrix covers both themes, high contrast, reduced motion, and the 920/640
+pixel layouts. It does not replace physical DPI, Windows forced-colors, or
+assistive-technology validation.

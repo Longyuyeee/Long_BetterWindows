@@ -14,6 +14,7 @@ namespace LongBetterWindows.Host.Engine
         private readonly WebPluginLanguageMessageState _languageMessages = new();
         private WebView2? _webView;
         private bool _themeSubscribed;
+        private bool _accessibilitySubscribed;
         private TaskCompletionSource<bool>? _navigationCompletion;
 
         internal WebPluginViewLifecycle(
@@ -89,6 +90,11 @@ namespace LongBetterWindows.Host.Engine
                     App.ThemeChanged += OnThemeChanged;
                     _themeSubscribed = true;
                 }
+                if (!_accessibilitySubscribed)
+                {
+                    App.AccessibilityPreferencesChanged += OnAccessibilityPreferencesChanged;
+                    _accessibilitySubscribed = true;
+                }
 
                 // 加载插件 HTML
                 if (!_navigationPolicy.TryResolveEntryPoint(EntryPoint, out var entryUri))
@@ -146,25 +152,29 @@ namespace LongBetterWindows.Host.Engine
                 var themeJson = System.Text.Json.JsonSerializer.Serialize(isLight ? "light" : "dark");
                 var uiKitVersionJson = System.Text.Json.JsonSerializer.Serialize(
                     PluginUiKitVersion.Current);
+                var highContrastJson = App.IsHighContrastEnabled ? "true" : "false";
+                var reducedMotionJson = App.IsReducedMotionEnabled ? "true" : "false";
 
                 return $$"""
                     (function () {
-                      const installLongUi = function () {
+                      window.LongUI = window.LongUI || {};
+                      window.LongUI.version = {{uiKitVersionJson}};
+                      const installLongUiDocument = function () {
                         document.documentElement.dataset.longTheme = {{themeJson}};
                         document.documentElement.dataset.longUiKitVersion = {{uiKitVersionJson}};
-                        window.LongUI = window.LongUI || {};
-                        window.LongUI.version = {{uiKitVersionJson}};
+                        document.documentElement.dataset.longHighContrast = '{{highContrastJson}}';
+                        document.documentElement.dataset.longReducedMotion = '{{reducedMotionJson}}';
                         if (!document.getElementById('long-ui-kit')) {
                           const style = document.createElement('style');
                           style.id = 'long-ui-kit';
                           style.textContent = {{cssJson}};
-                          (document.head || document.documentElement).appendChild(style);
+                          document.head.appendChild(style);
                         }
                       };
                       if (document.readyState === 'loading')
-                        document.addEventListener('DOMContentLoaded', installLongUi, { once: true });
+                        document.addEventListener('DOMContentLoaded', installLongUiDocument, { once: true });
                       else
-                        installLongUi();
+                        installLongUiDocument();
                       {{helpers}}
                     })();
                     """;
@@ -192,6 +202,26 @@ namespace LongBetterWindows.Host.Engine
                 catch (Exception ex)
                 {
                     Log.Debug(ex, "[Web:{Id}] 同步主题失败", _manifest.Id);
+                }
+            });
+        }
+
+        private void OnAccessibilityPreferencesChanged(bool highContrast, bool reducedMotion)
+        {
+            var webView = _webView;
+            if (webView?.CoreWebView2 == null) return;
+
+            _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    await webView.CoreWebView2.ExecuteScriptAsync(
+                        $"window.LongUI?.setHighContrast({highContrast.ToString().ToLowerInvariant()});" +
+                        $"window.LongUI?.setReducedMotion({reducedMotion.ToString().ToLowerInvariant()});");
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "[Web:{Id}] Failed to synchronize accessibility preferences", _manifest.Id);
                 }
             });
         }
@@ -308,6 +338,11 @@ namespace LongBetterWindows.Host.Engine
             {
                 App.ThemeChanged -= OnThemeChanged;
                 _themeSubscribed = false;
+            }
+            if (_accessibilitySubscribed)
+            {
+                App.AccessibilityPreferencesChanged -= OnAccessibilityPreferencesChanged;
+                _accessibilitySubscribed = false;
             }
 
             if (_webView?.CoreWebView2 != null)

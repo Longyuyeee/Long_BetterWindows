@@ -14,6 +14,7 @@
   --long-accent-hover: #765ee8;
   --long-accent-pressed: #6248de;
   --long-accent-soft: rgba(139, 120, 255, .2);
+  --long-on-accent: #ffffff;
   --long-success: #47d18c;
   --long-warning: #ffb84d;
   --long-danger: #ff647c;
@@ -43,6 +44,7 @@
   --long-accent-hover: #7354f0;
   --long-accent-pressed: #5637d8;
   --long-accent-soft: rgba(104, 71, 245, .12);
+  --long-on-accent: #ffffff;
   --long-success: #148a57;
   --long-warning: #b56500;
   --long-danger: #d93652;
@@ -87,7 +89,7 @@ button:hover, .long-button:hover { background: var(--long-surface-hover) !import
 button:active, .long-button:active { background: var(--long-surface-pressed) !important; transform: scale(.98); }
 button:focus-visible, .long-button:focus-visible { outline: 2px solid var(--long-accent); outline-offset: 2px; }
 button:disabled, .long-button:disabled { opacity: .42; cursor: default; }
-button.btn-primary, .long-button--primary { background: var(--long-accent) !important; border-color: var(--long-accent) !important; color: #fff !important; }
+button.btn-primary, .long-button--primary { background: var(--long-accent) !important; border-color: var(--long-accent) !important; color: var(--long-on-accent) !important; }
 button.btn-primary:hover, .long-button--primary:hover { background: var(--long-accent-hover) !important; }
 button.btn-primary:active, .long-button--primary:active { background: var(--long-accent-pressed) !important; border-color: var(--long-accent-pressed) !important; }
 button.btn-secondary, .long-button--secondary { background: var(--long-surface-card) !important; color: var(--long-text-primary) !important; }
@@ -112,6 +114,51 @@ input:focus, textarea:focus, select:focus, .long-input:focus {
   display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px;
   border-radius: 6px; background: var(--long-accent-soft); color: var(--long-text-primary);
   font-size: 10px; font-weight: 600;
+}
+
+:root[data-long-high-contrast="true"] {
+  --long-bg-base: #000000;
+  --long-bg-raised: #000000;
+  --long-surface-card: #000000;
+  --long-surface-hover: #1a1a1a;
+  --long-surface-pressed: #262626;
+  --long-stroke: #ffffff;
+  --long-stroke-strong: #ffffff;
+  --long-text-primary: #ffffff;
+  --long-text-secondary: #ffffff;
+  --long-text-muted: #e6e6e6;
+  --long-accent: #00ffff;
+  --long-accent-hover: #ffff00;
+  --long-accent-pressed: #ffff00;
+  --long-accent-soft: #003f3f;
+  --long-on-accent: #000000;
+  --long-success: #00ff00;
+  --long-warning: #ffff00;
+  --long-danger: #ff8080;
+  --long-shadow-1: none;
+  --long-shadow-2: none;
+}
+
+@media (forced-colors: active) {
+  :root {
+    --long-bg-base: Canvas;
+    --long-bg-raised: Canvas;
+    --long-surface-card: Canvas;
+    --long-surface-hover: Highlight;
+    --long-surface-pressed: Highlight;
+    --long-stroke: CanvasText;
+    --long-stroke-strong: CanvasText;
+    --long-text-primary: CanvasText;
+    --long-text-secondary: CanvasText;
+    --long-text-muted: CanvasText;
+    --long-accent: Highlight;
+    --long-accent-hover: Highlight;
+    --long-accent-pressed: Highlight;
+    --long-accent-soft: Canvas;
+    --long-on-accent: HighlightText;
+    --long-shadow-1: none;
+    --long-shadow-2: none;
+  }
 }
 .long-badge--neutral { background: var(--long-bg-raised); color: var(--long-text-secondary); }
 .long-badge--success { background: color-mix(in srgb, var(--long-success) 15%, transparent); color: var(--long-success); }
@@ -270,6 +317,9 @@ button.long-list-item__content { min-height: 0; padding: 0 !important; border: 0
 @keyframes long-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes long-state-spin { to { transform: rotate(360deg); } }
 :root[data-long-reduced-motion="true"] .long-state--loading .long-state__indicator { animation: none; border-color: var(--long-accent); }
+:root[data-long-reduced-motion="true"] *,
+:root[data-long-reduced-motion="true"] *::before,
+:root[data-long-reduced-motion="true"] *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 @media (max-width: 700px) {
   .long-grid, .long-metric-grid { grid-template-columns: 1fr; }
   .long-page { padding: 16px; }

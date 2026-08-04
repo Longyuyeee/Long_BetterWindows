@@ -113,7 +113,15 @@ public class DesignSystemTests
         Assert.Contains("LongUI?: LongUiKit", webTypes);
         Assert.Contains("PluginUiKitVersion.Current", lifecycle);
         Assert.Contains("dataset.longUiKitVersion", lifecycle);
+        Assert.Contains("dataset.longHighContrast", lifecycle);
+        Assert.Contains("dataset.longReducedMotion", lifecycle);
         Assert.Contains("window.LongUI.version", lifecycle);
+        Assert.Contains("App.AccessibilityPreferencesChanged += OnAccessibilityPreferencesChanged", lifecycle);
+        Assert.Contains("App.AccessibilityPreferencesChanged -= OnAccessibilityPreferencesChanged", lifecycle);
+        Assert.Contains("App.IsHighContrastEnabled", lifecycle);
+        Assert.Contains("App.IsReducedMotionEnabled", lifecycle);
+        Assert.Contains("DOMContentLoaded', installLongUiDocument", lifecycle);
+        Assert.Contains("document.head.appendChild(style)", lifecycle);
     }
 
     [Fact]
@@ -129,12 +137,20 @@ public class DesignSystemTests
         Assert.Contains(".long-state--loading", css);
         Assert.Contains(".long-state--error", css);
         Assert.Contains("data-long-reduced-motion", css);
+        Assert.Contains("data-long-high-contrast", css);
+        Assert.Contains("forced-colors: active", css);
+        Assert.Contains("--long-on-accent", css);
+        Assert.Contains("color: var(--long-on-accent) !important", css);
+        Assert.Contains("LongUI.setHighContrast", script);
         Assert.Contains("LongUI.renderState", script);
         Assert.Contains("LongUI.clearState", script);
         Assert.Contains("kind === 'error' ? 'alert' : 'status'", script);
         Assert.Contains("container.toggleAttribute('aria-busy', kind === 'loading')", script);
         Assert.Contains("container.replaceChildren(state)", script);
         Assert.DoesNotContain("innerHTML", script);
+
+        var types = File.ReadAllText(Path.Combine(root, "sdk", "web", "index.d.ts"));
+        Assert.Contains("setHighContrast(enabled: boolean)", types);
     }
 
     [Fact]

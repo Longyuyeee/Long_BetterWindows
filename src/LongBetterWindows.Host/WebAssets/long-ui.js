@@ -28,6 +28,10 @@
     requestAnimationFrame(function () { region.textContent = message || ''; });
   };
 
+  LongUI.setHighContrast = function (enabled) {
+    document.documentElement.dataset.longHighContrast = enabled ? 'true' : 'false';
+  };
+
   LongUI.clearState = function (container) {
     if (!container) return;
     container.removeAttribute('aria-busy');

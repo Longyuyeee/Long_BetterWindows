@@ -12,6 +12,7 @@ export interface LongUiStateOptions {
 export interface LongUiKit {
   readonly version: LongUiKitVersion;
   setTheme(theme: "light" | "dark"): void;
+  setHighContrast(enabled: boolean): void;
   setReducedMotion(reduced: boolean): void;
   setBusy(element: HTMLElement | null, busy: boolean): void;
   announce(message: string): void;

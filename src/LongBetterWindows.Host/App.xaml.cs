@@ -29,6 +29,7 @@ namespace LongBetterWindows.Host
             => (Current as App)?._pluginRuntime?.PackageInstaller;
 
         public static event Action<bool>? ThemeChanged;
+        internal static event Action<bool, bool>? AccessibilityPreferencesChanged;
         public static bool IsExiting { get; set; }
         public static string ProductVersion
             => typeof(App).Assembly
@@ -66,6 +67,10 @@ namespace LongBetterWindows.Host
         internal static bool IsPluginPagePerformanceTracing
             => Current is App { _pluginPageTrace: not null };
         internal static bool IsLightTheme => _currentIsLight;
+        internal static bool IsHighContrastEnabled
+            => SystemParameters.HighContrast || _forceHighContrast;
+        internal static bool IsReducedMotionEnabled
+            => !SystemParameters.ClientAreaAnimation || _forceReduceMotion;
         internal bool QualityWorkflowAutomationEnabled
             => !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowReviewId)
                 || !string.IsNullOrWhiteSpace(_startupOptions.QualityWorkflowsDirectory);
@@ -816,12 +821,15 @@ namespace LongBetterWindows.Host
             {
                 UpdateMotionResources();
                 UpdateThemeResources(_currentIsLight);
+                AccessibilityPreferencesChanged?.Invoke(
+                    IsHighContrastEnabled,
+                    IsReducedMotionEnabled);
             });
         }
 
         public static void UpdateMotionResources()
         {
-            var reduceMotion = !SystemParameters.ClientAreaAnimation || _forceReduceMotion;
+            var reduceMotion = IsReducedMotionEnabled;
             Current.Resources["Long.Motion.Fast"] = new Duration(
                 reduceMotion ? TimeSpan.Zero : TimeSpan.FromMilliseconds(100));
             Current.Resources["Long.Motion.Normal"] = new Duration(

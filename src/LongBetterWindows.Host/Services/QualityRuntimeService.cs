@@ -1526,10 +1526,9 @@ namespace LongBetterWindows.Host.Services
             bool highContrast,
             bool reducedMotion)
         {
-            var webView = FindVisualChild<WebView2>(target)
-                ?? throw new InvalidDataException("Quality capture could not find an active WebView2.");
-            if (webView.CoreWebView2 == null)
-                throw new InvalidDataException("WebView2 is not initialized for quality capture.");
+            var webView = await WaitForWebViewReadyAsync(target, TimeSpan.FromSeconds(10));
+            await Task.Delay(Math.Max(250, options.QualityCaptureDelayMilliseconds));
+            await webView.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
             await using (var stream = new FileStream(
                 path, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
@@ -1546,6 +1545,39 @@ namespace LongBetterWindows.Host.Services
                 Math.Max(1, (int)Math.Ceiling(webView.ActualHeight * webDpi.DpiScaleY)),
                 webDpi.PixelsPerInchX, "webview_preview",
                 isLight, highContrast, reducedMotion);
+        }
+
+        private static async Task<WebView2> WaitForWebViewReadyAsync(
+            DependencyObject target,
+            TimeSpan timeout)
+        {
+            var deadline = DateTimeOffset.UtcNow + timeout;
+            WebView2? webView = null;
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                webView = FindVisualChild<WebView2>(target);
+                if (webView?.CoreWebView2 != null)
+                {
+                    try
+                    {
+                        var state = await webView.CoreWebView2.ExecuteScriptAsync(
+                            "document.readyState");
+                        if (state is "\"interactive\"" or "\"complete\"")
+                            return webView;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // WebView2 can briefly reject script execution while navigation starts.
+                    }
+                }
+
+                await Task.Delay(100);
+            }
+
+            throw new InvalidDataException(
+                webView == null
+                    ? "Quality capture could not find an active WebView2."
+                    : "WebView2 did not become ready for quality capture before timeout.");
         }
 
         private static string? GetIconFingerprint(ImageSource? icon)

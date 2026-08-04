@@ -263,6 +263,9 @@ public class QualityGateTests
         Assert.Contains("CapturePreviewAsync", quality);
         Assert.Contains("CoreWebView2CapturePreviewImageFormat.Png", quality);
         Assert.Contains("webview_preview", quality);
+        Assert.Contains("WaitForWebViewReadyAsync", quality);
+        Assert.Contains("document.readyState", quality);
+        Assert.Contains("Math.Max(250, options.QualityCaptureDelayMilliseconds)", quality);
         Assert.Contains("VisualTreeHelper.GetDpi", quality);
         Assert.Contains("actual_monitor_dpi", quality);
         Assert.Contains("render_dpi", quality);
@@ -287,6 +290,23 @@ public class QualityGateTests
         Assert.Contains("Write-NewJsonFileAtomically", matrix);
         Assert.Contains("Visual matrix manifest", matrix);
         Assert.DoesNotContain("Set-Content `", matrix);
+    }
+
+    [Fact]
+    public void WebUiKitVisualMatrix_CoversThemesAccessibilityAndNarrowWidth()
+    {
+        var matrix = Read("capture-web-ui-kit-matrix.ps1");
+
+        Assert.Contains("com.long.reference-web-ui-kit", matrix);
+        Assert.Contains("light','dark", matrix);
+        Assert.Contains("normal','high-contrast','reduced-motion','combined", matrix);
+        Assert.Contains("920,640", matrix);
+        Assert.Contains("--quality-open-plugin-runtime", matrix);
+        Assert.Contains("--quality-capture-view', 'plugin", matrix);
+        Assert.Contains("physical_device_matrix_required = $true", matrix);
+        Assert.Contains("Get-FileHash", matrix);
+        Assert.Contains("Write-NewJsonFileAtomically", matrix);
+        Assert.Contains("web-ui-kit-matrix.json", matrix);
     }
 
     [Fact]
