@@ -2,6 +2,7 @@ using System.IO;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using LongBetterWindows.Host.Contracts;
+using LongBetterWindows.Host.Services;
 using Serilog;
 
 namespace LongBetterWindows.Host.Engine
@@ -15,6 +16,7 @@ namespace LongBetterWindows.Host.Engine
         private WebView2? _webView;
         private bool _themeSubscribed;
         private bool _accessibilitySubscribed;
+        private bool _languageSubscribed;
         private TaskCompletionSource<bool>? _navigationCompletion;
 
         internal WebPluginViewLifecycle(
@@ -95,6 +97,11 @@ namespace LongBetterWindows.Host.Engine
                     App.AccessibilityPreferencesChanged += OnAccessibilityPreferencesChanged;
                     _accessibilitySubscribed = true;
                 }
+                if (!_languageSubscribed)
+                {
+                    ServicesInitializer.I18n.LanguageChanged += OnLanguageChanged;
+                    _languageSubscribed = true;
+                }
 
                 // 加载插件 HTML
                 if (!_navigationPolicy.TryResolveEntryPoint(EntryPoint, out var entryUri))
@@ -154,11 +161,14 @@ namespace LongBetterWindows.Host.Engine
                     PluginUiKitVersion.Current);
                 var highContrastJson = App.IsHighContrastEnabled ? "true" : "false";
                 var reducedMotionJson = App.IsReducedMotionEnabled ? "true" : "false";
+                var languageJson = System.Text.Json.JsonSerializer.Serialize(
+                    ServicesInitializer.I18n.CurrentLanguage);
 
                 return $$"""
                     (function () {
                       window.LongUI = window.LongUI || {};
                       window.LongUI.version = {{uiKitVersionJson}};
+                      window.LongUI._initialLanguage = {{languageJson}};
                       const installLongUiDocument = function () {
                         document.documentElement.dataset.longTheme = {{themeJson}};
                         document.documentElement.dataset.longUiKitVersion = {{uiKitVersionJson}};
@@ -222,6 +232,26 @@ namespace LongBetterWindows.Host.Engine
                 catch (Exception ex)
                 {
                     Log.Debug(ex, "[Web:{Id}] Failed to synchronize accessibility preferences", _manifest.Id);
+                }
+            });
+        }
+
+        private void OnLanguageChanged(string language)
+        {
+            var webView = _webView;
+            if (webView?.CoreWebView2 == null) return;
+            var languageJson = System.Text.Json.JsonSerializer.Serialize(language);
+
+            _ = System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    await webView.CoreWebView2.ExecuteScriptAsync(
+                        $"window.LongUI?._setHostLanguage({languageJson});");
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug(ex, "[Web:{Id}] Failed to synchronize host language", _manifest.Id);
                 }
             });
         }
@@ -343,6 +373,11 @@ namespace LongBetterWindows.Host.Engine
             {
                 App.AccessibilityPreferencesChanged -= OnAccessibilityPreferencesChanged;
                 _accessibilitySubscribed = false;
+            }
+            if (_languageSubscribed)
+            {
+                ServicesInitializer.I18n.LanguageChanged -= OnLanguageChanged;
+                _languageSubscribed = false;
             }
 
             if (_webView?.CoreWebView2 != null)

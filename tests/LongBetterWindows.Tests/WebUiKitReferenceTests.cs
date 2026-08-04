@@ -19,6 +19,7 @@ public sealed class WebUiKitReferenceTests
 
         Assert.True(result.IsSuccess, result.Error);
         Assert.Equal("com.long.reference-web-ui-kit", result.Manifest!.Id);
+        Assert.Equal(PluginUiKitVersion.Current, result.Manifest.Version);
         Assert.Equal(
             PluginUiKitVersion.Current,
             result.Manifest.MinUiKitVersion);
@@ -41,6 +42,10 @@ public sealed class WebUiKitReferenceTests
         Assert.Contains("ui?.version", script);
         Assert.Contains("ui?.renderState", script);
         Assert.Contains("ui?.announce", script);
+        Assert.Contains("ui?.onLanguageChanged", script);
+        Assert.Contains("ui?.onViewportChanged", script);
+        Assert.Contains("ui?.language?.resolvedLanguage", script);
+        Assert.Contains("ui?.viewport", script);
     }
 
     [Fact]

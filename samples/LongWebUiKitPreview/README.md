@@ -1,6 +1,6 @@
 # Long Web UI Kit Preview
 
-Reference WebView plugin for UI Kit `1.1.0`. The sample relies entirely on the
+Reference WebView plugin for UI Kit `1.2.0`. The sample relies entirely on the
 CSS and `window.LongUI` helpers injected by Long Assistant. It intentionally
 contains no copied stylesheet, remote resource, or host capability request.
 
@@ -23,3 +23,7 @@ Capture the engineering visual regression matrix:
 The matrix covers both themes, high contrast, reduced motion, and the 920/640
 pixel layouts. It does not replace physical DPI, Windows forced-colors, or
 assistive-technology validation.
+
+The environment badge consumes `LongUI.onLanguageChanged` and
+`LongUI.onViewportChanged`. Both subscriptions immediately receive the current
+snapshot and return an unsubscribe function.

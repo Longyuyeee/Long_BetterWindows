@@ -1,5 +1,16 @@
 export type LongApiVersion = "1.1.0";
-export type LongUiKitVersion = "1.1.0";
+export type LongUiKitVersion = "1.2.0";
+
+export interface LongUiLanguageContext {
+  requestedLanguage: string;
+  resolvedLanguage: string;
+  resources: Readonly<Record<string, string>>;
+}
+
+export interface LongUiViewport {
+  width: number;
+  height: number;
+}
 
 export interface LongUiStateOptions {
   kind?: "empty" | "loading" | "error";
@@ -11,6 +22,8 @@ export interface LongUiStateOptions {
 
 export interface LongUiKit {
   readonly version: LongUiKitVersion;
+  readonly language: LongUiLanguageContext | null;
+  readonly viewport: LongUiViewport;
   setTheme(theme: "light" | "dark"): void;
   setHighContrast(enabled: boolean): void;
   setReducedMotion(reduced: boolean): void;
@@ -21,6 +34,10 @@ export interface LongUiKit {
     container: HTMLElement | null,
     options?: LongUiStateOptions
   ): HTMLElement | null;
+  onLanguageChanged(
+    handler: (context: LongUiLanguageContext) => void
+  ): () => void;
+  onViewportChanged(handler: (viewport: LongUiViewport) => void): () => void;
   onCommand(handler: (command: unknown) => void | Promise<void>): () => void;
   commandText(command: unknown): string;
   commandPaths(command: unknown): string[];
@@ -644,6 +661,8 @@ declare global {
   }
 
   interface WindowEventMap {
+    "long:language-changed": CustomEvent<LongUiLanguageContext>;
+    "long:viewport-changed": CustomEvent<LongUiViewport>;
     "long.widget-mounted": CustomEvent<LongWidgetEventEnvelope>;
     "long.widget-visibility-changed": CustomEvent<LongWidgetEventEnvelope<LongWidgetVisibilityPayload>>;
     "long.widget-resized": CustomEvent<LongWidgetEventEnvelope<LongWidgetSizePayload>>;

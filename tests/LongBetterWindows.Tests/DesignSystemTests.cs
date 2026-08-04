@@ -122,6 +122,10 @@ public class DesignSystemTests
         Assert.Contains("App.IsReducedMotionEnabled", lifecycle);
         Assert.Contains("DOMContentLoaded', installLongUiDocument", lifecycle);
         Assert.Contains("document.head.appendChild(style)", lifecycle);
+        Assert.Contains("ServicesInitializer.I18n.CurrentLanguage", lifecycle);
+        Assert.Contains("ServicesInitializer.I18n.LanguageChanged += OnLanguageChanged", lifecycle);
+        Assert.Contains("ServicesInitializer.I18n.LanguageChanged -= OnLanguageChanged", lifecycle);
+        Assert.Contains("window.LongUI?._setHostLanguage", lifecycle);
     }
 
     [Fact]
@@ -151,6 +155,18 @@ public class DesignSystemTests
 
         var types = File.ReadAllText(Path.Combine(root, "sdk", "web", "index.d.ts"));
         Assert.Contains("setHighContrast(enabled: boolean)", types);
+        Assert.Contains("LongUiLanguageContext", types);
+        Assert.Contains("LongUiViewport", types);
+        Assert.Contains("onLanguageChanged", types);
+        Assert.Contains("onViewportChanged", types);
+        Assert.Contains("long:language-changed", types);
+        Assert.Contains("long:viewport-changed", types);
+        Assert.Contains("LongUI.onLanguageChanged", script);
+        Assert.Contains("LongUI.onViewportChanged", script);
+        Assert.Contains("long.language-changed", script);
+        Assert.Contains("visualViewport", script);
+        Assert.Contains("LongUI._setHostLanguage", script);
+        Assert.Contains("Object.create(null)", script);
     }
 
     [Fact]

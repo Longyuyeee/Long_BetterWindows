@@ -6,7 +6,15 @@ const progress = document.getElementById('progress');
 const progressFill = document.getElementById('progressFill');
 const progressValue = document.getElementById('progressValue');
 
-versionBadge.textContent = `UI Kit ${ui?.version ?? 'unavailable'}`;
+function renderEnvironment() {
+  const language = ui?.language?.resolvedLanguage || document.documentElement.lang || 'unknown';
+  const viewport = ui?.viewport || { width: 0, height: 0 };
+  versionBadge.textContent = `UI Kit ${ui?.version ?? 'unavailable'} · ${language} · ${viewport.width}x${viewport.height}`;
+}
+
+ui?.onLanguageChanged(renderEnvironment);
+ui?.onViewportChanged(renderEnvironment);
+renderEnvironment();
 progressFill.style.width = '64%';
 
 function renderState(kind) {

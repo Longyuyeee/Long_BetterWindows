@@ -32,6 +32,102 @@
     document.documentElement.dataset.longHighContrast = enabled ? 'true' : 'false';
   };
 
+  const languageHandlers = LongUI._languageHandlers || new Set();
+  LongUI._languageHandlers = languageHandlers;
+  const viewportHandlers = LongUI._viewportHandlers || new Set();
+  LongUI._viewportHandlers = viewportHandlers;
+  const initialLanguage = typeof LongUI._initialLanguage === 'string'
+    ? LongUI._initialLanguage : (navigator.language || 'zh-CN');
+  LongUI.language = LongUI.language || Object.freeze({
+    requestedLanguage: initialLanguage,
+    resolvedLanguage: initialLanguage,
+    resources: Object.freeze({})
+  });
+  delete LongUI._initialLanguage;
+  LongUI.viewport = LongUI.viewport || readViewport();
+
+  function publishLanguage(message) {
+    const source = message && typeof message === 'object' ? message : {};
+    const resources = Object.create(null);
+    if (source.resources && typeof source.resources === 'object')
+      Object.entries(source.resources).forEach(function (entry) {
+        if (typeof entry[1] === 'string') resources[entry[0]] = entry[1];
+      });
+    const fallback = document.documentElement.lang || navigator.language || 'zh-CN';
+    const context = Object.freeze({
+      requestedLanguage: typeof source.requested_language === 'string'
+        ? source.requested_language : fallback,
+      resolvedLanguage: typeof source.resolved_language === 'string'
+        ? source.resolved_language : fallback,
+      resources: Object.freeze(resources)
+    });
+    LongUI.language = context;
+    document.documentElement.lang = context.resolvedLanguage;
+    languageHandlers.forEach(function (handler) {
+      try { handler(context); } catch (error) { console.error(error); }
+    });
+    window.dispatchEvent(new CustomEvent('long:language-changed', { detail: context }));
+  }
+
+  LongUI._setHostLanguage = function (language) {
+    if (typeof language !== 'string' || !language.trim()) return;
+    if (LongUI.language &&
+        LongUI.language.requestedLanguage.toLowerCase() === language.toLowerCase()) return;
+    publishLanguage({ requested_language: language, resolved_language: language, resources: {} });
+  };
+
+  function readViewport() {
+    const viewport = window.visualViewport;
+    return Object.freeze({
+      width: Math.max(0, Math.round(viewport ? viewport.width : window.innerWidth)),
+      height: Math.max(0, Math.round(viewport ? viewport.height : window.innerHeight))
+    });
+  }
+
+  function publishViewport() {
+    const next = readViewport();
+    if (LongUI.viewport.width === next.width && LongUI.viewport.height === next.height) return;
+    LongUI.viewport = next;
+    viewportHandlers.forEach(function (handler) {
+      try { handler(next); } catch (error) { console.error(error); }
+    });
+    window.dispatchEvent(new CustomEvent('long:viewport-changed', { detail: next }));
+  }
+
+  LongUI.onLanguageChanged = function (handler) {
+    if (typeof handler !== 'function') return function () {};
+    languageHandlers.add(handler);
+    if (LongUI.language)
+      queueMicrotask(function () {
+        if (languageHandlers.has(handler)) handler(LongUI.language);
+      });
+    return function () { languageHandlers.delete(handler); };
+  };
+
+  LongUI.onViewportChanged = function (handler) {
+    if (typeof handler !== 'function') return function () {};
+    viewportHandlers.add(handler);
+    queueMicrotask(function () {
+      if (viewportHandlers.has(handler)) handler(LongUI.viewport);
+    });
+    return function () { viewportHandlers.delete(handler); };
+  };
+
+  let viewportFrame = 0;
+  function scheduleViewport() {
+    if (viewportFrame) cancelAnimationFrame(viewportFrame);
+    viewportFrame = requestAnimationFrame(function () {
+      viewportFrame = 0;
+      publishViewport();
+    });
+  }
+  window.addEventListener('resize', scheduleViewport);
+  window.visualViewport?.addEventListener('resize', scheduleViewport);
+  document.addEventListener('DOMContentLoaded', function () {
+    document.documentElement.lang = LongUI.language.resolvedLanguage;
+    publishViewport();
+  }, { once: true });
+
   LongUI.clearState = function (container) {
     if (!container) return;
     container.removeAttribute('aria-busy');
@@ -159,6 +255,17 @@
       const envelope = { request_id: message.request_id, command: message.command };
       if (!commandHandlers.size) commandQueue.push(envelope);
       else void dispatchCommand(envelope);
+    });
+  }
+
+  if (!LongUI._environmentBridgeInstalled && window.chrome && window.chrome.webview) {
+    LongUI._environmentBridgeInstalled = true;
+    window.chrome.webview.addEventListener('message', function (event) {
+      let message = event.data;
+      if (typeof message === 'string') {
+        try { message = JSON.parse(message); } catch (_) { return; }
+      }
+      if (message && message.type === 'long.language-changed') publishLanguage(message);
     });
   }
 

@@ -221,6 +221,35 @@ public sealed class PluginPackageValidatorTests : IDisposable
         Assert.Contains("宿主版本不兼容", result.Error);
     }
 
+    [Theory]
+    [InlineData("1.1.0", true)]
+    [InlineData("1.2.0", true)]
+    [InlineData("1.3.0", false)]
+    public async Task ValidateAsync_UiKitMinorVersion_PreservesBackwardCompatibility(
+        string minimumUiKitVersion,
+        bool expectedSuccess)
+    {
+        var manifest = JsonSerializer.Serialize(new
+        {
+            id = "dev.long.ui-version",
+            version = "1.0.0",
+            name = "UI Version Plugin",
+            runtime = "webview",
+            entry_point = "index.html",
+            min_ui_kit_version = minimumUiKitVersion,
+            capabilities = Array.Empty<string>(),
+        });
+        var package = CreatePackage(
+            runtime: "webview",
+            entryPoint: "index.html",
+            manifestJson: manifest);
+
+        var result = await new PluginPackageValidator().ValidateAsync(package);
+
+        Assert.Equal(expectedSuccess, result.IsSuccess);
+        if (!expectedSuccess) Assert.Contains("UI Kit", result.Error);
+    }
+
     [Fact]
     public async Task ValidateDirectoryAsync_UsesManifestEntryAndLocalizationRules()
     {

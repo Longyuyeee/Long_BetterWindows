@@ -4,6 +4,8 @@ import type {
   LongFileOrganizationItem,
   LongHostInfo,
   LongResult,
+  LongUiLanguageContext,
+  LongUiViewport,
   LongUiKitVersion
 } from "@long-assistant/plugin-sdk";
 import {
@@ -73,4 +75,14 @@ void exercise(controller.long);
 window.long = controller.long;
 const uiKitVersion: LongUiKitVersion | undefined = window.LongUI?.version;
 uiKitVersion?.toString();
+const stopLanguage = window.LongUI?.onLanguageChanged((context: LongUiLanguageContext) => {
+  context.resolvedLanguage.toLowerCase();
+  Object.keys(context.resources);
+});
+const stopViewport = window.LongUI?.onViewportChanged((viewport: LongUiViewport) => {
+  viewport.width.toFixed();
+  viewport.height.toFixed();
+});
+stopLanguage?.();
+stopViewport?.();
 long.app.log("type contract ready");
