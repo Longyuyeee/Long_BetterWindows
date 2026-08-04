@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://long-assistant.local/schemas/plugin-catalog.schema.json",
+  "title": "Long Assistant Plugin Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest",
+        "classifications",
+        "marketplace_listing",
+        "category",
+        "tags",
+        "summary"
+      ],
+      "properties": {
+        "manifest": {
+          "type": "string",
+          "pattern": "^(src|samples)/[A-Za-z0-9._-]+/manifest\\.json$"
+        },
+        "classifications": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["built_in", "marketplace", "local_trusted", "sample", "reference"]
+          }
+        },
+        "marketplace_listing": {
+          "enum": ["none", "local", "remote"]
+        },
+        "category": {
+          "enum": ["automation", "design", "developer", "file", "productivity", "security", "system", "text"]
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 32 }
+        },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    }
+  }
+}

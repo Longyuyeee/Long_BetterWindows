@@ -1,0 +1,222 @@
+{
+  "$schema": "../schemas/plugin-catalog.schema.json",
+  "schema_version": 1,
+  "entries": [
+    {
+      "manifest": "src/Base64Tool/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "text",
+      "tags": ["Base64", "编码", "文本"],
+      "summary": "将文本或剪贴板内容进行 Base64 编码与解码"
+    },
+    {
+      "manifest": "src/ClipboardHistory/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "productivity",
+      "tags": ["剪贴板", "历史", "搜索"],
+      "summary": "在本地记录、检索并重新复制文本剪贴板历史"
+    },
+    {
+      "manifest": "src/ClipboardTool/manifest.json",
+      "classifications": ["built_in", "marketplace"],
+      "marketplace_listing": "remote",
+      "category": "productivity",
+      "tags": ["剪贴板", "历史", "文本"],
+      "summary": "整理、搜索并快速复用最近复制的内容"
+    },
+    {
+      "manifest": "src/ColorPickerPlugin/manifest.json",
+      "classifications": ["built_in", "local_trusted"],
+      "marketplace_listing": "local",
+      "category": "design",
+      "tags": ["颜色", "取色", "设计"],
+      "summary": "从屏幕捕获颜色并复制多种色值"
+    },
+    {
+      "manifest": "src/DevToolkit/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["编码", "Hash", "转换"],
+      "summary": "提供编码、哈希、进制、Unicode 与常用开发转换工具"
+    },
+    {
+      "manifest": "src/FileOrganizer/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "file",
+      "tags": ["文件", "整理", "重复文件"],
+      "summary": "按类型或日期整理文件，并查找大文件与重复文件"
+    },
+    {
+      "manifest": "src/FileRenamerPlugin/manifest.json",
+      "classifications": ["built_in", "marketplace"],
+      "marketplace_listing": "remote",
+      "category": "file",
+      "tags": ["文件", "重命名", "Explorer"],
+      "summary": "基于 Explorer 选区预览并执行批量改名"
+    },
+    {
+      "manifest": "src/FolderNotePlugin/manifest.json",
+      "classifications": ["built_in", "local_trusted"],
+      "marketplace_listing": "none",
+      "category": "file",
+      "tags": ["文件夹", "备注", "NTFS"],
+      "summary": "为文件夹或 Explorer 选区编辑本地备注"
+    },
+    {
+      "manifest": "src/HardwareMonitor/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "system",
+      "tags": ["CPU", "内存", "进程"],
+      "summary": "查看 CPU、内存、磁盘与进程资源占用"
+    },
+    {
+      "manifest": "src/JsonFormatterPlugin/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["JSON", "格式化", "校验"],
+      "summary": "格式化并校验文本或剪贴板中的 JSON"
+    },
+    {
+      "manifest": "src/MacroPlugin/manifest.json",
+      "classifications": ["built_in", "local_trusted"],
+      "marketplace_listing": "none",
+      "category": "automation",
+      "tags": ["宏", "录制", "键鼠"],
+      "summary": "录制并可取消地回放键盘与鼠标操作"
+    },
+    {
+      "manifest": "src/MarkdownPreview/manifest.json",
+      "classifications": ["built_in", "marketplace"],
+      "marketplace_listing": "remote",
+      "category": "text",
+      "tags": ["Markdown", "预览", "写作"],
+      "summary": "在统一插件界面中安全预览 Markdown"
+    },
+    {
+      "manifest": "src/PasswordGenerator/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "security",
+      "tags": ["密码", "随机", "安全"],
+      "summary": "使用安全随机源生成可配置的随机密码"
+    },
+    {
+      "manifest": "src/PortManager/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["端口", "进程", "网络"],
+      "summary": "扫描端口、识别占用进程并执行受控释放"
+    },
+    {
+      "manifest": "src/QuickLaunchPlugin/manifest.json",
+      "classifications": ["built_in", "local_trusted"],
+      "marketplace_listing": "none",
+      "category": "productivity",
+      "tags": ["搜索", "启动", "文件"],
+      "summary": "搜索并快速打开本机应用、文件和常用位置"
+    },
+    {
+      "manifest": "src/QuickNotePlugin/manifest.json",
+      "classifications": ["built_in", "marketplace"],
+      "marketplace_listing": "remote",
+      "category": "productivity",
+      "tags": ["便签", "笔记", "本地"],
+      "summary": "捕捉想法并安全保存在本地便签中"
+    },
+    {
+      "manifest": "src/RegexTester/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["正则", "测试", "文本"],
+      "summary": "本地测试正则表达式并查看匹配结果"
+    },
+    {
+      "manifest": "src/SamplePlugin/manifest.json",
+      "classifications": ["built_in", "local_trusted", "sample"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["SDK", "示例", "生命周期"],
+      "summary": "演示原生插件 SDK、生命周期与统一命令协议"
+    },
+    {
+      "manifest": "src/ScreenshotPlugin/manifest.json",
+      "classifications": ["built_in", "local_trusted"],
+      "marketplace_listing": "local",
+      "category": "design",
+      "tags": ["截图", "区域", "屏幕"],
+      "summary": "截取全部显示器或区域并复制到剪贴板"
+    },
+    {
+      "manifest": "src/TextDiffPlugin/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "text",
+      "tags": ["文本", "对比", "差异"],
+      "summary": "比较两段文本并突出显示行级差异"
+    },
+    {
+      "manifest": "src/TimestampConverter/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["时间戳", "日期", "转换"],
+      "summary": "在 Unix 时间戳与本地日期时间之间转换"
+    },
+    {
+      "manifest": "src/TranslatePlugin/manifest.json",
+      "classifications": ["built_in", "marketplace"],
+      "marketplace_listing": "remote",
+      "category": "text",
+      "tags": ["翻译", "文本", "网络"],
+      "summary": "从选中文本或剪贴板开始一次翻译"
+    },
+    {
+      "manifest": "src/UrlToolkit/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["URL", "编码", "解码"],
+      "summary": "对 URL 文本执行编码、解码与组成分析"
+    },
+    {
+      "manifest": "src/UuidGenerator/manifest.json",
+      "classifications": ["built_in"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["UUID", "随机", "生成"],
+      "summary": "使用安全随机源批量生成 UUID v4"
+    },
+    {
+      "manifest": "src/WindowManagerPlugin/manifest.json",
+      "classifications": ["built_in", "local_trusted"],
+      "marketplace_listing": "local",
+      "category": "system",
+      "tags": ["窗口", "布局", "置顶"],
+      "summary": "用命令和热键编排当前 Windows 窗口"
+    },
+    {
+      "manifest": "samples/LongWebUiKitPreview/manifest.json",
+      "classifications": ["reference"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["UI Kit", "主题", "组件"],
+      "summary": "Long Web UI Kit 公共组件与环境桥参考插件"
+    },
+    {
+      "manifest": "samples/LongWidgetReference/manifest.json",
+      "classifications": ["reference"],
+      "marketplace_listing": "none",
+      "category": "developer",
+      "tags": ["LPWP", "Widget", "参考"],
+      "summary": "LPWP 1.0 有状态 Web Widget 参考插件"
+    }
+  ]
+}
