@@ -19,6 +19,9 @@ namespace LongBetterWindows.Host.Engine
         /// <summary>随插件注册和注销自动同步的功能指令索引。</summary>
         public CommandRegistry Commands { get; } = new();
 
+        /// <summary>进程内、无敏感内容的插件命令健康度聚合。</summary>
+        public PluginRuntimeHealthMonitor RuntimeHealth { get; } = new();
+
         /// <summary>插件注册/注销/状态变化时触发（在 UI 线程订阅后需自行 Dispatch）</summary>
         public event Action? PluginsChanged;
 

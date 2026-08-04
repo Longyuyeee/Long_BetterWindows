@@ -2,6 +2,7 @@ using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using Serilog;
+using System.Diagnostics;
 
 namespace LongBetterWindows.Host.Interaction
 {
@@ -66,6 +67,7 @@ namespace LongBetterWindows.Host.Interaction
                 Arguments = argumentValidation.Arguments,
             };
 
+            var stopwatch = Stopwatch.StartNew();
             try
             {
                 if (entry.State != PluginState.Running)
@@ -74,32 +76,47 @@ namespace LongBetterWindows.Host.Interaction
                         entry.Id,
                         persistAutoStart: false);
                     if (!started && entry.State != PluginState.Running)
+                    {
+                        _plugins.RuntimeHealth.RecordFailure(
+                            entry.Id,
+                            stopwatch.Elapsed,
+                            PluginRuntimeFailureKind.StartFailed);
                         return PluginCommandResult.Failure($"插件启动失败: {entry.DisplayName}");
+                    }
                 }
 
                 using (PluginAccessContext.Enter(entry.Id))
                 {
                     if (entry.Instance is IPluginCommandHandler handler)
                     {
-                        return await handler.ExecuteCommandAsync(invocation, cancellationToken);
+                        var result = await handler.ExecuteCommandAsync(invocation, cancellationToken);
+                        if (result.IsSuccess)
+                            _plugins.RuntimeHealth.RecordSuccess(entry.Id, stopwatch.Elapsed);
+                        else
+                            _plugins.RuntimeHealth.RecordFailure(entry.Id, stopwatch.Elapsed);
+                        return result;
                     }
 
                     if (entry.Instance is IHasMainUI mainUi)
                     {
                         mainUi.ShowMainUI();
+                        _plugins.RuntimeHealth.RecordSuccess(entry.Id, stopwatch.Elapsed);
                         return PluginCommandResult.Success();
                     }
                 }
 
+                _plugins.RuntimeHealth.RecordFailure(entry.Id, stopwatch.Elapsed);
                 return PluginCommandResult.Failure(
                     $"插件尚未实现命令执行接口: {entry.DisplayName}");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+                _plugins.RuntimeHealth.RecordCancellation(entry.Id, stopwatch.Elapsed);
                 return PluginCommandResult.Failure("命令已取消。");
             }
             catch (Exception ex)
             {
+                _plugins.RuntimeHealth.RecordException(entry.Id, stopwatch.Elapsed);
                 Log.Error(ex, "执行插件命令 {CommandKey} 失败", commandKey);
                 return PluginCommandResult.Failure($"执行失败: {ex.Message}");
             }
