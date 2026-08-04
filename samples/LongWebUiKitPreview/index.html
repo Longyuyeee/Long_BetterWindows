@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Long Web UI Kit Preview</title>
+</head>
+<body>
+  <main class="long-page long-page--wide">
+    <header class="long-page-header">
+      <div>
+        <div class="long-eyebrow">PLUGIN UI KIT</div>
+        <h1 class="long-page-title">组件预览</h1>
+        <p class="long-page-description">公开注入组件的主题、状态与键盘交互基线。</p>
+      </div>
+      <span class="long-badge long-badge--neutral" id="versionBadge">UI Kit</span>
+    </header>
+
+    <section class="long-grid" aria-label="基础控件">
+      <article class="long-card long-stack">
+        <h2 class="long-section-title">操作与输入</h2>
+        <div class="long-field">
+          <label class="long-field-label" for="sampleInput">示例内容</label>
+          <input class="long-input" id="sampleInput" value="Long Assistant">
+        </div>
+        <div class="long-toolbar">
+          <button class="long-button long-button--primary" id="primaryButton" type="button">主要操作</button>
+          <button class="long-button long-button--secondary" id="dialogButton" type="button">打开确认</button>
+          <button class="long-button" type="button" disabled>不可用</button>
+          <span class="long-kbd">Ctrl Enter</span>
+        </div>
+        <div class="long-toolbar" aria-label="状态徽标">
+          <span class="long-badge long-badge--success">成功</span>
+          <span class="long-badge long-badge--warning">警告</span>
+          <span class="long-badge long-badge--danger">失败</span>
+        </div>
+      </article>
+
+      <article class="long-card long-stack">
+        <h2 class="long-section-title">进度与指标</h2>
+        <div class="long-metric">
+          <span class="long-metric__label">完成度</span>
+          <strong class="long-metric__value" id="progressValue">64%</strong>
+          <div class="long-progress" id="progress" role="progressbar" aria-label="示例完成度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="64">
+            <div class="long-progress__fill" id="progressFill"></div>
+          </div>
+          <span class="long-metric__detail">数值变化保持稳定布局。</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="long-grid" aria-label="列表与内容状态">
+      <article class="long-card long-stack">
+        <h2 class="long-section-title">列表</h2>
+        <div class="long-list">
+          <div class="long-list-item">
+            <div class="long-list-item__content">键盘焦点与语义颜色</div>
+            <span class="long-list-item__meta">Ready</span>
+          </div>
+          <div class="long-list-item">
+            <div class="long-list-item__content">亮色、暗色和高对比度</div>
+            <span class="long-list-item__meta">Theme</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="long-card long-stack">
+        <div class="long-toolbar">
+          <h2 class="long-section-title">内容状态</h2>
+          <span class="long-toolbar__spacer"></span>
+          <button class="long-button long-button--small" data-state="empty" type="button">空</button>
+          <button class="long-button long-button--small" data-state="loading" type="button">加载</button>
+          <button class="long-button long-button--small" data-state="error" type="button">错误</button>
+        </div>
+        <div id="statePreview" aria-label="内容状态预览"></div>
+      </article>
+    </section>
+  </main>
+
+  <dialog class="long-dialog" id="confirmDialog" aria-labelledby="dialogTitle">
+    <div class="long-dialog__header">
+      <h2 class="long-dialog__title" id="dialogTitle">确认示例操作</h2>
+    </div>
+    <div class="long-dialog__body">此对话框只演示公开样式和原生焦点行为。</div>
+    <div class="long-dialog__actions">
+      <button class="long-button long-button--secondary" id="cancelButton" type="button">取消</button>
+      <button class="long-button long-button--primary" id="confirmButton" type="button">确认</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

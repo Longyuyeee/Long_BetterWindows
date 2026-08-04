@@ -1,0 +1,29 @@
+{
+  "id": "com.long.reference-web-ui-kit",
+  "version": "1.1.0",
+  "name": "Long Web UI Kit Preview",
+  "description": "Reference surface for the public Long Web UI Kit contract.",
+  "author": "Long",
+  "entry_point": "index.html",
+  "runtime": "webview",
+  "min_api_version": "1.1.0",
+  "min_ui_kit_version": "1.1.0",
+  "capabilities": [],
+  "commands": [],
+  "window": {
+    "mode": "standard",
+    "preferred_width": 920,
+    "preferred_height": 720,
+    "min_width": 640,
+    "min_height": 520
+  },
+  "lifecycle": {
+    "start_with_host": false,
+    "close_behavior": "stop",
+    "default_presentation": "embedded",
+    "search_in_background": false
+  },
+  "default_settings": {
+    "auto_start": false
+  }
+}
