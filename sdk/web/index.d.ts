@@ -1,4 +1,29 @@
 export type LongApiVersion = "1.1.0";
+export type LongUiKitVersion = "1.1.0";
+
+export interface LongUiStateOptions {
+  kind?: "empty" | "loading" | "error";
+  title?: string;
+  detail?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
+
+export interface LongUiKit {
+  readonly version: LongUiKitVersion;
+  setTheme(theme: "light" | "dark"): void;
+  setReducedMotion(reduced: boolean): void;
+  setBusy(element: HTMLElement | null, busy: boolean): void;
+  announce(message: string): void;
+  clearState(container: HTMLElement | null): void;
+  renderState(
+    container: HTMLElement | null,
+    options?: LongUiStateOptions
+  ): HTMLElement | null;
+  onCommand(handler: (command: unknown) => void | Promise<void>): () => void;
+  commandText(command: unknown): string;
+  commandPaths(command: unknown): string[];
+}
 
 export interface LongResult<T = never> {
   success: boolean;
@@ -611,6 +636,7 @@ declare global {
 
   interface Window {
     long: LongApi;
+    LongUI?: LongUiKit;
     chrome?: {
       webview?: LongWebView;
     };

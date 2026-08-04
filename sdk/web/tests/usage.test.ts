@@ -3,7 +3,8 @@ import type {
   LongClipboardChangedEvent,
   LongFileOrganizationItem,
   LongHostInfo,
-  LongResult
+  LongResult,
+  LongUiKitVersion
 } from "@long-assistant/plugin-sdk";
 import {
   createLongMock,
@@ -70,4 +71,6 @@ const controller: LongMockController = createLongMock({
 
 void exercise(controller.long);
 window.long = controller.long;
+const uiKitVersion: LongUiKitVersion | undefined = window.LongUI?.version;
+uiKitVersion?.toString();
 long.app.log("type contract ready");

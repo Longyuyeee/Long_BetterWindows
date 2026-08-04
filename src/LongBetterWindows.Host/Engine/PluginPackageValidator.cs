@@ -11,7 +11,7 @@ namespace LongBetterWindows.Host.Engine
     {
         public const int MaximumEntryCount = 2048;
         public const long MaximumUncompressedBytes = 256L * 1024 * 1024;
-        public static readonly Version CurrentUiKitVersion = new(1, 1, 0);
+        public static Version CurrentUiKitVersion => PluginUiKitVersion.CurrentVersion;
 
         private readonly Version _hostVersion;
         private readonly Version _uiKitVersion;

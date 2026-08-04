@@ -144,11 +144,16 @@ namespace LongBetterWindows.Host.Engine
                     == Wpf.Ui.Appearance.ApplicationTheme.Light;
                 var cssJson = System.Text.Json.JsonSerializer.Serialize(css);
                 var themeJson = System.Text.Json.JsonSerializer.Serialize(isLight ? "light" : "dark");
+                var uiKitVersionJson = System.Text.Json.JsonSerializer.Serialize(
+                    PluginUiKitVersion.Current);
 
                 return $$"""
                     (function () {
                       const installLongUi = function () {
                         document.documentElement.dataset.longTheme = {{themeJson}};
+                        document.documentElement.dataset.longUiKitVersion = {{uiKitVersionJson}};
+                        window.LongUI = window.LongUI || {};
+                        window.LongUI.version = {{uiKitVersionJson}};
                         if (!document.getElementById('long-ui-kit')) {
                           const style = document.createElement('style');
                           style.id = 'long-ui-kit';

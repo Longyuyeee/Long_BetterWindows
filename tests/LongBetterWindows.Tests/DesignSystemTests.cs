@@ -92,6 +92,31 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void UiKitVersion_IsSharedByContractsValidatorAndWebSdk()
+    {
+        var root = FindRepositoryRoot();
+        var webTypes = File.ReadAllText(Path.Combine(
+            root, "sdk", "web", "index.d.ts"));
+        var lifecycle = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Engine",
+            "WebPluginViewLifecycle.cs"));
+
+        Assert.Equal(
+            PluginUiKitVersion.CurrentVersion,
+            PluginPackageValidator.CurrentUiKitVersion);
+        Assert.Contains(
+            $"LongUiKitVersion = \"{PluginUiKitVersion.Current}\"",
+            webTypes);
+        Assert.Contains("LongUI?: LongUiKit", webTypes);
+        Assert.Contains("PluginUiKitVersion.Current", lifecycle);
+        Assert.Contains("dataset.longUiKitVersion", lifecycle);
+        Assert.Contains("window.LongUI.version", lifecycle);
+    }
+
+    [Fact]
     public void WebUiKit_ExposesAccessibleContentStates()
     {
         var root = FindRepositoryRoot();
