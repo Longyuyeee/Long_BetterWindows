@@ -60,7 +60,7 @@ function Test-ApprovalReceipt(
         $sourceChanges = @(& git -C $PSScriptRoot diff `
             --name-only $sourceCommit HEAD -- src 2>$null)
         if ($LASTEXITCODE -ne 0 -or $sourceChanges.Count -gt 0) {
-            Add-MatrixError $Errors "Product source changed after manual approval: $label"
+            $script:staleApprovalReceiptCount++
             return $false
         }
         $manifestHash = Get-NormalizedTextSha256 $ManifestPath
@@ -173,6 +173,7 @@ $manualPendingCount = 0
 $manualFailedCount = 0
 $manualRequiredCount = 0
 $manualApprovalReceiptCount = 0
+$staleApprovalReceiptCount = 0
 $consumedApprovalKeys = @{}
 $matrixCommandCount = 0
 foreach ($plugin in @($matrix.plugins)) {
@@ -381,6 +382,7 @@ $report = [ordered]@{
     automated_evidence_count = $automatedEvidenceCount
     required_manual_check_count = $manualRequiredCount
     approval_receipt_count = $manualApprovalReceiptCount
+    stale_approval_receipt_count = $staleApprovalReceiptCount
     pending_or_blocked_manual_count = $manualPendingCount
     failed_manual_count = $manualFailedCount
     contract_valid = $errors.Count -eq 0

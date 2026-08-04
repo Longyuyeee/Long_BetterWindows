@@ -200,6 +200,9 @@ public sealed class PluginPositiveFunctionMatrixTests
         var approvalCount = report.RootElement
             .GetProperty("approval_receipt_count")
             .GetInt32();
+        var staleApprovalCount = report.RootElement
+            .GetProperty("stale_approval_receipt_count")
+            .GetInt32();
         var pendingCount = report.RootElement
             .GetProperty("pending_or_blocked_manual_count")
             .GetInt32();
@@ -207,6 +210,11 @@ public sealed class PluginPositiveFunctionMatrixTests
             .GetProperty("failed_manual_count")
             .GetInt32();
         Assert.Equal(25, approvalCount + pendingCount + failedCount);
+        Assert.Equal(
+            Directory.GetFiles(
+                Path.Combine(root, "docs", "plugin-manual-approvals"),
+                "*.json").Length,
+            approvalCount + staleApprovalCount);
         Assert.Equal(
             approvalCount == 25 && pendingCount == 0 && failedCount == 0,
             releaseEligible);
