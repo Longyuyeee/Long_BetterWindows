@@ -224,10 +224,21 @@ namespace LongBetterWindows.Host.Engine
                     try
                     {
                         using (PluginAccessContext.Enter(loaded.Id))
-                            await plugin.StopAsync();
+                        {
+                            if (!await plugin.StopAsync())
+                            {
+                                registry.RuntimeHealth.RecordLifecycleFailure(
+                                    loaded.Id,
+                                    PluginRuntimeFailureKind.StopFailed);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
+                        registry.RuntimeHealth.RecordLifecycleFailure(
+                            loaded.Id,
+                            PluginRuntimeFailureKind.StopFailed,
+                            isException: true);
                         Log.Warning(ex, "插件 {PluginId} 停止时出错", loaded.Id);
                     }
                 }
@@ -241,6 +252,10 @@ namespace LongBetterWindows.Host.Engine
                     }
                     catch (Exception ex)
                     {
+                        registry.RuntimeHealth.RecordLifecycleFailure(
+                            loaded.Id,
+                            PluginRuntimeFailureKind.ResourceReleaseFailed,
+                            isException: true);
                         Log.Warning(
                             ex,
                             "Plugin {PluginId} resource release failed during unload",
@@ -253,6 +268,10 @@ namespace LongBetterWindows.Host.Engine
                 }
                 catch (Exception ex)
                 {
+                    registry.RuntimeHealth.RecordLifecycleFailure(
+                        loaded.Id,
+                        PluginRuntimeFailureKind.ResourceReleaseFailed,
+                        isException: true);
                     Log.Warning(
                         ex,
                         "Plugin {PluginId} host resource release failed during unload",

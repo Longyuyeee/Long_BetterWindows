@@ -11,9 +11,24 @@ namespace LongBetterWindows.Host.Engine
     public enum PluginRuntimeFailureKind
     {
         None,
+        ActivationFailed,
         StartFailed,
+        StopFailed,
+        BackgroundTransitionFailed,
+        ResourceReleaseFailed,
         CommandFailed,
         UnhandledException,
+    }
+
+    public enum PluginRuntimeLifecycleState
+    {
+        Unknown,
+        Loaded,
+        Running,
+        Background,
+        Stopped,
+        Error,
+        Unloaded,
     }
 
     public sealed record PluginRuntimeHealthSnapshot(
@@ -25,6 +40,9 @@ namespace LongBetterWindows.Host.Engine
         long CancellationCount,
         long ExceptionCount,
         long ConsecutiveFailureCount,
+        long LifecycleEventCount,
+        long LifecycleFailureCount,
+        PluginRuntimeLifecycleState LifecycleState,
         double LastDurationMilliseconds,
         double MaximumDurationMilliseconds,
         PluginRuntimeFailureKind LastFailureKind,
@@ -86,6 +104,47 @@ namespace LongBetterWindows.Host.Engine
                 RuntimeOutcome.Exception,
                 PluginRuntimeFailureKind.UnhandledException);
 
+        public void RecordLifecycleTransition(
+            string pluginId,
+            PluginRuntimeLifecycleState state)
+        {
+            if (state == PluginRuntimeLifecycleState.Unknown)
+                throw new ArgumentOutOfRangeException(nameof(state));
+            ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+            lock (_sync)
+            {
+                var health = GetOrCreate(pluginId);
+                health.LifecycleEventCount++;
+                health.LifecycleState = state;
+                health.LastObservedAt = DateTimeOffset.UtcNow;
+                if (state == PluginRuntimeLifecycleState.Running)
+                {
+                    health.ConsecutiveFailureCount = 0;
+                    health.LastFailureKind = PluginRuntimeFailureKind.None;
+                }
+            }
+        }
+
+        public void RecordLifecycleFailure(
+            string pluginId,
+            PluginRuntimeFailureKind kind,
+            bool isException = false)
+        {
+            if (kind is PluginRuntimeFailureKind.None
+                or PluginRuntimeFailureKind.CommandFailed)
+                throw new ArgumentOutOfRangeException(nameof(kind));
+            ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+            lock (_sync)
+            {
+                var health = GetOrCreate(pluginId);
+                health.LifecycleFailureCount++;
+                health.ConsecutiveFailureCount++;
+                health.LastFailureKind = kind;
+                health.LastObservedAt = DateTimeOffset.UtcNow;
+                if (isException) health.ExceptionCount++;
+            }
+        }
+
         private void Record(
             string pluginId,
             TimeSpan duration,
@@ -98,11 +157,7 @@ namespace LongBetterWindows.Host.Engine
 
             lock (_sync)
             {
-                if (!_health.TryGetValue(pluginId, out var health))
-                {
-                    health = new MutableHealth();
-                    _health.Add(pluginId, health);
-                }
+                var health = GetOrCreate(pluginId);
 
                 health.ExecutionCount++;
                 health.LastDurationMilliseconds = duration.TotalMilliseconds;
@@ -147,6 +202,9 @@ namespace LongBetterWindows.Host.Engine
                 health.CancellationCount,
                 health.ExceptionCount,
                 health.ConsecutiveFailureCount,
+                health.LifecycleEventCount,
+                health.LifecycleFailureCount,
+                health.LifecycleState,
                 Math.Round(health.LastDurationMilliseconds, 3),
                 Math.Round(health.MaximumDurationMilliseconds, 3),
                 health.LastFailureKind,
@@ -154,13 +212,22 @@ namespace LongBetterWindows.Host.Engine
 
         private static PluginRuntimeHealthState ResolveState(MutableHealth health)
         {
-            if (health.ExecutionCount == 0) return PluginRuntimeHealthState.Idle;
-            if (health.LastFailureKind == PluginRuntimeFailureKind.UnhandledException
+            if (health.LifecycleState == PluginRuntimeLifecycleState.Error
+                || health.LastFailureKind == PluginRuntimeFailureKind.UnhandledException
                 || health.ConsecutiveFailureCount >= 3)
                 return PluginRuntimeHealthState.Unhealthy;
             if (health.ConsecutiveFailureCount > 0)
                 return PluginRuntimeHealthState.Degraded;
+            if (health.ExecutionCount == 0) return PluginRuntimeHealthState.Idle;
             return PluginRuntimeHealthState.Healthy;
+        }
+
+        private MutableHealth GetOrCreate(string pluginId)
+        {
+            if (_health.TryGetValue(pluginId, out var health)) return health;
+            health = new MutableHealth();
+            _health.Add(pluginId, health);
+            return health;
         }
 
         private static PluginRuntimeHealthSnapshot Empty(string pluginId)
@@ -173,6 +240,9 @@ namespace LongBetterWindows.Host.Engine
                 0,
                 0,
                 0,
+                0,
+                0,
+                PluginRuntimeLifecycleState.Unknown,
                 0,
                 0,
                 PluginRuntimeFailureKind.None,
@@ -194,6 +264,9 @@ namespace LongBetterWindows.Host.Engine
             public long CancellationCount { get; set; }
             public long ExceptionCount { get; set; }
             public long ConsecutiveFailureCount { get; set; }
+            public long LifecycleEventCount { get; set; }
+            public long LifecycleFailureCount { get; set; }
+            public PluginRuntimeLifecycleState LifecycleState { get; set; }
             public double LastDurationMilliseconds { get; set; }
             public double MaximumDurationMilliseconds { get; set; }
             public PluginRuntimeFailureKind LastFailureKind { get; set; }

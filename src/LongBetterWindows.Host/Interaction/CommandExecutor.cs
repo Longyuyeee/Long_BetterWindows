@@ -77,10 +77,6 @@ namespace LongBetterWindows.Host.Interaction
                         persistAutoStart: false);
                     if (!started && entry.State != PluginState.Running)
                     {
-                        _plugins.RuntimeHealth.RecordFailure(
-                            entry.Id,
-                            stopwatch.Elapsed,
-                            PluginRuntimeFailureKind.StartFailed);
                         return PluginCommandResult.Failure($"插件启动失败: {entry.DisplayName}");
                     }
                 }

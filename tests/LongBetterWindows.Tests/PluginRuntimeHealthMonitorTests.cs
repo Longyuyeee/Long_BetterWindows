@@ -26,6 +26,18 @@ public sealed class PluginRuntimeHealthMonitorTests
         Assert.Equal(
             PluginRuntimeHealthState.Unhealthy,
             monitor.GetSnapshot("sample").State);
+        monitor.RecordLifecycleTransition(
+            "sample",
+            PluginRuntimeLifecycleState.Stopped);
+        Assert.Equal(
+            PluginRuntimeHealthState.Unhealthy,
+            monitor.GetSnapshot("sample").State);
+        monitor.RecordLifecycleTransition(
+            "sample",
+            PluginRuntimeLifecycleState.Running);
+        Assert.Equal(
+            PluginRuntimeHealthState.Healthy,
+            monitor.GetSnapshot("sample").State);
 
         monitor.RecordSuccess("sample", TimeSpan.FromMilliseconds(10));
         var recovered = monitor.GetSnapshot("sample");
@@ -52,6 +64,27 @@ public sealed class PluginRuntimeHealthMonitorTests
         Assert.Equal(2, snapshot.ExecutionCount);
         Assert.Equal(1, snapshot.CancellationCount);
         Assert.Equal(0, snapshot.FailureCount);
+    }
+
+    [Fact]
+    public async Task PluginRegistry_RecordsSuccessfulLifecycleTransitions()
+    {
+        var registry = new PluginRegistry();
+        var plugin = new HealthCommandPlugin();
+        registry.Register(Manifest(), plugin, null, AppContext.BaseDirectory);
+
+        Assert.Equal(
+            PluginRuntimeLifecycleState.Loaded,
+            registry.RuntimeHealth.GetSnapshot(plugin.Id).LifecycleState);
+        Assert.True(await registry.StartPluginAsync(plugin.Id));
+        Assert.True(await registry.StopPluginAsync(plugin.Id));
+        Assert.True(registry.Unregister(plugin.Id));
+
+        var snapshot = registry.RuntimeHealth.GetSnapshot(plugin.Id);
+        Assert.Equal(PluginRuntimeLifecycleState.Unloaded, snapshot.LifecycleState);
+        Assert.Equal(4, snapshot.LifecycleEventCount);
+        Assert.Equal(0, snapshot.LifecycleFailureCount);
+        Assert.Equal(PluginRuntimeHealthState.Idle, snapshot.State);
     }
 
     [Fact]
@@ -97,6 +130,74 @@ public sealed class PluginRuntimeHealthMonitorTests
             registry.RuntimeHealth.GetSnapshot("health.sample").State);
     }
 
+    [Fact]
+    public async Task CommandExecutor_StartFailureIsRecordedOnceByLifecycleOwner()
+    {
+        var registry = new PluginRegistry();
+        var plugin = new HealthCommandPlugin { StartSucceeds = false };
+        registry.Register(Manifest(), plugin, null, AppContext.BaseDirectory);
+
+        var result = await new CommandExecutor(registry).ExecuteAsync("health.sample:run");
+
+        Assert.False(result.IsSuccess);
+        var snapshot = registry.RuntimeHealth.GetSnapshot(plugin.Id);
+        Assert.Equal(0, snapshot.ExecutionCount);
+        Assert.Equal(1, snapshot.LifecycleFailureCount);
+        Assert.Equal(PluginRuntimeFailureKind.StartFailed, snapshot.LastFailureKind);
+        Assert.Equal(PluginRuntimeHealthState.Degraded, snapshot.State);
+    }
+
+    [Fact]
+    public async Task PluginRegistry_ResourceReleaseFailureKeepsRunningState()
+    {
+        var registry = new PluginRegistry();
+        var plugin = new HealthCommandPlugin { ReleaseThrows = true };
+        registry.Register(Manifest(), plugin, null, AppContext.BaseDirectory);
+        Assert.True(await registry.StartPluginAsync(plugin.Id));
+
+        Assert.False(await registry.StopPluginAsync(plugin.Id));
+
+        Assert.Equal(PluginState.Running, registry.Get(plugin.Id)!.State);
+        var snapshot = registry.RuntimeHealth.GetSnapshot(plugin.Id);
+        Assert.Equal(1, snapshot.LifecycleFailureCount);
+        Assert.Equal(1, snapshot.ExceptionCount);
+        Assert.Equal(
+            PluginRuntimeFailureKind.ResourceReleaseFailed,
+            snapshot.LastFailureKind);
+        Assert.Equal(PluginRuntimeHealthState.Degraded, snapshot.State);
+    }
+
+    [Fact]
+    public void Diagnostics_AreSortedAndRetainOnlyHealthAfterUnregister()
+    {
+        var registry = new PluginRegistry();
+        registry.Register(Manifest(), new HealthCommandPlugin(), null, AppContext.BaseDirectory);
+        registry.Register(new PluginManifest
+        {
+            Id = "alpha.plugin",
+            Name = "Alpha",
+            Version = "2.0.0",
+            Runtime = "webview",
+            EntryPoint = "index.html",
+        }, new object(), null, AppContext.BaseDirectory);
+
+        var active = PluginRuntimeDiagnostics.Build(registry);
+        Assert.Equal(["alpha.plugin", "health.sample"], active.Select(item => item.PluginId));
+        Assert.Equal("webview", active[0].Runtime);
+        Assert.Equal("loaded", active[0].RegistryState);
+
+        Assert.True(registry.Unregister("alpha.plugin"));
+        var unloaded = PluginRuntimeDiagnostics.Build(registry)[0];
+        Assert.Equal("alpha.plugin", unloaded.PluginId);
+        Assert.Null(unloaded.Name);
+        Assert.Null(unloaded.Version);
+        Assert.Null(unloaded.Runtime);
+        Assert.Equal("unloaded", unloaded.RegistryState);
+        Assert.Equal(
+            PluginRuntimeLifecycleState.Unloaded,
+            unloaded.Health.LifecycleState);
+    }
+
     private static PluginManifest Manifest() => new()
     {
         Id = "health.sample",
@@ -114,9 +215,14 @@ public sealed class PluginRuntimeHealthMonitorTests
         ],
     };
 
-    private sealed class HealthCommandPlugin : ILongPlugin, IPluginCommandHandler
+    private sealed class HealthCommandPlugin :
+        ILongPlugin,
+        IPluginCommandHandler,
+        IPluginResourceLifecycle
     {
         public string Outcome { get; set; } = "success";
+        public bool StartSucceeds { get; set; } = true;
+        public bool ReleaseThrows { get; set; }
         public string Id => "health.sample";
         public string Name => "Health sample";
         public string Version => "1.0.0";
@@ -124,14 +230,18 @@ public sealed class PluginRuntimeHealthMonitorTests
         public Task<bool> InitializeAsync(IHostApi host) => Task.FromResult(true);
         public Task<bool> StartAsync()
         {
-            State = PluginState.Running;
-            return Task.FromResult(true);
+            if (StartSucceeds) State = PluginState.Running;
+            return Task.FromResult(StartSucceeds);
         }
         public Task<bool> StopAsync()
         {
             State = PluginState.Stopped;
             return Task.FromResult(true);
         }
+        public Task ReleaseResourcesAsync()
+            => ReleaseThrows
+                ? Task.FromException(new InvalidOperationException("sensitive release detail"))
+                : Task.CompletedTask;
 
         public Task<PluginCommandResult> ExecuteCommandAsync(
             PluginCommandInvocation invocation,

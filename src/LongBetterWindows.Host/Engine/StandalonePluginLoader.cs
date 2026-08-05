@@ -63,10 +63,17 @@ namespace LongBetterWindows.Host.Engine
             if (_registry.Get(manifest.Id) is not null)
                 return StandalonePluginLoadResult.Failure($"插件 {manifest.Id} 已注册");
 
-            return kind == StandalonePluginKind.CSharpScript
+            var result = kind == StandalonePluginKind.CSharpScript
                 ? await LoadCSharpAsync(sourcePath, scriptDirectory, manifest)
                 : await LoadWebScriptAsync(
                     sourcePath, scriptDirectory, scriptContent, manifest, kind.Value);
+            if (!result.IsSuccess)
+            {
+                _registry.RuntimeHealth.RecordLifecycleFailure(
+                    manifest.Id,
+                    PluginRuntimeFailureKind.ActivationFailed);
+            }
+            return result;
         }
 
         public async Task UnloadAsync(StandalonePluginHandle handle)
@@ -76,7 +83,14 @@ namespace LongBetterWindows.Host.Engine
                 if (handle.Entry.Instance is ILongPlugin plugin)
                 {
                     using (PluginAccessContext.Enter(handle.Manifest.Id))
-                        await plugin.StopAsync();
+                    {
+                        if (!await plugin.StopAsync())
+                        {
+                            _registry.RuntimeHealth.RecordLifecycleFailure(
+                                handle.Manifest.Id,
+                                PluginRuntimeFailureKind.StopFailed);
+                        }
+                    }
                 }
                 else if (handle.Entry.Instance is IDisposable disposable)
                 {
@@ -85,6 +99,10 @@ namespace LongBetterWindows.Host.Engine
             }
             catch (Exception ex)
             {
+                _registry.RuntimeHealth.RecordLifecycleFailure(
+                    handle.Manifest.Id,
+                    PluginRuntimeFailureKind.StopFailed,
+                    isException: true);
                 Log.Warning(ex, "单文件插件 {PluginId} 停止时出错", handle.Manifest.Id);
             }
 

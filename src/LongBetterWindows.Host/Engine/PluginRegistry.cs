@@ -99,6 +99,9 @@ namespace LongBetterWindows.Host.Engine
                 Log.Information("插件 {PluginId} (v{Version}) 已注册", manifest.Id, manifest.Version);
             }
 
+            RuntimeHealth.RecordLifecycleTransition(
+                manifest.Id,
+                PluginRuntimeLifecycleState.Loaded);
             NotifyChanged();
             return true;
         }
@@ -118,6 +121,9 @@ namespace LongBetterWindows.Host.Engine
                 Log.Information("插件 {PluginId} 已注销", pluginId);
             }
 
+            RuntimeHealth.RecordLifecycleTransition(
+                pluginId,
+                PluginRuntimeLifecycleState.Unloaded);
             NotifyChanged();
             return true;
         }
@@ -143,6 +149,15 @@ namespace LongBetterWindows.Host.Engine
                 SyncSearchProvider(entry);
             }
 
+            RuntimeHealth.RecordLifecycleTransition(pluginId, state switch
+            {
+                PluginState.Loaded => PluginRuntimeLifecycleState.Loaded,
+                PluginState.Running => PluginRuntimeLifecycleState.Running,
+                PluginState.Background => PluginRuntimeLifecycleState.Background,
+                PluginState.Stopped => PluginRuntimeLifecycleState.Stopped,
+                PluginState.Error => PluginRuntimeLifecycleState.Error,
+                _ => throw new ArgumentOutOfRangeException(nameof(state)),
+            });
             NotifyChanged();
             return true;
         }
@@ -174,6 +189,9 @@ namespace LongBetterWindows.Host.Engine
                     manifest.Version);
             }
 
+            RuntimeHealth.RecordLifecycleTransition(
+                manifest.Id,
+                PluginRuntimeLifecycleState.Loaded);
             NotifyChanged();
             return true;
         }
@@ -285,6 +303,9 @@ namespace LongBetterWindows.Host.Engine
                     return false;
                 if (!await entry.EnsureActivatedAsync())
                 {
+                    RuntimeHealth.RecordLifecycleFailure(
+                        pluginId,
+                        PluginRuntimeFailureKind.ActivationFailed);
                     Log.Error("插件 {PluginId} 运行时激活失败", pluginId);
                     SetState(pluginId, PluginState.Error);
                     return false;
@@ -306,6 +327,12 @@ namespace LongBetterWindows.Host.Engine
                                 entry.SetAutoStart(true);
                             Log.Information("插件 {PluginId} 已启用", pluginId);
                         }
+                        else
+                        {
+                            RuntimeHealth.RecordLifecycleFailure(
+                                pluginId,
+                                PluginRuntimeFailureKind.StartFailed);
+                        }
                         return ok;
                     }
                     else
@@ -321,6 +348,10 @@ namespace LongBetterWindows.Host.Engine
             }
             catch (Exception ex)
             {
+                RuntimeHealth.RecordLifecycleFailure(
+                    pluginId,
+                    PluginRuntimeFailureKind.StartFailed,
+                    isException: true);
                 Log.Error(ex, "插件 {PluginId} 启动失败", pluginId);
                 SetState(pluginId, PluginState.Error);
                 return false;
@@ -355,14 +386,43 @@ namespace LongBetterWindows.Host.Engine
                     {
                         if (!await plugin.StopAsync())
                         {
+                            RuntimeHealth.RecordLifecycleFailure(
+                                pluginId,
+                                PluginRuntimeFailureKind.StopFailed);
                             Log.Warning("插件 {PluginId} 拒绝停止", pluginId);
                             return false;
                         }
                     }
                     if (entry.Instance is IPluginResourceLifecycle resources)
-                        await resources.ReleaseResourcesAsync();
+                    {
+                        try
+                        {
+                            await resources.ReleaseResourcesAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            RuntimeHealth.RecordLifecycleFailure(
+                                pluginId,
+                                PluginRuntimeFailureKind.ResourceReleaseFailed,
+                                isException: true);
+                            Log.Error(ex, "插件 {PluginId} 资源释放失败", pluginId);
+                            return false;
+                        }
+                    }
                 }
-                await ReleaseHostResourcesAsync(pluginId);
+                try
+                {
+                    await ReleaseHostResourcesAsync(pluginId);
+                }
+                catch (Exception ex)
+                {
+                    RuntimeHealth.RecordLifecycleFailure(
+                        pluginId,
+                        PluginRuntimeFailureKind.ResourceReleaseFailed,
+                        isException: true);
+                    Log.Error(ex, "插件 {PluginId} 宿主资源释放失败", pluginId);
+                    return false;
+                }
                 SetState(pluginId, PluginState.Stopped);
                 if (persistAutoStart)
                     entry.SetAutoStart(false);
@@ -371,6 +431,10 @@ namespace LongBetterWindows.Host.Engine
             }
             catch (Exception ex)
             {
+                RuntimeHealth.RecordLifecycleFailure(
+                    pluginId,
+                    PluginRuntimeFailureKind.StopFailed,
+                    isException: true);
                 Log.Error(ex, "插件 {PluginId} 停止失败", pluginId);
                 return false;
             }
@@ -393,7 +457,12 @@ namespace LongBetterWindows.Host.Engine
                 {
                     if (entry.Instance is IPluginBackgroundLifecycle background
                         && !await background.EnterBackgroundAsync())
+                    {
+                        RuntimeHealth.RecordLifecycleFailure(
+                            pluginId,
+                            PluginRuntimeFailureKind.BackgroundTransitionFailed);
                         return false;
+                    }
                 }
 
                 if (!SetState(pluginId, PluginState.Background))
@@ -404,6 +473,10 @@ namespace LongBetterWindows.Host.Engine
             }
             catch (Exception ex)
             {
+                RuntimeHealth.RecordLifecycleFailure(
+                    pluginId,
+                    PluginRuntimeFailureKind.BackgroundTransitionFailed,
+                    isException: true);
                 Log.Error(ex, "插件 {PluginId} 转入后台失败", pluginId);
                 SetState(pluginId, PluginState.Error);
                 return false;
