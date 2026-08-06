@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://long-assistant.local/schemas/plugin-worker-migration-readiness.schema.json",
+  "title": "Long Assistant Plugin Worker Migration Readiness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "assessment_date",
+    "phase",
+    "decision",
+    "assessed_existing_candidates",
+    "eligible_existing_candidates",
+    "production_enabled",
+    "real_plugins_migrated",
+    "recommended_next",
+    "exit_criteria",
+    "candidates"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "assessment_date": { "type": "string", "format": "date" },
+    "phase": { "const": "PX6B-4" },
+    "decision": { "const": "no_existing_production_candidate_is_eligible" },
+    "assessed_existing_candidates": { "const": 8 },
+    "eligible_existing_candidates": { "const": 0 },
+    "production_enabled": { "const": false },
+    "real_plugins_migrated": { "const": 0 },
+    "recommended_next": { "const": "non_catalog_headless_reference_workload" },
+    "exit_criteria": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/candidate" }
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plugin_id",
+        "manifest",
+        "component_project",
+        "runtime_profile",
+        "headless_component",
+        "has_host_ui",
+        "direct_ihostapi_object",
+        "capabilities",
+        "side_effect_tier",
+        "required_proxy_methods",
+        "required_resource_leases",
+        "decision",
+        "blockers",
+        "evidence"
+      ],
+      "properties": {
+        "plugin_id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$" },
+        "manifest": { "type": "string", "pattern": "^src/.+/manifest\\.json$" },
+        "component_project": { "type": "string", "pattern": "^src/.+\\.csproj$" },
+        "runtime_profile": { "enum": ["native_dll", "webview_native_background"] },
+        "headless_component": { "type": "boolean" },
+        "has_host_ui": { "type": "boolean" },
+        "direct_ihostapi_object": { "const": true },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "side_effect_tier": { "enum": ["low", "high", "critical"] },
+        "required_proxy_methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_resource_leases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "decision": { "enum": ["reference_split_only", "defer_missing_proxy", "defer_high_risk"] },
+        "blockers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidence" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "contains"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^src/" },
+        "contains": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

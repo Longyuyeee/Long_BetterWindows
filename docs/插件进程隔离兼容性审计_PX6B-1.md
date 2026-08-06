@@ -57,3 +57,12 @@ Worker 反向面目前只有只读 `host.capability.query`，身份来自已认�
 下一步只做迁移就绪复审与退出条件冻结。
 最终门禁为 Release 0 警告 / 0 错误、全量自动化 1166 / 1166、Worker/隔离专项 14 / 14、
 IPC 1.1.0 打包通过，测试后无 Worker 进程残留。
+
+## 7. PX6B-4 迁移就绪结论
+
+[`plugin-worker-migration-readiness.json`](plugin-worker-migration-readiness.json) 对 8 个现有候选完成
+源码与 Manifest 对账：7 个 Native 均绑定宿主 WPF UI，ClipboardHistory 后台则具有高隐私和多资源
+副作用，因此可迁移候选为 0。Sample 只可拆出非生产参考工作负载，不可直接迁移。下一步先让
+Worker 加载一个不进权威目录、无用户数据和系统副作用的 headless 合同实现。
+最终门禁为 Release 0 警告 / 0 错误、全量自动化 1169 / 1169、迁移就绪专项 3 / 3、
+目录派生无漂移，测试后无 Worker 进程残留。

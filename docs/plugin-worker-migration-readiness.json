@@ -1,0 +1,161 @@
+{
+  "$schema": "../schemas/plugin-worker-migration-readiness.schema.json",
+  "schema_version": 1,
+  "assessment_date": "2026-08-06",
+  "phase": "PX6B-4",
+  "decision": "no_existing_production_candidate_is_eligible",
+  "assessed_existing_candidates": 8,
+  "eligible_existing_candidates": 0,
+  "production_enabled": false,
+  "real_plugins_migrated": 0,
+  "recommended_next": "non_catalog_headless_reference_workload",
+  "exit_criteria": [
+    "reference workload is not present in the authoritative plugin catalog",
+    "worker loads a bounded headless contract instead of hard-coded synthetic commands",
+    "all reverse host methods use explicit DTOs and session-bound identity",
+    "every side-effect resource has a host-owned crash cleanup lease",
+    "default plugin loading remains unchanged until release gates pass"
+  ],
+  "candidates": [
+    {
+      "plugin_id": "com.long.sample",
+      "manifest": "src/SamplePlugin/manifest.json",
+      "component_project": "src/SamplePlugin/SamplePlugin.csproj",
+      "runtime_profile": "native_dll",
+      "headless_component": false,
+      "has_host_ui": true,
+      "direct_ihostapi_object": true,
+      "capabilities": ["system.notification"],
+      "side_effect_tier": "low",
+      "required_proxy_methods": ["notification.show"],
+      "required_resource_leases": [],
+      "decision": "reference_split_only",
+      "blockers": [
+        "The production plugin returns host-owned WPF UI.",
+        "Its command performs a notification side effect and cannot use the read-only proxy."
+      ],
+      "evidence": [
+        { "path": "src/SamplePlugin/HelloPlugin.cs", "contains": "IHasMainUI" },
+        { "path": "src/SamplePlugin/HelloPlugin.cs", "contains": "_notification.ShowAsync" }
+      ]
+    },
+    {
+      "plugin_id": "com.long.folder-note",
+      "manifest": "src/FolderNotePlugin/manifest.json",
+      "component_project": "src/FolderNotePlugin/FolderNotePlugin.csproj",
+      "runtime_profile": "native_dll",
+      "headless_component": false,
+      "has_host_ui": true,
+      "direct_ihostapi_object": true,
+      "capabilities": ["system.hotkey", "shell.selection", "fs.ads.access", "system.notification"],
+      "side_effect_tier": "high",
+      "required_proxy_methods": ["hotkey.register", "settings.read_write", "shell.selection.read", "ads.read_write", "notification.show"],
+      "required_resource_leases": ["hotkey.registration"],
+      "decision": "defer_missing_proxy",
+      "blockers": ["WPF UI, Explorer selection and ADS writes cross the current boundary."],
+      "evidence": [{ "path": "src/FolderNotePlugin/FolderNotePluginImpl.cs", "contains": "_host.ShellSelection" }]
+    },
+    {
+      "plugin_id": "com.long.quicklaunch",
+      "manifest": "src/QuickLaunchPlugin/manifest.json",
+      "component_project": "src/QuickLaunchPlugin/QuickLaunchPlugin.csproj",
+      "runtime_profile": "native_dll",
+      "headless_component": false,
+      "has_host_ui": true,
+      "direct_ihostapi_object": true,
+      "capabilities": ["shell.execute", "system.clipboard"],
+      "side_effect_tier": "high",
+      "required_proxy_methods": ["shell.execute", "clipboard.write"],
+      "required_resource_leases": [],
+      "decision": "defer_missing_proxy",
+      "blockers": ["Application discovery and launch UI are host presentation work; commands launch external targets."],
+      "evidence": [{ "path": "src/QuickLaunchPlugin/QuickLaunchPluginImpl.cs", "contains": "_host.ShellExecute.OpenWithDefaultAsync" }]
+    },
+    {
+      "plugin_id": "com.long.macro",
+      "manifest": "src/MacroPlugin/manifest.json",
+      "component_project": "src/MacroPlugin/MacroPlugin.csproj",
+      "runtime_profile": "native_dll",
+      "headless_component": false,
+      "has_host_ui": true,
+      "direct_ihostapi_object": true,
+      "capabilities": ["system.hotkey", "system.notification"],
+      "side_effect_tier": "critical",
+      "required_proxy_methods": ["hotkey.register", "settings.read_write", "notification.show"],
+      "required_resource_leases": ["hotkey.registration", "keyboard.hook", "mouse.hook", "pressed_input.cleanup"],
+      "decision": "defer_high_risk",
+      "blockers": ["Global hooks and pressed-input cleanup require proven crash recovery before migration."],
+      "evidence": [{ "path": "src/MacroPlugin/MacroEngine.cs", "contains": "SetWindowsHookEx" }]
+    },
+    {
+      "plugin_id": "com.long.color-picker",
+      "manifest": "src/ColorPickerPlugin/manifest.json",
+      "component_project": "src/ColorPickerPlugin/ColorPickerPlugin.csproj",
+      "runtime_profile": "native_dll",
+      "headless_component": false,
+      "has_host_ui": true,
+      "direct_ihostapi_object": true,
+      "capabilities": ["system.hotkey", "system.clipboard", "system.notification", "system.screenshot"],
+      "side_effect_tier": "critical",
+      "required_proxy_methods": ["hotkey.register", "settings.read_write", "screen.color.sample", "clipboard.write", "notification.show"],
+      "required_resource_leases": ["hotkey.registration", "screen.overlay"],
+      "decision": "defer_high_risk",
+      "blockers": ["Screen sampling, overlay ownership and clipboard writes are not represented by worker DTOs."],
+      "evidence": [{ "path": "src/ColorPickerPlugin/ColorPickerPluginImpl.cs", "contains": "host.ScreenColorSampler" }]
+    },
+    {
+      "plugin_id": "com.long.screenshot",
+      "manifest": "src/ScreenshotPlugin/manifest.json",
+      "component_project": "src/ScreenshotPlugin/ScreenshotPlugin.csproj",
+      "runtime_profile": "native_dll",
+      "headless_component": false,
+      "has_host_ui": true,
+      "direct_ihostapi_object": true,
+      "capabilities": ["system.hotkey", "system.clipboard", "system.notification", "system.screenshot"],
+      "side_effect_tier": "critical",
+      "required_proxy_methods": ["hotkey.register", "settings.read_write", "screen.capture", "clipboard.image.write", "notification.show"],
+      "required_resource_leases": ["hotkey.registration", "capture.overlay", "capture.delivery"],
+      "decision": "defer_high_risk",
+      "blockers": ["Capture bitmap transfer, region UI and late clipboard delivery require dedicated contracts."],
+      "evidence": [{ "path": "src/ScreenshotPlugin/ScreenshotPluginImpl.cs", "contains": "_host.ScreenCapture.CaptureRegionAsync" }]
+    },
+    {
+      "plugin_id": "com.long.window-manager",
+      "manifest": "src/WindowManagerPlugin/manifest.json",
+      "component_project": "src/WindowManagerPlugin/WindowManagerPlugin.csproj",
+      "runtime_profile": "native_dll",
+      "headless_component": false,
+      "has_host_ui": true,
+      "direct_ihostapi_object": true,
+      "capabilities": ["system.hotkey", "system.notification", "window.info"],
+      "side_effect_tier": "critical",
+      "required_proxy_methods": ["hotkey.register", "settings.read_write", "window.layout", "notification.show"],
+      "required_resource_leases": ["hotkey.registration"],
+      "decision": "defer_high_risk",
+      "blockers": ["Foreground-window mutation and physical monitor geometry remain host-owned operations."],
+      "evidence": [{ "path": "src/WindowManagerPlugin/WindowManagerPluginImpl.cs", "contains": "_host.WindowInfo.ApplyForegroundLayout" }]
+    },
+    {
+      "plugin_id": "com.long.clipboardhistory",
+      "manifest": "src/ClipboardHistory/manifest.json",
+      "component_project": "src/ClipboardHistoryBackground/ClipboardHistoryBackground.csproj",
+      "runtime_profile": "webview_native_background",
+      "headless_component": true,
+      "has_host_ui": false,
+      "direct_ihostapi_object": true,
+      "capabilities": ["system.clipboard", "system.clipboard.monitor", "storage.local", "system.hotkey"],
+      "side_effect_tier": "critical",
+      "required_proxy_methods": ["clipboard.read", "clipboard.monitor", "storage.compare_exchange", "hotkey.register", "ui.open_request"],
+      "required_resource_leases": ["clipboard.monitor", "hotkey.registration", "open_request.subscription"],
+      "decision": "defer_high_risk",
+      "blockers": [
+        "The headless component handles private clipboard data and persistent CAS updates.",
+        "Web UI coordination uses an in-process OpenRequested event."
+      ],
+      "evidence": [
+        { "path": "src/ClipboardHistoryBackground/ClipboardHistoryBackgroundPlugin.cs", "contains": "host.Clipboard" },
+        { "path": "src/ClipboardHistoryBackground/ClipboardHistoryBackgroundPlugin.cs", "contains": "OpenRequested" }
+      ]
+    }
+  ]
+}
