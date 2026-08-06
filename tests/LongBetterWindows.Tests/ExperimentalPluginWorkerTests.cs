@@ -9,6 +9,84 @@ namespace LongBetterWindows.Tests;
 public sealed class ExperimentalPluginWorkerTests
 {
     [Fact]
+    public async Task ReferenceWorkload_LoadsBoundedContractWithoutSyntheticFallback()
+    {
+        await using var session = await StartWorkerAsync(
+            "reference.headless.native",
+            workloadPath: ReferenceWorkloadPath());
+        Assert.Equal("initialized", (await session.InvokeLifecycleAsync(
+            PluginWorkerLifecycleOperation.Initialize)).State);
+        Assert.Equal("running", (await session.InvokeLifecycleAsync(
+            PluginWorkerLifecycleOperation.Start)).State);
+
+        var digest = await session.InvokeCommandAsync(
+            new PluginWorkerCommandRequest("reference.sha256", "hello"));
+        Assert.Equal(
+            "2CF24DBA5FB0A30E26E83B2AC5B9E29E1B161E5C1FA7425E73043362938B9824",
+            digest.Text);
+
+        var synthetic = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+            session.InvokeCommandAsync(new PluginWorkerCommandRequest("echo", "blocked")));
+        Assert.Equal(IpcErrorCodes.CommandNotFound, synthetic.Code);
+
+        var requestId = Guid.NewGuid().ToString();
+        var pending = session.InvokeCommandWithIdAsync(
+            requestId,
+            new PluginWorkerCommandRequest("reference.delay", "cancelled", 5_000));
+        await Task.Delay(100);
+        Assert.True((await session.CancelCommandAsync(requestId)).Cancelled);
+        var cancelled = await Assert.ThrowsAsync<IpcRemoteException>(async () => await pending);
+        Assert.Equal(IpcErrorCodes.Cancelled, cancelled.Code);
+
+        var timedOut = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+            session.InvokeCommandAsync(
+                new PluginWorkerCommandRequest("reference.delay", "late", 1_000),
+                deadlineMilliseconds: 100));
+        Assert.Equal(IpcErrorCodes.Timeout, timedOut.Code);
+        Assert.Equal("alive", (await session.InvokeCommandAsync(
+            new PluginWorkerCommandRequest("reference.delay", "alive", 1))).Text);
+    }
+
+    [Fact]
+    public void ReferenceWorkload_RemainsHeadlessAndOutsideAuthoritativeCatalog()
+    {
+        var root = FindRepositoryRoot();
+        var project = File.ReadAllText(Path.Combine(
+            root,
+            "tools",
+            "LongBetterWindows.PluginWorker.Reference",
+            "LongBetterWindows.PluginWorker.Reference.csproj"));
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "tools",
+            "LongBetterWindows.PluginWorker.Reference",
+            "ReferenceWorkload.cs"));
+        var catalog = File.ReadAllText(Path.Combine(root, "catalog", "plugin-catalog.json"));
+
+        Assert.DoesNotContain("LongBetterWindows.Host", project, StringComparison.Ordinal);
+        Assert.DoesNotContain("<UseWPF>true", project, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("reference.headless.native", catalog, StringComparison.Ordinal);
+        Assert.DoesNotContain("Environment.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.IO", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.Net", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReferenceWorkload_RejectsIdentityMismatchAfterHandshake()
+    {
+        await using var session = await StartWorkerAsync(
+            "reference.wrong.identity",
+            workloadPath: ReferenceWorkloadPath());
+        using var timeout = new CancellationTokenSource(5_000);
+        await session.WaitForExitAsync(timeout.Token);
+        Assert.True(session.HasExited);
+
+        var rejected = await Assert.ThrowsAsync<PluginWorkerExitedException>(() =>
+            session.InvokeLifecycleAsync(PluginWorkerLifecycleOperation.Initialize));
+        Assert.NotEqual(0, rejected.ExitCode);
+    }
+
+    [Fact]
     public async Task Worker_AuthenticatesRunsLifecycleCommandsAndReportsOwnResources()
     {
         await using var session = await StartWorkerAsync();
@@ -283,9 +361,10 @@ public sealed class ExperimentalPluginWorkerTests
 
     private static async Task<ExperimentalPluginWorkerSession> StartRunningWorkerAsync(
         string pluginId = "synthetic.headless.native",
-        IExperimentalPluginWorkerHostBridge? hostBridge = null)
+        IExperimentalPluginWorkerHostBridge? hostBridge = null,
+        string? workloadPath = null)
     {
-        var session = await StartWorkerAsync(pluginId, hostBridge);
+        var session = await StartWorkerAsync(pluginId, hostBridge, workloadPath);
         try
         {
             await session.InvokeLifecycleAsync(PluginWorkerLifecycleOperation.Initialize);
@@ -301,9 +380,13 @@ public sealed class ExperimentalPluginWorkerTests
 
     private static Task<ExperimentalPluginWorkerSession> StartWorkerAsync(
         string pluginId = "synthetic.headless.native",
-        IExperimentalPluginWorkerHostBridge? hostBridge = null)
+        IExperimentalPluginWorkerHostBridge? hostBridge = null,
+        string? workloadPath = null)
         => ExperimentalPluginWorkerSession.StartAsync(
-            WorkerPath(), pluginId, hostBridge: hostBridge);
+            WorkerPath(),
+            pluginId,
+            hostBridge: hostBridge,
+            workloadPath: workloadPath);
 
     private static async Task AssertEventuallyAsync(Func<bool> condition)
     {
@@ -329,6 +412,22 @@ public sealed class ExperimentalPluginWorkerTests
             "net8.0-windows",
             "long-plugin-worker.dll");
         Assert.True(File.Exists(path), $"Synthetic plugin worker is missing: {path}");
+        return path;
+    }
+
+    private static string ReferenceWorkloadPath()
+    {
+        var configuration = new DirectoryInfo(AppContext.BaseDirectory)
+            .Parent?.Name ?? "Release";
+        var path = Path.Combine(
+            FindRepositoryRoot(),
+            "tools",
+            "LongBetterWindows.PluginWorker.Reference",
+            "bin",
+            configuration,
+            "net8.0-windows",
+            "long-plugin-worker-reference.dll");
+        Assert.True(File.Exists(path), $"Reference worker workload is missing: {path}");
         return path;
     }
 

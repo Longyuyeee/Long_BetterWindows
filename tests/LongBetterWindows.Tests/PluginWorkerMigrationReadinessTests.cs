@@ -12,16 +12,16 @@ public sealed class PluginWorkerMigrationReadinessTests
         RepositoryRoot, "schemas", "plugin-worker-migration-readiness.schema.json");
 
     [Fact]
-    public void Schema_LocksNoMigrationDecisionAndReferenceWorkloadNext()
+    public void Schema_LocksValidatedReferenceDecisionAndProductionPolicyNext()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(SchemaPath));
         var root = document.RootElement;
         var properties = root.GetProperty("properties");
 
         Assert.False(root.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal("PX6B-4",
+        Assert.Equal("PX6B-5",
             properties.GetProperty("phase").GetProperty("const").GetString());
-        Assert.Equal("no_existing_production_candidate_is_eligible",
+        Assert.Equal("headless_reference_workload_validated",
             properties.GetProperty("decision").GetProperty("const").GetString());
         Assert.Equal(8, properties.GetProperty("assessed_existing_candidates")
             .GetProperty("const").GetInt32());
@@ -31,7 +31,7 @@ public sealed class PluginWorkerMigrationReadinessTests
             .GetProperty("const").GetBoolean());
         Assert.Equal(0, properties.GetProperty("real_plugins_migrated")
             .GetProperty("const").GetInt32());
-        Assert.Equal("non_catalog_headless_reference_workload",
+        Assert.Equal("production_worker_package_and_capability_policy",
             properties.GetProperty("recommended_next").GetProperty("const").GetString());
     }
 
@@ -43,7 +43,7 @@ public sealed class PluginWorkerMigrationReadinessTests
         var candidates = root.GetProperty("candidates").EnumerateArray().ToArray();
         var expected = ReadCandidateManifests();
 
-        Assert.Equal("PX6B-4", root.GetProperty("phase").GetString());
+        Assert.Equal("PX6B-5", root.GetProperty("phase").GetString());
         Assert.Equal(8, root.GetProperty("assessed_existing_candidates").GetInt32());
         Assert.Equal(0, root.GetProperty("eligible_existing_candidates").GetInt32());
         Assert.False(root.GetProperty("production_enabled").GetBoolean());
@@ -90,11 +90,11 @@ public sealed class PluginWorkerMigrationReadinessTests
     }
 
     [Fact]
-    public void Matrix_RequiresASeparateNonCatalogReferenceBeforeProductionMigration()
+    public void Matrix_RecordsSeparateNonCatalogReferenceBeforeProductionMigration()
     {
         using var matrix = JsonDocument.Parse(File.ReadAllText(MatrixPath));
         var root = matrix.RootElement;
-        Assert.Equal("non_catalog_headless_reference_workload",
+        Assert.Equal("production_worker_package_and_capability_policy",
             root.GetProperty("recommended_next").GetString());
         Assert.Equal(5, root.GetProperty("exit_criteria")
             .EnumerateArray().Select(item => item.GetString()).Distinct().Count());
@@ -105,6 +105,14 @@ public sealed class PluginWorkerMigrationReadinessTests
             catalog.RootElement.GetProperty("entries").EnumerateArray(),
             entry => entry.GetProperty("manifest").GetString()!
                 .Contains("PluginWorker", StringComparison.OrdinalIgnoreCase));
+
+        var reference = root.GetProperty("reference_workload");
+        Assert.Equal("reference.headless.native",
+            reference.GetProperty("plugin_id").GetString());
+        Assert.False(reference.GetProperty("cataloged").GetBoolean());
+        Assert.False(reference.GetProperty("host_or_wpf_reference").GetBoolean());
+        Assert.False(reference.GetProperty("ambient_user_data").GetBoolean());
+        Assert.False(reference.GetProperty("system_side_effects").GetBoolean());
     }
 
     private static Dictionary<string, ManifestFact> ReadCandidateManifests()

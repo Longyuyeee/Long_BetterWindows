@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Text.Json;
 using LongBetterWindows.PluginIpc.Contracts;
 using LongBetterWindows.PluginIpc.Framing;
@@ -30,10 +32,15 @@ if (helloResponse.Protocol != PluginWorkerProtocol.Name
     return 4;
 }
 
-await new SyntheticWorkerServer(pipe).RunAsync();
+var workload = options.WorkloadPath is null
+    ? null
+    : WorkerWorkloadLoader.Load(options.WorkloadPath, options.PluginId);
+await new WorkerServer(pipe, workload).RunAsync();
 return 0;
 
-internal sealed class SyntheticWorkerServer(Stream stream)
+internal sealed class WorkerServer(
+    Stream stream,
+    IPluginWorkerWorkload? workload)
 {
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _commands =
@@ -41,6 +48,7 @@ internal sealed class SyntheticWorkerServer(Stream stream)
     private readonly ConcurrentDictionary<string, TaskCompletionSource<IpcEnvelope>> _hostRequests =
         new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly object _stateLock = new();
     private string _state = "loaded";
 
@@ -113,6 +121,9 @@ internal sealed class SyntheticWorkerServer(Stream stream)
             foreach (var command in _commands.Values)
                 command.Dispose();
             _commands.Clear();
+            if (workload is not null)
+                await workload.DisposeAsync().ConfigureAwait(false);
+            _lifecycleGate.Dispose();
             _writeGate.Dispose();
             _shutdown.Dispose();
         }
@@ -128,7 +139,8 @@ internal sealed class SyntheticWorkerServer(Stream stream)
             {
                 case PluginWorkerProtocol.LifecycleInvoke:
                     var lifecycle = Deserialize<PluginWorkerLifecycleRequest>(request);
-                    var state = ApplyLifecycle(lifecycle);
+                    var state = await ApplyLifecycleAsync(lifecycle, deadline.Token)
+                        .ConfigureAwait(false);
                     await WriteResultAsync(
                         request.Id,
                         new PluginWorkerLifecycleResponse(state),
@@ -206,46 +218,63 @@ internal sealed class SyntheticWorkerServer(Stream stream)
         try
         {
             string? result;
-            switch (command.Command)
+            if (workload is not null)
             {
-                case "echo":
-                    result = command.Text;
-                    break;
-                case "delay":
-                    ValidateDelay(command.DelayMilliseconds);
-                    await Task.Delay(command.DelayMilliseconds, invocation.Token)
-                        .ConfigureAwait(false);
-                    result = command.Text;
-                    break;
-                case "burn":
-                    ValidateDelay(command.DelayMilliseconds);
-                    var stopwatch = Stopwatch.StartNew();
-                    while (stopwatch.ElapsedMilliseconds < command.DelayMilliseconds)
-                    {
-                        invocation.Token.ThrowIfCancellationRequested();
-                        Thread.SpinWait(10_000);
-                    }
-                    result = command.Text;
-                    break;
-                case "crash":
-                    Environment.Exit(91);
-                    return;
-                case "query-capability":
-                    if (string.IsNullOrWhiteSpace(command.Text))
-                        throw new ArgumentException("Capability name is required.");
-                    var capability = await QueryHostCapabilityAsync(
-                        command.Text,
-                        command.DelayMilliseconds > 0 ? command.DelayMilliseconds : null,
-                        invocation.Token).ConfigureAwait(false);
-                    result = capability.Granted ? "granted" : "denied";
-                    break;
-                default:
+                if (!workload.Commands.Contains(command.Command))
+                {
                     await WriteErrorAsync(
                         request.Id,
                         IpcErrorCodes.CommandNotFound,
-                        "Synthetic worker command was not found.",
+                        "Loaded workload command was not found.",
                         invocation.Token).ConfigureAwait(false);
                     return;
+                }
+                result = await workload.InvokeCommandAsync(command, invocation.Token)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                switch (command.Command)
+                {
+                    case "echo":
+                        result = command.Text;
+                        break;
+                    case "delay":
+                        ValidateDelay(command.DelayMilliseconds);
+                        await Task.Delay(command.DelayMilliseconds, invocation.Token)
+                            .ConfigureAwait(false);
+                        result = command.Text;
+                        break;
+                    case "burn":
+                        ValidateDelay(command.DelayMilliseconds);
+                        var stopwatch = Stopwatch.StartNew();
+                        while (stopwatch.ElapsedMilliseconds < command.DelayMilliseconds)
+                        {
+                            invocation.Token.ThrowIfCancellationRequested();
+                            Thread.SpinWait(10_000);
+                        }
+                        result = command.Text;
+                        break;
+                    case "crash":
+                        Environment.Exit(91);
+                        return;
+                    case "query-capability":
+                        if (string.IsNullOrWhiteSpace(command.Text))
+                            throw new ArgumentException("Capability name is required.");
+                        var capability = await QueryHostCapabilityAsync(
+                            command.Text,
+                            command.DelayMilliseconds > 0 ? command.DelayMilliseconds : null,
+                            invocation.Token).ConfigureAwait(false);
+                        result = capability.Granted ? "granted" : "denied";
+                        break;
+                    default:
+                        await WriteErrorAsync(
+                            request.Id,
+                            IpcErrorCodes.CommandNotFound,
+                            "Synthetic worker command was not found.",
+                            invocation.Token).ConfigureAwait(false);
+                        return;
+                }
             }
 
             await WriteResultAsync(
@@ -277,22 +306,38 @@ internal sealed class SyntheticWorkerServer(Stream stream)
         }
     }
 
-    private string ApplyLifecycle(PluginWorkerLifecycleRequest request)
+    private async Task<string> ApplyLifecycleAsync(
+        PluginWorkerLifecycleRequest request,
+        CancellationToken cancellationToken)
     {
-        lock (_stateLock)
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            _state = request.Operation switch
+            string nextState;
+            lock (_stateLock)
             {
-                PluginWorkerLifecycleOperation.Initialize when _state == "loaded" => "initialized",
-                PluginWorkerLifecycleOperation.Start when _state is "initialized" or "stopped" => "running",
-                PluginWorkerLifecycleOperation.Stop => "stopped",
-                PluginWorkerLifecycleOperation.EnterBackground when _state == "running" => "background",
-                PluginWorkerLifecycleOperation.Resume when _state == "background" => "running",
-                PluginWorkerLifecycleOperation.ReleaseResources => "released",
-                PluginWorkerLifecycleOperation.LanguageChanged when !string.IsNullOrWhiteSpace(request.Language) => _state,
-                _ => throw new InvalidOperationException("Lifecycle operation is invalid for the current state."),
-            };
-            return _state;
+                nextState = request.Operation switch
+                {
+                    PluginWorkerLifecycleOperation.Initialize when _state == "loaded" => "initialized",
+                    PluginWorkerLifecycleOperation.Start when _state is "initialized" or "stopped" => "running",
+                    PluginWorkerLifecycleOperation.Stop => "stopped",
+                    PluginWorkerLifecycleOperation.EnterBackground when _state == "running" => "background",
+                    PluginWorkerLifecycleOperation.Resume when _state == "background" => "running",
+                    PluginWorkerLifecycleOperation.ReleaseResources => "released",
+                    PluginWorkerLifecycleOperation.LanguageChanged when !string.IsNullOrWhiteSpace(request.Language) => _state,
+                    _ => throw new InvalidOperationException("Lifecycle operation is invalid for the current state."),
+                };
+            }
+
+            if (workload is not null)
+                await workload.InvokeLifecycleAsync(
+                    request.Operation, request.Language, cancellationToken).ConfigureAwait(false);
+            lock (_stateLock) _state = nextState;
+            return nextState;
+        }
+        finally
+        {
+            _lifecycleGate.Release();
         }
     }
 
@@ -414,6 +459,7 @@ internal sealed record WorkerOptions(
     string PipeName,
     string Nonce,
     string PluginId,
+    string? WorkloadPath,
     int ConnectTimeoutMilliseconds)
 {
     internal static WorkerOptions Parse(string[] args)
@@ -430,6 +476,51 @@ internal sealed record WorkerOptions(
             Read("--pipe"),
             Read("--nonce"),
             Read("--plugin-id"),
+            ReadOptional("--workload"),
             5_000);
+
+        string? ReadOptional(string name)
+        {
+            var index = Array.IndexOf(args, name);
+            if (index < 0) return null;
+            if (index + 1 >= args.Length || string.IsNullOrWhiteSpace(args[index + 1]))
+                throw new ArgumentException($"Missing worker option value: {name}");
+            return args[index + 1];
+        }
+    }
+}
+
+internal static class WorkerWorkloadLoader
+{
+    internal static IPluginWorkerWorkload Load(string assemblyPath, string pluginId)
+    {
+        var fullPath = Path.GetFullPath(assemblyPath);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("Worker workload assembly was not found.", fullPath);
+
+        var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
+        var types = assembly.GetTypes()
+            .Where(type => typeof(IPluginWorkerWorkload).IsAssignableFrom(type)
+                && type is { IsAbstract: false, IsInterface: false })
+            .ToArray();
+        if (types.Length != 1)
+            throw new InvalidDataException(
+                "Worker workload assembly must contain exactly one workload implementation.");
+
+        var workload = Activator.CreateInstance(types[0], nonPublic: true)
+            as IPluginWorkerWorkload
+            ?? throw new InvalidDataException("Worker workload could not be created.");
+        if (!string.Equals(workload.PluginId, pluginId, StringComparison.Ordinal))
+        {
+            workload.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            throw new InvalidDataException("Worker workload identity does not match the session.");
+        }
+        if (workload.Commands.Count == 0
+            || workload.Commands.Any(string.IsNullOrWhiteSpace))
+        {
+            workload.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            throw new InvalidDataException("Worker workload command set is invalid.");
+        }
+        return workload;
     }
 }

@@ -14,6 +14,7 @@
     "production_enabled",
     "real_plugins_migrated",
     "recommended_next",
+    "reference_workload",
     "exit_criteria",
     "candidates"
   ],
@@ -21,13 +22,40 @@
     "$schema": { "type": "string" },
     "schema_version": { "const": 1 },
     "assessment_date": { "type": "string", "format": "date" },
-    "phase": { "const": "PX6B-4" },
-    "decision": { "const": "no_existing_production_candidate_is_eligible" },
+    "phase": { "const": "PX6B-5" },
+    "decision": { "const": "headless_reference_workload_validated" },
     "assessed_existing_candidates": { "const": 8 },
     "eligible_existing_candidates": { "const": 0 },
     "production_enabled": { "const": false },
     "real_plugins_migrated": { "const": 0 },
-    "recommended_next": { "const": "non_catalog_headless_reference_workload" },
+    "recommended_next": { "const": "production_worker_package_and_capability_policy" },
+    "reference_workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plugin_id",
+        "project",
+        "cataloged",
+        "host_or_wpf_reference",
+        "ambient_user_data",
+        "system_side_effects",
+        "commands"
+      ],
+      "properties": {
+        "plugin_id": { "const": "reference.headless.native" },
+        "project": { "const": "tools/LongBetterWindows.PluginWorker.Reference/LongBetterWindows.PluginWorker.Reference.csproj" },
+        "cataloged": { "const": false },
+        "host_or_wpf_reference": { "const": false },
+        "ambient_user_data": { "const": false },
+        "system_side_effects": { "const": false },
+        "commands": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["reference.sha256", "reference.delay"] }
+        }
+      }
+    },
     "exit_criteria": {
       "type": "array",
       "minItems": 5,
