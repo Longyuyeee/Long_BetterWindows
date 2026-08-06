@@ -23,13 +23,13 @@
     "$schema": { "type": "string" },
     "schema_version": { "const": 1 },
     "assessment_date": { "type": "string", "format": "date" },
-    "phase": { "const": "PX6B-6" },
-    "decision": { "const": "worker_package_policy_validated_without_production_bridge" },
+    "phase": { "const": "PX6B-7" },
+    "decision": { "const": "verified_package_descriptor_bridge_validated_release_gate_closed" },
     "assessed_existing_candidates": { "const": 8 },
     "eligible_existing_candidates": { "const": 0 },
     "production_enabled": { "const": false },
     "real_plugins_migrated": { "const": 0 },
-    "recommended_next": { "const": "verified_package_descriptor_bridge_and_release_gate" },
+    "recommended_next": { "const": "low_risk_candidate_contract_split_audit" },
     "reference_workload": {
       "type": "object",
       "additionalProperties": false,
@@ -63,6 +63,9 @@
       "required": [
         "package_hash_source",
         "trusted_descriptor_bridge",
+        "sealed_file_evidence",
+        "post_extraction_file_reverification",
+        "production_release_gate_closed",
         "host_preflight_sha256",
         "worker_post_handshake_sha256",
         "load_verified_bytes",
@@ -73,7 +76,10 @@
       ],
       "properties": {
         "package_hash_source": { "const": "verified_package_file_manifest_required" },
-        "trusted_descriptor_bridge": { "const": false },
+        "trusted_descriptor_bridge": { "const": true },
+        "sealed_file_evidence": { "const": true },
+        "post_extraction_file_reverification": { "const": true },
+        "production_release_gate_closed": { "const": true },
         "host_preflight_sha256": { "const": true },
         "worker_post_handshake_sha256": { "const": true },
         "load_verified_bytes": { "const": true },
@@ -89,7 +95,7 @@
     },
     "exit_criteria": {
       "type": "array",
-      "minItems": 5,
+      "minItems": 6,
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 }
     },

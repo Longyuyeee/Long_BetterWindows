@@ -106,6 +106,15 @@ namespace LongBetterWindows.Host.Engine
                     || !string.Equals(stagedManifest.Manifest.Version, manifest.Version, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("暂存包 Manifest 与已验证内容不一致。");
 
+                if (PluginPackageValidator.TryGetVerifiedPackageFiles(validation, out _)
+                    && !PluginPackageValidator.VerifyExtractedPackageFiles(
+                        validation,
+                        stagingDir,
+                        out var extractedFileError))
+                {
+                    throw new InvalidDataException(extractedFileError);
+                }
+
                 if (Directory.Exists(targetDir))
                 {
                     await UnloadPluginAsync(manifest.Id);

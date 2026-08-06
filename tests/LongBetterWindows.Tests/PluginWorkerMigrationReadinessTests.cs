@@ -13,16 +13,16 @@ public sealed class PluginWorkerMigrationReadinessTests
         RepositoryRoot, "schemas", "plugin-worker-migration-readiness.schema.json");
 
     [Fact]
-    public void Schema_LocksWorkerPolicyDecisionAndVerifiedDescriptorNext()
+    public void Schema_LocksVerifiedDescriptorDecisionAndCandidateAuditNext()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(SchemaPath));
         var root = document.RootElement;
         var properties = root.GetProperty("properties");
 
         Assert.False(root.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal("PX6B-6",
+        Assert.Equal("PX6B-7",
             properties.GetProperty("phase").GetProperty("const").GetString());
-        Assert.Equal("worker_package_policy_validated_without_production_bridge",
+        Assert.Equal("verified_package_descriptor_bridge_validated_release_gate_closed",
             properties.GetProperty("decision").GetProperty("const").GetString());
         Assert.Equal(8, properties.GetProperty("assessed_existing_candidates")
             .GetProperty("const").GetInt32());
@@ -32,7 +32,7 @@ public sealed class PluginWorkerMigrationReadinessTests
             .GetProperty("const").GetBoolean());
         Assert.Equal(0, properties.GetProperty("real_plugins_migrated")
             .GetProperty("const").GetInt32());
-        Assert.Equal("verified_package_descriptor_bridge_and_release_gate",
+        Assert.Equal("low_risk_candidate_contract_split_audit",
             properties.GetProperty("recommended_next").GetProperty("const").GetString());
     }
 
@@ -44,7 +44,7 @@ public sealed class PluginWorkerMigrationReadinessTests
         var candidates = root.GetProperty("candidates").EnumerateArray().ToArray();
         var expected = ReadCandidateManifests();
 
-        Assert.Equal("PX6B-6", root.GetProperty("phase").GetString());
+        Assert.Equal("PX6B-7", root.GetProperty("phase").GetString());
         Assert.Equal(8, root.GetProperty("assessed_existing_candidates").GetInt32());
         Assert.Equal(0, root.GetProperty("eligible_existing_candidates").GetInt32());
         Assert.False(root.GetProperty("production_enabled").GetBoolean());
@@ -95,9 +95,9 @@ public sealed class PluginWorkerMigrationReadinessTests
     {
         using var matrix = JsonDocument.Parse(File.ReadAllText(MatrixPath));
         var root = matrix.RootElement;
-        Assert.Equal("verified_package_descriptor_bridge_and_release_gate",
+        Assert.Equal("low_risk_candidate_contract_split_audit",
             root.GetProperty("recommended_next").GetString());
-        Assert.Equal(5, root.GetProperty("exit_criteria")
+        Assert.Equal(6, root.GetProperty("exit_criteria")
             .EnumerateArray().Select(item => item.GetString()).Distinct().Count());
 
         using var catalog = JsonDocument.Parse(File.ReadAllText(Path.Combine(
@@ -118,7 +118,10 @@ public sealed class PluginWorkerMigrationReadinessTests
         var policy = root.GetProperty("worker_policy");
         Assert.Equal("verified_package_file_manifest_required",
             policy.GetProperty("package_hash_source").GetString());
-        Assert.False(policy.GetProperty("trusted_descriptor_bridge").GetBoolean());
+        Assert.True(policy.GetProperty("trusted_descriptor_bridge").GetBoolean());
+        Assert.True(policy.GetProperty("sealed_file_evidence").GetBoolean());
+        Assert.True(policy.GetProperty("post_extraction_file_reverification").GetBoolean());
+        Assert.True(policy.GetProperty("production_release_gate_closed").GetBoolean());
         Assert.True(policy.GetProperty("host_preflight_sha256").GetBoolean());
         Assert.True(policy.GetProperty("worker_post_handshake_sha256").GetBoolean());
         Assert.True(policy.GetProperty("load_verified_bytes").GetBoolean());

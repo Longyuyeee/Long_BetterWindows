@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
@@ -9,6 +10,8 @@ namespace LongBetterWindows.Host.Engine
 {
     public sealed class PluginPackageValidator
     {
+        private static readonly object FileManifestVerificationSeal = new();
+
         public const int MaximumEntryCount = 2048;
         public const long MaximumUncompressedBytes = 256L * 1024 * 1024;
         public static Version CurrentUiKitVersion => PluginUiKitVersion.CurrentVersion;
@@ -91,7 +94,8 @@ namespace LongBetterWindows.Host.Engine
                 var fileManifestError = ValidateFileManifest(
                     archive,
                     out var fileManifestPluginId,
-                    out var fileManifestVersion);
+                    out var fileManifestVersion,
+                    out var verifiedFiles);
                 if (fileManifestError != null)
                     return PackageValidationResult.Fail(fileManifestError, sha256);
 
@@ -133,12 +137,14 @@ namespace LongBetterWindows.Host.Engine
                 if (compatibilityError != null)
                     return PackageValidationResult.Fail(compatibilityError, sha256, manifest);
 
-                return PackageValidationResult.Ok(
+                return PackageValidationResult.OkVerified(
                     manifest,
                     sha256,
                     trust,
                     CreatePermissionDiff(installedManifest?.Capabilities, manifest.Capabilities),
-                    RequiresHighTrust(manifest));
+                    RequiresHighTrust(manifest),
+                    verifiedFiles,
+                    FileManifestVerificationSeal);
             }
             catch (InvalidDataException ex)
             {
@@ -228,6 +234,112 @@ namespace LongBetterWindows.Host.Engine
                 }
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                 entry.ExtractToFile(target, true);
+            }
+        }
+
+        internal static bool TryGetVerifiedPackageFiles(
+            PackageValidationResult validation,
+            out IReadOnlyDictionary<string, VerifiedPackageFile> verifiedFiles)
+        {
+            ArgumentNullException.ThrowIfNull(validation);
+            if (ReferenceEquals(validation.VerificationSeal, FileManifestVerificationSeal)
+                && validation.VerifiedFiles is { Count: > 0 } files)
+            {
+                verifiedFiles = files;
+                return true;
+            }
+
+            verifiedFiles = new ReadOnlyDictionary<string, VerifiedPackageFile>(
+                new Dictionary<string, VerifiedPackageFile>());
+            return false;
+        }
+
+        internal static bool VerifyExtractedPackageFiles(
+            PackageValidationResult validation,
+            string packageRoot,
+            out string? error)
+        {
+            if (!TryGetVerifiedPackageFiles(validation, out var expectedFiles))
+            {
+                error = "Verified package file evidence is unavailable.";
+                return false;
+            }
+
+            try
+            {
+                var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(packageRoot));
+                if (!Directory.Exists(root))
+                {
+                    error = "Verified package root does not exist.";
+                    return false;
+                }
+
+                foreach (var path in Directory.EnumerateFileSystemEntries(
+                    root,
+                    "*",
+                    SearchOption.AllDirectories))
+                {
+                    if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                    {
+                        error = "Verified package paths cannot contain reparse points.";
+                        return false;
+                    }
+                }
+
+                var actualFiles = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                    .Select(path => new
+                    {
+                        FullPath = path,
+                        RelativePath = Path.GetRelativePath(root, path).Replace('\\', '/'),
+                    })
+                    .Where(file => !string.Equals(
+                        file.RelativePath,
+                        "package-files.json",
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
+                if (actualFiles.Length != expectedFiles.Count)
+                {
+                    error = "Verified package file count changed after extraction.";
+                    return false;
+                }
+
+                foreach (var file in actualFiles)
+                {
+                    if (!expectedFiles.TryGetValue(file.RelativePath, out var expected))
+                    {
+                        error = $"Unexpected extracted package file: {file.RelativePath}.";
+                        return false;
+                    }
+
+                    using var stream = new FileStream(
+                        file.FullPath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read);
+                    if (stream.Length != expected.Size)
+                    {
+                        error = $"Extracted package file size changed: {file.RelativePath}.";
+                        return false;
+                    }
+
+                    var actualHash = SHA256.HashData(stream);
+                    if (!CryptographicOperations.FixedTimeEquals(
+                        actualHash,
+                        Convert.FromHexString(expected.Sha256)))
+                    {
+                        error = $"Extracted package file SHA-256 changed: {file.RelativePath}.";
+                        return false;
+                    }
+                }
+
+                error = null;
+                return true;
+            }
+            catch (Exception exception) when (exception is
+                IOException or UnauthorizedAccessException or FormatException)
+            {
+                error = $"Unable to verify extracted package files: {exception.Message}";
+                return false;
             }
         }
 
@@ -322,10 +434,12 @@ namespace LongBetterWindows.Host.Engine
         private static string? ValidateFileManifest(
             ZipArchive archive,
             out string? pluginId,
-            out string? version)
+            out string? version,
+            out IReadOnlyDictionary<string, VerifiedPackageFile>? verifiedFiles)
         {
             pluginId = null;
             version = null;
+            verifiedFiles = null;
             var ledgerEntries = archive.Entries
                 .Where(entry => string.Equals(
                     entry.FullName.Replace('\\', '/'),
@@ -414,6 +528,15 @@ namespace LongBetterWindows.Host.Engine
                         return $"插件文件总账 SHA-256 不一致：{path}。";
                     }
                 }
+
+                verifiedFiles = new ReadOnlyDictionary<string, VerifiedPackageFile>(
+                    declared.ToDictionary(
+                        pair => pair.Key,
+                        pair => new VerifiedPackageFile(
+                            pair.Key,
+                            pair.Value.Size,
+                            Convert.ToHexString(Convert.FromHexString(pair.Value.Sha256))),
+                        StringComparer.OrdinalIgnoreCase));
 
                 return null;
             }
@@ -527,6 +650,8 @@ namespace LongBetterWindows.Host.Engine
         public ManifestErrorCode? ManifestFailureCode { get; init; }
         public IReadOnlyList<ManifestValidationIssue> ManifestIssues { get; init; }
             = Array.Empty<ManifestValidationIssue>();
+        internal object? VerificationSeal { get; init; }
+        internal IReadOnlyDictionary<string, VerifiedPackageFile>? VerifiedFiles { get; init; }
 
         public static PackageValidationResult Ok(
             PluginManifest manifest, string? sha256, PackageTrustLevel trust,
@@ -539,6 +664,26 @@ namespace LongBetterWindows.Host.Engine
                 TrustLevel = trust,
                 PermissionDiff = permissionDiff,
                 RequiresHighTrustWarning = highTrust,
+            };
+
+        internal static PackageValidationResult OkVerified(
+            PluginManifest manifest,
+            string sha256,
+            PackageTrustLevel trust,
+            PermissionDiff permissionDiff,
+            bool highTrust,
+            IReadOnlyDictionary<string, VerifiedPackageFile>? verifiedFiles,
+            object verificationSeal)
+            => new()
+            {
+                IsSuccess = true,
+                Manifest = manifest,
+                Sha256 = sha256,
+                TrustLevel = trust,
+                PermissionDiff = permissionDiff,
+                RequiresHighTrustWarning = highTrust,
+                VerifiedFiles = verifiedFiles,
+                VerificationSeal = verificationSeal,
             };
 
         public static PackageValidationResult Fail(
@@ -556,4 +701,6 @@ namespace LongBetterWindows.Host.Engine
                 ManifestIssues = manifestIssues ?? Array.Empty<ManifestValidationIssue>(),
             };
     }
+
+    internal sealed record VerifiedPackageFile(string Path, long Size, string Sha256);
 }
