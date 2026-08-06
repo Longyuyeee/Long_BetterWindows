@@ -83,6 +83,120 @@ public sealed class ExperimentalPluginWorkerTests
     }
 
     [Fact]
+    public async Task Worker_QueriesCapabilitiesThroughBoundPluginContext()
+    {
+        const string pluginId = "synthetic.capability.reader";
+        string? observedPluginId = null;
+        var bridge = new PluginWorkerHostBridge(pluginId, capability =>
+        {
+            observedPluginId = PluginAccessContext.CurrentPluginId;
+            return capability == "system.theme";
+        });
+        PluginAccessContext.CurrentPluginId = "outer.context";
+        try
+        {
+            await using var session = await StartRunningWorkerAsync(pluginId, bridge);
+            var granted = await session.InvokeCommandAsync(
+                new PluginWorkerCommandRequest("query-capability", "system.theme"));
+            Assert.Equal("granted", granted.Text);
+            Assert.Equal(pluginId, observedPluginId);
+            Assert.Equal("outer.context", PluginAccessContext.CurrentPluginId);
+
+            var denied = await session.InvokeCommandAsync(
+                new PluginWorkerCommandRequest("query-capability", "system.clipboard"));
+            Assert.Equal("denied", denied.Text);
+            Assert.Equal("outer.context", PluginAccessContext.CurrentPluginId);
+        }
+        finally
+        {
+            PluginAccessContext.CurrentPluginId = null;
+        }
+    }
+
+    [Fact]
+    public async Task HostBridge_RejectsUnknownMethodsAndRestoresContextOnFailure()
+    {
+        var bridge = new PluginWorkerHostBridge(
+            "synthetic.capability.reader",
+            _ => throw new InvalidOperationException("synthetic failure"));
+        var unknown = await bridge.HandleRequestAsync(
+            IpcEnvelope.RequestForProtocol(
+                PluginWorkerProtocol.Name, "host.unknown", new { }),
+            CancellationToken.None);
+        Assert.Equal(IpcErrorCodes.SurfaceNotSupported, unknown.Error?.Code);
+
+        PluginAccessContext.CurrentPluginId = "outer.context";
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                bridge.HandleRequestAsync(
+                    IpcEnvelope.RequestForProtocol(
+                        PluginWorkerProtocol.Name,
+                        PluginWorkerProtocol.HostCapabilityQuery,
+                        new PluginWorkerCapabilityQueryRequest("system.theme")),
+                    CancellationToken.None));
+            Assert.Equal("outer.context", PluginAccessContext.CurrentPluginId);
+        }
+        finally
+        {
+            PluginAccessContext.CurrentPluginId = null;
+            await bridge.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task WorkerHostRequest_UsesItsOwnDeadline()
+    {
+        await using var session = await StartRunningWorkerAsync(
+            "synthetic.capability.reader",
+            new DelayedHostBridge(TimeSpan.FromSeconds(1)));
+        var timeout = await Assert.ThrowsAsync<IpcRemoteException>(() =>
+            session.InvokeCommandAsync(
+                new PluginWorkerCommandRequest(
+                    "query-capability", "system.theme", 100),
+                deadlineMilliseconds: 2_000));
+        Assert.Equal(IpcErrorCodes.Timeout, timeout.Code);
+        Assert.Equal("alive", (await session.InvokeCommandAsync(
+            new PluginWorkerCommandRequest("echo", "alive"))).Text);
+    }
+
+    [Fact]
+    public async Task WorkerCrash_ReleasesTrackedHostResourcesExactlyOnce()
+    {
+        var releases = new List<string>();
+        var bridge = new PluginWorkerHostBridge(
+            "synthetic.headless.native", _ => false);
+        bridge.TrackResource(new RecordingResource("lease", releases));
+        await using var session = await StartRunningWorkerAsync(
+            "synthetic.headless.native", bridge);
+
+        await Assert.ThrowsAsync<PluginWorkerExitedException>(() =>
+            session.InvokeCommandAsync(new PluginWorkerCommandRequest("crash")));
+        await AssertEventuallyAsync(() => releases.Count == 1);
+        Assert.Equal(["lease"], releases);
+        Assert.Equal(0, bridge.LeaseCount);
+    }
+
+    [Fact]
+    public async Task ResourceLeaseScope_ReleasesLifoAndContinuesAfterFailure()
+    {
+        var releases = new List<string>();
+        var leases = new PluginWorkerResourceLeaseScope();
+        var first = leases.Acquire(new RecordingResource("first", releases));
+        leases.Acquire(new RecordingResource("second", releases, fail: true));
+        leases.Acquire(new RecordingResource("third", releases));
+
+        Assert.True(await leases.ReleaseAsync(first));
+        Assert.False(await leases.ReleaseAsync(first));
+        var failure = await Assert.ThrowsAsync<AggregateException>(
+            async () => await leases.DisposeAsync());
+        Assert.Single(failure.InnerExceptions);
+        Assert.Equal(["first", "third", "second"], releases);
+        Assert.Equal(0, leases.Count);
+        await leases.DisposeAsync();
+    }
+
+    [Fact]
     public void Handshake_RequiresSpawnedProcessIdentityPluginAndNonce()
     {
         Assert.False(typeof(ExperimentalPluginWorkerSession).IsPublic);
@@ -167,9 +281,11 @@ public sealed class ExperimentalPluginWorkerTests
         Assert.Equal(PluginRuntimeFailureKind.WorkerCrashed, crashed.LastFailureKind);
     }
 
-    private static async Task<ExperimentalPluginWorkerSession> StartRunningWorkerAsync()
+    private static async Task<ExperimentalPluginWorkerSession> StartRunningWorkerAsync(
+        string pluginId = "synthetic.headless.native",
+        IExperimentalPluginWorkerHostBridge? hostBridge = null)
     {
-        var session = await StartWorkerAsync();
+        var session = await StartWorkerAsync(pluginId, hostBridge);
         try
         {
             await session.InvokeLifecycleAsync(PluginWorkerLifecycleOperation.Initialize);
@@ -183,8 +299,11 @@ public sealed class ExperimentalPluginWorkerTests
         }
     }
 
-    private static Task<ExperimentalPluginWorkerSession> StartWorkerAsync()
-        => ExperimentalPluginWorkerSession.StartAsync(WorkerPath());
+    private static Task<ExperimentalPluginWorkerSession> StartWorkerAsync(
+        string pluginId = "synthetic.headless.native",
+        IExperimentalPluginWorkerHostBridge? hostBridge = null)
+        => ExperimentalPluginWorkerSession.StartAsync(
+            WorkerPath(), pluginId, hostBridge: hostBridge);
 
     private static async Task AssertEventuallyAsync(Func<bool> condition)
     {
@@ -223,5 +342,36 @@ public sealed class ExperimentalPluginWorkerTests
                 return directory.FullName;
         }
         throw new DirectoryNotFoundException("Repository root was not found.");
+    }
+
+    private sealed class RecordingResource(
+        string name,
+        List<string> releases,
+        bool fail = false) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync()
+        {
+            releases.Add(name);
+            return fail
+                ? ValueTask.FromException(new InvalidOperationException(name))
+                : ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class DelayedHostBridge(TimeSpan delay)
+        : IExperimentalPluginWorkerHostBridge
+    {
+        public async Task<IpcEnvelope> HandleRequestAsync(
+            IpcEnvelope request,
+            CancellationToken cancellationToken)
+        {
+            await Task.Delay(delay, cancellationToken);
+            return IpcEnvelope.Response(
+                PluginWorkerProtocol.Name,
+                request.Id,
+                new PluginWorkerCapabilityQueryResponse(true));
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

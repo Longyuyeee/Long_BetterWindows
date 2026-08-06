@@ -58,15 +58,16 @@
         "validated_gates"
       ],
       "properties": {
-        "phase": { "const": "PX6B-2" },
-        "status": { "const": "synthetic_worker_validated" },
+        "phase": { "const": "PX6B-3" },
+        "status": { "const": "read_only_capability_proxy_validated" },
         "worker_project": { "const": "tools/LongBetterWindows.PluginWorker/LongBetterWindows.PluginWorker.csproj" },
         "test_path": { "const": "tests/LongBetterWindows.Tests/ExperimentalPluginWorkerTests.cs" },
         "production_enabled": { "const": false },
         "real_plugins_migrated": { "const": 0 },
         "validated_gates": {
           "type": "array",
-          "minItems": 8,
+          "minItems": 15,
+          "maxItems": 15,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -80,7 +81,11 @@
               "deterministic_cleanup",
               "dedicated_resource_snapshot",
               "health_mapping",
-              "public_api_isolation"
+              "public_api_isolation",
+              "read_only_capability_proxy",
+              "access_context_restoration",
+              "reverse_method_rejection",
+              "crash_resource_lease_cleanup"
             ]
           }
         }
@@ -99,6 +104,8 @@
         "maximum_deadline_ms",
         "authentication",
         "host_api_rule",
+        "host_proxy_methods",
+        "resource_lease_rule",
         "ui_rule",
         "lifecycle_methods"
       ],
@@ -112,6 +119,14 @@
         "maximum_deadline_ms": { "const": 120000 },
         "authentication": { "const": "host_spawned_pipe_with_process_identity_and_ephemeral_nonce" },
         "host_api_rule": { "type": "string", "minLength": 1 },
+        "host_proxy_methods": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": { "const": "host.capability.query" }
+        },
+        "resource_lease_rule": { "const": "session_owned_lifo_release_on_close_or_crash" },
         "ui_rule": { "const": "wpf_and_webview_ui_remain_in_host_process" },
         "lifecycle_methods": {
           "type": "array",

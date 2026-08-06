@@ -9,6 +9,7 @@ internal static class PluginWorkerProtocol
     public const string LifecycleInvoke = "worker.lifecycle.invoke";
     public const string CommandInvoke = "worker.command.invoke";
     public const string CommandCancel = "worker.command.cancel";
+    public const string HostCapabilityQuery = "host.capability.query";
     public const string Shutdown = "worker.shutdown";
 
     public static IReadOnlyList<string> Features { get; } =
@@ -16,6 +17,7 @@ internal static class PluginWorkerProtocol
         LifecycleInvoke,
         CommandInvoke,
         CommandCancel,
+        HostCapabilityQuery,
         Shutdown,
     ];
 }
@@ -64,6 +66,12 @@ internal sealed record PluginWorkerCancelRequest(
 
 internal sealed record PluginWorkerCancelResponse(
     [property: JsonPropertyName("cancelled")] bool Cancelled);
+
+internal sealed record PluginWorkerCapabilityQueryRequest(
+    [property: JsonPropertyName("capability")] string Capability);
+
+internal sealed record PluginWorkerCapabilityQueryResponse(
+    [property: JsonPropertyName("granted")] bool Granted);
 
 internal sealed record PluginWorkerShutdownRequest;
 

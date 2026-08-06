@@ -48,3 +48,12 @@ PX6B-2 只实现 `synthetic_headless_native_command_worker`：
 生产开关仍关闭，真实插件迁移数仍为 0，下一步先完成最小能力代理与资源租约设计。
 最终门禁为 Release 0 警告 / 0 错误、全量自动化 1161 / 1161、目录派生检查通过、
 `LongBetterWindows.PluginIpc` 1.1.0 打包通过，且测试后没有 Worker 进程残留。
+
+## 6. PX6B-3 代理与租约结果
+
+Worker 反向面目前只有只读 `host.capability.query`，身份来自已认证会话而非请求载荷；Host 在权限
+解析前恢复 `PluginAccessContext`。会话拥有独立资源租约作用域，关闭和崩溃都会执行 LIFO 清理，
+且单项失败不阻断其余资源。该阶段仍未开放真实宿主服务、未迁移插件、未修改默认加载路径。
+下一步只做迁移就绪复审与退出条件冻结。
+最终门禁为 Release 0 警告 / 0 错误、全量自动化 1166 / 1166、Worker/隔离专项 14 / 14、
+IPC 1.1.0 打包通过，测试后无 Worker 进程残留。

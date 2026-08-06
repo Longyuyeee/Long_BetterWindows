@@ -38,6 +38,8 @@ internal sealed class SyntheticWorkerServer(Stream stream)
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _commands =
         new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<IpcEnvelope>> _hostRequests =
+        new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _shutdown = new();
     private readonly object _stateLock = new();
     private string _state = "loaded";
@@ -60,7 +62,15 @@ internal sealed class SyntheticWorkerServer(Stream stream)
                     break;
                 }
 
-                if (!Validate(request))
+                if (request.Protocol == PluginWorkerProtocol.Name
+                    && request.Kind == "response"
+                    && _hostRequests.TryRemove(request.Id, out var hostRequest))
+                {
+                    hostRequest.TrySetResult(request);
+                    continue;
+                }
+
+                if (!ValidateRequest(request))
                 {
                     await WriteErrorAsync(
                         request.Id,
@@ -94,6 +104,8 @@ internal sealed class SyntheticWorkerServer(Stream stream)
             _shutdown.Cancel();
             foreach (var command in _commands.Values)
                 command.Cancel();
+            foreach (var request in _hostRequests.Values)
+                request.TrySetCanceled();
             Task[] pending;
             lock (requests) pending = requests.ToArray();
             try { await Task.WhenAll(pending).ConfigureAwait(false); }
@@ -218,6 +230,15 @@ internal sealed class SyntheticWorkerServer(Stream stream)
                 case "crash":
                     Environment.Exit(91);
                     return;
+                case "query-capability":
+                    if (string.IsNullOrWhiteSpace(command.Text))
+                        throw new ArgumentException("Capability name is required.");
+                    var capability = await QueryHostCapabilityAsync(
+                        command.Text,
+                        command.DelayMilliseconds > 0 ? command.DelayMilliseconds : null,
+                        invocation.Token).ConfigureAwait(false);
+                    result = capability.Granted ? "granted" : "denied";
+                    break;
                 default:
                     await WriteErrorAsync(
                         request.Id,
@@ -242,6 +263,13 @@ internal sealed class SyntheticWorkerServer(Stream stream)
                 timedOut
                     ? "Worker command deadline elapsed."
                     : "Worker command was cancelled.").ConfigureAwait(false);
+        }
+        catch (WorkerHostRequestException ex)
+        {
+            await TryWriteErrorAsync(
+                request.Id,
+                IpcErrorCodes.Normalize(ex.Code),
+                "Worker host request failed.").ConfigureAwait(false);
         }
         finally
         {
@@ -332,7 +360,39 @@ internal sealed class SyntheticWorkerServer(Stream stream)
             ?? throw new JsonException("Worker request payload is empty.");
     }
 
-    private static bool Validate(IpcEnvelope request)
+    private async Task<PluginWorkerCapabilityQueryResponse> QueryHostCapabilityAsync(
+        string capability,
+        int? deadlineMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        var request = IpcEnvelope.RequestForProtocol(
+            PluginWorkerProtocol.Name,
+            PluginWorkerProtocol.HostCapabilityQuery,
+            new PluginWorkerCapabilityQueryRequest(capability),
+            deadlineMilliseconds);
+        var completion = new TaskCompletionSource<IpcEnvelope>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_hostRequests.TryAdd(request.Id, completion))
+            throw new InvalidOperationException("A duplicate host request id was generated.");
+        try
+        {
+            await WriteAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await completion.Task.WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (response.Error is not null)
+                throw new WorkerHostRequestException(response.Error.Code);
+            if (response.Result is not JsonElement result)
+                throw new InvalidDataException("Host capability response is missing.");
+            return result.Deserialize<PluginWorkerCapabilityQueryResponse>(IpcJson.Options)
+                ?? throw new InvalidDataException("Host capability response is empty.");
+        }
+        finally
+        {
+            _hostRequests.TryRemove(request.Id, out _);
+        }
+    }
+
+    private static bool ValidateRequest(IpcEnvelope request)
         => request.Protocol == PluginWorkerProtocol.Name
             && request.Kind == "request"
             && !string.IsNullOrWhiteSpace(request.Id)
@@ -343,6 +403,11 @@ internal sealed class SyntheticWorkerServer(Stream stream)
         if (delayMilliseconds is < 0 or > 60_000)
             throw new ArgumentOutOfRangeException(nameof(delayMilliseconds));
     }
+}
+
+internal sealed class WorkerHostRequestException(string code) : Exception
+{
+    internal string Code { get; } = code;
 }
 
 internal sealed record WorkerOptions(

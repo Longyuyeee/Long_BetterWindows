@@ -54,12 +54,22 @@ public sealed class PluginIsolationCompatibilityTests
         var experiment = definitions.GetProperty("experiment");
         var experimentProperties = experiment.GetProperty("properties");
         Assert.False(experiment.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal("PX6B-2",
+        Assert.Equal("PX6B-3",
             experimentProperties.GetProperty("phase").GetProperty("const").GetString());
+        Assert.Equal("read_only_capability_proxy_validated",
+            experimentProperties.GetProperty("status").GetProperty("const").GetString());
         Assert.False(experimentProperties.GetProperty("production_enabled")
             .GetProperty("const").GetBoolean());
         Assert.Equal(0, experimentProperties.GetProperty("real_plugins_migrated")
             .GetProperty("const").GetInt32());
+        var workerContract = definitions.GetProperty("workerContract");
+        Assert.False(workerContract.GetProperty("additionalProperties").GetBoolean());
+        Assert.Equal("host.capability.query",
+            workerContract.GetProperty("properties")
+                .GetProperty("host_proxy_methods")
+                .GetProperty("items")
+                .GetProperty("const")
+                .GetString());
     }
 
     [Fact]
@@ -110,11 +120,11 @@ public sealed class PluginIsolationCompatibilityTests
             "synthetic_headless_native_command_worker",
             root.GetProperty("policy").GetProperty("first_experiment").GetString());
         var experiment = root.GetProperty("experiment");
-        Assert.Equal("PX6B-2", experiment.GetProperty("phase").GetString());
-        Assert.Equal("synthetic_worker_validated", experiment.GetProperty("status").GetString());
+        Assert.Equal("PX6B-3", experiment.GetProperty("phase").GetString());
+        Assert.Equal("read_only_capability_proxy_validated", experiment.GetProperty("status").GetString());
         Assert.False(experiment.GetProperty("production_enabled").GetBoolean());
         Assert.Equal(0, experiment.GetProperty("real_plugins_migrated").GetInt32());
-        Assert.Equal(11, experiment.GetProperty("validated_gates")
+        Assert.Equal(15, experiment.GetProperty("validated_gates")
             .EnumerateArray().Select(item => item.GetString()).Distinct().Count());
     }
 
@@ -140,6 +150,12 @@ public sealed class PluginIsolationCompatibilityTests
         Assert.Equal(
             "wpf_and_webview_ui_remain_in_host_process",
             contract.GetProperty("ui_rule").GetString());
+        Assert.Equal(
+            [PluginWorkerProtocol.HostCapabilityQuery],
+            ReadStrings(contract.GetProperty("host_proxy_methods")));
+        Assert.Equal(
+            "session_owned_lifo_release_on_close_or_crash",
+            contract.GetProperty("resource_lease_rule").GetString());
     }
 
     private static Dictionary<string, int> ReadAuthoritativeInventory()

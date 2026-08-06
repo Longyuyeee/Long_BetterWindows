@@ -15,21 +15,26 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
 {
     private readonly Process _process;
     private readonly NamedPipeServerStream _pipe;
+    private readonly IExperimentalPluginWorkerHostBridge? _hostBridge;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<IpcEnvelope>> _pending =
         new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _shutdown = new();
     private Task? _responseLoop;
+    private Exception? _hostBridgeDisposeError;
+    private int _hostBridgeDisposed;
     private bool _disposed;
 
     private ExperimentalPluginWorkerSession(
         string pluginId,
         Process process,
-        NamedPipeServerStream pipe)
+        NamedPipeServerStream pipe,
+        IExperimentalPluginWorkerHostBridge? hostBridge)
     {
         PluginId = pluginId;
         _process = process;
         _pipe = pipe;
+        _hostBridge = hostBridge;
     }
 
     public string PluginId { get; }
@@ -40,6 +45,7 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         string workerPath,
         string pluginId = "synthetic.headless.native",
         int connectTimeoutMilliseconds = 5_000,
+        IExperimentalPluginWorkerHostBridge? hostBridge = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workerPath);
@@ -62,7 +68,8 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         {
             process = Process.Start(CreateStartInfo(workerPath, pipeName, nonce, pluginId))
                 ?? throw new InvalidOperationException("Plugin worker process could not be started.");
-            var session = new ExperimentalPluginWorkerSession(pluginId, process, pipe);
+            var session = new ExperimentalPluginWorkerSession(
+                pluginId, process, pipe, hostBridge);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(connectTimeoutMilliseconds);
             await pipe.WaitForConnectionAsync(timeout.Token).ConfigureAwait(false);
@@ -107,6 +114,8 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
                 TryTerminate(process);
                 process.Dispose();
             }
+            if (hostBridge is not null)
+                await hostBridge.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
@@ -214,6 +223,10 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         _process.Dispose();
         _writeGate.Dispose();
         _shutdown.Dispose();
+        if (_hostBridgeDisposeError is not null)
+            throw new InvalidOperationException(
+                "Plugin worker host resources could not be released.",
+                _hostBridgeDisposeError);
     }
 
     private async Task<TResponse> RequestAsync<TRequest, TResponse>(
@@ -279,10 +292,18 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
                 var response = await LengthPrefixedJsonFraming.ReadAsync(
                     _pipe, cancellationToken).ConfigureAwait(false);
                 if (!string.Equals(
-                        response.Protocol,
-                        PluginWorkerProtocol.Name,
-                        StringComparison.Ordinal)
-                    || response.Kind != "response"
+                    response.Protocol,
+                    PluginWorkerProtocol.Name,
+                    StringComparison.Ordinal))
+                    throw new InvalidDataException(
+                        "Plugin worker returned an invalid protocol namespace.");
+                if (response.Kind == "request")
+                {
+                    await HandleWorkerRequestAsync(response, cancellationToken)
+                        .ConfigureAwait(false);
+                    continue;
+                }
+                if (response.Kind != "response"
                     || !_pending.TryRemove(response.Id, out var completion))
                 {
                     throw new InvalidDataException(
@@ -302,6 +323,89 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         catch (Exception ex)
         {
             FailPending(ex);
+        }
+        finally
+        {
+            await DisposeHostBridgeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task HandleWorkerRequestAsync(
+        IpcEnvelope request,
+        CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(IpcProtocol.NormalizeDeadline(request.DeadlineMilliseconds));
+        IpcEnvelope response;
+        if (_hostBridge is null)
+        {
+            response = IpcEnvelope.Failure(
+                PluginWorkerProtocol.Name,
+                request.Id,
+                new IpcError(
+                    IpcErrorCodes.HostUnavailable,
+                    "Worker host bridge is unavailable."));
+        }
+        else
+        {
+            try
+            {
+                response = await _hostBridge.HandleRequestAsync(request, deadline.Token)
+                    .ConfigureAwait(false);
+                if (response.Protocol != PluginWorkerProtocol.Name
+                    || response.Kind != "response"
+                    || response.Id != request.Id)
+                    throw new InvalidDataException(
+                        "Worker host bridge returned an invalid response envelope.");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                response = IpcEnvelope.Failure(
+                    PluginWorkerProtocol.Name,
+                    request.Id,
+                    new IpcError(
+                        IpcErrorCodes.Timeout,
+                        "Worker host request deadline elapsed."));
+            }
+            catch (Exception)
+            {
+                response = IpcEnvelope.Failure(
+                    PluginWorkerProtocol.Name,
+                    request.Id,
+                    new IpcError(
+                        IpcErrorCodes.InternalError,
+                        "Worker host request failed."));
+            }
+        }
+
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await LengthPrefixedJsonFraming.WriteAsync(
+                _pipe, response, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    private async ValueTask DisposeHostBridgeAsync()
+    {
+        if (_hostBridge is null
+            || Interlocked.Exchange(ref _hostBridgeDisposed, 1) != 0)
+            return;
+        try
+        {
+            await _hostBridge.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _hostBridgeDisposeError = ex;
         }
     }
 

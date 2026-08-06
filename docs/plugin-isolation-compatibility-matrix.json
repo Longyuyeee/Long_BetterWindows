@@ -10,8 +10,8 @@
     "first_experiment": "synthetic_headless_native_command_worker"
   },
   "experiment": {
-    "phase": "PX6B-2",
-    "status": "synthetic_worker_validated",
+    "phase": "PX6B-3",
+    "status": "read_only_capability_proxy_validated",
     "worker_project": "tools/LongBetterWindows.PluginWorker/LongBetterWindows.PluginWorker.csproj",
     "test_path": "tests/LongBetterWindows.Tests/ExperimentalPluginWorkerTests.cs",
     "production_enabled": false,
@@ -27,7 +27,11 @@
       "deterministic_cleanup",
       "dedicated_resource_snapshot",
       "health_mapping",
-      "public_api_isolation"
+      "public_api_isolation",
+      "read_only_capability_proxy",
+      "access_context_restoration",
+      "reverse_method_rejection",
+      "crash_resource_lease_cleanup"
     ]
   },
   "shared_worker_contract": {
@@ -40,6 +44,10 @@
     "maximum_deadline_ms": 120000,
     "authentication": "host_spawned_pipe_with_process_identity_and_ephemeral_nonce",
     "host_api_rule": "Worker capability calls must use explicit serializable proxy contracts and must re-enter PluginAccessContext in the host before permission checks and side effects.",
+    "host_proxy_methods": [
+      "host.capability.query"
+    ],
+    "resource_lease_rule": "session_owned_lifo_release_on_close_or_crash",
     "ui_rule": "wpf_and_webview_ui_remain_in_host_process",
     "lifecycle_methods": [
       "initialize",
