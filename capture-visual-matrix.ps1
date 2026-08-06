@@ -9,9 +9,11 @@ param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [ValidateSet('light','dark')] [string[]] $Themes = @('light','dark'),
     [ValidateSet(96,120,144,192)] [int[]] $RenderDpis = @(96,120,144,192),
-    [ValidateSet('main','market','palette','super-panel')] [string[]] $Views = @('main','market','palette'),
+    [ValidateSet('main','market','palette','super-panel','diagnostics')] [string[]] $Views = @('main','market','palette'),
     [ValidateSet('normal','high-contrast','reduced-motion','combined')]
     [string[]] $AccessibilityModes = @('normal'),
+    [ValidateRange(640,3840)] [int] $CaptureWidth = 1120,
+    [ValidateRange(480,2160)] [int] $CaptureHeight = 760,
     [ValidateRange(100,10000)] [int] $CaptureDelayMilliseconds = 700,
     [switch] $NoBuild
 )
@@ -58,6 +60,8 @@ foreach ($accessibilityMode in $AccessibilityModes) {
                 '--quality-capture', $capturePath,
                 '--quality-capture-view', $view,
                 '--quality-render-dpi', $dpi.ToString(),
+                '--quality-width', $CaptureWidth.ToString(),
+                '--quality-height', $CaptureHeight.ToString(),
                 '--quality-capture-delay-ms', $CaptureDelayMilliseconds.ToString()
             )
             if ($view -eq 'market') { $arguments += '--quality-open-market' }

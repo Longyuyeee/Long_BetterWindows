@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:engine="clr-namespace:LongBetterWindows.Host.Engine"
              mc:Ignorable="d"
              d:DesignHeight="620" d:DesignWidth="900"
              AutomationProperties.Name="{DynamicResource i18n.diagnostics.name}"
@@ -40,6 +41,107 @@
 
         <Border Style="{StaticResource LongCard}" Margin="0,0,0,16">
             <StackPanel>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource i18n.diagnostics.health.title}"
+                                   FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Text="{DynamicResource i18n.diagnostics.health.detail}"
+                                   Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    </StackPanel>
+                    <Button x:Name="RefreshHealthButton" Grid.Column="1"
+                            Width="40" Height="40" Margin="12,0,0,0"
+                            Style="{StaticResource LongIconButton}"
+                            Click="RefreshHealthButton_Click"
+                            ToolTip="{DynamicResource i18n.diagnostics.health.refresh}"
+                            AutomationProperties.AutomationId="Long.Diagnostics.PluginHealth.Refresh"
+                            AutomationProperties.Name="{DynamicResource i18n.diagnostics.health.refreshA11y}">
+                        <Path Data="{StaticResource Long.Icon.Refresh}"
+                              Style="{StaticResource LongIcon}" Width="17" Height="17" />
+                    </Button>
+                </Grid>
+
+                <ListBox x:Name="PluginHealthItems"
+                         MaxHeight="280"
+                         Background="Transparent" BorderThickness="0" Padding="0"
+                         HorizontalContentAlignment="Stretch"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         AutomationProperties.Name="{DynamicResource i18n.diagnostics.health.listA11y}">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                                    BorderThickness="0,0,0,1" Padding="0,11"
+                                    AutomationProperties.Name="{Binding AccessibilityName}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="180" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <TextBlock Text="{Binding DisplayName}" FontSize="13"
+                                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding PluginId}" Margin="0,3,0,0" FontSize="10"
+                                                   FontFamily="{DynamicResource Long.Font.Mono}"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Identity}" Margin="0,3,0,0" FontSize="10"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <TextBlock Text="{Binding HealthState}" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Text.Muted}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HealthStateValue}"
+                                                                     Value="{x:Static engine:PluginRuntimeHealthState.Healthy}">
+                                                            <Setter Property="Foreground" Value="{DynamicResource Long.Brush.State.Success}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding HealthStateValue}"
+                                                                     Value="{x:Static engine:PluginRuntimeHealthState.Degraded}">
+                                                            <Setter Property="Foreground" Value="{DynamicResource Long.Brush.State.Warning}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding HealthStateValue}"
+                                                                     Value="{x:Static engine:PluginRuntimeHealthState.Unhealthy}">
+                                                            <Setter Property="Foreground" Value="{DynamicResource Long.Brush.State.Danger}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding RegistryState}" Margin="0,4,0,0" FontSize="10"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding Summary}"
+                                               VerticalAlignment="Center" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock x:Name="NoHealthDataText"
+                           Text="{DynamicResource i18n.diagnostics.health.empty}"
+                           Style="{StaticResource LongEmptyState}" Margin="0,18,0,6" />
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource LongCard}" Margin="0,0,0,16">
+            <StackPanel>
                 <Grid Margin="0,0,0,14">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource i18n.diagnostics.history.title}" FontSize="15" FontWeight="SemiBold" />
@@ -58,7 +160,7 @@
             </StackPanel>
         </Border>
 
-        <Border Style="{StaticResource LongCard}">
+        <Border Style="{StaticResource LongCard}" Margin="0,0,0,16">
             <StackPanel>
                 <Grid Margin="0,0,0,10">
                     <StackPanel>
@@ -112,5 +214,6 @@
                            Style="{StaticResource LongEmptyState}" Margin="0,18,0,6" />
             </StackPanel>
         </Border>
+
     </StackPanel>
 </UserControl>

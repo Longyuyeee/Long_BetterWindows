@@ -9,6 +9,37 @@ namespace LongBetterWindows.Tests;
 public class QualityGateTests
 {
     [Fact]
+    public void PluginHealthDiagnostics_AreKeyboardAccessibleAndNotTimerPolled()
+    {
+        var xaml = Read("src", "LongBetterWindows.Host", "Views", "PerformancePanel.xaml");
+        var code = Read("src", "LongBetterWindows.Host", "Views", "PerformancePanel.xaml.cs");
+        var presentation = Read(
+            "src", "LongBetterWindows.Host", "Interaction",
+            "PluginRuntimeDiagnosticPresentation.cs");
+        var performanceRefresh = Read(
+            "src", "LongBetterWindows.Host", "Interaction",
+            "PerformanceRefreshCoordinator.cs");
+
+        Assert.Contains("Long.Diagnostics.PluginHealth.Refresh", xaml);
+        Assert.Contains("LongIconButton", xaml);
+        Assert.Contains("<ListBox", xaml);
+        Assert.Contains("MaxHeight=\"280\"", xaml);
+        Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", xaml);
+        Assert.Contains("AutomationProperties.Name=\"{Binding AccessibilityName}\"", xaml);
+        Assert.Contains("Value=\"{DynamicResource Long.Brush.State.Danger}\"", xaml);
+        Assert.DoesNotContain("StatusBrush", code);
+        Assert.Contains("RefreshHealthButton_Click", code);
+        Assert.Contains("PluginRuntimeDiagnostics.Build", code);
+        Assert.Contains("PluginRuntimeHealthState.Unhealthy => 0", presentation);
+        Assert.Contains("PluginRuntimeHealthState.Degraded => 1", presentation);
+        Assert.DoesNotContain("PluginRuntimeDiagnostics", performanceRefresh);
+        var captureScript = Read("capture-visual-matrix.ps1");
+        Assert.Contains("'super-panel','diagnostics'", captureScript);
+        Assert.Contains("[int] $CaptureWidth = 1120", captureScript);
+        Assert.Contains("'--quality-width', $CaptureWidth.ToString()", captureScript);
+    }
+
+    [Fact]
     public void Marketplace_ExposesTrustCompatibilityPermissionsAndRollbackActions()
     {
         var xaml = Read("src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml");

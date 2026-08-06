@@ -71,6 +71,7 @@ namespace LongBetterWindows.Host.Views
                 _languageSubscribed = true;
             }
             ApplyResponsiveLayout(ActualWidth);
+            RefreshHealthDiagnostics();
             _coordinator.Start();
         }
 
@@ -91,6 +92,7 @@ namespace LongBetterWindows.Host.Views
             }
             if (_lastSnapshot is not null)
                 RenderSnapshot(_lastSnapshot);
+            RefreshHealthDiagnostics();
         }
 
         private void DrawCpuChart()
@@ -145,6 +147,30 @@ namespace LongBetterWindows.Host.Views
 
         private void RefreshButton_Click(object sender, RoutedEventArgs e) => _coordinator.Refresh();
 
+        private void RefreshHealthButton_Click(object sender, RoutedEventArgs e)
+            => RefreshHealthDiagnostics();
+
+        private void RefreshHealthDiagnostics()
+        {
+            var diagnostics = PluginRuntimeDiagnostics.Build(
+                HostProvider.Instance.PluginStore);
+            var rows = PluginRuntimeDiagnosticPresentation.Build(diagnostics, I18n)
+                .Select(row => new PluginHealthRow(
+                    row.PluginId,
+                    row.DisplayName,
+                    row.Identity,
+                    row.RegistryState,
+                    row.HealthState,
+                    row.Summary,
+                    row.AccessibilityName,
+                    row.HealthStateValue))
+                .ToArray();
+            PluginHealthItems.ItemsSource = rows;
+            NoHealthDataText.Visibility = rows.Length == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
         private void PerformancePanel_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             ApplyResponsiveLayout(e.NewSize.Width);
@@ -172,5 +198,15 @@ namespace LongBetterWindows.Host.Views
             string PluginName,
             int CallCount,
             string AverageDuration);
+
+        private sealed record PluginHealthRow(
+            string PluginId,
+            string DisplayName,
+            string Identity,
+            string RegistryState,
+            string HealthState,
+            string Summary,
+            string AccessibilityName,
+            PluginRuntimeHealthState HealthStateValue);
     }
 }

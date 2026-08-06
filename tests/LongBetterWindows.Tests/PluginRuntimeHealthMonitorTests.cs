@@ -198,6 +198,44 @@ public sealed class PluginRuntimeHealthMonitorTests
             unloaded.Health.LifecycleState);
     }
 
+    [Fact]
+    public void DiagnosticPresentation_PrioritizesFailuresAndBuildsAccessibleSummary()
+    {
+        var registry = new PluginRegistry();
+        registry.Register(Manifest(), new HealthCommandPlugin(), null, AppContext.BaseDirectory);
+        registry.Register(new PluginManifest
+        {
+            Id = "alpha.plugin",
+            Name = "Alpha",
+            Version = "2.0.0",
+            Runtime = "webview",
+            EntryPoint = "index.html",
+        }, new object(), null, AppContext.BaseDirectory);
+        registry.RuntimeHealth.RecordFailure(
+            "health.sample",
+            TimeSpan.FromMilliseconds(12));
+
+        var rows = PluginRuntimeDiagnosticPresentation.Build(
+            PluginRuntimeDiagnostics.Build(registry),
+            key => key switch
+            {
+                "diagnostics.health.state.degraded" => "attention",
+                "diagnostics.health.state.idle" => "idle",
+                "diagnostics.health.registry.loaded" => "loaded",
+                "diagnostics.health.summary" => "{0}/{1}/{2}",
+                "diagnostics.health.itemA11y" => "{0}|{1}|{2}|{3}",
+                _ => key,
+            });
+
+        Assert.Equal(["health.sample", "alpha.plugin"], rows.Select(row => row.PluginId));
+        Assert.Equal("attention", rows[0].HealthState);
+        Assert.Equal("1/1/0", rows[0].Summary);
+        Assert.Equal(
+            "Health sample|attention|loaded|1/1/0",
+            rows[0].AccessibilityName);
+        Assert.Equal("webview · v2.0.0", rows[1].Identity);
+    }
+
     private static PluginManifest Manifest() => new()
     {
         Id = "health.sample",
