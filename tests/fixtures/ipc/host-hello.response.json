@@ -4,7 +4,7 @@
   "kind": "response",
   "result": {
     "host_name": "Long助手",
-    "host_version": "1.11.0-rc.3",
+    "host_version": "1.11.0-rc.4",
     "protocol": "long.plugin.ipc/1.0",
     "features": ["health.ping", "plugin.catalog.list", "plugin.catalog.get", "command.invoke", "command.cancel", "plugin.open"],
     "maximum_frame_bytes": 1048576,
