@@ -25,6 +25,7 @@ namespace LongBetterWindows.Host.Views
         private nint _originWindowHandle;
         private CancellationTokenSource? _contextCts;
         private CancellationTokenSource? _searchCts;
+        private string? _preferredSelectionId;
         private readonly QualityWindowAutomation? _qualityAutomation;
 
         private CommandPaletteWindow()
@@ -54,7 +55,7 @@ namespace LongBetterWindows.Host.Views
         }
 
         public static void ShowPalette()
-            => ShowPalette(null);
+            => ShowPalette(initialQuery: null);
 
         public static void ShowPalette(string? initialQuery)
         {
@@ -72,6 +73,7 @@ namespace LongBetterWindows.Host.Views
             _instance ??= new CommandPaletteWindow();
             ServicesInitializer.LauncherContinuity.Discard();
             _instance._originWindowHandle = captureRequest.ForegroundWindowHandle;
+            _instance._preferredSelectionId = null;
             _instance.SearchBox.Text = initialQuery ?? string.Empty;
             _instance.SearchBox.CaretIndex = _instance.SearchBox.Text.Length;
             _instance.BeginSearch();
@@ -88,6 +90,35 @@ namespace LongBetterWindows.Host.Views
                 Stopwatch.GetElapsedTime(started).TotalMilliseconds);
         }
 
+        internal static void ShowPalette(PanelExpansionIntent intent)
+        {
+            ArgumentNullException.ThrowIfNull(intent);
+            var dispatcher = Application.Current.Dispatcher;
+            if (!dispatcher.CheckAccess())
+            {
+                dispatcher.Invoke(() => ShowPalette(intent));
+                return;
+            }
+
+            var state = intent.Consume();
+            _instance ??= new CommandPaletteWindow();
+            ServicesInitializer.LauncherContinuity.Discard();
+            _instance._contextCts?.Cancel();
+            _instance._originWindowHandle = state.OriginWindowHandle;
+            _instance._contextSnapshot = state.Context;
+            _instance._preferredSelectionId = state.SelectedResultId;
+            _instance.SearchBox.Text = state.Query;
+            _instance.SearchBox.CaretIndex = state.Query.Length;
+            _instance.RenderContextBadges();
+            _instance.StatusText.Text = string.Empty;
+
+            if (!_instance.IsVisible)
+                _instance.Show();
+            _instance.Activate();
+            _instance.SearchBox.Focus();
+            _instance.AnimateIn();
+        }
+
         internal static void RestoreFromWorkspace(LauncherReturnState state)
         {
             var dispatcher = Application.Current.Dispatcher;
@@ -100,6 +131,7 @@ namespace LongBetterWindows.Host.Views
             _instance ??= new CommandPaletteWindow();
             _instance._originWindowHandle = state.OriginWindowHandle;
             _instance._contextSnapshot = state.Context;
+            _instance._preferredSelectionId = null;
             _instance.SearchBox.Text = state.Query;
             _instance.SearchBox.CaretIndex = state.Query.Length;
             _instance.RenderContextBadges();
@@ -249,7 +281,8 @@ namespace LongBetterWindows.Host.Views
         {
             if (!IsInitialized) return;
 
-            var selectedId = (ResultsList.SelectedItem as LauncherResultViewItem)?.Id;
+            var selectedId = _preferredSelectionId
+                ?? (ResultsList.SelectedItem as LauncherResultViewItem)?.Id;
             var projected = LauncherResultProjection.Build(
                 results,
                 SearchBox.Text,
@@ -269,6 +302,11 @@ namespace LongBetterWindows.Host.Views
             ResultsList.SelectedIndex = selectedIndex >= 0
                 ? selectedIndex
                 : projected.Count > 0 ? 0 : -1;
+            if (_preferredSelectionId is not null
+                && (selectedIndex >= 0 || completed))
+            {
+                _preferredSelectionId = null;
+            }
             EmptyState.Visibility = completed && projected.Count == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;

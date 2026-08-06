@@ -96,7 +96,9 @@
                     </GroupStyle>
                 </ListBox.GroupStyle>
                 <ListBox.ItemContainerStyle>
-                    <StaticResource ResourceKey="LongCommandItem" />
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
+                        <Setter Property="AutomationProperties.AutomationId" Value="{Binding Id}" />
+                    </Style>
                 </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
@@ -243,11 +245,13 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource LongBadge}" Margin="2,0">
+                            <Border Style="{StaticResource LongBadge}" Margin="2,0"
+                                    AutomationProperties.Name="{Binding Label}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="{Binding Label}" MaxWidth="150"
                                                TextTrimming="CharacterEllipsis"
                                                FontSize="10" VerticalAlignment="Center"
+                                               AutomationProperties.AutomationId="{Binding Id}"
                                                Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                                     <Button Content="×" Tag="{Binding Id}" Click="ContextRemove_Click"
                                             Width="16" Height="16" Margin="5,0,-3,0" Padding="0"

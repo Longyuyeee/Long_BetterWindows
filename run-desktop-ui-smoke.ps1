@@ -720,13 +720,26 @@ try {
     $superPanelProcess = $null
 
     Write-Stage 'Starting Super Panel to Command Palette transition host.'
-    $superPanelTransitionProcess = Start-QualityHost '--quality-open-super-panel'
+    $superPanelTransitionProcess = Start-QualityHost @(
+        '--quality-open-super-panel',
+        '--language', 'en-US')
     $transitionPanel = Wait-Until {
         Find-WindowByAutomationId $superPanelTransitionProcess.Id 'Long.SuperPanel'
     } 'Super Panel did not appear for the command-center transition.'
     $groups = Wait-Until {
         Find-DescendantByAutomationId $transitionPanel 'Long.SuperPanel.Groups'
     } 'Super Panel groups were not discoverable.'
+    $transitionPanelResults = Wait-Until {
+        Find-DescendantByAutomationId $transitionPanel 'Long.SuperPanel.Results'
+    } 'Super Panel results were not discoverable for the command-center transition.'
+    $transitionPanelSelection = Wait-Until {
+        $pattern = [Windows.Automation.SelectionPattern]`
+            $transitionPanelResults.GetCurrentPattern(
+                [Windows.Automation.SelectionPattern]::Pattern)
+        $selection = $pattern.Current.GetSelection()
+        if ($selection.Count -gt 0) { $selection[0] }
+    } 'Super Panel did not expose a selected result before expansion.'
+    $transitionSelectedId = [string]$transitionPanelSelection.Current.AutomationId
     $openCommandCenter = Wait-Until {
         Find-DescendantByAutomationId `
             $transitionPanel 'Long.SuperPanel.OpenCommandCenter'
@@ -747,6 +760,21 @@ try {
         Find-WindowByAutomationId `
             $superPanelTransitionProcess.Id 'Long.CommandPalette'
     } 'Opening Command Center did not show the Command Palette.'
+    $transitionPaletteResults = Wait-Until {
+        Find-DescendantByAutomationId $transitionPalette 'Long.CommandPalette.Results'
+    } 'The transitioned Command Palette results were not discoverable.'
+    $preservedContext = Wait-Until {
+        Find-DescendantByAutomationId $transitionPalette 'quality.url'
+    } 'The transitioned Command Palette did not preserve the Super Panel context.'
+    $preservedSelection = Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $transitionPaletteResults $transitionSelectedId
+        if ($null -eq $candidate) { return $null }
+        $pattern = [Windows.Automation.SelectionItemPattern]`
+            $candidate.GetCurrentPattern(
+                [Windows.Automation.SelectionItemPattern]::Pattern)
+        if ($pattern.Current.IsSelected) { $candidate }
+    } 'The transitioned Command Palette did not preserve the selected result.'
     [LongDesktopInput]::WindowAction(
         [IntPtr]$transitionPalette.Current.NativeWindowHandle, 3) | Out-Null
     Wait-Until {
@@ -757,6 +785,9 @@ try {
     $report.super_panel['open_command_center_invoked'] = $true
     $report.super_panel['panel_hidden_on_transition'] = $true
     $report.super_panel['palette_shown_on_transition'] = $true
+    $report.super_panel['context_preserved_on_transition'] = $null -ne $preservedContext
+    $report.super_panel['selection_preserved_on_transition'] = $null -ne $preservedSelection
+    $report.super_panel['preserved_selection_id'] = $transitionSelectedId
     Stop-QualityHost $superPanelTransitionProcess
     $superPanelTransitionProcess = $null
 

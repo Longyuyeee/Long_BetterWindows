@@ -911,6 +911,8 @@ public class QualityGateTests
         var projection = Read(
             "src", "LongBetterWindows.Host", "Interaction", "SuperPanelViewProjection.cs");
         var palette = Read("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml.cs");
+        var expansion = Read(
+            "src", "LongBetterWindows.Host", "Interaction", "PanelExpansionIntent.cs");
 
         Assert.Contains("i18n.superPanel.title", xaml);
         Assert.Contains("new SuperPanelSearchSession", source);
@@ -948,6 +950,15 @@ public class QualityGateTests
         Assert.Contains("AddHook(WindowMessageHook)", lifecycle);
         Assert.Contains("CalculatePosition", lifecycle);
         Assert.Contains("Shell32.SetForegroundWindow", lifecycle);
+        Assert.Contains("_windowLifecycle.ForegroundWindowHandle", source);
+        Assert.Contains("new PanelExpansionIntent", source);
+        Assert.Contains("CommandPaletteWindow.ShowPalette(intent)", source);
+        Assert.Contains("internal static void ShowPalette(PanelExpansionIntent intent)", palette);
+        Assert.Contains("_preferredSelectionId", palette);
+        Assert.Contains("ClearSensitiveState", expansion);
+        Assert.Contains("context_preserved_on_transition", Read("run-desktop-ui-smoke.ps1"));
+        Assert.Contains("selection_preserved_on_transition", Read("run-desktop-ui-smoke.ps1"));
+        Assert.DoesNotContain("CommandPaletteWindow.ShowPalette();", source);
         Assert.DoesNotContain("HwndSource? _windowSource", source);
         Assert.Contains("_cycleGroup(delta)", lifecycle);
         Assert.Contains("_dragSession.TryBegin", source);

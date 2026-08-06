@@ -30,6 +30,8 @@ namespace LongBetterWindows.Host.Views
         internal void CaptureForegroundWindow(IntPtr foregroundWindow) =>
             _foregroundWindow = foregroundWindow;
 
+        internal IntPtr ForegroundWindowHandle => _foregroundWindow;
+
         internal void Present(bool animate)
         {
             if (!_window.IsVisible)

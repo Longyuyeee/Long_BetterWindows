@@ -458,8 +458,14 @@ namespace LongBetterWindows.Host.Views
 
         private void OpenCommandCenter_Click(object sender, RoutedEventArgs e)
         {
+            var intent = new PanelExpansionIntent(
+                _windowLifecycle.ForegroundWindowHandle,
+                query: string.Empty,
+                _searchSession.CurrentContext,
+                (ResultsList.SelectedItem as SearchResultItem)?.Id,
+                DateTimeOffset.UtcNow);
             Hide();
-            CommandPaletteWindow.ShowPalette();
+            CommandPaletteWindow.ShowPalette(intent);
         }
 
         private void Close_Click(object sender, RoutedEventArgs e) =>
