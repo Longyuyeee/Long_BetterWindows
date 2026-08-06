@@ -2013,6 +2013,26 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void WorkspacePluginRail_IsLimitedToManagementContext()
+    {
+        var shell = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "WorkspaceShellControl.xaml.cs");
+
+        Assert.Contains("SetPluginRuntimePresentation(isVisible: true)", shell);
+        Assert.Contains("SetPluginRuntimePresentation(isVisible: false)", shell);
+        Assert.Contains("WorkspaceChromePolicy.ShowsInstalledPluginRail", shell);
+
+        var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
+        Assert.Contains("market_plugin_rail_visible", desktopSmoke);
+        Assert.Contains("settings_plugin_rail_hidden", desktopSmoke);
+        Assert.Contains("plugin_rail_hidden_in_runtime", desktopSmoke);
+        Assert.Contains("plugin_rail_hidden_after_restore", desktopSmoke);
+    }
+
+    [Fact]
     public void PluginSettingsModule_EmbedsSettingsAndKeepsLifecycleInHost()
     {
         var xaml = Read(

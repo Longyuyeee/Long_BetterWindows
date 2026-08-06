@@ -131,6 +131,31 @@ public sealed class WorkspaceShellProjectionTests
             new WorkspaceModuleKey("workflow", "sample")));
     }
 
+    [Theory]
+    [InlineData("marketplace", "catalog")]
+    [InlineData("plugin-settings", "com.long.base64")]
+    [InlineData("management-page", "plugins")]
+    public void WorkspaceChromePolicy_ShowsPluginRailOnlyForPluginManagement(
+        string kind,
+        string resourceId)
+    {
+        Assert.True(WorkspaceChromePolicy.ShowsInstalledPluginRail(
+            new WorkspaceModuleKey(kind, resourceId)));
+    }
+
+    [Theory]
+    [InlineData("management", "root")]
+    [InlineData("settings", "root")]
+    [InlineData("management-page", "workflows")]
+    [InlineData("plugin-runtime", "com.long.base64")]
+    public void WorkspaceChromePolicy_HidesPluginRailOutsidePluginManagement(
+        string kind,
+        string resourceId)
+    {
+        Assert.False(WorkspaceChromePolicy.ShowsInstalledPluginRail(
+            new WorkspaceModuleKey(kind, resourceId)));
+    }
+
     private static WorkspaceModuleDescriptor Management(
         WorkspaceManagementPage page)
         => WorkspaceManagementModuleCatalog.Create(page);

@@ -100,8 +100,7 @@ namespace LongBetterWindows.Host.Views
             PluginRuntimeTitle.Text = title;
             PluginRuntimeDetachedText.Visibility = Visibility.Collapsed;
             PluginRuntimeContent.Content = content;
-            ToolCenterContent.Visibility = Visibility.Collapsed;
-            PluginRuntimeSurface.Visibility = Visibility.Visible;
+            SetPluginRuntimePresentation(isVisible: true);
             PluginRuntimeEndButton.IsEnabled = true;
             System.Windows.Automation.AutomationProperties.SetItemStatus(
                 PluginRuntimeSurface,
@@ -127,8 +126,7 @@ namespace LongBetterWindows.Host.Views
             PluginRuntimeTitle.Text = title;
             PluginRuntimeContent.Content = null;
             PluginRuntimeDetachedText.Visibility = Visibility.Visible;
-            ToolCenterContent.Visibility = Visibility.Collapsed;
-            PluginRuntimeSurface.Visibility = Visibility.Visible;
+            SetPluginRuntimePresentation(isVisible: true);
             PluginRuntimeEndButton.IsEnabled = true;
             System.Windows.Automation.AutomationProperties.SetItemStatus(
                 PluginRuntimeSurface,
@@ -144,8 +142,7 @@ namespace LongBetterWindows.Host.Views
                     PluginRuntimeContent.Content,
                     _runtimeContent);
             PluginRuntimeContent.Content = null;
-            PluginRuntimeSurface.Visibility = Visibility.Collapsed;
-            ToolCenterContent.Visibility = Visibility.Visible;
+            SetPluginRuntimePresentation(isVisible: false);
             if (notifyHidden && wasAttached)
                 _runtimeHidden?.Invoke();
             return true;
@@ -156,8 +153,7 @@ namespace LongBetterWindows.Host.Views
             if (!ReferenceEquals(_runtimeContent, content))
                 return;
             PluginRuntimeContent.Content = null;
-            PluginRuntimeSurface.Visibility = Visibility.Collapsed;
-            ToolCenterContent.Visibility = Visibility.Visible;
+            SetPluginRuntimePresentation(isVisible: false);
             ClearPluginRuntimeState();
         }
 
@@ -166,8 +162,7 @@ namespace LongBetterWindows.Host.Views
             if (_runtimeModuleKey != key)
                 return;
             PluginRuntimeContent.Content = null;
-            PluginRuntimeSurface.Visibility = Visibility.Collapsed;
-            ToolCenterContent.Visibility = Visibility.Visible;
+            SetPluginRuntimePresentation(isVisible: false);
             ClearPluginRuntimeState();
         }
 
@@ -222,6 +217,32 @@ namespace LongBetterWindows.Host.Views
 
         internal FrameworkElement? GetPluginRuntimeContentForQuality()
             => _runtimeContent;
+
+        private void SetPluginRuntimePresentation(bool isVisible)
+        {
+            ToolCenterContent.Visibility = isVisible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            PluginRuntimeSurface.Visibility = isVisible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            if (isVisible)
+            {
+                InstalledPluginRail.Visibility = Visibility.Collapsed;
+            }
+            else if (_coordinator is not null)
+            {
+                ApplyInstalledPluginRailVisibility(
+                    _coordinator.State.ActiveModuleKey);
+            }
+        }
+
+        private void ApplyInstalledPluginRailVisibility(
+            WorkspaceModuleKey activeModuleKey)
+            => InstalledPluginRail.Visibility =
+                WorkspaceChromePolicy.ShowsInstalledPluginRail(activeModuleKey)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
 
         private void ClearPluginRuntimeState()
         {
@@ -369,6 +390,7 @@ namespace LongBetterWindows.Host.Views
             }
 
             ActivateSearchScope(state.ActiveModuleKey);
+            ApplyInstalledPluginRailVisibility(state.ActiveModuleKey);
             InstalledPluginRail.SetActivePlugin(
                 state.ActiveModuleKey.Kind is "plugin-settings" or "plugin-runtime"
                     ? state.ActiveModuleKey.ResourceId

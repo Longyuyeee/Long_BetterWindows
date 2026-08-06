@@ -832,6 +832,12 @@ try {
             $candidate
         }
     } 'Opening Plugin Market did not create an active Workspace module tab.'
+    $marketPluginRail = Wait-Until {
+        Find-DescendantByAutomationId `
+            $managementMain 'Long.Workspace.PluginRail'
+    } 'The installed plugin rail was not visible in Plugin Market.'
+    $report.automation_semantics.management_navigation[
+        'market_plugin_rail_visible'] = $null -ne $marketPluginRail
     $rootTab = Wait-Until {
         Find-ProcessElementByAutomationId `
             $managementProcess.Id `
@@ -859,6 +865,12 @@ try {
             $candidate
         }
     } 'Opening Settings did not create an active Workspace module tab.'
+    Wait-Until {
+        $null -eq (Find-DescendantByAutomationId `
+            $managementMain 'Long.Workspace.PluginRail')
+    } 'The installed plugin rail remained visible in Settings.' | Out-Null
+    $report.automation_semantics.management_navigation[
+        'settings_plugin_rail_hidden'] = $true
     $settingsClose = Wait-Until {
         Find-ProcessElementByAutomationId `
             $managementProcess.Id `
@@ -1331,6 +1343,11 @@ try {
         Find-DescendantByAutomationId `
             $mainWindow 'Long.Workspace.PluginRuntime.Title'
     } 'The Base64 Workspace runtime did not appear.'
+    Wait-Until {
+        $null -eq (Find-DescendantByAutomationId `
+            $mainWindow 'Long.Workspace.PluginRail')
+    } 'The installed plugin rail remained visible in plugin runtime context.' |
+        Out-Null
     $detach = Wait-Until {
         Find-DescendantByAutomationId `
             $mainWindow 'Long.Workspace.PluginRuntime.Detach'
@@ -1365,14 +1382,21 @@ try {
         Find-DescendantByAutomationId `
             $mainWindow 'Long.Workspace.PluginRuntime.Title'
     } 'Returning from the detached plugin did not restore the Workspace runtime.'
+    Wait-Until {
+        $null -eq (Find-DescendantByAutomationId `
+            $mainWindow 'Long.Workspace.PluginRail')
+    } 'The installed plugin rail reappeared after returning to plugin runtime.' |
+        Out-Null
     $report.plugin_lifecycle = [ordered]@{
         main_window_discovered = $true
         workspace_runtime_discovered = $null -ne $workspaceRuntime
+        plugin_rail_hidden_in_runtime = $true
         detach_invoked = $true
         detached_window_discovered = $true
         detached_back_discovered = $null -ne $detachedBack
         escape_closed_detached_window = $true
         workspace_runtime_restored = $null -ne $restoredRuntime
+        plugin_rail_hidden_after_restore = $true
     }
     Stop-QualityHost $pluginProcess
     $pluginProcess = $null
