@@ -253,7 +253,11 @@ public sealed class MacroEngineTests
         Assert.True(engine.StartRecording());
         native.PauseHookRead();
 
-        var callback = Task.Run(() => native.RaiseKeyboard(0x0100, 0x41));
+        var callback = Task.Factory.StartNew(
+            () => native.RaiseKeyboard(0x0100, 0x41),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
         await native.HookReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
         bool stopped;
         try
@@ -281,7 +285,11 @@ public sealed class MacroEngineTests
         Assert.True(engine.StartRecording());
         native.PauseHookRead();
 
-        var callback = Task.Run(() => native.RaiseMouse(0x0201, 40, 50));
+        var callback = Task.Factory.StartNew(
+            () => native.RaiseMouse(0x0201, 40, 50),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
         await native.HookReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
         bool stopped;
         try
