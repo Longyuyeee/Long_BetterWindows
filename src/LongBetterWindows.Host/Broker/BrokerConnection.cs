@@ -101,7 +101,10 @@ internal sealed class BrokerConnection(
         {
             return await LengthPrefixedJsonFraming.ReadAsync(stream, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is EndOfStreamException or IOException or OperationCanceledException)
+        catch (Exception ex) when (ex is EndOfStreamException
+            or IOException
+            or InvalidDataException
+            or OperationCanceledException)
         {
             return null;
         }

@@ -120,15 +120,19 @@ public sealed class PluginBrokerReadOnlyTests
     public async Task Broker_closes_oversized_frames_without_allocating_payload()
     {
         await using var fixture = await BrokerFixture.StartAsync(CreateRegistry());
-        await using var pipe = await ConnectRawAsync(fixture.PipeName);
-        var prefix = new byte[sizeof(int)];
-        BinaryPrimitives.WriteInt32LittleEndian(prefix, IpcProtocol.MaximumFrameBytes + 1);
-        await pipe.WriteAsync(prefix);
-        await pipe.FlushAsync();
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            await using var pipe = await ConnectRawAsync(fixture.PipeName);
+            var prefix = new byte[sizeof(int)];
+            BinaryPrimitives.WriteInt32LittleEndian(
+                prefix, IpcProtocol.MaximumFrameBytes + 1);
+            await pipe.WriteAsync(prefix);
+            await pipe.FlushAsync();
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        var buffer = new byte[1];
-        Assert.Equal(0, await pipe.ReadAsync(buffer, timeout.Token));
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var buffer = new byte[1];
+            Assert.Equal(0, await pipe.ReadAsync(buffer, timeout.Token));
+        }
     }
 
     [Fact]
