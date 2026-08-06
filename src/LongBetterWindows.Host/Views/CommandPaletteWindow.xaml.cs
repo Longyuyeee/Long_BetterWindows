@@ -358,7 +358,7 @@ namespace LongBetterWindows.Host.Views
             // 先归还前台焦点，再执行依赖“当前窗口/Explorer”的命令。
             Hide();
             if (_originWindowHandle != nint.Zero)
-                Shell32.SetForegroundWindow(_originWindowHandle);
+                ForegroundWindowActivator.TryActivate(_originWindowHandle);
             await Task.Delay(40);
             var result = await _executor.ExecuteAsync(
                 descriptor.Key,
@@ -589,7 +589,7 @@ namespace LongBetterWindows.Host.Views
         {
             Hide();
             if (_originWindowHandle != nint.Zero)
-                Shell32.SetForegroundWindow(_originWindowHandle);
+                ForegroundWindowActivator.TryActivate(_originWindowHandle);
             _originWindowHandle = nint.Zero;
         }
 

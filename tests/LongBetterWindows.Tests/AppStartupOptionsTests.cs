@@ -30,6 +30,7 @@ public class AppStartupOptionsTests
             "--quality-window-automation",
             "--quality-empty-context",
             "--quality-context", "IMAGE",
+            "--quality-origin-window", "12345",
             "--quality-workflows-dir", "quality-workflows",
             "--quality-open-workflow", "workflow.quality.review",
             "--quality-edit-workflow", "workflow.quality.editor",
@@ -79,6 +80,7 @@ public class AppStartupOptionsTests
         Assert.True(options.EnableWindowAutomationForQuality);
         Assert.True(options.UseEmptyContextForQuality);
         Assert.Equal("image", options.QualityContextProfile);
+        Assert.Equal(new nint(12345), options.QualityOriginWindowHandle);
         Assert.Equal("quality-workflows", options.QualityWorkflowsDirectory);
         Assert.Equal("workflow.quality.review", options.QualityWorkflowReviewId);
         Assert.Equal("workflow.quality.editor", options.QualityWorkflowEditorId);

@@ -87,6 +87,33 @@ $sourceWorkflowPath = Join-Path `
     [Text.UTF8Encoding]::new($false))
 $sourceWorkflowSha256 = (Get-FileHash `
     -LiteralPath $sourceWorkflowPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$focusProbeScript = Join-Path $outputRoot 'focus-probe.ps1'
+$focusProbeSource = @'
+param([Parameter(Mandatory=$true)] [string] $HandlePath)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+[Windows.Forms.Application]::EnableVisualStyles()
+$form = [Windows.Forms.Form]::new()
+$form.Text = 'Long Focus Probe'
+$form.Name = 'LongFocusProbe'
+$form.Width = 420
+$form.Height = 240
+$form.StartPosition = [Windows.Forms.FormStartPosition]::Manual
+$form.Location = [Drawing.Point]::new(80, 80)
+$form.Add_Shown({
+    [IO.File]::WriteAllText(
+        $HandlePath,
+        $form.Handle.ToInt64().ToString([Globalization.CultureInfo]::InvariantCulture),
+        [Text.UTF8Encoding]::new($false))
+    $form.Activate()
+})
+[Windows.Forms.Application]::Run($form)
+'@
+[IO.File]::WriteAllText(
+    $focusProbeScript,
+    $focusProbeSource,
+    [Text.UTF8Encoding]::new($false))
 
 $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
 if (-not (Test-Path -LiteralPath $dotnet)) {
@@ -180,6 +207,7 @@ public static class LongDesktopInput {
                 AttachThreadInput(callerThread, foregroundThread, false);
         }
     }
+    public static IntPtr ForegroundWindow() { return GetForegroundWindow(); }
     public static void Click(IntPtr window, int x, int y) {
         Activate(window);
         System.Threading.Thread.Sleep(100);
@@ -531,6 +559,32 @@ function Stop-QualityHost([Diagnostics.Process] $process) {
     $process.WaitForExit(5000) | Out-Null
 }
 
+function Start-FocusProbe {
+    $handlePath = Join-Path $outputRoot 'focus-probe.handle'
+    Remove-Item -LiteralPath $handlePath -Force -ErrorAction SilentlyContinue
+    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', $focusProbeScript,
+        '-HandlePath', $handlePath) -WindowStyle Hidden -PassThru
+    Wait-Until {
+        if (-not (Test-Path -LiteralPath $handlePath -PathType Leaf)) { return $null }
+        $value = [IO.File]::ReadAllText($handlePath).Trim()
+        $parsed = 0L
+        if ([long]::TryParse($value, [ref]$parsed) -and $parsed -gt 0) {
+            [IntPtr]$parsed
+        }
+    } 'The independent foreground focus probe did not publish its window handle.' | Out-Null
+    $handle = [IntPtr][long]([IO.File]::ReadAllText($handlePath).Trim())
+    return [pscustomobject]@{ Process = $process; Handle = $handle }
+}
+
+function Wait-FocusProbe([IntPtr] $handle, [string] $failureMessage) {
+    Wait-Until {
+        if ([LongDesktopInput]::ForegroundWindow() -eq $handle) { $true }
+    } $failureMessage | Out-Null
+}
+
 $report = [ordered]@{
     schema_version = 1
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
@@ -538,6 +592,7 @@ $report = [ordered]@{
     release_executable = $executable
     palette = [ordered]@{}
     super_panel = [ordered]@{}
+    focus_restore = [ordered]@{}
     management_navigation = [ordered]@{}
     workflow_review = [ordered]@{}
     workflow_argument_schema = [ordered]@{}
@@ -554,6 +609,10 @@ $paletteProcess = $null
 $paletteMenuProcess = $null
 $superPanelProcess = $null
 $contextMatrixProcess = $null
+$focusProbeProcess = $null
+$focusEscapeProcess = $null
+$focusExpandProcess = $null
+$focusExecuteProcess = $null
 $superPanelTransitionProcess = $null
 $managementProcess = $null
 $workflowPaletteProcess = $null
@@ -783,6 +842,107 @@ try {
             $contextMatrixProcess = $null
         }
     }
+
+    Write-Stage 'Starting independent foreground focus probe.'
+    $focusProbe = Start-FocusProbe
+    $focusProbeProcess = $focusProbe.Process
+    $focusProbeHandle = [IntPtr]$focusProbe.Handle
+
+    [LongDesktopInput]::Activate($focusProbeHandle) | Out-Null
+    Wait-FocusProbe $focusProbeHandle 'The focus probe could not become foreground before Escape validation.'
+    $focusEscapeProcess = Start-QualityHost @(
+        '--quality-open-super-panel',
+        '--quality-context', 'empty',
+        '--quality-origin-window', $focusProbeHandle.ToInt64().ToString())
+    $focusEscapePanel = Wait-Until {
+        Find-WindowByAutomationId $focusEscapeProcess.Id 'Long.SuperPanel'
+    } 'Super Panel did not appear for Escape focus restoration.'
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$focusEscapePanel.Current.NativeWindowHandle, 3) -ne 1) {
+        throw 'Super Panel rejected Escape focus restoration.'
+    }
+    Wait-Until {
+        $null -eq (Find-WindowByAutomationId $focusEscapeProcess.Id 'Long.SuperPanel')
+    } 'Super Panel did not hide during Escape focus restoration.' | Out-Null
+    Wait-FocusProbe $focusProbeHandle 'Escape did not restore the independent foreground window.'
+    Stop-QualityHost $focusEscapeProcess
+    $focusEscapeProcess = $null
+
+    [LongDesktopInput]::Activate($focusProbeHandle) | Out-Null
+    Wait-FocusProbe $focusProbeHandle 'The focus probe could not become foreground before expansion validation.'
+    $focusExpandProcess = Start-QualityHost @(
+        '--quality-open-super-panel',
+        '--quality-context', 'url',
+        '--quality-origin-window', $focusProbeHandle.ToInt64().ToString())
+    $focusExpandPanel = Wait-Until {
+        Find-WindowByAutomationId $focusExpandProcess.Id 'Long.SuperPanel'
+    } 'Super Panel did not appear for expansion focus restoration.'
+    $focusOpenCommandCenter = Wait-Until {
+        Find-DescendantByAutomationId $focusExpandPanel 'Long.SuperPanel.OpenCommandCenter'
+    } 'Open Command Center was unavailable for expansion focus restoration.'
+    Invoke-AutomationElement $focusOpenCommandCenter `
+        'Open Command Center could not be invoked for focus restoration.'
+    $focusPalette = Wait-Until {
+        Find-WindowByAutomationId $focusExpandProcess.Id 'Long.CommandPalette'
+    } 'Command Palette did not appear for expansion focus restoration.'
+    if ([LongDesktopInput]::WindowAction(
+        [IntPtr]$focusPalette.Current.NativeWindowHandle, 3) -ne 1) {
+        throw 'Command Palette rejected expansion focus restoration.'
+    }
+    Wait-Until {
+        $null -eq (Find-WindowByAutomationId $focusExpandProcess.Id 'Long.CommandPalette')
+    } 'Command Palette did not hide during expansion focus restoration.' | Out-Null
+    Wait-FocusProbe $focusProbeHandle 'Expanded Command Palette did not restore the original foreground window.'
+    Stop-QualityHost $focusExpandProcess
+    $focusExpandProcess = $null
+
+    [LongDesktopInput]::Activate($focusProbeHandle) | Out-Null
+    Wait-FocusProbe $focusProbeHandle 'The focus probe could not become foreground before command validation.'
+    $focusExecuteProcess = Start-QualityHost @(
+        '--quality-open-super-panel',
+        '--quality-context', 'empty',
+        '--quality-origin-window', $focusProbeHandle.ToInt64().ToString())
+    $focusExecutePanel = Wait-Until {
+        Find-WindowByAutomationId $focusExecuteProcess.Id 'Long.SuperPanel'
+    } 'Super Panel did not appear for command focus restoration.'
+    $focusExecuteHandle = [IntPtr]$focusExecutePanel.Current.NativeWindowHandle
+    $focusCommandSelected = $false
+    for ($pageAttempt = 0; $pageAttempt -lt 8; $pageAttempt++) {
+        if ([LongDesktopInput]::WindowAction($focusExecuteHandle, 5) -eq 1) {
+            $focusCommandSelected = $true
+            break
+        }
+        $focusNextPage = Find-DescendantByAutomationId `
+            $focusExecutePanel 'Long.SuperPanel.NextPage'
+        if ($null -eq $focusNextPage -or -not $focusNextPage.Current.IsEnabled) {
+            break
+        }
+        Invoke-AutomationElement $focusNextPage `
+            'Super Panel could not page to the focus-sensitive window command.'
+        Start-Sleep -Milliseconds 120
+    }
+    if (-not $focusCommandSelected) {
+        throw 'The focus-sensitive window command was not available in Super Panel.'
+    }
+    if ([LongDesktopInput]::WindowAction($focusExecuteHandle, 1) -ne 1) {
+        throw 'Super Panel rejected focus-sensitive command execution.'
+    }
+    Wait-Until {
+        $null -eq (Find-WindowByAutomationId $focusExecuteProcess.Id 'Long.SuperPanel')
+    } 'Super Panel did not hide before focus-sensitive command execution.' | Out-Null
+    Wait-FocusProbe $focusProbeHandle 'Command execution did not restore the original foreground window.'
+    Stop-QualityHost $focusExecuteProcess
+    $focusExecuteProcess = $null
+
+    $report.focus_restore = [ordered]@{
+        probe_window = 'independent_winforms_process'
+        escape_restored = $true
+        expansion_dismiss_restored = $true
+        command_execution_restored = $true
+        command_key = 'com.long.window-manager:window.topmost'
+    }
+    Stop-QualityHost $focusProbeProcess
+    $focusProbeProcess = $null
 
     Write-Stage 'Starting Super Panel to Command Palette transition host.'
     $superPanelTransitionProcess = Start-QualityHost @(
@@ -1683,6 +1843,10 @@ finally {
     Stop-QualityHost $paletteMenuProcess
     Stop-QualityHost $superPanelProcess
     Stop-QualityHost $contextMatrixProcess
+    Stop-QualityHost $focusEscapeProcess
+    Stop-QualityHost $focusExpandProcess
+    Stop-QualityHost $focusExecuteProcess
+    Stop-QualityHost $focusProbeProcess
     Stop-QualityHost $superPanelTransitionProcess
     Stop-QualityHost $managementProcess
     Stop-QualityHost $workflowPaletteProcess

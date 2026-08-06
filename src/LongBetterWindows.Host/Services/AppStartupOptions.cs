@@ -49,6 +49,7 @@ namespace LongBetterWindows.Host.Services
         public bool UseLiveContextForQuality { get; private init; }
         public bool UseEmptyContextForQuality { get; private init; }
         public string? QualityContextProfile { get; private init; }
+        public nint QualityOriginWindowHandle { get; private init; }
         public string? QualityWorkflowsDirectory { get; private init; }
         public string? QualityWorkflowReviewId { get; private init; }
         public string? QualityWorkflowEditorId { get; private init; }
@@ -172,6 +173,9 @@ namespace LongBetterWindows.Host.Services
                 UseEmptyContextForQuality = HasSwitch(arguments, "--quality-empty-context"),
                 QualityContextProfile = ReadArgument(arguments, "--quality-context")?
                     .ToLowerInvariant(),
+                QualityOriginWindowHandle = ReadWindowHandle(
+                    arguments,
+                    "--quality-origin-window"),
                 QualityWorkflowsDirectory = ReadArgument(arguments, "--quality-workflows-dir"),
                 QualityWorkflowReviewId = ReadArgument(arguments, "--quality-open-workflow"),
                 QualityWorkflowEditorId = ReadArgument(arguments, "--quality-edit-workflow"),
@@ -258,6 +262,16 @@ namespace LongBetterWindows.Host.Services
             return int.TryParse(value, out var parsed)
                 ? Math.Clamp(parsed, minimum, maximum)
                 : fallback;
+        }
+
+        private static nint ReadWindowHandle(
+            IReadOnlyList<string> arguments,
+            string name)
+        {
+            var value = ReadArgument(arguments, name);
+            return long.TryParse(value, out var parsed) && parsed > 0
+                ? new nint(parsed)
+                : nint.Zero;
         }
     }
 }

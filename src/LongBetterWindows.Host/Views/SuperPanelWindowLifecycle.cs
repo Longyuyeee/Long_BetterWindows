@@ -46,7 +46,13 @@ namespace LongBetterWindows.Host.Views
         {
             _window.Hide();
             if (restoreFocus && _foregroundWindow != IntPtr.Zero)
-                Shell32.SetForegroundWindow(_foregroundWindow);
+                ForegroundWindowActivator.TryActivate(_foregroundWindow);
+        }
+
+        internal async Task ReleaseForegroundAsync()
+        {
+            Dismiss(restoreFocus: true);
+            await Task.Delay(40);
         }
 
         internal void AttachWindowMessageHook()

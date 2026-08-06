@@ -949,8 +949,11 @@ public class QualityGateTests
         Assert.Contains("WmMouseWheel", lifecycle);
         Assert.Contains("AddHook(WindowMessageHook)", lifecycle);
         Assert.Contains("CalculatePosition", lifecycle);
-        Assert.Contains("Shell32.SetForegroundWindow", lifecycle);
+        Assert.Contains("ForegroundWindowActivator.TryActivate", lifecycle);
+        Assert.Contains("ForegroundWindowActivator.TryActivate", palette);
         Assert.Contains("_windowLifecycle.ForegroundWindowHandle", source);
+        Assert.Contains("_windowLifecycle.ReleaseForegroundAsync", source);
+        Assert.Contains("--quality-origin-window", Read("run-desktop-ui-smoke.ps1"));
         Assert.Contains("new PanelExpansionIntent", source);
         Assert.Contains("CommandPaletteWindow.ShowPalette(intent)", source);
         Assert.Contains("internal static void ShowPalette(PanelExpansionIntent intent)", palette);

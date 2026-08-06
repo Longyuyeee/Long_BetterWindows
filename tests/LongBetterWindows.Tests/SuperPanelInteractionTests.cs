@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using LongBetterWindows.Host.Contracts;
@@ -117,6 +118,33 @@ public class SuperPanelInteractionTests
     }
 
     [Fact]
+    public void FocusSensitiveExecution_UsesLifecycleReleaseBeforeCoordinator()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "SuperPanelWindow.xaml.cs"));
+        var release = source.IndexOf(
+            "beforeCommandExecution: _windowLifecycle.ReleaseForegroundAsync",
+            StringComparison.Ordinal);
+        var execute = source.IndexOf(
+            "_actionCoordinator.ExecuteAsync",
+            StringComparison.Ordinal);
+
+        Assert.True(execute >= 0);
+        Assert.True(release > execute);
+        Assert.Equal(
+            2,
+            source.Split(
+                "beforeCommandExecution: _windowLifecycle.ReleaseForegroundAsync",
+                StringSplitOptions.None).Length - 1);
+        Assert.Contains("CommandPaletteWindow.ShowPalette(intent)", source);
+        Assert.DoesNotContain("CommandPaletteWindow.ShowPalette(view.ContinuationQuery", source);
+    }
+
+    [Fact]
     public void SecondaryActionMenuProjection_UsesStableLabelsAndAutomationIds()
     {
         var first = new SearchResultAction(SearchActionKind.CopyText, "one");
@@ -222,4 +250,16 @@ public class SuperPanelInteractionTests
             ? new[] { new SearchResultAction(SearchActionKind.ContinueSearch, id) }
             : Array.Empty<SearchResultAction>(),
     };
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null
+               && !File.Exists(Path.Combine(
+                   directory.FullName,
+                   "LongBetterWindows.sln")))
+            directory = directory.Parent;
+        return directory?.FullName
+            ?? throw new DirectoryNotFoundException("Repository root not found.");
+    }
 }

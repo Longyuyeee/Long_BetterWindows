@@ -68,20 +68,28 @@ namespace LongBetterWindows.Host.Views
         public static void ShowPanel()
             => ShowPanelCore(null);
 
-        internal static void ShowPanelForQuality(string? contextProfile = null)
-            => ShowPanelCore(QualityContextFixtures.Create(contextProfile));
+        internal static void ShowPanelForQuality(
+            string? contextProfile = null,
+            nint originWindowHandle = default)
+            => ShowPanelCore(
+                QualityContextFixtures.Create(contextProfile),
+                originWindowHandle == nint.Zero ? null : originWindowHandle);
 
-        private static void ShowPanelCore(ContextSnapshot? presetContext)
+        private static void ShowPanelCore(
+            ContextSnapshot? presetContext,
+            nint? originWindowHandle = null)
         {
             var started = Stopwatch.GetTimestamp();
             var dispatcher = Application.Current.Dispatcher;
             if (!dispatcher.CheckAccess())
             {
-                dispatcher.Invoke(() => ShowPanelCore(presetContext));
+                dispatcher.Invoke(() => ShowPanelCore(
+                    presetContext,
+                    originWindowHandle));
                 return;
             }
 
-            var foreground = Shell32.GetForegroundWindow();
+            var foreground = originWindowHandle ?? Shell32.GetForegroundWindow();
             var request = new ContextCaptureRequest(foreground, DateTimeOffset.UtcNow);
             _instance ??= new SuperPanelWindow();
             _instance._windowLifecycle.CaptureForegroundWindow(foreground);
@@ -175,11 +183,7 @@ namespace LongBetterWindows.Host.Views
                 selected,
                 selected.PrimaryAction,
                 _searchSession.CurrentContext,
-                beforeCommandExecution: async () =>
-                {
-                    Hide();
-                    await Task.Delay(35);
-                });
+                beforeCommandExecution: _windowLifecycle.ReleaseForegroundAsync);
             ApplyActionOutcome(outcome);
         }
 
@@ -212,7 +216,10 @@ namespace LongBetterWindows.Host.Views
             SearchResultAction action)
         {
             var outcome = await _actionCoordinator.ExecuteAsync(
-                selected, action, _searchSession.CurrentContext);
+                selected,
+                action,
+                _searchSession.CurrentContext,
+                beforeCommandExecution: _windowLifecycle.ReleaseForegroundAsync);
             ApplyActionOutcome(outcome);
         }
 
@@ -221,8 +228,14 @@ namespace LongBetterWindows.Host.Views
             var view = SuperPanelViewProjection.ProjectAction(outcome);
             if (view.Disposition == SuperPanelActionDisposition.ContinueSearch)
             {
+                var intent = new PanelExpansionIntent(
+                    _windowLifecycle.ForegroundWindowHandle,
+                    view.ContinuationQuery ?? string.Empty,
+                    _searchSession.CurrentContext,
+                    selectedResultId: null,
+                    DateTimeOffset.UtcNow);
                 Hide();
-                CommandPaletteWindow.ShowPalette(view.ContinuationQuery ?? string.Empty);
+                CommandPaletteWindow.ShowPalette(intent);
                 return;
             }
 
@@ -551,6 +564,20 @@ namespace LongBetterWindows.Host.Views
                     ResultsList.SelectedIndex = 0;
                     ResultsList.ScrollIntoView(ResultsList.SelectedItem);
                     return ResultsList.SelectedItem is SearchResultItem;
+                case QualityWindowAction.SelectFocusProbeCommand:
+                    var focusProbeCommand = ResultsList.Items
+                        .OfType<SearchResultItem>()
+                        .FirstOrDefault(item =>
+                            item.PrimaryAction.Kind == SearchActionKind.ExecuteCommand
+                            && string.Equals(
+                                item.PrimaryAction.Target,
+                                "com.long.window-manager:window.topmost",
+                                StringComparison.OrdinalIgnoreCase));
+                    if (focusProbeCommand is null)
+                        return false;
+                    ResultsList.SelectedItem = focusProbeCommand;
+                    ResultsList.ScrollIntoView(focusProbeCommand);
+                    return true;
                 default:
                     return false;
             }

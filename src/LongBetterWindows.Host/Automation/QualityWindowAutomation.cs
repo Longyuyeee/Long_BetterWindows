@@ -10,6 +10,7 @@ internal enum QualityWindowAction
     ExecuteSecondary = 2,
     Dismiss = 3,
     SelectDeterministicResult = 4,
+    SelectFocusProbeCommand = 5,
 }
 
 internal sealed class QualityWindowAutomation : IDisposable
