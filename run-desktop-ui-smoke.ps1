@@ -698,6 +698,21 @@ try {
     $panelResults = Wait-Until {
         Find-DescendantByAutomationId $superPanel 'Long.SuperPanel.Results'
     } 'Super Panel result list was not discoverable.'
+    $contextListMode = Wait-Until {
+        if ($panelResults.Current.ItemStatus -like 'mode:context-list;page:1/*') {
+            $panelResults.Current.ItemStatus
+        }
+    } 'Super Panel did not expose the contextual list presentation.'
+    $nextPanelPage = Wait-Until {
+        Find-DescendantByAutomationId $superPanel 'Long.SuperPanel.NextPage'
+    } 'Super Panel next-page action was not discoverable.'
+    Invoke-AutomationElement $nextPanelPage `
+        'The Super Panel next-page action did not support InvokePattern.'
+    $contextSecondPage = Wait-Until {
+        if ($panelResults.Current.ItemStatus -like 'mode:context-list;page:2/*') {
+            $panelResults.Current.ItemStatus
+        }
+    } 'Super Panel did not move to the second contextual page.'
     $report.automation_semantics['super_panel'] = [ordered]@{
         window = Get-AutomationSemantics $superPanel 'ControlType.Window' 'Super Panel window semantics failed.'
         results = Get-AutomationSemantics $panelResults 'ControlType.List' 'Super Panel results semantics failed.'
@@ -713,6 +728,8 @@ try {
     $report.super_panel = [ordered]@{
         window_discovered = $true
         results_discovered = $null -ne $panelResults
+        context_list_mode = [string]$contextListMode
+        context_second_page = [string]$contextSecondPage
         escape_closed_panel = $true
     }
 
@@ -1093,6 +1110,12 @@ try {
     $workflowPanelResults = Wait-Until {
         Find-DescendantByAutomationId $workflowPanel 'Long.SuperPanel.Results'
     } 'Super Panel workflow results were not discoverable.'
+    $compactGridMode = Wait-Until {
+        if ($workflowPanelResults.Current.ItemStatus -like 'mode:compact-grid;page:1/*') {
+            $workflowPanelResults.Current.ItemStatus
+        }
+    } 'The empty-context Super Panel did not expose the compact grid presentation.'
+    $report.super_panel['compact_grid_mode'] = [string]$compactGridMode
     [LongDesktopInput]::Activate(
         [IntPtr]$workflowPanel.Current.NativeWindowHandle) | Out-Null
     $workflowPanelResults.SetFocus()

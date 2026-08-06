@@ -930,6 +930,8 @@
   "superPanel.context.loading": "正在读取当前上下文…",
   "superPanel.context.detected": "已识别 {0} 项上下文，操作将自动匹配",
   "superPanel.context.default": "常用、固定与最近操作",
+  "superPanel.previousPage": "上一页",
+  "superPanel.nextPage": "下一页",
   "superPanel.editor.createTitle": "新建操作分组",
   "superPanel.editor.renameTitle": "重命名操作分组",
   "superPanel.editor.createShort": "新建分组",

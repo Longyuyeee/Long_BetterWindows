@@ -1,8 +1,9 @@
 <Window x:Class="LongBetterWindows.Host.Views.SuperPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:interaction="clr-namespace:LongBetterWindows.Host.Interaction"
         Title="{DynamicResource i18n.superPanel.title}"
-        Width="640" Height="450"
+        Width="640" Height="560"
         MinWidth="560" MinHeight="360"
         WindowStyle="None"
         ResizeMode="NoResize"
@@ -16,6 +17,175 @@
         AutomationProperties.AutomationId="Long.SuperPanel"
         AutomationProperties.Name="{DynamicResource i18n.superPanel.title}"
         PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Window.Resources>
+        <DataTemplate x:Key="SuperPanelResultIconTemplate">
+            <Border Width="42" Height="42" CornerRadius="8"
+                    Background="{DynamicResource Long.Brush.Background.Raised}"
+                    BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                    BorderThickness="1">
+                <Grid>
+                    <Path Width="20" Height="20" Stretch="Uniform"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                          Stroke="{DynamicResource Long.Brush.Accent.Primary}"
+                          StrokeThickness="1.6">
+                        <Path.Style>
+                            <Style TargetType="Path">
+                                <Setter Property="Data" Value="{StaticResource Long.Icon.Command}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IconKind}"
+                                                 Value="{x:Static interaction:SearchResultIconKind.Management}">
+                                        <Setter Property="Data" Value="{StaticResource Long.Icon.Settings}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IconKind}"
+                                                 Value="{x:Static interaction:SearchResultIconKind.Marketplace}">
+                                        <Setter Property="Data" Value="{StaticResource Long.Icon.Plugin}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IconKind}"
+                                                 Value="{x:Static interaction:SearchResultIconKind.Plugin}">
+                                        <Setter Property="Data" Value="{StaticResource Long.Icon.Plugin}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IconKind}"
+                                                 Value="{x:Static interaction:SearchResultIconKind.Settings}">
+                                        <Setter Property="Data" Value="{StaticResource Long.Icon.Settings}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
+                    <Image Source="{Binding IconPath}" Width="32" Height="32" Stretch="Uniform">
+                        <Image.Style>
+                            <Style TargetType="Image">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IconPath}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Image.Style>
+                    </Image>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <ItemsPanelTemplate x:Key="SuperPanelCompactItemsPanel">
+            <UniformGrid Columns="4" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="SuperPanelContextItemsPanel">
+            <StackPanel />
+        </ItemsPanelTemplate>
+
+        <Style x:Key="SuperPanelCompactItem" TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="4" />
+            <Setter Property="Height" Value="102" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="AutomationProperties.AutomationId" Value="{Binding Id}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Card" Padding="8" CornerRadius="8"
+                                Background="{DynamicResource Long.Brush.Surface.Card}"
+                                BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
+                                BorderThickness="1">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Card" Property="Background"
+                                        Value="{DynamicResource Long.Brush.Surface.Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Card" Property="Background"
+                                        Value="{DynamicResource Long.Brush.Accent.Soft}" />
+                                <Setter TargetName="Card" Property="BorderBrush"
+                                        Value="{DynamicResource Long.Brush.Accent.Primary}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SuperPanelContextItem" TargetType="ListBoxItem"
+               BasedOn="{StaticResource SuperPanelCompactItem}">
+            <Setter Property="Height" Value="58" />
+            <Setter Property="Margin" Value="3" />
+        </Style>
+
+        <DataTemplate x:Key="SuperPanelCompactResultTemplate">
+            <Grid>
+                <ContentControl Content="{Binding}"
+                                ContentTemplate="{StaticResource SuperPanelResultIconTemplate}"
+                                HorizontalAlignment="Center" VerticalAlignment="Top" />
+                <TextBlock Text="{Binding Title}" Margin="2,50,2,0"
+                           TextAlignment="Center" TextWrapping="Wrap" MaxHeight="34"
+                           FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SuperPanelContextResultTemplate">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ContentControl Content="{Binding}"
+                                ContentTemplate="{StaticResource SuperPanelResultIconTemplate}"
+                                VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Margin="0,2,0,0"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                </StackPanel>
+                <Button Grid.Column="2" Click="SecondaryActions_Click"
+                        Width="26" Height="26" Margin="4,0"
+                        Content="⋯" ToolTip="{DynamicResource i18n.superPanel.moreActions}"
+                        AutomationProperties.AutomationId="Long.Result.MoreActions"
+                        AutomationProperties.Name="{DynamicResource i18n.superPanel.moreResultActions}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource LongIconButton}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSecondaryActions}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Grid.Column="3" Tag="{Binding Id}" Click="PinResult_Click"
+                        Width="26" Height="26" Margin="4,0"
+                        ToolTip="{DynamicResource i18n.superPanel.togglePin}"
+                        AutomationProperties.Name="{DynamicResource i18n.superPanel.togglePinAutomation}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource LongIconButton}">
+                            <Setter Property="Content" Value="☆" />
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CanPin}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                    <Setter Property="Content" Value="★" />
+                                    <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Accent.Primary}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
 
     <Border x:Name="PanelChrome"
             Background="{DynamicResource Long.Brush.Surface.Overlay}"
@@ -189,106 +359,6 @@
                     <ListBox.Resources>
                         <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}" />
                     </ListBox.Resources>
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel ItemWidth="292" ItemHeight="78" />
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="Padding" Value="0" />
-                            <Setter Property="Margin" Value="3" />
-                            <Setter Property="Background" Value="Transparent" />
-                            <Setter Property="BorderThickness" Value="0" />
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="AutomationProperties.AutomationId" Value="{Binding Id}" />
-                            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Card" Padding="12,10" MinHeight="72"
-                                                Background="{DynamicResource Long.Brush.Surface.Card}"
-                                                BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
-                                                BorderThickness="1" CornerRadius="12">
-                                            <ContentPresenter />
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Card" Property="Background"
-                                                        Value="{DynamicResource Long.Brush.Surface.Hover}" />
-                                                <Setter TargetName="Card" Property="BorderBrush"
-                                                        Value="{DynamicResource Long.Brush.Accent.Primary}" />
-                                            </Trigger>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Card" Property="Background"
-                                                        Value="{DynamicResource Long.Brush.Accent.Soft}" />
-                                                <Setter TargetName="Card" Property="BorderBrush"
-                                                        Value="{DynamicResource Long.Brush.Accent.Primary}" />
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource Long.Brush.Text.Primary}"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Margin="0,4,0,0"
-                                               Foreground="{DynamicResource Long.Brush.Text.Secondary}"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding Source}" FontSize="9" Margin="0,4,0,0"
-                                               Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                                </StackPanel>
-                                <Button Grid.Column="1" Click="SecondaryActions_Click"
-                                        Width="26" Height="26" Margin="8,0,0,0"
-                                        Content="⋯" ToolTip="{DynamicResource i18n.superPanel.moreActions}"
-                                        AutomationProperties.AutomationId="Long.Result.MoreActions"
-                                        AutomationProperties.Name="{DynamicResource i18n.superPanel.moreResultActions}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource LongIconButton}">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasSecondaryActions}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                                <Button Grid.Column="2" Tag="{Binding Id}" Click="PinResult_Click"
-                                        Width="26" Height="26" Margin="8,0,0,0"
-                                        ToolTip="{DynamicResource i18n.superPanel.togglePin}"
-                                        AutomationProperties.Name="{DynamicResource i18n.superPanel.togglePinAutomation}">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource LongIconButton}">
-                                            <Setter Property="Content" Value="☆" />
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Text.Muted}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding CanPin}" Value="True">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsPinned}" Value="True">
-                                                    <Setter Property="Content" Value="★" />
-                                                    <Setter Property="Foreground" Value="{DynamicResource Long.Brush.Accent.Primary}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
                 </ListBox>
 
                 <StackPanel x:Name="EmptyState" Visibility="Collapsed"
@@ -302,9 +372,28 @@
             </Grid>
 
             <Grid Grid.Row="4" Margin="4,9,4,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
                 <TextBlock x:Name="InteractionHint" Text="{DynamicResource i18n.superPanel.interactionHint}" FontSize="10"
                            Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                <TextBlock x:Name="StatusText" HorizontalAlignment="Right" FontSize="10"
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="PreviousPageButton" Style="{StaticResource LongIconButton}"
+                            Width="26" Height="26" Content="‹" Click="PreviousPage_Click"
+                            AutomationProperties.AutomationId="Long.SuperPanel.PreviousPage"
+                            AutomationProperties.Name="{DynamicResource i18n.superPanel.previousPage}" />
+                    <TextBlock x:Name="PageText" MinWidth="42" Text="1/1" TextAlignment="Center"
+                               VerticalAlignment="Center" FontSize="10"
+                               AutomationProperties.LiveSetting="Polite"
+                               Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                    <Button x:Name="NextPageButton" Style="{StaticResource LongIconButton}"
+                            Width="26" Height="26" Content="›" Click="NextPage_Click"
+                            AutomationProperties.AutomationId="Long.SuperPanel.NextPage"
+                            AutomationProperties.Name="{DynamicResource i18n.superPanel.nextPage}" />
+                </StackPanel>
+                <TextBlock x:Name="StatusText" Grid.Column="2" HorizontalAlignment="Right" FontSize="10"
                            AutomationProperties.LiveSetting="Polite"
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
             </Grid>

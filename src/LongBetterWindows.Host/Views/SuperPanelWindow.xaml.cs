@@ -125,6 +125,8 @@ namespace LongBetterWindows.Host.Views
             SuperPanelContextUpdate update)
         {
             _groupCoordinator.ResetResults();
+            _groupCoordinator.SetContext(
+                !update.IsLoading && update.Snapshot.Items.Count > 0);
             var view = SuperPanelViewProjection.ProjectContext(
                 update,
                 key => ServicesInitializer.I18n.T(key));
@@ -146,6 +148,7 @@ namespace LongBetterWindows.Host.Views
         private void RenderActiveGroup()
         {
             var view = _groupCoordinator.BuildView();
+            ApplyPresentation(view);
             ResultsList.ItemsSource = view.VisibleResults;
             ResultsList.SelectedIndex = view.VisibleResults.Count > 0 ? 0 : -1;
             EmptyState.Visibility = view.ShowEmptyState
@@ -158,6 +161,28 @@ namespace LongBetterWindows.Host.Views
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             GroupTabs.ItemsSource = view.Groups;
+        }
+
+        private void ApplyPresentation(SuperPanelViewState view)
+        {
+            var compact = view.PresentationMode == SuperPanelPresentationMode.CompactGrid;
+            ResultsList.ItemsPanel = (ItemsPanelTemplate)FindResource(compact
+                ? "SuperPanelCompactItemsPanel"
+                : "SuperPanelContextItemsPanel");
+            ResultsList.ItemContainerStyle = (Style)FindResource(compact
+                ? "SuperPanelCompactItem"
+                : "SuperPanelContextItem");
+            ResultsList.ItemTemplate = (DataTemplate)FindResource(compact
+                ? "SuperPanelCompactResultTemplate"
+                : "SuperPanelContextResultTemplate");
+            ScrollViewer.SetVerticalScrollBarVisibility(
+                ResultsList, ScrollBarVisibility.Hidden);
+            PreviousPageButton.IsEnabled = view.Page.CanMovePrevious;
+            NextPageButton.IsEnabled = view.Page.CanMoveNext;
+            PageText.Text = view.Page.Label;
+            AutomationProperties.SetItemStatus(
+                ResultsList,
+                $"mode:{(compact ? "compact-grid" : "context-list")};page:{view.Page.Label}");
         }
         private async Task ExecuteAsync(SearchResultItem selected)
         {
@@ -284,6 +309,20 @@ namespace LongBetterWindows.Host.Views
         {
             _dragSession.Reset();
             RenderActiveGroup();
+        }
+
+        private void PreviousPage_Click(object sender, RoutedEventArgs e)
+            => MovePage(-1);
+
+        private void NextPage_Click(object sender, RoutedEventArgs e)
+            => MovePage(1);
+
+        private void MovePage(int offset)
+        {
+            if (!_groupCoordinator.MovePage(offset)) return;
+            _dragSession.Reset();
+            RenderActiveGroup();
+            ResultsList.Focus();
         }
 
         private void ResultsList_PreviewMouseLeftButtonDown(
@@ -489,6 +528,12 @@ namespace LongBetterWindows.Host.Views
                     break;
                 case SuperPanelKeyboardCommand.ExecutePrimary:
                     _ = ExecuteAsync(selected!);
+                    break;
+                case SuperPanelKeyboardCommand.PreviousPage:
+                    MovePage(-1);
+                    break;
+                case SuperPanelKeyboardCommand.NextPage:
+                    MovePage(1);
                     break;
                 case SuperPanelKeyboardCommand.Dismiss:
                     _windowLifecycle.Dismiss(restoreFocus: true);

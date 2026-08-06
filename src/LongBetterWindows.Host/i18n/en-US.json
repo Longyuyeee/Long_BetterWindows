@@ -930,6 +930,8 @@
   "superPanel.context.loading": "Reading current context…",
   "superPanel.context.detected": "{0} context items detected; actions matched automatically",
   "superPanel.context.default": "Common, pinned, and recent actions",
+  "superPanel.previousPage": "Previous page",
+  "superPanel.nextPage": "Next page",
   "superPanel.editor.createTitle": "Create action group",
   "superPanel.editor.renameTitle": "Rename action group",
   "superPanel.editor.createShort": "Create group",

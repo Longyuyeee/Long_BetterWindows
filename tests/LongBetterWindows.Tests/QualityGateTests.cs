@@ -956,8 +956,19 @@ public class QualityGateTests
         Assert.Contains("internal static void ShowPalette(PanelExpansionIntent intent)", palette);
         Assert.Contains("_preferredSelectionId", palette);
         Assert.Contains("ClearSensitiveState", expansion);
+        Assert.Contains("SuperPanelPresentationMode.CompactGrid", groups);
+        Assert.Contains("SuperPanelPresentationMode.ContextList", groups);
+        Assert.Contains("_groupCoordinator.MovePage", source);
+        Assert.Contains("SuperPanelCompactResultTemplate", xaml);
+        Assert.Contains("SuperPanelContextResultTemplate", xaml);
+        Assert.Contains("Long.SuperPanel.PreviousPage", xaml);
+        Assert.Contains("Long.SuperPanel.NextPage", xaml);
         Assert.Contains("context_preserved_on_transition", Read("run-desktop-ui-smoke.ps1"));
         Assert.Contains("selection_preserved_on_transition", Read("run-desktop-ui-smoke.ps1"));
+        Assert.Contains("context_list_mode", Read("run-desktop-ui-smoke.ps1"));
+        Assert.Contains("compact_grid_mode", Read("run-desktop-ui-smoke.ps1"));
+        Assert.Contains("app._startupOptions.OpenSuperPanelForQuality", Read(
+            "src", "LongBetterWindows.Host", "App.xaml.cs"));
         Assert.DoesNotContain("CommandPaletteWindow.ShowPalette();", source);
         Assert.DoesNotContain("HwndSource? _windowSource", source);
         Assert.Contains("_cycleGroup(delta)", lifecycle);

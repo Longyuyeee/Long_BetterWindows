@@ -76,6 +76,14 @@ public class SuperPanelInteractionTests
             SuperPanelKeyboardRouter.Resolve(
                 Key.Escape, ModifierKeys.None, null, SuperPanelGroupIds.Smart));
         Assert.Equal(
+            SuperPanelKeyboardCommand.PreviousPage,
+            SuperPanelKeyboardRouter.Resolve(
+                Key.PageUp, ModifierKeys.None, null, SuperPanelGroupIds.Smart));
+        Assert.Equal(
+            SuperPanelKeyboardCommand.NextPage,
+            SuperPanelKeyboardRouter.Resolve(
+                Key.PageDown, ModifierKeys.None, selected, SuperPanelGroupIds.Smart));
+        Assert.Equal(
             SuperPanelKeyboardCommand.None,
             SuperPanelKeyboardRouter.Resolve(
                 Key.Delete, ModifierKeys.None, selected, SuperPanelGroupIds.Pinned));

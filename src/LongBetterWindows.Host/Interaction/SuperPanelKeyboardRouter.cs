@@ -23,6 +23,12 @@ namespace LongBetterWindows.Host.Interaction
             if (key == Key.Enter && selected is not null)
                 return SuperPanelKeyboardCommand.ExecutePrimary;
 
+            if (key == Key.PageUp)
+                return SuperPanelKeyboardCommand.PreviousPage;
+
+            if (key == Key.PageDown)
+                return SuperPanelKeyboardCommand.NextPage;
+
             return key == Key.Escape
                 ? SuperPanelKeyboardCommand.Dismiss
                 : SuperPanelKeyboardCommand.None;
@@ -35,6 +41,8 @@ namespace LongBetterWindows.Host.Interaction
         ExecutePrimary,
         ExecuteSecondary,
         RemoveFromGroup,
+        PreviousPage,
+        NextPage,
         Dismiss,
     }
 }

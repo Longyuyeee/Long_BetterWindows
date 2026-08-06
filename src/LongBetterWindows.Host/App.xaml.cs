@@ -17,7 +17,9 @@ namespace LongBetterWindows.Host
     public partial class App : Application
     {
         internal static bool KeepPaletteVisibleForQuality
-            => Current is App { _startupOptions.OpenPaletteForQuality: true };
+            => Current is App app
+                && (app._startupOptions.OpenPaletteForQuality
+                    || app._startupOptions.OpenSuperPanelForQuality);
         internal static bool KeepSuperPanelVisibleForQuality
             => Current is App { _startupOptions.OpenSuperPanelForQuality: true };
         internal static bool EnableWindowAutomationForQuality

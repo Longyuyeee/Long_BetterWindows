@@ -289,6 +289,44 @@ public class SearchPreferenceTests
     }
 
     [Fact]
+    public void SuperPanelCoordinator_UsesSharedPagedGridAndContextListProjection()
+    {
+        var storage = new MemoryStorage();
+        var coordinator = new SuperPanelGroupCoordinator(
+            new SearchPreferenceService(storage),
+            new SuperPanelGroupService(storage));
+        coordinator.SetResults(
+            Enumerable.Range(1, 14)
+                .Select(index => Result($"result-{index:00}", 100 - index))
+                .ToList(),
+            completed: true);
+
+        var compact = coordinator.BuildView();
+
+        Assert.Equal(SuperPanelPresentationMode.CompactGrid, compact.PresentationMode);
+        Assert.Equal(12, compact.VisibleResults.Count);
+        Assert.Equal("1/2", compact.Page.Label);
+        Assert.False(compact.Page.CanMovePrevious);
+        Assert.True(compact.Page.CanMoveNext);
+        Assert.True(coordinator.MovePage(1));
+        Assert.Equal(
+            ["result-13", "result-14"],
+            coordinator.BuildView().VisibleResults.Select(result => result.Id));
+
+        coordinator.SetContext(hasContext: true);
+        var contextual = coordinator.BuildView();
+
+        Assert.Equal(SuperPanelPresentationMode.ContextList, contextual.PresentationMode);
+        Assert.Equal(6, contextual.VisibleResults.Count);
+        Assert.Equal("1/3", contextual.Page.Label);
+        Assert.True(coordinator.MovePage(1));
+        Assert.Equal("2/3", coordinator.BuildView().Page.Label);
+        Assert.True(coordinator.MovePage(1));
+        Assert.False(coordinator.MovePage(1));
+        Assert.Equal("3/3", coordinator.BuildView().Page.Label);
+    }
+
+    [Fact]
     public void SuperPanelCoordinator_ShowsEmptyStateOnlyAfterSearchCompletes()
     {
         var storage = new MemoryStorage();

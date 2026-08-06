@@ -7,6 +7,8 @@ namespace LongBetterWindows.Host.Interaction
         private readonly Func<string, string>? _localize;
         private IReadOnlyList<SearchResultItem> _results = Array.Empty<SearchResultItem>();
         private bool _searchCompleted;
+        private bool _hasContext;
+        private int _pageIndex;
 
         public SuperPanelGroupCoordinator(
             SearchPreferenceService preferences,
@@ -28,6 +30,14 @@ namespace LongBetterWindows.Host.Interaction
         {
             _results = Array.Empty<SearchResultItem>();
             _searchCompleted = false;
+            _pageIndex = 0;
+        }
+
+        public void SetContext(bool hasContext)
+        {
+            if (_hasContext == hasContext) return;
+            _hasContext = hasContext;
+            _pageIndex = 0;
         }
 
         public void SetResults(IReadOnlyList<SearchResultItem> results, bool completed)
@@ -43,6 +53,7 @@ namespace LongBetterWindows.Host.Interaction
                 return false;
 
             ActiveGroupId = groupId;
+            _pageIndex = 0;
             return true;
         }
 
@@ -56,6 +67,17 @@ namespace LongBetterWindows.Host.Interaction
             var offset = wheelDelta < 0 ? 1 : -1;
             var nextIndex = (currentIndex + offset + groups.Count) % groups.Count;
             ActiveGroupId = groups[nextIndex].Id;
+            _pageIndex = 0;
+            return true;
+        }
+
+        public bool MovePage(int offset)
+        {
+            if (offset == 0) return false;
+            var pageCount = GetPageCount();
+            var next = Math.Clamp(_pageIndex + Math.Sign(offset), 0, pageCount - 1);
+            if (next == _pageIndex) return false;
+            _pageIndex = next;
             return true;
         }
 
@@ -162,13 +184,22 @@ namespace LongBetterWindows.Host.Interaction
             var customGroups = _groups.GetGroups();
             var customGroup = customGroups.FirstOrDefault(group => string.Equals(
                 group.Id, ActiveGroupId, StringComparison.OrdinalIgnoreCase));
-            var visible = SuperPanelResultOrganizer.SelectGroup(
+            var matching = SuperPanelResultOrganizer.SelectGroup(
                 _results,
                 ActiveGroupId,
                 pinnedIds,
                 recentIds,
                 customGroup?.ResultIds,
-                maxResults: 6);
+                maxResults: 24);
+            var mode = ResolvePresentationMode();
+            var pageSize = GetPageSize(mode);
+            var pageCount = Math.Max(1, (int)Math.Ceiling(
+                matching.Count / (double)pageSize));
+            _pageIndex = Math.Clamp(_pageIndex, 0, pageCount - 1);
+            var visible = matching
+                .Skip(_pageIndex * pageSize)
+                .Take(pageSize)
+                .ToList();
             var resultIds = _results.Select(result => result.Id)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var groupViews = GetGroupDefinitions(customGroups)
@@ -221,8 +252,43 @@ namespace LongBetterWindows.Host.Interaction
                         "superPanel.hint.default",
                         "单击执行 · 滚轮切组 · Esc 返回原窗口"),
                 },
-                customGroup is not null);
+                customGroup is not null,
+                mode,
+                new SuperPanelPageView(
+                    _pageIndex,
+                    pageCount,
+                    _pageIndex > 0,
+                    _pageIndex + 1 < pageCount,
+                    $"{_pageIndex + 1}/{pageCount}"));
         }
+
+        private SuperPanelPresentationMode ResolvePresentationMode()
+            => _hasContext
+                && string.Equals(
+                    ActiveGroupId,
+                    SuperPanelGroupIds.Smart,
+                    StringComparison.OrdinalIgnoreCase)
+                ? SuperPanelPresentationMode.ContextList
+                : SuperPanelPresentationMode.CompactGrid;
+
+        private int GetPageCount()
+        {
+            var pinnedIds = _preferences.GetPinnedResultIds();
+            var recentIds = _preferences.GetRecentResultIds(24);
+            var custom = ActiveCustomGroup;
+            var count = SuperPanelResultOrganizer.SelectGroup(
+                _results,
+                ActiveGroupId,
+                pinnedIds,
+                recentIds,
+                custom?.ResultIds,
+                maxResults: 24).Count;
+            return Math.Max(1, (int)Math.Ceiling(
+                count / (double)GetPageSize(ResolvePresentationMode())));
+        }
+
+        private static int GetPageSize(SuperPanelPresentationMode mode)
+            => mode == SuperPanelPresentationMode.CompactGrid ? 12 : 6;
 
         private int GetVisibleCount(
             string groupId,
@@ -238,7 +304,7 @@ namespace LongBetterWindows.Host.Interaction
                     .First(custom => string.Equals(
                         custom.Id, groupId, StringComparison.OrdinalIgnoreCase))
                     .ResultIds.Count(resultIds.Contains),
-                _ => Math.Min(6, _results.Count),
+                _ => Math.Min(24, _results.Count),
             };
 
         private List<SuperPanelGroupDefinition> GetGroupDefinitions()
@@ -305,7 +371,22 @@ namespace LongBetterWindows.Host.Interaction
         string EmptyStateText,
         string StatusText,
         string InteractionHint,
-        bool ShowCustomGroupActions);
+        bool ShowCustomGroupActions,
+        SuperPanelPresentationMode PresentationMode,
+        SuperPanelPageView Page);
+
+    internal enum SuperPanelPresentationMode
+    {
+        CompactGrid,
+        ContextList,
+    }
+
+    internal sealed record SuperPanelPageView(
+        int PageIndex,
+        int PageCount,
+        bool CanMovePrevious,
+        bool CanMoveNext,
+        string Label);
 
     internal sealed record SuperPanelGroupMutationResult(bool Success, string Message)
     {
