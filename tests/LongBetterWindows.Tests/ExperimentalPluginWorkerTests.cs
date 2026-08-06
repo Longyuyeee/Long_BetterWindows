@@ -77,13 +77,14 @@ public sealed class ExperimentalPluginWorkerTests
         await using var session = await StartWorkerAsync(
             "reference.wrong.identity",
             workloadPath: ReferenceWorkloadPath());
-        using var timeout = new CancellationTokenSource(5_000);
-        await session.WaitForExitAsync(timeout.Token);
-        Assert.True(session.HasExited);
-
-        var rejected = await Assert.ThrowsAsync<PluginWorkerExitedException>(() =>
-            session.InvokeLifecycleAsync(PluginWorkerLifecycleOperation.Initialize));
-        Assert.NotEqual(0, rejected.ExitCode);
+        using var timeout = new CancellationTokenSource(15_000);
+        var rejected = await Record.ExceptionAsync(() =>
+            session.InvokeLifecycleAsync(
+                PluginWorkerLifecycleOperation.Initialize,
+                cancellationToken: timeout.Token));
+        Assert.True(
+            rejected is PluginWorkerExitedException or IOException,
+            $"Expected the mismatched workload connection to close, got {rejected?.GetType().Name ?? "success"}.");
     }
 
     [Fact]

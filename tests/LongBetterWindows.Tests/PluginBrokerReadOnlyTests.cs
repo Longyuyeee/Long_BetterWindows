@@ -240,17 +240,20 @@ public sealed class PluginBrokerReadOnlyTests
     [Fact]
     public async Task Client_local_wait_cancellation_does_not_poison_connection()
     {
-        var handler = new DelayedCommandHandler();
+        var handler = new ControlledCommandHandler();
         await using var fixture = await BrokerFixture.StartAsync(CreateCommandRegistry(handler));
         await using var client = new LongPluginBrokerClient(fixture.PipeName);
         await client.ConnectAsync(Hello());
-        using var localCancellation = new CancellationTokenSource(20);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
+        using var localCancellation = new CancellationTokenSource();
+        var request = client.RequestAsync<CommandInvokeRequest, CommandInvokeResponse>(
                 BrokerMethods.CommandInvoke,
                 CommandRequest(),
                 1_000,
-                localCancellation.Token));
+                localCancellation.Token);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        localCancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await request);
+        handler.Release.TrySetResult();
         await handler.Completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Task.Delay(50);
         var ping = await client.RequestAsync<HealthPingRequest, HealthPingResponse>(
@@ -473,15 +476,18 @@ public sealed class PluginBrokerReadOnlyTests
         }
     }
 
-    private sealed class DelayedCommandHandler : IPluginCommandHandler
+    private sealed class ControlledCommandHandler : IPluginCommandHandler
     {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Completed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async Task<PluginCommandResult> ExecuteCommandAsync(
             PluginCommandInvocation invocation,
             CancellationToken cancellationToken = default)
         {
-            await Task.Delay(100, cancellationToken);
+            Started.TrySetResult();
+            await Release.Task.WaitAsync(cancellationToken);
             Completed.TrySetResult();
             return PluginCommandResult.Success();
         }
