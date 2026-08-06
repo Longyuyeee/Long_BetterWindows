@@ -2,13 +2,27 @@
   "$schema": "../schemas/plugin-worker-migration-readiness.schema.json",
   "schema_version": 1,
   "assessment_date": "2026-08-06",
-  "phase": "PX6B-7",
-  "decision": "verified_package_descriptor_bridge_validated_release_gate_closed",
+  "phase": "PX6B-8",
+  "decision": "sample_contract_split_rejected_worker_migration_paused",
   "assessed_existing_candidates": 8,
   "eligible_existing_candidates": 0,
   "production_enabled": false,
   "real_plugins_migrated": 0,
-  "recommended_next": "low_risk_candidate_contract_split_audit",
+  "recommended_next": "unsigned_rc_acceptance_and_manual_plugin_validation",
+  "first_candidate_audit": {
+    "plugin_id": "com.long.sample",
+    "command_id": "sample.hello",
+    "verdict": "rejected_no_meaningful_worker_contract",
+    "pure_worker_operations": [],
+    "host_owned_operations": ["localized_ui_presentation", "notification.show"],
+    "source_capabilities": ["system.notification"],
+    "production_component_created": false,
+    "production_route_changed": false,
+    "blockers": [
+      "The command has no business computation independent of host presentation.",
+      "Moving a constant ready result into a process would add latency and lifecycle cost without isolation value."
+    ]
+  },
   "reference_workload": {
     "plugin_id": "reference.headless.native",
     "project": "tools/LongBetterWindows.PluginWorker.Reference/LongBetterWindows.PluginWorker.Reference.csproj",
@@ -38,7 +52,9 @@
     "worker loads the exact post-handshake verified bytes instead of reopening an assembly path",
     "workload required Host methods exactly match the approved DTO method set",
     "only sealed validator results can construct internal Worker candidate descriptors",
-    "production loading remains disabled until a separately reviewed candidate contract and release decision exist"
+    "production loading remains disabled until a separately reviewed candidate contract and release decision exist",
+    "the first production candidate must contain meaningful non-presentation behavior",
+    "worker migration resumes only when a new headless native candidate or approved isolation requirement exists"
   ],
   "candidates": [
     {

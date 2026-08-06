@@ -14,6 +14,7 @@
     "production_enabled",
     "real_plugins_migrated",
     "recommended_next",
+    "first_candidate_audit",
     "reference_workload",
     "worker_policy",
     "exit_criteria",
@@ -23,13 +24,49 @@
     "$schema": { "type": "string" },
     "schema_version": { "const": 1 },
     "assessment_date": { "type": "string", "format": "date" },
-    "phase": { "const": "PX6B-7" },
-    "decision": { "const": "verified_package_descriptor_bridge_validated_release_gate_closed" },
+    "phase": { "const": "PX6B-8" },
+    "decision": { "const": "sample_contract_split_rejected_worker_migration_paused" },
     "assessed_existing_candidates": { "const": 8 },
     "eligible_existing_candidates": { "const": 0 },
     "production_enabled": { "const": false },
     "real_plugins_migrated": { "const": 0 },
-    "recommended_next": { "const": "low_risk_candidate_contract_split_audit" },
+    "recommended_next": { "const": "unsigned_rc_acceptance_and_manual_plugin_validation" },
+    "first_candidate_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plugin_id",
+        "command_id",
+        "verdict",
+        "pure_worker_operations",
+        "host_owned_operations",
+        "source_capabilities",
+        "production_component_created",
+        "production_route_changed",
+        "blockers"
+      ],
+      "properties": {
+        "plugin_id": { "const": "com.long.sample" },
+        "command_id": { "const": "sample.hello" },
+        "verdict": { "const": "rejected_no_meaningful_worker_contract" },
+        "pure_worker_operations": { "const": [] },
+        "host_owned_operations": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["localized_ui_presentation", "notification.show"] }
+        },
+        "source_capabilities": { "const": ["system.notification"] },
+        "production_component_created": { "const": false },
+        "production_route_changed": { "const": false },
+        "blockers": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "reference_workload": {
       "type": "object",
       "additionalProperties": false,
@@ -95,7 +132,7 @@
     },
     "exit_criteria": {
       "type": "array",
-      "minItems": 6,
+      "minItems": 8,
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 }
     },

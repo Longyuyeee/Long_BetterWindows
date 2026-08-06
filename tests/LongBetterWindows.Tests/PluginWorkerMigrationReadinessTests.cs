@@ -13,16 +13,16 @@ public sealed class PluginWorkerMigrationReadinessTests
         RepositoryRoot, "schemas", "plugin-worker-migration-readiness.schema.json");
 
     [Fact]
-    public void Schema_LocksVerifiedDescriptorDecisionAndCandidateAuditNext()
+    public void Schema_LocksRejectedCandidateDecisionAndAcceptanceNext()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(SchemaPath));
         var root = document.RootElement;
         var properties = root.GetProperty("properties");
 
         Assert.False(root.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal("PX6B-7",
+        Assert.Equal("PX6B-8",
             properties.GetProperty("phase").GetProperty("const").GetString());
-        Assert.Equal("verified_package_descriptor_bridge_validated_release_gate_closed",
+        Assert.Equal("sample_contract_split_rejected_worker_migration_paused",
             properties.GetProperty("decision").GetProperty("const").GetString());
         Assert.Equal(8, properties.GetProperty("assessed_existing_candidates")
             .GetProperty("const").GetInt32());
@@ -32,7 +32,7 @@ public sealed class PluginWorkerMigrationReadinessTests
             .GetProperty("const").GetBoolean());
         Assert.Equal(0, properties.GetProperty("real_plugins_migrated")
             .GetProperty("const").GetInt32());
-        Assert.Equal("low_risk_candidate_contract_split_audit",
+        Assert.Equal("unsigned_rc_acceptance_and_manual_plugin_validation",
             properties.GetProperty("recommended_next").GetProperty("const").GetString());
     }
 
@@ -44,7 +44,7 @@ public sealed class PluginWorkerMigrationReadinessTests
         var candidates = root.GetProperty("candidates").EnumerateArray().ToArray();
         var expected = ReadCandidateManifests();
 
-        Assert.Equal("PX6B-7", root.GetProperty("phase").GetString());
+        Assert.Equal("PX6B-8", root.GetProperty("phase").GetString());
         Assert.Equal(8, root.GetProperty("assessed_existing_candidates").GetInt32());
         Assert.Equal(0, root.GetProperty("eligible_existing_candidates").GetInt32());
         Assert.False(root.GetProperty("production_enabled").GetBoolean());
@@ -95,9 +95,9 @@ public sealed class PluginWorkerMigrationReadinessTests
     {
         using var matrix = JsonDocument.Parse(File.ReadAllText(MatrixPath));
         var root = matrix.RootElement;
-        Assert.Equal("low_risk_candidate_contract_split_audit",
+        Assert.Equal("unsigned_rc_acceptance_and_manual_plugin_validation",
             root.GetProperty("recommended_next").GetString());
-        Assert.Equal(6, root.GetProperty("exit_criteria")
+        Assert.Equal(8, root.GetProperty("exit_criteria")
             .EnumerateArray().Select(item => item.GetString()).Distinct().Count());
 
         using var catalog = JsonDocument.Parse(File.ReadAllText(Path.Combine(
@@ -131,6 +131,43 @@ public sealed class PluginWorkerMigrationReadinessTests
         Assert.Equal([PluginWorkerProtocol.HostCapabilityQuery],
             ReadStrings(policy.GetProperty("approved_host_methods")));
         Assert.Empty(policy.GetProperty("reference_allowed_host_methods").EnumerateArray());
+    }
+
+    [Fact]
+    public void Matrix_RejectsSampleSplitFromCurrentSourceFacts()
+    {
+        using var matrix = JsonDocument.Parse(File.ReadAllText(MatrixPath));
+        var audit = matrix.RootElement.GetProperty("first_candidate_audit");
+        Assert.Equal("com.long.sample", audit.GetProperty("plugin_id").GetString());
+        Assert.Equal("sample.hello", audit.GetProperty("command_id").GetString());
+        Assert.Equal("rejected_no_meaningful_worker_contract",
+            audit.GetProperty("verdict").GetString());
+        Assert.Empty(audit.GetProperty("pure_worker_operations").EnumerateArray());
+        Assert.Equal(
+            ["localized_ui_presentation", "notification.show"],
+            ReadStrings(audit.GetProperty("host_owned_operations"))
+                .Order(StringComparer.Ordinal));
+        Assert.Equal(["system.notification"],
+            ReadStrings(audit.GetProperty("source_capabilities")));
+        Assert.False(audit.GetProperty("production_component_created").GetBoolean());
+        Assert.False(audit.GetProperty("production_route_changed").GetBoolean());
+        Assert.True(audit.GetProperty("blockers").GetArrayLength() >= 2);
+
+        var source = File.ReadAllText(FullPath("src/SamplePlugin/HelloPlugin.cs"));
+        Assert.Contains("IHasMainUI", source, StringComparison.Ordinal);
+        Assert.Contains("_notification = host.Notification", source, StringComparison.Ordinal);
+        Assert.Contains("_notification.ShowAsync", source, StringComparison.Ordinal);
+        Assert.Contains("ShowMainUI()", source, StringComparison.Ordinal);
+        Assert.Contains("ShowReadyAsync()", source, StringComparison.Ordinal);
+
+        using var manifest = JsonDocument.Parse(File.ReadAllText(
+            FullPath("src/SamplePlugin/manifest.json")));
+        Assert.Equal(["system.notification"],
+            ReadStrings(manifest.RootElement.GetProperty("capabilities")));
+        Assert.Contains(
+            manifest.RootElement.GetProperty("commands").EnumerateArray(),
+            command => command.GetProperty("id").GetString() == "sample.hello");
+        Assert.False(Directory.Exists(FullPath("src/SamplePlugin.Worker")));
     }
 
     private static Dictionary<string, ManifestFact> ReadCandidateManifests()
