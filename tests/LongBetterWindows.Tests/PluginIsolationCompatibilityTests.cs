@@ -51,6 +51,15 @@ public sealed class PluginIsolationCompatibilityTests
                 .GetProperty("decision")
                 .GetProperty("const")
                 .GetString());
+        var experiment = definitions.GetProperty("experiment");
+        var experimentProperties = experiment.GetProperty("properties");
+        Assert.False(experiment.GetProperty("additionalProperties").GetBoolean());
+        Assert.Equal("PX6B-2",
+            experimentProperties.GetProperty("phase").GetProperty("const").GetString());
+        Assert.False(experimentProperties.GetProperty("production_enabled")
+            .GetProperty("const").GetBoolean());
+        Assert.Equal(0, experimentProperties.GetProperty("real_plugins_migrated")
+            .GetProperty("const").GetInt32());
     }
 
     [Fact]
@@ -100,6 +109,13 @@ public sealed class PluginIsolationCompatibilityTests
         Assert.Equal(
             "synthetic_headless_native_command_worker",
             root.GetProperty("policy").GetProperty("first_experiment").GetString());
+        var experiment = root.GetProperty("experiment");
+        Assert.Equal("PX6B-2", experiment.GetProperty("phase").GetString());
+        Assert.Equal("synthetic_worker_validated", experiment.GetProperty("status").GetString());
+        Assert.False(experiment.GetProperty("production_enabled").GetBoolean());
+        Assert.Equal(0, experiment.GetProperty("real_plugins_migrated").GetInt32());
+        Assert.Equal(11, experiment.GetProperty("validated_gates")
+            .EnumerateArray().Select(item => item.GetString()).Distinct().Count());
     }
 
     [Fact]

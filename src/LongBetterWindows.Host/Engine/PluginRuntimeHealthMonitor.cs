@@ -17,6 +17,8 @@ namespace LongBetterWindows.Host.Engine
         BackgroundTransitionFailed,
         ResourceReleaseFailed,
         CommandFailed,
+        WorkerTimeout,
+        WorkerCrashed,
         UnhandledException,
     }
 
@@ -98,11 +100,25 @@ namespace LongBetterWindows.Host.Engine
             => Record(pluginId, duration, RuntimeOutcome.Cancellation);
 
         public void RecordException(string pluginId, TimeSpan duration)
-            => Record(
+            => RecordException(
+                pluginId,
+                duration,
+                PluginRuntimeFailureKind.UnhandledException);
+
+        public void RecordException(
+            string pluginId,
+            TimeSpan duration,
+            PluginRuntimeFailureKind kind)
+        {
+            if (kind is not PluginRuntimeFailureKind.UnhandledException
+                and not PluginRuntimeFailureKind.WorkerCrashed)
+                throw new ArgumentOutOfRangeException(nameof(kind));
+            Record(
                 pluginId,
                 duration,
                 RuntimeOutcome.Exception,
-                PluginRuntimeFailureKind.UnhandledException);
+                kind);
+        }
 
         public void RecordLifecycleTransition(
             string pluginId,
@@ -214,6 +230,7 @@ namespace LongBetterWindows.Host.Engine
         {
             if (health.LifecycleState == PluginRuntimeLifecycleState.Error
                 || health.LastFailureKind == PluginRuntimeFailureKind.UnhandledException
+                || health.LastFailureKind == PluginRuntimeFailureKind.WorkerCrashed
                 || health.ConsecutiveFailureCount >= 3)
                 return PluginRuntimeHealthState.Unhealthy;
             if (health.ConsecutiveFailureCount > 0)

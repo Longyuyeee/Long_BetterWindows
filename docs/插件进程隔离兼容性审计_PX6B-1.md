@@ -40,3 +40,11 @@ PX6B-2 只实现 `synthetic_headless_native_command_worker`：
 - 全量自动化：1155 / 1155。
 - Release 构建：0 警告、0 错误。
 - 权威目录派生检查：通过。
+
+## 5. PX6B-2 实验结果
+
+合成无界面 Native Worker 已通过 PID + nonce 握手、完整生命周期、命令、取消、deadline、崩溃、
+确定性清理、专属进程资源快照、健康映射和公开 API 隔离门禁。该结果只证明实验架构可行：
+生产开关仍关闭，真实插件迁移数仍为 0，下一步先完成最小能力代理与资源租约设计。
+最终门禁为 Release 0 警告 / 0 错误、全量自动化 1161 / 1161、目录派生检查通过、
+`LongBetterWindows.PluginIpc` 1.1.0 打包通过，且测试后没有 Worker 进程残留。

@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\WindowManagerPlugin\WindowManagerPlugin.csproj" />
     <ProjectReference Include="..\..\tools\LongBetterWindows.MarketplacePublisher\LongBetterWindows.MarketplacePublisher.csproj" />
     <ProjectReference Include="..\..\tools\LongBetterWindows.PluginCatalogGenerator\LongBetterWindows.PluginCatalogGenerator.csproj" />
+    <ProjectReference Include="..\..\tools\LongBetterWindows.PluginWorker\LongBetterWindows.PluginWorker.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

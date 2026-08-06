@@ -9,6 +9,27 @@
     "resource_attribution_rule": "Per-plugin CPU and memory may only be reported for a dedicated worker process; in-process estimates are not accepted as attribution.",
     "first_experiment": "synthetic_headless_native_command_worker"
   },
+  "experiment": {
+    "phase": "PX6B-2",
+    "status": "synthetic_worker_validated",
+    "worker_project": "tools/LongBetterWindows.PluginWorker/LongBetterWindows.PluginWorker.csproj",
+    "test_path": "tests/LongBetterWindows.Tests/ExperimentalPluginWorkerTests.cs",
+    "production_enabled": false,
+    "real_plugins_migrated": 0,
+    "validated_gates": [
+      "process_identity",
+      "ephemeral_nonce",
+      "lifecycle",
+      "command",
+      "cancellation",
+      "deadline_timeout",
+      "crash_detection",
+      "deterministic_cleanup",
+      "dedicated_resource_snapshot",
+      "health_mapping",
+      "public_api_isolation"
+    ]
+  },
   "shared_worker_contract": {
     "process_model": "one_worker_per_plugin_instance",
     "transport_reuse": "lpwp_length_prefixed_json_framing",

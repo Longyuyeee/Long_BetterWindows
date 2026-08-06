@@ -39,15 +39,63 @@ public sealed record IpcEnvelope
         T payload,
         int? deadlineMilliseconds = null,
         string? id = null)
+        => RequestForProtocol(
+            IpcProtocol.Name,
+            method,
+            payload,
+            deadlineMilliseconds,
+            id);
+
+    internal static IpcEnvelope RequestForProtocol<T>(
+        string protocol,
+        string method,
+        T payload,
+        int? deadlineMilliseconds = null,
+        string? id = null)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
         return new IpcEnvelope
         {
+            Protocol = protocol,
             Id = id ?? Guid.NewGuid().ToString(),
             Kind = "request",
             Method = method,
             DeadlineMilliseconds = IpcProtocol.NormalizeDeadline(deadlineMilliseconds),
             Payload = JsonSerializer.SerializeToElement(payload, IpcJson.Options)
+        };
+    }
+
+    internal static IpcEnvelope Response<T>(
+        string protocol,
+        string id,
+        T result)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        return new IpcEnvelope
+        {
+            Protocol = protocol,
+            Id = id,
+            Kind = "response",
+            Result = JsonSerializer.SerializeToElement(result, IpcJson.Options),
+        };
+    }
+
+    internal static IpcEnvelope Failure(
+        string protocol,
+        string id,
+        IpcError error)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        ArgumentNullException.ThrowIfNull(error);
+        return new IpcEnvelope
+        {
+            Protocol = protocol,
+            Id = id,
+            Kind = "response",
+            Error = error,
         };
     }
 }
