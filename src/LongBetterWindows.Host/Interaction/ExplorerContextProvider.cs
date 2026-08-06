@@ -27,11 +27,7 @@ namespace LongBetterWindows.Host.Interaction
 
             if (selection.IsSuccess && selection.Data is { Count: > 0 } paths)
             {
-                var inputType = paths.Count > 1
-                    ? AcceptedInputType.Files
-                    : Directory.Exists(paths[0])
-                        ? AcceptedInputType.Folder
-                        : AcceptedInputType.File;
+                var inputTypes = ContextInputClassifier.ClassifyExplorerSelection(paths);
                 var label = paths.Count > 1
                     ? $"Explorer 选区 · {paths.Count} 项"
                     : $"Explorer 选区 · {Path.GetFileName(paths[0])}";
@@ -43,7 +39,7 @@ namespace LongBetterWindows.Host.Interaction
                         Source = ContextSource.ExplorerSelection,
                         Label = label,
                         Paths = paths,
-                        CompatibleInputTypes = new[] { inputType, AcceptedInputType.ExplorerSelection },
+                        CompatibleInputTypes = inputTypes,
                         Sensitivity = ContextSensitivity.Sensitive,
                     },
                 };

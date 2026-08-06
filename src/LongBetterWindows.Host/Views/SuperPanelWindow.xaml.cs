@@ -23,6 +23,7 @@ namespace LongBetterWindows.Host.Views
         private readonly SuperPanelDragSession _dragSession = new();
         private readonly SuperPanelWindowLifecycle _windowLifecycle;
         private readonly QualityWindowAutomation? _qualityAutomation;
+        private string _contextMetadata = ContextMetadataProjection.Project(ContextSnapshot.Empty);
 
         private SuperPanelWindow()
         {
@@ -67,28 +68,8 @@ namespace LongBetterWindows.Host.Views
         public static void ShowPanel()
             => ShowPanelCore(null);
 
-        internal static void ShowPanelForQuality(bool useEmptyContext = false)
-            => ShowPanelCore(useEmptyContext
-                ? ContextSnapshot.Empty
-                : new ContextSnapshot(DateTimeOffset.UtcNow, new[]
-                {
-                    new ContextItem
-                    {
-                        Id = "quality.url",
-                        Source = ContextSource.Clipboard,
-                        Label = string.Format(
-                            ServicesInitializer.I18n.T(
-                                "superPanel.quality.clipboardLink"),
-                            "https://long.example/quality"),
-                        Text = "https://long.example/quality",
-                        CompatibleInputTypes = new[]
-                        {
-                            LongBetterWindows.Host.Contracts.AcceptedInputType.Url,
-                            LongBetterWindows.Host.Contracts.AcceptedInputType.Clipboard,
-                            LongBetterWindows.Host.Contracts.AcceptedInputType.Text,
-                        },
-                    },
-                }));
+        internal static void ShowPanelForQuality(string? contextProfile = null)
+            => ShowPanelCore(QualityContextFixtures.Create(contextProfile));
 
         private static void ShowPanelCore(ContextSnapshot? presetContext)
         {
@@ -125,6 +106,9 @@ namespace LongBetterWindows.Host.Views
             SuperPanelContextUpdate update)
         {
             _groupCoordinator.ResetResults();
+            _contextMetadata = ContextMetadataProjection.Project(
+                update.Snapshot,
+                update.IsLoading);
             _groupCoordinator.SetContext(
                 !update.IsLoading && update.Snapshot.Items.Count > 0);
             var view = SuperPanelViewProjection.ProjectContext(
@@ -182,7 +166,8 @@ namespace LongBetterWindows.Host.Views
             PageText.Text = view.Page.Label;
             AutomationProperties.SetItemStatus(
                 ResultsList,
-                $"mode:{(compact ? "compact-grid" : "context-list")};page:{view.Page.Label}");
+                $"mode:{(compact ? "compact-grid" : "context-list")};" +
+                $"page:{view.Page.Label};{_contextMetadata}");
         }
         private async Task ExecuteAsync(SearchResultItem selected)
         {

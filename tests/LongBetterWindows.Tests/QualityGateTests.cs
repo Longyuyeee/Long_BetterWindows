@@ -967,6 +967,11 @@ public class QualityGateTests
         Assert.Contains("selection_preserved_on_transition", Read("run-desktop-ui-smoke.ps1"));
         Assert.Contains("context_list_mode", Read("run-desktop-ui-smoke.ps1"));
         Assert.Contains("compact_grid_mode", Read("run-desktop-ui-smoke.ps1"));
+        Assert.Contains("context_matrix", Read("run-desktop-ui-smoke.ps1"));
+        Assert.Contains("--quality-context", Read("run-desktop-ui-smoke.ps1"));
+        Assert.Contains("ContextMetadataProjection.Project", source);
+        Assert.Contains("ContextInputClassifier.ClassifyExplorerSelection", Read(
+            "src", "LongBetterWindows.Host", "Interaction", "ExplorerContextProvider.cs"));
         Assert.Contains("app._startupOptions.OpenSuperPanelForQuality", Read(
             "src", "LongBetterWindows.Host", "App.xaml.cs"));
         Assert.DoesNotContain("CommandPaletteWindow.ShowPalette();", source);

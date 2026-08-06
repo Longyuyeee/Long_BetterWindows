@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using LongBetterWindows.Host.Capabilities;
@@ -63,6 +64,88 @@ public class ContextCaptureTests
         Assert.Equal(new byte[] { 137, 80, 78, 71 }, result.ImagePng![..4]);
         Assert.Equal(new[] { AcceptedInputType.Image }, result.CompatibleInputTypes);
         Assert.Equal(ContextSensitivity.Sensitive, result.Sensitivity);
+    }
+
+    [Fact]
+    public void ExplorerClassifier_RecognizesSingleImageWithoutLosingFileCompatibility()
+    {
+        var inputs = ContextInputClassifier.ClassifyExplorerSelection(
+            new[] { @"C:\quality\PHOTO.PNG" });
+
+        Assert.Equal(
+            new[]
+            {
+                AcceptedInputType.Image,
+                AcceptedInputType.File,
+                AcceptedInputType.ExplorerSelection,
+            },
+            inputs);
+    }
+
+    [Fact]
+    public void ExplorerClassifier_PreservesSingleMultiAndFolderSemantics()
+    {
+        var directory = Directory.CreateTempSubdirectory("long-context-");
+        try
+        {
+            Assert.Equal(
+                new[] { AcceptedInputType.File, AcceptedInputType.ExplorerSelection },
+                ContextInputClassifier.ClassifyExplorerSelection(
+                    new[] { @"C:\quality\document.txt" }));
+            Assert.Equal(
+                new[] { AcceptedInputType.Files, AcceptedInputType.ExplorerSelection },
+                ContextInputClassifier.ClassifyExplorerSelection(
+                    new[] { @"C:\quality\one.png", @"C:\quality\two.png" }));
+            Assert.Equal(
+                new[] { AcceptedInputType.Folder, AcceptedInputType.ExplorerSelection },
+                ContextInputClassifier.ClassifyExplorerSelection(
+                    new[] { directory.FullName }));
+        }
+        finally
+        {
+            directory.Delete();
+        }
+    }
+
+    [Theory]
+    [InlineData("url", 1, "url,clipboard,text")]
+    [InlineData("text", 1, "clipboard,text")]
+    [InlineData("image", 1, "image")]
+    [InlineData("file", 1, "file,explorerselection")]
+    [InlineData("files", 1, "files,explorerselection")]
+    [InlineData("empty", 0, "none")]
+    public void QualityContextFixtures_ExposeOnlyTypeMetadata(
+        string profile,
+        int itemCount,
+        string expectedInputs)
+    {
+        var snapshot = QualityContextFixtures.Create(profile);
+        var metadata = ContextMetadataProjection.Project(snapshot);
+
+        Assert.Equal(itemCount, snapshot.Items.Count);
+        Assert.Equal($"context-items:{itemCount};inputs:{expectedInputs}", metadata);
+        Assert.DoesNotContain("LongQuality", metadata, StringComparison.Ordinal);
+        Assert.DoesNotContain("quality text", metadata, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void QualityContextFixtures_RejectUnknownProfile()
+        => Assert.Throws<ArgumentOutOfRangeException>(
+            () => QualityContextFixtures.Create("unknown"));
+
+    [Fact]
+    public void QualityImageFixture_ContainsDecodableOnePixelPng()
+    {
+        var item = Assert.Single(QualityContextFixtures.Create("image").Items);
+        using var stream = new MemoryStream(item.ImagePng!);
+        var decoder = new PngBitmapDecoder(
+            stream,
+            BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad);
+
+        var frame = Assert.Single(decoder.Frames);
+        Assert.Equal(1, frame.PixelWidth);
+        Assert.Equal(1, frame.PixelHeight);
     }
 
     [Fact]

@@ -553,6 +553,7 @@ $report = [ordered]@{
 $paletteProcess = $null
 $paletteMenuProcess = $null
 $superPanelProcess = $null
+$contextMatrixProcess = $null
 $superPanelTransitionProcess = $null
 $managementProcess = $null
 $workflowPaletteProcess = $null
@@ -731,10 +732,57 @@ try {
         context_list_mode = [string]$contextListMode
         context_second_page = [string]$contextSecondPage
         escape_closed_panel = $true
+        context_matrix = @(
+            [ordered]@{
+                profile = 'url'
+                expected_mode = 'context-list'
+                expected_inputs = 'url,clipboard,text'
+                item_status = [string]$contextListMode
+            }
+        )
     }
 
     Stop-QualityHost $superPanelProcess
     $superPanelProcess = $null
+
+    $contextProfiles = @(
+        [ordered]@{ profile = 'text'; mode = 'context-list'; items = 1; inputs = 'clipboard,text' },
+        [ordered]@{ profile = 'image'; mode = 'context-list'; items = 1; inputs = 'image' },
+        [ordered]@{ profile = 'file'; mode = 'context-list'; items = 1; inputs = 'file,explorerselection' },
+        [ordered]@{ profile = 'files'; mode = 'context-list'; items = 1; inputs = 'files,explorerselection' },
+        [ordered]@{ profile = 'empty'; mode = 'compact-grid'; items = 0; inputs = 'none' }
+    )
+    foreach ($profile in $contextProfiles) {
+        Write-Stage "Validating Super Panel context profile: $($profile.profile)."
+        try {
+            $contextMatrixProcess = Start-QualityHost @(
+                '--quality-open-super-panel',
+                '--quality-context', [string]$profile.profile)
+            $contextPanel = Wait-Until {
+                Find-WindowByAutomationId $contextMatrixProcess.Id 'Long.SuperPanel'
+            } "Super Panel did not appear for context profile $($profile.profile)."
+            $contextResults = Wait-Until {
+                Find-DescendantByAutomationId $contextPanel 'Long.SuperPanel.Results'
+            } "Super Panel results were unavailable for context profile $($profile.profile)."
+            $expectedSuffix = "context-items:$($profile.items);inputs:$($profile.inputs)"
+            $contextStatus = Wait-Until {
+                $status = [string]$contextResults.Current.ItemStatus
+                if ($status -like "mode:$($profile.mode);page:1/*;$expectedSuffix") {
+                    $status
+                }
+            } "Super Panel context profile $($profile.profile) did not expose $expectedSuffix."
+            $report.super_panel.context_matrix += [ordered]@{
+                profile = [string]$profile.profile
+                expected_mode = [string]$profile.mode
+                expected_inputs = [string]$profile.inputs
+                item_status = [string]$contextStatus
+            }
+        }
+        finally {
+            Stop-QualityHost $contextMatrixProcess
+            $contextMatrixProcess = $null
+        }
+    }
 
     Write-Stage 'Starting Super Panel to Command Palette transition host.'
     $superPanelTransitionProcess = Start-QualityHost @(
@@ -1634,6 +1682,7 @@ finally {
     Stop-QualityHost $paletteProcess
     Stop-QualityHost $paletteMenuProcess
     Stop-QualityHost $superPanelProcess
+    Stop-QualityHost $contextMatrixProcess
     Stop-QualityHost $superPanelTransitionProcess
     Stop-QualityHost $managementProcess
     Stop-QualityHost $workflowPaletteProcess

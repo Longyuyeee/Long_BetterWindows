@@ -29,6 +29,7 @@ public class AppStartupOptionsTests
             "--quality-reduce-motion",
             "--quality-window-automation",
             "--quality-empty-context",
+            "--quality-context", "IMAGE",
             "--quality-workflows-dir", "quality-workflows",
             "--quality-open-workflow", "workflow.quality.review",
             "--quality-edit-workflow", "workflow.quality.editor",
@@ -77,6 +78,7 @@ public class AppStartupOptionsTests
         Assert.True(options.ForceReduceMotion);
         Assert.True(options.EnableWindowAutomationForQuality);
         Assert.True(options.UseEmptyContextForQuality);
+        Assert.Equal("image", options.QualityContextProfile);
         Assert.Equal("quality-workflows", options.QualityWorkflowsDirectory);
         Assert.Equal("workflow.quality.review", options.QualityWorkflowReviewId);
         Assert.Equal("workflow.quality.editor", options.QualityWorkflowEditorId);

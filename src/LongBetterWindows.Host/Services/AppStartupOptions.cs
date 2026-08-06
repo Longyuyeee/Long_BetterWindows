@@ -48,6 +48,7 @@ namespace LongBetterWindows.Host.Services
         public string? MarketplaceTrustStorePath { get; private init; }
         public bool UseLiveContextForQuality { get; private init; }
         public bool UseEmptyContextForQuality { get; private init; }
+        public string? QualityContextProfile { get; private init; }
         public string? QualityWorkflowsDirectory { get; private init; }
         public string? QualityWorkflowReviewId { get; private init; }
         public string? QualityWorkflowEditorId { get; private init; }
@@ -169,6 +170,8 @@ namespace LongBetterWindows.Host.Services
                 MarketplaceTrustStorePath = ReadArgument(arguments, "--quality-market-trust-store"),
                 UseLiveContextForQuality = HasSwitch(arguments, "--quality-live-context"),
                 UseEmptyContextForQuality = HasSwitch(arguments, "--quality-empty-context"),
+                QualityContextProfile = ReadArgument(arguments, "--quality-context")?
+                    .ToLowerInvariant(),
                 QualityWorkflowsDirectory = ReadArgument(arguments, "--quality-workflows-dir"),
                 QualityWorkflowReviewId = ReadArgument(arguments, "--quality-open-workflow"),
                 QualityWorkflowEditorId = ReadArgument(arguments, "--quality-edit-workflow"),

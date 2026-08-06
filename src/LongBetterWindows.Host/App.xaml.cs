@@ -277,7 +277,9 @@ namespace LongBetterWindows.Host
                         SuperPanelWindow.ShowPanel();
                     else
                         SuperPanelWindow.ShowPanelForQuality(
-                            _startupOptions.UseEmptyContextForQuality);
+                            _startupOptions.UseEmptyContextForQuality
+                                ? "empty"
+                                : _startupOptions.QualityContextProfile);
                 }
                 if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginSettingsId))
