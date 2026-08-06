@@ -23,6 +23,8 @@ namespace LongBetterWindows.Host.Views
         }
 
         private readonly List<FrameworkElement> _responsiveActions;
+        private string _activeCategory = "appearance";
+        private bool _categorySelectorReady;
         private UpdateService? _updateService;
         private UpdateCheckResult? _availableUpdate;
         private string? _downloadedUpdatePath;
@@ -35,6 +37,7 @@ namespace LongBetterWindows.Host.Views
         public SettingsPageControl()
         {
             InitializeComponent();
+            InitializeCategoryNavigation();
             _responsiveActions =
             [
                 LanguageSelector,
@@ -58,6 +61,35 @@ namespace LongBetterWindows.Host.Views
         }
 
         public event EventHandler? LanguageApplied;
+
+        internal bool NavigateToCategory(string category)
+        {
+            var normalized = category.Trim().ToLowerInvariant();
+            if (normalized is not ("appearance" or "interaction"
+                or "connections" or "updates"))
+            {
+                return false;
+            }
+
+            _activeCategory = normalized;
+            AppearanceCategory.Visibility = normalized == "appearance"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            InteractionCategory.Visibility = normalized == "interaction"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ConnectionsCategory.Visibility = normalized == "connections"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            UpdatesCategory.Visibility = normalized == "updates"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            SynchronizeCategorySelectors();
+            AutomationProperties.SetHelpText(
+                CategoryContent,
+                I18n($"settings.category.{normalized}"));
+            return true;
+        }
 
         public void Dispose()
         {
@@ -90,6 +122,84 @@ namespace LongBetterWindows.Host.Views
                     ? new Thickness(0, 12, 0, 0)
                     : new Thickness(0);
             }
+
+            var compactNavigation = e.NewSize.Width < 760;
+            DesktopCategoryList.Visibility = compactNavigation
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            CompactCategorySelector.Visibility = compactNavigation
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            CategoryColumn.Width = compactNavigation
+                ? new GridLength(0)
+                : new GridLength(200);
+            CategoryGapColumn.Width = compactNavigation
+                ? new GridLength(0)
+                : new GridLength(20);
+            Grid.SetRow(CategoryContent, compactNavigation ? 1 : 0);
+            Grid.SetRowSpan(CategoryContent, compactNavigation ? 1 : 2);
+            Grid.SetColumn(CategoryContent, compactNavigation ? 0 : 2);
+            Grid.SetColumnSpan(CategoryContent, compactNavigation ? 3 : 1);
+        }
+
+        private void InitializeCategoryNavigation()
+        {
+            _categorySelectorReady = true;
+            NavigateToCategory(_activeCategory);
+        }
+
+        private void CategorySelector_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
+        {
+            if (!_categorySelectorReady)
+                return;
+            var selected = sender switch
+            {
+                ComboBox combo => combo.SelectedItem as FrameworkElement,
+                _ => null,
+            };
+            if (selected?.Tag is string category
+                && !string.Equals(
+                    category,
+                    _activeCategory,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                NavigateToCategory(category);
+            }
+        }
+
+        private void CategoryButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { Tag: string category })
+                NavigateToCategory(category);
+        }
+
+        private void SynchronizeCategorySelectors()
+        {
+            _categorySelectorReady = false;
+            foreach (var button in DesktopCategoryList.Children.OfType<Button>())
+            {
+                var selected = string.Equals(
+                    button.Tag?.ToString(),
+                    _activeCategory,
+                    StringComparison.OrdinalIgnoreCase);
+                button.SetResourceReference(
+                    FrameworkElement.StyleProperty,
+                    selected
+                        ? "SettingsCategoryButton.Selected"
+                        : "SettingsCategoryButton");
+                AutomationProperties.SetItemStatus(
+                    button,
+                    selected ? "selected" : "");
+            }
+            CompactCategorySelector.SelectedItem = CompactCategorySelector.Items
+                .OfType<ComboBoxItem>()
+                .First(item => string.Equals(
+                    item.Tag?.ToString(),
+                    _activeCategory,
+                    StringComparison.OrdinalIgnoreCase));
+            _categorySelectorReady = true;
         }
 
         private void InitializeLanguageSelector()

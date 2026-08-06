@@ -95,7 +95,7 @@ namespace LongBetterWindows.Host.Interaction
             {
                 WorkspaceModuleAddressKind.Management => "root",
                 WorkspaceModuleAddressKind.Marketplace => "catalog",
-                WorkspaceModuleAddressKind.Settings => "root",
+                WorkspaceModuleAddressKind.Settings => null,
                 WorkspaceModuleAddressKind.Diagnostics => "root",
                 WorkspaceModuleAddressKind.Developer => "root",
                 WorkspaceModuleAddressKind.Widgets => "root",
@@ -106,6 +106,15 @@ namespace LongBetterWindows.Host.Interaction
                 return fixedResource.Equals(
                     resourceId,
                     StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (kind == WorkspaceModuleAddressKind.Settings)
+            {
+                return resourceId.Equals("root", StringComparison.OrdinalIgnoreCase)
+                    || resourceId.Equals("appearance", StringComparison.OrdinalIgnoreCase)
+                    || resourceId.Equals("interaction", StringComparison.OrdinalIgnoreCase)
+                    || resourceId.Equals("connections", StringComparison.OrdinalIgnoreCase)
+                    || resourceId.Equals("updates", StringComparison.OrdinalIgnoreCase);
             }
 
             return IsSafeIdentifier(resourceId);
@@ -186,7 +195,13 @@ namespace LongBetterWindows.Host.Interaction
                 case WorkspaceModuleAddressKind.Marketplace:
                     return Success(canonical, Text("page.market.title", "插件应用市场"));
                 case WorkspaceModuleAddressKind.Settings:
-                    return Success(canonical, Text("page.settings.title", "设置"));
+                    return Success(
+                        canonical,
+                        Text("page.settings.title", "设置"),
+                        moduleResourceId: "root",
+                        navigationTarget: canonical.ResourceId == "root"
+                            ? null
+                            : canonical.ResourceId);
                 case WorkspaceModuleAddressKind.Diagnostics:
                     return Success(canonical, Text("page.diagnostics.title", "诊断"));
                 case WorkspaceModuleAddressKind.Developer:
@@ -253,18 +268,21 @@ namespace LongBetterWindows.Host.Interaction
             string title,
             bool canClose = true,
             bool supportsDetach = false,
-            string? searchScopeId = null)
+            string? searchScopeId = null,
+            string? moduleResourceId = null,
+            string? navigationTarget = null)
             => new(
                 address,
                 new WorkspaceModuleDescriptor(
                     new WorkspaceModuleKey(
                         address.CanonicalValue[..address.CanonicalValue.IndexOf(':')],
-                        address.ResourceId,
+                        moduleResourceId ?? address.ResourceId,
                         address.InstanceId),
                     title,
                     canClose,
                     supportsDetach,
-                    searchScopeId: searchScopeId),
+                    searchScopeId: searchScopeId,
+                    navigationTarget: navigationTarget),
                 WorkspaceModuleResolutionError.None);
 
         private static WorkspaceModuleResolution Failure(

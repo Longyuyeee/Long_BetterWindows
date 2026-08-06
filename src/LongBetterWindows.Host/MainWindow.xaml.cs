@@ -361,7 +361,9 @@ namespace LongBetterWindows.Host
                         : I18nOrFallback(
                             "plugins.settingsUnavailable",
                             "插件设置当前不可用。"),
-                _ => ToolCenter.OpenWorkspaceModule(module.Key)
+                _ => ToolCenter.OpenWorkspaceModule(
+                    module.Key,
+                    module.NavigationTarget)
                     ? null
                     : I18nOrFallback(
                         "search.error.workspaceResourceUnsupported",

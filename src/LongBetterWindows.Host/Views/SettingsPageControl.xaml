@@ -6,8 +6,80 @@
         <Style x:Key="SettingsCard" TargetType="Border" BasedOn="{StaticResource LongCard}">
             <Setter Property="Effect" Value="{x:Null}" />
         </Style>
+        <Style x:Key="SettingsCategoryButton"
+               TargetType="Button"
+               BasedOn="{StaticResource LongButton}">
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style x:Key="SettingsCategoryButton.Selected"
+               TargetType="Button"
+               BasedOn="{StaticResource LongButton.Primary}">
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
     </UserControl.Resources>
-    <StackPanel VerticalAlignment="Top">
+    <Grid VerticalAlignment="Top">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="CategoryColumn" Width="200" />
+            <ColumnDefinition x:Name="CategoryGapColumn" Width="20" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel x:Name="DesktopCategoryList"
+                    Grid.RowSpan="2"
+                    automation:AutomationProperties.AutomationId="Long.Settings.CategoryList">
+            <Button Tag="appearance" Style="{StaticResource SettingsCategoryButton}"
+                    Click="CategoryButton_Click"
+                    automation:AutomationProperties.AutomationId="Long.Settings.CategoryItem.appearance"
+                    Content="{DynamicResource i18n.settings.category.appearance}" />
+            <Button Tag="interaction" Style="{StaticResource SettingsCategoryButton}"
+                    Click="CategoryButton_Click"
+                    automation:AutomationProperties.AutomationId="Long.Settings.CategoryItem.interaction"
+                    Content="{DynamicResource i18n.settings.category.interaction}" />
+            <Button Tag="connections" Style="{StaticResource SettingsCategoryButton}"
+                    Click="CategoryButton_Click"
+                    automation:AutomationProperties.AutomationId="Long.Settings.CategoryItem.connections"
+                    Content="{DynamicResource i18n.settings.category.connections}" />
+            <Button Tag="updates" Style="{StaticResource SettingsCategoryButton}"
+                    Click="CategoryButton_Click"
+                    automation:AutomationProperties.AutomationId="Long.Settings.CategoryItem.updates"
+                    Content="{DynamicResource i18n.settings.category.updates}" />
+        </StackPanel>
+
+        <ComboBox x:Name="CompactCategorySelector"
+                  Grid.ColumnSpan="3"
+                  Margin="0,0,0,16"
+                  Visibility="Collapsed"
+                  SelectionChanged="CategorySelector_SelectionChanged"
+                  automation:AutomationProperties.AutomationId="Long.Settings.CategorySelector">
+            <ComboBoxItem Tag="appearance"
+                          automation:AutomationProperties.AutomationId="Long.Settings.CompactCategoryItem.appearance"
+                          Content="{DynamicResource i18n.settings.category.appearance}" />
+            <ComboBoxItem Tag="interaction"
+                          automation:AutomationProperties.AutomationId="Long.Settings.CompactCategoryItem.interaction"
+                          Content="{DynamicResource i18n.settings.category.interaction}" />
+            <ComboBoxItem Tag="connections"
+                          automation:AutomationProperties.AutomationId="Long.Settings.CompactCategoryItem.connections"
+                          Content="{DynamicResource i18n.settings.category.connections}" />
+            <ComboBoxItem Tag="updates"
+                          automation:AutomationProperties.AutomationId="Long.Settings.CompactCategoryItem.updates"
+                          Content="{DynamicResource i18n.settings.category.updates}" />
+        </ComboBox>
+
+        <Grid x:Name="CategoryContent" Grid.RowSpan="2" Grid.Column="2">
+        <StackPanel x:Name="AppearanceCategory" VerticalAlignment="Top"
+                    automation:AutomationProperties.AutomationId="Long.Settings.Category.appearance">
+        <TextBlock Text="{DynamicResource i18n.settings.category.appearance}"
+                   automation:AutomationProperties.AutomationId="Long.Settings.CategoryContent.appearance"
+                   automation:AutomationProperties.HeadingLevel="Level2"
+                   FontSize="20" FontWeight="SemiBold" Margin="0,0,0,14" />
         <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,12">
             <Grid>
                 <Grid.RowDefinitions>
@@ -82,7 +154,14 @@
                               IsEnabled="False" />
             </Grid>
         </Border>
+        </StackPanel>
 
+        <StackPanel x:Name="UpdatesCategory" VerticalAlignment="Top" Visibility="Collapsed"
+                    automation:AutomationProperties.AutomationId="Long.Settings.Category.updates">
+        <TextBlock Text="{DynamicResource i18n.settings.category.updates}"
+                   automation:AutomationProperties.AutomationId="Long.Settings.CategoryContent.updates"
+                   automation:AutomationProperties.HeadingLevel="Level2"
+                   FontSize="20" FontWeight="SemiBold" Margin="0,0,0,14" />
         <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,12">
             <Grid>
                 <Grid.RowDefinitions>
@@ -109,7 +188,14 @@
                         Click="UpdateAction_Click" />
             </Grid>
         </Border>
+        </StackPanel>
 
+        <StackPanel x:Name="InteractionCategory" VerticalAlignment="Top" Visibility="Collapsed"
+                    automation:AutomationProperties.AutomationId="Long.Settings.Category.interaction">
+        <TextBlock Text="{DynamicResource i18n.settings.category.interaction}"
+                   automation:AutomationProperties.AutomationId="Long.Settings.CategoryContent.interaction"
+                   automation:AutomationProperties.HeadingLevel="Level2"
+                   FontSize="20" FontWeight="SemiBold" Margin="0,0,0,14" />
         <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,12">
             <StackPanel>
                 <TextBlock Text="{DynamicResource i18n.settings.gesture.title}"
@@ -133,7 +219,14 @@
                 </WrapPanel>
             </StackPanel>
         </Border>
+        </StackPanel>
 
+        <StackPanel x:Name="ConnectionsCategory" VerticalAlignment="Top" Visibility="Collapsed"
+                    automation:AutomationProperties.AutomationId="Long.Settings.Category.connections">
+        <TextBlock Text="{DynamicResource i18n.settings.category.connections}"
+                   automation:AutomationProperties.AutomationId="Long.Settings.CategoryContent.connections"
+                   automation:AutomationProperties.HeadingLevel="Level2"
+                   FontSize="20" FontWeight="SemiBold" Margin="0,0,0,14" />
         <Border Style="{StaticResource SettingsCard}" Margin="0,0,0,12">
             <Grid>
                 <Grid.RowDefinitions>
@@ -196,5 +289,7 @@
                         Click="ClearSearchPreferences_Click" />
             </Grid>
         </Border>
-    </StackPanel>
+        </StackPanel>
+        </Grid>
+    </Grid>
 </UserControl>

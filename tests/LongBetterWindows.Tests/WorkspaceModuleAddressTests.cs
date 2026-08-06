@@ -18,6 +18,10 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
     [InlineData("management:root", "management:root")]
     [InlineData("MARKETPLACE:CATALOG", "marketplace:catalog")]
     [InlineData("settings:root", "settings:root")]
+    [InlineData("SETTINGS:APPEARANCE", "settings:appearance")]
+    [InlineData("settings:interaction", "settings:interaction")]
+    [InlineData("settings:connections", "settings:connections")]
+    [InlineData("settings:updates", "settings:updates")]
     [InlineData("diagnostics:root", "diagnostics:root")]
     [InlineData("developer:root", "developer:root")]
     [InlineData("WIDGETS:ROOT", "widgets:root")]
@@ -38,6 +42,7 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
     [InlineData("")]
     [InlineData("unknown:root")]
     [InlineData("management:other")]
+    [InlineData("settings:unknown")]
     [InlineData("workflow:")]
     [InlineData("workflow:unsafe/id")]
     [InlineData("workflow:safe:extra")]
@@ -60,6 +65,25 @@ public sealed class WorkspaceModuleAddressTests : IDisposable
         Assert.NotNull(result.Module);
         Assert.False(result.Module.CanClose);
         Assert.Equal("management:root", result.Module.Key.ToString());
+    }
+
+    [Theory]
+    [InlineData("settings:appearance", "appearance")]
+    [InlineData("settings:interaction", "interaction")]
+    [InlineData("settings:connections", "connections")]
+    [InlineData("settings:updates", "updates")]
+    public async Task ResolveAsync_SettingsDeepLink_ReusesRootModule(
+        string target,
+        string expectedCategory)
+    {
+        var resolver = Resolver(new PluginRegistry());
+        WorkspaceModuleAddress.TryParse(target, out var address);
+
+        var result = await resolver.ResolveAsync(address);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new WorkspaceModuleKey("settings", "root"), result.Module!.Key);
+        Assert.Equal(expectedCategory, result.Module.NavigationTarget);
     }
 
     [Fact]

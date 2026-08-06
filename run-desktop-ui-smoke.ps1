@@ -1127,6 +1127,54 @@ try {
     } 'The installed plugin rail remained visible in Settings.' | Out-Null
     $report.automation_semantics.management_navigation[
         'settings_plugin_rail_hidden'] = $true
+    Wait-Until {
+        $null -ne (Find-DescendantByAutomationId `
+            $managementMain 'Long.Settings.CategoryItem.appearance') -or
+        $null -ne (Find-DescendantByAutomationId `
+            $managementMain 'Long.Settings.CategorySelector')
+    } 'The Settings category navigation was not discoverable.' | Out-Null
+    $settingsCategoryButton = Find-DescendantByAutomationId `
+        $managementMain 'Long.Settings.CategoryItem.appearance'
+    $settingsCompactCategories = Find-DescendantByAutomationId `
+        $managementMain 'Long.Settings.CategorySelector'
+    $settingsCategoryMode = if ($null -ne $settingsCategoryButton) {
+        'sidebar'
+    } else {
+        'compact'
+    }
+    foreach ($category in @('interaction', 'connections', 'updates', 'appearance')) {
+        if ($settingsCategoryMode -eq 'sidebar') {
+            $categoryItem = Wait-Until {
+                Find-DescendantByAutomationId `
+                    $managementMain "Long.Settings.CategoryItem.$category"
+            } "The Settings category '$category' was not discoverable."
+            Invoke-AutomationElement $categoryItem `
+                "The Settings category '$category' could not be invoked."
+        } else {
+            $expandPattern = $null
+            if (-not $settingsCompactCategories.TryGetCurrentPattern(
+                [Windows.Automation.ExpandCollapsePattern]::Pattern,
+                [ref]$expandPattern)) {
+                throw 'The compact Settings category selector could not expand.'
+            }
+            ([Windows.Automation.ExpandCollapsePattern]$expandPattern).Expand()
+            $categoryItem = Wait-Until {
+                Find-ProcessElementByAutomationId `
+                    $managementProcess.Id `
+                    "Long.Settings.CompactCategoryItem.$category"
+            } "The compact Settings category '$category' was not discoverable."
+            Select-AutomationElement $categoryItem `
+                "The compact Settings category '$category' could not be selected."
+        }
+        Wait-Until {
+            $null -ne (Find-DescendantByAutomationId `
+                $managementMain "Long.Settings.CategoryContent.$category")
+        } "The Settings category '$category' content did not become visible." | Out-Null
+    }
+    $report.automation_semantics.management_navigation[
+        'settings_categories_selectable'] = $true
+    $report.automation_semantics.management_navigation[
+        'settings_category_navigation_mode'] = $settingsCategoryMode
     $settingsClose = Wait-Until {
         Find-ProcessElementByAutomationId `
             $managementProcess.Id `

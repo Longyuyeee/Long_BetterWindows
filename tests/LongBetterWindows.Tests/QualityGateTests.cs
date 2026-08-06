@@ -1326,6 +1326,11 @@ public class QualityGateTests
         Assert.Contains("new SettingsPageControl()", code);
         Assert.Equal(7, settingsXaml.Split("Style=\"{StaticResource SettingsCard}\"").Length - 1);
         Assert.Contains("x:Name=\"BrokerToggle\"", settingsXaml);
+        Assert.Contains("Long.Settings.CategoryList", settingsXaml);
+        Assert.Contains("Long.Settings.CategorySelector", settingsXaml);
+        Assert.Contains("NavigateToCategory", settingsCode);
+        Assert.Contains("settings.category.appearance", settingsXaml);
+        Assert.Contains("Long.Settings.CategoryItem.updates", settingsXaml);
         Assert.Contains("ExportBrokerDiagnostics_Click", settingsCode);
         Assert.Contains("VerticalAlignment=\"Top\"", settingsXaml);
         Assert.Contains("IDisposable", settingsCode);

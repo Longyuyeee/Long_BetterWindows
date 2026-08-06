@@ -40,7 +40,8 @@ namespace LongBetterWindows.Host.Interaction
             string title,
             bool canClose = true,
             bool supportsDetach = false,
-            string? searchScopeId = null)
+            string? searchScopeId = null,
+            string? navigationTarget = null)
         {
             if (!key.IsValid)
             {
@@ -56,6 +57,9 @@ namespace LongBetterWindows.Host.Interaction
             SearchScopeId = string.IsNullOrWhiteSpace(searchScopeId)
                 ? null
                 : searchScopeId.Trim();
+            NavigationTarget = string.IsNullOrWhiteSpace(navigationTarget)
+                ? null
+                : navigationTarget.Trim().ToLowerInvariant();
         }
 
         public WorkspaceModuleKey Key { get; }
@@ -63,6 +67,7 @@ namespace LongBetterWindows.Host.Interaction
         public bool CanClose { get; }
         public bool SupportsDetach { get; }
         public string? SearchScopeId { get; }
+        public string? NavigationTarget { get; }
     }
 
     internal sealed class WorkspaceNavigationState

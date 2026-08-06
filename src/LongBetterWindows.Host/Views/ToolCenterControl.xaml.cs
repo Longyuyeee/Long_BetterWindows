@@ -226,13 +226,21 @@ namespace LongBetterWindows.Host.Views
             => ShowManagementPage(WorkspaceManagementPage.System);
         internal void OpenSettingsForQuality()
             => ShowManagementPage(WorkspaceManagementPage.Settings);
-        internal bool OpenWorkspaceModule(WorkspaceModuleKey key)
+        internal bool OpenWorkspaceModule(
+            WorkspaceModuleKey key,
+            string? navigationTarget = null)
         {
             if (!WorkspaceManagementModuleCatalog.TryResolvePage(key, out var page))
                 return false;
             if (key != new WorkspaceModuleKey("management", "root"))
                 FilterManagementNavigation(string.Empty);
             ShowManagementPage(page);
+            if (page == WorkspaceManagementPage.Settings
+                && navigationTarget is not null
+                && SettingsHost.Content is SettingsPageControl settingsPage)
+            {
+                settingsPage.NavigateToCategory(navigationTarget);
+            }
             return true;
         }
 
