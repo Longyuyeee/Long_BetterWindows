@@ -1,0 +1,142 @@
+{
+  "$schema": "../schemas/plugin-isolation-compatibility.schema.json",
+  "schema_version": 1,
+  "assessment_date": "2026-08-06",
+  "policy": {
+    "phase": "PX6B-1",
+    "decision": "assessment_only",
+    "migration_rule": "Do not migrate an installed or built-in plugin until a synthetic worker passes lifecycle, crash, timeout, cancellation, capability and cleanup gates.",
+    "resource_attribution_rule": "Per-plugin CPU and memory may only be reported for a dedicated worker process; in-process estimates are not accepted as attribution.",
+    "first_experiment": "synthetic_headless_native_command_worker"
+  },
+  "shared_worker_contract": {
+    "process_model": "one_worker_per_plugin_instance",
+    "transport_reuse": "lpwp_length_prefixed_json_framing",
+    "protocol_namespace": "long.plugin.worker/experimental-1",
+    "maximum_frame_bytes": 1048576,
+    "default_deadline_ms": 10000,
+    "minimum_deadline_ms": 100,
+    "maximum_deadline_ms": 120000,
+    "authentication": "host_spawned_pipe_with_process_identity_and_ephemeral_nonce",
+    "host_api_rule": "Worker capability calls must use explicit serializable proxy contracts and must re-enter PluginAccessContext in the host before permission checks and side effects.",
+    "ui_rule": "wpf_and_webview_ui_remain_in_host_process",
+    "lifecycle_methods": [
+      "initialize",
+      "start",
+      "stop",
+      "enter_background",
+      "resume",
+      "release_resources",
+      "language_changed"
+    ]
+  },
+  "profiles": [
+    {
+      "id": "native_dll",
+      "manifest_runtime": "native",
+      "has_native_background": false,
+      "current_inventory_count": 7,
+      "current_boundary": "Collectible AssemblyLoadContext inside the host process with direct ILongPlugin and IHostApi object calls.",
+      "ui_boundary": "All current native assets expose host-owned WPF UI and cannot cross a process boundary as CLR objects.",
+      "readiness": "candidate_after_contract",
+      "target_model": "Keep WPF presentation in the host; permit an opt-in headless command and lifecycle worker only after proxy contracts exist.",
+      "migration_risk": "very_high",
+      "blockers": [
+        "ILongPlugin receives the non-serializable IHostApi service graph directly.",
+        "IHasMainUI and WPF controls are returned as in-process CLR objects.",
+        "Optional lifecycle interfaces and events have no worker protocol contract.",
+        "Native dependencies and plugin-created threads require deterministic worker cleanup rules."
+      ],
+      "evidence": [
+        {
+          "path": "src/LongBetterWindows.Host/Engine/PluginLoader.cs",
+          "contains": "context.LoadFromAssemblyPath(assemblyPath)"
+        },
+        {
+          "path": "src/LongBetterWindows.Host/Core/ILongPlugin.cs",
+          "contains": "Task<bool> InitializeAsync(IHostApi host)"
+        }
+      ]
+    },
+    {
+      "id": "csharp_script",
+      "manifest_runtime": "csharp-script",
+      "has_native_background": false,
+      "current_inventory_count": 0,
+      "current_boundary": "Roslyn executes the script in the host process and injects HostProvider through ScriptGlobals.",
+      "ui_boundary": "The current script contract is headless, but delegates capture host-process objects and state.",
+      "readiness": "candidate_after_contract",
+      "target_model": "Compile and execute in a dedicated worker after replacing ScriptGlobals.Host with a serializable capability proxy.",
+      "migration_risk": "high",
+      "blockers": [
+        "ScriptGlobals exposes IHostApi directly.",
+        "Start, Stop and language delegates have no remote invocation contract.",
+        "The current unload operation removes bookkeeping but cannot terminate script-created work.",
+        "There is no production script asset to provide migration compatibility evidence."
+      ],
+      "evidence": [
+        {
+          "path": "src/LongBetterWindows.Host/Engine/ScriptPluginLoader.cs",
+          "contains": "Host = host"
+        },
+        {
+          "path": "src/LongBetterWindows.Host/Engine/ScriptPluginLoader.cs",
+          "contains": "CSharpScript.Create(code, options"
+        }
+      ]
+    },
+    {
+      "id": "webview",
+      "manifest_runtime": "webview",
+      "has_native_background": false,
+      "current_inventory_count": 19,
+      "current_boundary": "Web content uses the WebView2 process model while its WPF control, lifecycle adapter and host bridge dispatcher remain in the host process.",
+      "ui_boundary": "Retain WebView2 ownership in the host workspace; do not introduce a second Long worker around browser content.",
+      "readiness": "retain_current_boundary",
+      "target_model": "Harden the existing bounded JSON bridge and WebView2 process controls instead of duplicating UI isolation.",
+      "migration_risk": "medium",
+      "blockers": [
+        "WebView2 WPF controls are host-owned presentation objects.",
+        "The host dispatcher maps bridge methods directly to IHostApi services.",
+        "Commands, widgets, navigation and focus depend on the current host presentation lifecycle."
+      ],
+      "evidence": [
+        {
+          "path": "src/LongBetterWindows.Host/Engine/WebPluginRuntime.cs",
+          "contains": "new WebPluginHostDispatcher("
+        },
+        {
+          "path": "src/LongBetterWindows.Host/Engine/WebPluginBridgeProtocol.cs",
+          "contains": "BridgeMessageLimitBytes = 1024 * 1024"
+        }
+      ]
+    },
+    {
+      "id": "webview_native_background",
+      "manifest_runtime": "webview",
+      "has_native_background": true,
+      "current_inventory_count": 1,
+      "current_boundary": "The WebView2 UI and native background DLL share one in-host lifecycle adapter and direct IHostApi instance.",
+      "ui_boundary": "Keep the WebView2 UI in the host; only the headless native background is a future worker candidate.",
+      "readiness": "candidate_after_contract",
+      "target_model": "Split the native background into a worker while preserving one logical plugin lifecycle and a host-mediated open-request event.",
+      "migration_risk": "very_high",
+      "blockers": [
+        "Background initialization receives IHostApi directly.",
+        "OpenRequested is an in-process CLR event.",
+        "Web and background start-stop rollback is coordinated with direct object calls.",
+        "Clipboard monitoring and hotkey resources need crash-safe host cleanup and lease semantics."
+      ],
+      "evidence": [
+        {
+          "path": "src/LongBetterWindows.Host/Engine/WebPluginWithBackgroundAdapter.cs",
+          "contains": "_background.InitializeAsync(host)"
+        },
+        {
+          "path": "src/LongBetterWindows.Host/Engine/WebPluginWithBackgroundAdapter.cs",
+          "contains": "_openRequestSource.OpenRequested += ShowMainUI"
+        }
+      ]
+    }
+  ]
+}
