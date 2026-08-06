@@ -46,17 +46,18 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         string pluginId = "synthetic.headless.native",
         int connectTimeoutMilliseconds = 5_000,
         IExperimentalPluginWorkerHostBridge? hostBridge = null,
-        string? workloadPath = null,
+        PluginWorkerWorkloadLaunchPolicy? workloadPolicy = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workerPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
         if (!File.Exists(workerPath))
             throw new FileNotFoundException("Plugin worker executable was not found.", workerPath);
-        if (workloadPath is not null && !File.Exists(workloadPath))
-            throw new FileNotFoundException("Plugin worker workload was not found.", workloadPath);
         if (connectTimeoutMilliseconds is < 100 or > 30_000)
             throw new ArgumentOutOfRangeException(nameof(connectTimeoutMilliseconds));
+        var validatedWorkloadPolicy = workloadPolicy is null
+            ? null
+            : PluginWorkerWorkloadPolicyValidator.Validate(workloadPolicy);
 
         var pipeName = $"long-plugin-worker-{Environment.ProcessId}-{Guid.NewGuid():N}";
         var nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -70,7 +71,7 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         try
         {
             process = Process.Start(CreateStartInfo(
-                workerPath, pipeName, nonce, pluginId, workloadPath))
+                workerPath, pipeName, nonce, pluginId, validatedWorkloadPolicy))
                 ?? throw new InvalidOperationException("Plugin worker process could not be started.");
             var session = new ExperimentalPluginWorkerSession(
                 pluginId, process, pipe, hostBridge);
@@ -455,7 +456,7 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         string pipeName,
         string nonce,
         string pluginId,
-        string? workloadPath)
+        ValidatedPluginWorkerWorkloadLaunchPolicy? workloadPolicy)
     {
         var isDll = string.Equals(Path.GetExtension(workerPath), ".dll", StringComparison.OrdinalIgnoreCase);
         var start = new ProcessStartInfo
@@ -474,10 +475,17 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         start.ArgumentList.Add(nonce);
         start.ArgumentList.Add("--plugin-id");
         start.ArgumentList.Add(pluginId);
-        if (workloadPath is not null)
+        if (workloadPolicy is not null)
         {
             start.ArgumentList.Add("--workload");
-            start.ArgumentList.Add(Path.GetFullPath(workloadPath));
+            start.ArgumentList.Add(workloadPolicy.AssemblyPath);
+            start.ArgumentList.Add("--workload-sha256");
+            start.ArgumentList.Add(workloadPolicy.ExpectedSha256);
+            foreach (var method in workloadPolicy.AllowedHostMethods)
+            {
+                start.ArgumentList.Add("--allow-host-method");
+                start.ArgumentList.Add(method);
+            }
         }
         return start;
     }

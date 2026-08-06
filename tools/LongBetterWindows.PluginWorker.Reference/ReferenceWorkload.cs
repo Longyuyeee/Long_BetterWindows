@@ -12,6 +12,9 @@ internal sealed class ReferenceWorkload : IPluginWorkerWorkload
         ["reference.sha256", "reference.delay"],
         StringComparer.Ordinal);
 
+    public IReadOnlySet<string> RequiredHostMethods { get; } = new HashSet<string>(
+        StringComparer.Ordinal);
+
     public ValueTask InvokeLifecycleAsync(
         PluginWorkerLifecycleOperation operation,
         string? language,

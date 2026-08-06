@@ -2,13 +2,13 @@
   "$schema": "../schemas/plugin-worker-migration-readiness.schema.json",
   "schema_version": 1,
   "assessment_date": "2026-08-06",
-  "phase": "PX6B-5",
-  "decision": "headless_reference_workload_validated",
+  "phase": "PX6B-6",
+  "decision": "worker_package_policy_validated_without_production_bridge",
   "assessed_existing_candidates": 8,
   "eligible_existing_candidates": 0,
   "production_enabled": false,
   "real_plugins_migrated": 0,
-  "recommended_next": "production_worker_package_and_capability_policy",
+  "recommended_next": "verified_package_descriptor_bridge_and_release_gate",
   "reference_workload": {
     "plugin_id": "reference.headless.native",
     "project": "tools/LongBetterWindows.PluginWorker.Reference/LongBetterWindows.PluginWorker.Reference.csproj",
@@ -18,12 +18,23 @@
     "system_side_effects": false,
     "commands": ["reference.sha256", "reference.delay"]
   },
+  "worker_policy": {
+    "package_hash_source": "verified_package_file_manifest_required",
+    "trusted_descriptor_bridge": false,
+    "host_preflight_sha256": true,
+    "worker_post_handshake_sha256": true,
+    "load_verified_bytes": true,
+    "reject_reparse_points": true,
+    "maximum_assembly_bytes": 67108864,
+    "approved_host_methods": ["host.capability.query"],
+    "reference_allowed_host_methods": []
+  },
   "exit_criteria": [
-    "reference workload is not present in the authoritative plugin catalog",
-    "worker loads a bounded headless contract instead of hard-coded synthetic commands",
-    "all reverse host methods use explicit DTOs and session-bound identity",
-    "every side-effect resource has a host-owned crash cleanup lease",
-    "default plugin loading remains unchanged until release gates pass"
+    "workload DLL path remains inside a package root with no reparse points",
+    "host and worker verify the expected SHA-256 from a verified package file manifest",
+    "worker loads the exact post-handshake verified bytes instead of reopening an assembly path",
+    "workload required Host methods exactly match the approved DTO method set",
+    "production loading remains disabled until a trusted package descriptor bridge and release gate exist"
   ],
   "candidates": [
     {

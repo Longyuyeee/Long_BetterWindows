@@ -20,6 +20,10 @@ internal static class PluginWorkerProtocol
         HostCapabilityQuery,
         Shutdown,
     ];
+
+    public static IReadOnlySet<string> HostMethods { get; } = new HashSet<string>(
+        [HostCapabilityQuery],
+        StringComparer.Ordinal);
 }
 
 internal enum PluginWorkerLifecycleOperation

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using LongBetterWindows.PluginIpc.Contracts;
 
 namespace LongBetterWindows.Tests;
 
@@ -12,16 +13,16 @@ public sealed class PluginWorkerMigrationReadinessTests
         RepositoryRoot, "schemas", "plugin-worker-migration-readiness.schema.json");
 
     [Fact]
-    public void Schema_LocksValidatedReferenceDecisionAndProductionPolicyNext()
+    public void Schema_LocksWorkerPolicyDecisionAndVerifiedDescriptorNext()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(SchemaPath));
         var root = document.RootElement;
         var properties = root.GetProperty("properties");
 
         Assert.False(root.GetProperty("additionalProperties").GetBoolean());
-        Assert.Equal("PX6B-5",
+        Assert.Equal("PX6B-6",
             properties.GetProperty("phase").GetProperty("const").GetString());
-        Assert.Equal("headless_reference_workload_validated",
+        Assert.Equal("worker_package_policy_validated_without_production_bridge",
             properties.GetProperty("decision").GetProperty("const").GetString());
         Assert.Equal(8, properties.GetProperty("assessed_existing_candidates")
             .GetProperty("const").GetInt32());
@@ -31,7 +32,7 @@ public sealed class PluginWorkerMigrationReadinessTests
             .GetProperty("const").GetBoolean());
         Assert.Equal(0, properties.GetProperty("real_plugins_migrated")
             .GetProperty("const").GetInt32());
-        Assert.Equal("production_worker_package_and_capability_policy",
+        Assert.Equal("verified_package_descriptor_bridge_and_release_gate",
             properties.GetProperty("recommended_next").GetProperty("const").GetString());
     }
 
@@ -43,7 +44,7 @@ public sealed class PluginWorkerMigrationReadinessTests
         var candidates = root.GetProperty("candidates").EnumerateArray().ToArray();
         var expected = ReadCandidateManifests();
 
-        Assert.Equal("PX6B-5", root.GetProperty("phase").GetString());
+        Assert.Equal("PX6B-6", root.GetProperty("phase").GetString());
         Assert.Equal(8, root.GetProperty("assessed_existing_candidates").GetInt32());
         Assert.Equal(0, root.GetProperty("eligible_existing_candidates").GetInt32());
         Assert.False(root.GetProperty("production_enabled").GetBoolean());
@@ -94,7 +95,7 @@ public sealed class PluginWorkerMigrationReadinessTests
     {
         using var matrix = JsonDocument.Parse(File.ReadAllText(MatrixPath));
         var root = matrix.RootElement;
-        Assert.Equal("production_worker_package_and_capability_policy",
+        Assert.Equal("verified_package_descriptor_bridge_and_release_gate",
             root.GetProperty("recommended_next").GetString());
         Assert.Equal(5, root.GetProperty("exit_criteria")
             .EnumerateArray().Select(item => item.GetString()).Distinct().Count());
@@ -113,6 +114,20 @@ public sealed class PluginWorkerMigrationReadinessTests
         Assert.False(reference.GetProperty("host_or_wpf_reference").GetBoolean());
         Assert.False(reference.GetProperty("ambient_user_data").GetBoolean());
         Assert.False(reference.GetProperty("system_side_effects").GetBoolean());
+
+        var policy = root.GetProperty("worker_policy");
+        Assert.Equal("verified_package_file_manifest_required",
+            policy.GetProperty("package_hash_source").GetString());
+        Assert.False(policy.GetProperty("trusted_descriptor_bridge").GetBoolean());
+        Assert.True(policy.GetProperty("host_preflight_sha256").GetBoolean());
+        Assert.True(policy.GetProperty("worker_post_handshake_sha256").GetBoolean());
+        Assert.True(policy.GetProperty("load_verified_bytes").GetBoolean());
+        Assert.True(policy.GetProperty("reject_reparse_points").GetBoolean());
+        Assert.Equal(64 * 1024 * 1024,
+            policy.GetProperty("maximum_assembly_bytes").GetInt32());
+        Assert.Equal([PluginWorkerProtocol.HostCapabilityQuery],
+            ReadStrings(policy.GetProperty("approved_host_methods")));
+        Assert.Empty(policy.GetProperty("reference_allowed_host_methods").EnumerateArray());
     }
 
     private static Dictionary<string, ManifestFact> ReadCandidateManifests()

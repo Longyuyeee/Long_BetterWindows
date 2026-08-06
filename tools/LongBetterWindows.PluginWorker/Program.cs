@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Pipes;
-using System.Reflection;
 using System.Runtime.Loader;
+using System.Security.Cryptography;
 using System.Text.Json;
 using LongBetterWindows.PluginIpc.Contracts;
 using LongBetterWindows.PluginIpc.Framing;
@@ -34,7 +34,11 @@ if (helloResponse.Protocol != PluginWorkerProtocol.Name
 
 var workload = options.WorkloadPath is null
     ? null
-    : WorkerWorkloadLoader.Load(options.WorkloadPath, options.PluginId);
+    : WorkerWorkloadLoader.Load(
+        options.WorkloadPath,
+        options.WorkloadSha256!,
+        options.PluginId,
+        options.AllowedHostMethods);
 await new WorkerServer(pipe, workload).RunAsync();
 return 0;
 
@@ -460,6 +464,8 @@ internal sealed record WorkerOptions(
     string Nonce,
     string PluginId,
     string? WorkloadPath,
+    string? WorkloadSha256,
+    IReadOnlySet<string> AllowedHostMethods,
     int ConnectTimeoutMilliseconds)
 {
     internal static WorkerOptions Parse(string[] args)
@@ -472,11 +478,25 @@ internal sealed record WorkerOptions(
             return args[index + 1];
         }
 
+        var workloadPath = ReadOptional("--workload");
+        var workloadSha256 = ReadOptional("--workload-sha256");
+        if ((workloadPath is null) != (workloadSha256 is null))
+            throw new ArgumentException(
+                "Worker workload path and SHA-256 must be provided together.");
+        var allowedHostMethods = ReadMany("--allow-host-method");
+        if (workloadPath is null && allowedHostMethods.Count != 0)
+            throw new ArgumentException(
+                "Worker Host methods require a workload policy.");
+        if (allowedHostMethods.Any(method => !PluginWorkerProtocol.HostMethods.Contains(method)))
+            throw new ArgumentException("Worker Host method policy is invalid.");
+
         return new WorkerOptions(
             Read("--pipe"),
             Read("--nonce"),
             Read("--plugin-id"),
-            ReadOptional("--workload"),
+            workloadPath,
+            workloadSha256,
+            allowedHostMethods,
             5_000);
 
         string? ReadOptional(string name)
@@ -487,18 +507,57 @@ internal sealed record WorkerOptions(
                 throw new ArgumentException($"Missing worker option value: {name}");
             return args[index + 1];
         }
+
+        IReadOnlySet<string> ReadMany(string name)
+        {
+            var values = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < args.Length; index++)
+            {
+                if (!string.Equals(args[index], name, StringComparison.Ordinal)) continue;
+                if (index + 1 >= args.Length || string.IsNullOrWhiteSpace(args[index + 1]))
+                    throw new ArgumentException($"Missing worker option value: {name}");
+                if (!values.Add(args[index + 1]))
+                    throw new ArgumentException($"Duplicate worker option value: {name}");
+                index++;
+            }
+            return values;
+        }
     }
 }
 
 internal static class WorkerWorkloadLoader
 {
-    internal static IPluginWorkerWorkload Load(string assemblyPath, string pluginId)
+    private const int MaximumAssemblyBytes = 64 * 1024 * 1024;
+
+    internal static IPluginWorkerWorkload Load(
+        string assemblyPath,
+        string expectedSha256,
+        string pluginId,
+        IReadOnlySet<string> allowedHostMethods)
     {
         var fullPath = Path.GetFullPath(assemblyPath);
         if (!File.Exists(fullPath))
             throw new FileNotFoundException("Worker workload assembly was not found.", fullPath);
 
-        var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(fullPath);
+        byte[] expectedHash;
+        try
+        {
+            expectedHash = Convert.FromHexString(expectedSha256);
+        }
+        catch (FormatException ex)
+        {
+            throw new InvalidDataException("Worker workload SHA-256 is invalid.", ex);
+        }
+        if (expectedHash.Length != SHA256.HashSizeInBytes)
+            throw new InvalidDataException("Worker workload SHA-256 is invalid.");
+
+        var assemblyBytes = ReadAssemblyBytes(fullPath);
+        var actualHash = SHA256.HashData(assemblyBytes);
+        if (!CryptographicOperations.FixedTimeEquals(expectedHash, actualHash))
+            throw new InvalidDataException("Worker workload SHA-256 does not match policy.");
+
+        using var assemblyStream = new MemoryStream(assemblyBytes, writable: false);
+        var assembly = AssemblyLoadContext.Default.LoadFromStream(assemblyStream);
         var types = assembly.GetTypes()
             .Where(type => typeof(IPluginWorkerWorkload).IsAssignableFrom(type)
                 && type is { IsAbstract: false, IsInterface: false })
@@ -521,6 +580,27 @@ internal static class WorkerWorkloadLoader
             workload.DisposeAsync().AsTask().GetAwaiter().GetResult();
             throw new InvalidDataException("Worker workload command set is invalid.");
         }
+        if (workload.RequiredHostMethods.Any(string.IsNullOrWhiteSpace)
+            || !workload.RequiredHostMethods.SetEquals(allowedHostMethods))
+        {
+            workload.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            throw new InvalidDataException(
+                "Worker workload Host methods do not match policy.");
+        }
         return workload;
+    }
+
+    private static byte[] ReadAssemblyBytes(string fullPath)
+    {
+        using var stream = new FileStream(
+            fullPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read);
+        if (stream.Length is <= 0 or > MaximumAssemblyBytes)
+            throw new InvalidDataException("Worker workload assembly size is invalid.");
+        var bytes = new byte[checked((int)stream.Length)];
+        stream.ReadExactly(bytes);
+        return bytes;
     }
 }

@@ -15,6 +15,7 @@
     "real_plugins_migrated",
     "recommended_next",
     "reference_workload",
+    "worker_policy",
     "exit_criteria",
     "candidates"
   ],
@@ -22,13 +23,13 @@
     "$schema": { "type": "string" },
     "schema_version": { "const": 1 },
     "assessment_date": { "type": "string", "format": "date" },
-    "phase": { "const": "PX6B-5" },
-    "decision": { "const": "headless_reference_workload_validated" },
+    "phase": { "const": "PX6B-6" },
+    "decision": { "const": "worker_package_policy_validated_without_production_bridge" },
     "assessed_existing_candidates": { "const": 8 },
     "eligible_existing_candidates": { "const": 0 },
     "production_enabled": { "const": false },
     "real_plugins_migrated": { "const": 0 },
-    "recommended_next": { "const": "production_worker_package_and_capability_policy" },
+    "recommended_next": { "const": "verified_package_descriptor_bridge_and_release_gate" },
     "reference_workload": {
       "type": "object",
       "additionalProperties": false,
@@ -54,6 +55,36 @@
           "uniqueItems": true,
           "items": { "enum": ["reference.sha256", "reference.delay"] }
         }
+      }
+    },
+    "worker_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_hash_source",
+        "trusted_descriptor_bridge",
+        "host_preflight_sha256",
+        "worker_post_handshake_sha256",
+        "load_verified_bytes",
+        "reject_reparse_points",
+        "maximum_assembly_bytes",
+        "approved_host_methods",
+        "reference_allowed_host_methods"
+      ],
+      "properties": {
+        "package_hash_source": { "const": "verified_package_file_manifest_required" },
+        "trusted_descriptor_bridge": { "const": false },
+        "host_preflight_sha256": { "const": true },
+        "worker_post_handshake_sha256": { "const": true },
+        "load_verified_bytes": { "const": true },
+        "reject_reparse_points": { "const": true },
+        "maximum_assembly_bytes": { "const": 67108864 },
+        "approved_host_methods": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["host.capability.query"] }
+        },
+        "reference_allowed_host_methods": { "const": [] }
       }
     },
     "exit_criteria": {

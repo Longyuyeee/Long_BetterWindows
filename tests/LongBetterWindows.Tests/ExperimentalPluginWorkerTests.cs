@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.PluginIpc.Client;
 using LongBetterWindows.PluginIpc.Contracts;
@@ -13,7 +14,7 @@ public sealed class ExperimentalPluginWorkerTests
     {
         await using var session = await StartWorkerAsync(
             "reference.headless.native",
-            workloadPath: ReferenceWorkloadPath());
+            workloadPolicy: ReferenceWorkloadPolicy());
         Assert.Equal("initialized", (await session.InvokeLifecycleAsync(
             PluginWorkerLifecycleOperation.Initialize)).State);
         Assert.Equal("running", (await session.InvokeLifecycleAsync(
@@ -72,11 +73,36 @@ public sealed class ExperimentalPluginWorkerTests
     }
 
     [Fact]
+    public void WorkloadPolicy_LocksVerifiedBytesAndExactHostMethodBoundary()
+    {
+        var root = FindRepositoryRoot();
+        var policySource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.PluginIpc",
+            "Client",
+            "PluginWorkerWorkloadLaunchPolicy.cs"));
+        var workerSource = File.ReadAllText(Path.Combine(
+            root,
+            "tools",
+            "LongBetterWindows.PluginWorker",
+            "Program.cs"));
+
+        Assert.Contains("Path.GetRelativePath", policySource, StringComparison.Ordinal);
+        Assert.Contains("FileAttributes.ReparsePoint", policySource, StringComparison.Ordinal);
+        Assert.Contains("CryptographicOperations.FixedTimeEquals", policySource, StringComparison.Ordinal);
+        Assert.Contains("MaximumAssemblyBytes", policySource, StringComparison.Ordinal);
+        Assert.Contains("AssemblyLoadContext.Default.LoadFromStream", workerSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("LoadFromAssemblyPath", workerSource, StringComparison.Ordinal);
+        Assert.Contains("RequiredHostMethods.SetEquals", workerSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ReferenceWorkload_RejectsIdentityMismatchAfterHandshake()
     {
         await using var session = await StartWorkerAsync(
             "reference.wrong.identity",
-            workloadPath: ReferenceWorkloadPath());
+            workloadPolicy: ReferenceWorkloadPolicy());
         using var timeout = new CancellationTokenSource(15_000);
         var rejected = await Record.ExceptionAsync(() =>
             session.InvokeLifecycleAsync(
@@ -85,6 +111,53 @@ public sealed class ExperimentalPluginWorkerTests
         Assert.True(
             rejected is PluginWorkerExitedException or IOException,
             $"Expected the mismatched workload connection to close, got {rejected?.GetType().Name ?? "success"}.");
+    }
+
+    [Fact]
+    public async Task WorkloadPolicy_RejectsHashRootAndUnknownHostMethodBeforeSpawn()
+    {
+        var valid = ReferenceWorkloadPolicy();
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            ExperimentalPluginWorkerSession.StartAsync(
+                WorkerPath(),
+                "reference.headless.native",
+                workloadPolicy: valid with { ExpectedSha256 = new string('0', 64) }));
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            ExperimentalPluginWorkerSession.StartAsync(
+                WorkerPath(),
+                "reference.headless.native",
+                workloadPolicy: valid with
+                {
+                    PackageRoot = Path.Combine(valid.PackageRoot, "nested"),
+                }));
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            ExperimentalPluginWorkerSession.StartAsync(
+                WorkerPath(),
+                "reference.headless.native",
+                workloadPolicy: valid with
+                {
+                    AllowedHostMethods = new HashSet<string>(
+                        ["host.unbounded"], StringComparer.Ordinal),
+                }));
+    }
+
+    [Fact]
+    public async Task ReferenceWorkload_RejectsHostMethodPolicyMismatchAfterHandshake()
+    {
+        var policy = ReferenceWorkloadPolicy() with
+        {
+            AllowedHostMethods = new HashSet<string>(
+                [PluginWorkerProtocol.HostCapabilityQuery], StringComparer.Ordinal),
+        };
+        await using var session = await StartWorkerAsync(
+            "reference.headless.native",
+            workloadPolicy: policy);
+        using var timeout = new CancellationTokenSource(15_000);
+        var rejected = await Record.ExceptionAsync(() =>
+            session.InvokeLifecycleAsync(
+                PluginWorkerLifecycleOperation.Initialize,
+                cancellationToken: timeout.Token));
+        Assert.True(rejected is PluginWorkerExitedException or IOException);
     }
 
     [Fact]
@@ -362,10 +435,9 @@ public sealed class ExperimentalPluginWorkerTests
 
     private static async Task<ExperimentalPluginWorkerSession> StartRunningWorkerAsync(
         string pluginId = "synthetic.headless.native",
-        IExperimentalPluginWorkerHostBridge? hostBridge = null,
-        string? workloadPath = null)
+        IExperimentalPluginWorkerHostBridge? hostBridge = null)
     {
-        var session = await StartWorkerAsync(pluginId, hostBridge, workloadPath);
+        var session = await StartWorkerAsync(pluginId, hostBridge);
         try
         {
             await session.InvokeLifecycleAsync(PluginWorkerLifecycleOperation.Initialize);
@@ -382,12 +454,12 @@ public sealed class ExperimentalPluginWorkerTests
     private static Task<ExperimentalPluginWorkerSession> StartWorkerAsync(
         string pluginId = "synthetic.headless.native",
         IExperimentalPluginWorkerHostBridge? hostBridge = null,
-        string? workloadPath = null)
+        PluginWorkerWorkloadLaunchPolicy? workloadPolicy = null)
         => ExperimentalPluginWorkerSession.StartAsync(
             WorkerPath(),
             pluginId,
             hostBridge: hostBridge,
-            workloadPath: workloadPath);
+            workloadPolicy: workloadPolicy);
 
     private static async Task AssertEventuallyAsync(Func<bool> condition)
     {
@@ -430,6 +502,16 @@ public sealed class ExperimentalPluginWorkerTests
             "long-plugin-worker-reference.dll");
         Assert.True(File.Exists(path), $"Reference worker workload is missing: {path}");
         return path;
+    }
+
+    private static PluginWorkerWorkloadLaunchPolicy ReferenceWorkloadPolicy()
+    {
+        var path = ReferenceWorkloadPath();
+        return new PluginWorkerWorkloadLaunchPolicy(
+            Path.GetDirectoryName(path)!,
+            path,
+            Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))),
+            new HashSet<string>(StringComparer.Ordinal));
     }
 
     private static string FindRepositoryRoot()
