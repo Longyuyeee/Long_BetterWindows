@@ -18,6 +18,8 @@
   "status.copied": "HTML 已复制",
   "status.refreshed": "预览已刷新",
   "status.commandReady": "Markdown 预览已就绪",
+  "error.emptyPreview": "没有可复制的预览内容",
+  "error.clipboardEmpty": "剪贴板中没有文本内容",
   "error.clipboardRead": "无法读取剪贴板",
   "error.copy": "复制失败"
 }

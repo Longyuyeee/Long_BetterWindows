@@ -793,8 +793,14 @@ public class DesignSystemTests
 
         Assert.Contains("preview.replaceChildren()", html);
         Assert.Contains("isSafeUrl", html);
+        Assert.Contains("isTableDelimiter", html);
+        Assert.Contains("document.createElement('table')", html);
+        Assert.Contains("new URL(value.trim())", html);
+        Assert.Contains("copyButton.disabled = previewEmpty", html);
+        Assert.Contains("error.emptyPreview", html);
         Assert.Contains("noopener noreferrer", html);
         Assert.DoesNotContain("preview.innerHTML =", html);
+        Assert.DoesNotContain("new URL(value, 'https://local.invalid')", html);
     }
 
     [Fact]

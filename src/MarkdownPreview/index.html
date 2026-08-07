@@ -18,7 +18,7 @@
 
     <div class="long-toolbar">
       <button class="long-button long-button--primary btn-primary" id="pasteButton" type="button" data-i18n="action.paste">粘贴 Markdown</button>
-      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制 HTML</button>
+      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy" disabled>复制 HTML</button>
       <button class="long-button long-button--secondary btn-secondary" id="clearButton" type="button" data-i18n="action.clear">清空</button>
       <span class="long-toolbar__spacer"></span>
       <span class="long-secondary" data-i18n="page.livePreview">实时预览</span>
@@ -40,6 +40,7 @@
     const input = document.getElementById('input');
     const preview = document.getElementById('preview');
     const status = document.getElementById('status');
+    const copyButton = document.getElementById('copyButton');
     let strings = {};
     let previewEmpty = true;
     let currentStatus = { key: '', fallback: '', kind: '' };
@@ -63,6 +64,12 @@
         title: t('state.empty', '等待 Markdown 内容'),
         detail: t('state.emptyDetail', '在左侧输入内容后，这里会显示预览')
       });
+    }
+
+    function clearStatus() {
+      currentStatus = { key: '', fallback: '', kind: '' };
+      status.textContent = '';
+      status.className = 'long-status';
     }
 
     function applyLocalization(message) {
@@ -95,36 +102,84 @@
       const lines = input.value.replace(/\r\n/g, '\n').split('\n');
       let codeBlock = null;
       let list = null;
-      lines.forEach(function (line) {
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
         if (line.startsWith('```')) {
           if (codeBlock) { preview.appendChild(codeBlock); codeBlock = null; }
           else { codeBlock = document.createElement('pre'); codeBlock.appendChild(document.createElement('code')); }
           list = null;
-          return;
+          continue;
         }
         if (codeBlock) {
           codeBlock.firstChild.textContent += (codeBlock.firstChild.textContent ? '\n' : '') + line;
-          return;
+          continue;
         }
-        if (!line.trim()) { list = null; return; }
-        if (line === '---') { preview.appendChild(document.createElement('hr')); list = null; return; }
+        if (!line.trim()) { list = null; continue; }
+        if (line === '---') { preview.appendChild(document.createElement('hr')); list = null; continue; }
+        const headerCells = parseTableCells(line);
+        if (headerCells.length > 0
+            && index + 1 < lines.length
+            && isTableDelimiter(lines[index + 1], headerCells.length)) {
+          const table = document.createElement('table');
+          const head = document.createElement('thead');
+          const headRow = document.createElement('tr');
+          headerCells.forEach(function (cell) {
+            const heading = document.createElement('th');
+            appendInline(heading, cell);
+            headRow.appendChild(heading);
+          });
+          head.appendChild(headRow);
+          table.appendChild(head);
+          const body = document.createElement('tbody');
+          index += 2;
+          while (index < lines.length && lines[index].trim()) {
+            const cells = parseTableCells(lines[index]);
+            if (cells.length !== headerCells.length) break;
+            const row = document.createElement('tr');
+            cells.forEach(function (cell) {
+              const value = document.createElement('td');
+              appendInline(value, cell);
+              row.appendChild(value);
+            });
+            body.appendChild(row);
+            index += 1;
+          }
+          table.appendChild(body);
+          preview.appendChild(table);
+          index -= 1;
+          list = null;
+          continue;
+        }
         const heading = line.match(/^(#{1,3})\s+(.+)$/);
         if (heading) {
           const element = document.createElement('h' + heading[1].length);
-          appendInline(element, heading[2]); preview.appendChild(element); list = null; return;
+          appendInline(element, heading[2]); preview.appendChild(element); list = null; continue;
         }
         if (line.startsWith('> ')) {
-          const quote = document.createElement('blockquote'); appendInline(quote, line.slice(2)); preview.appendChild(quote); list = null; return;
+          const quote = document.createElement('blockquote'); appendInline(quote, line.slice(2)); preview.appendChild(quote); list = null; continue;
         }
         if (/^-\s+/.test(line)) {
           if (!list) { list = document.createElement('ul'); preview.appendChild(list); }
-          const item = document.createElement('li'); appendInline(item, line.replace(/^-\s+/, '')); list.appendChild(item); return;
+          const item = document.createElement('li'); appendInline(item, line.replace(/^-\s+/, '')); list.appendChild(item); continue;
         }
         const paragraph = document.createElement('p'); appendInline(paragraph, line); preview.appendChild(paragraph); list = null;
-      });
+      }
       if (codeBlock) preview.appendChild(codeBlock);
       previewEmpty = !preview.childNodes.length;
+      copyButton.disabled = previewEmpty;
       if (previewEmpty) renderEmptyState();
+    }
+
+    function parseTableCells(line) {
+      if (!line.includes('|')) return [];
+      return line.trim().replace(/^\|/, '').replace(/\|$/, '')
+        .split('|').map(function (cell) { return cell.trim(); });
+    }
+
+    function isTableDelimiter(line, expectedCells) {
+      const cells = parseTableCells(line);
+      return cells.length === expectedCells
+        && cells.every(function (cell) { return /^:?-{3,}:?$/.test(cell); });
     }
 
     function appendInline(parent, text) {
@@ -152,7 +207,7 @@
 
     function isSafeUrl(value) {
       try {
-        const url = new URL(value, 'https://local.invalid');
+        const url = new URL(value.trim());
         return ['http:', 'https:', 'mailto:'].includes(url.protocol);
       } catch (_) { return false; }
     }
@@ -160,7 +215,13 @@
     async function paste() {
       try {
         const response = await long.clipboard.getText();
-        if (response.success) { input.value = response.data || ''; render(); input.focus(); }
+        if (response.success) {
+          input.value = response.data || '';
+          render();
+          clearStatus();
+          if (!input.value.trim()) setStatus('error.clipboardEmpty', 'danger', '剪贴板中没有文本内容');
+          input.focus();
+        }
         else setStatus('', 'danger', response.error || t('error.clipboardRead', '无法读取剪贴板'));
       } catch (_) {
         setStatus('error.clipboardRead', 'danger', '无法读取剪贴板');
@@ -168,6 +229,10 @@
     }
 
     async function copyHtml() {
+      if (previewEmpty) {
+        setStatus('error.emptyPreview', 'danger', '没有可复制的预览内容');
+        return;
+      }
       try {
         const response = await long.clipboard.setText(preview.innerHTML);
         if (response.success) setStatus('status.copied', 'success', 'HTML 已复制');
@@ -177,10 +242,10 @@
       }
     }
 
-    input.addEventListener('input', render);
+    input.addEventListener('input', function () { render(); clearStatus(); });
     document.getElementById('pasteButton').addEventListener('click', paste);
     document.getElementById('copyButton').addEventListener('click', copyHtml);
-    document.getElementById('clearButton').addEventListener('click', function () { input.value = ''; render(); input.focus(); });
+    document.getElementById('clearButton').addEventListener('click', function () { input.value = ''; render(); clearStatus(); input.focus(); });
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); render(); preview.focus(); setStatus('status.refreshed', 'success', '预览已刷新'); }
       else if (event.ctrlKey && event.shiftKey && event.key.toLocaleLowerCase() === 'c') { event.preventDefault(); copyHtml(); }

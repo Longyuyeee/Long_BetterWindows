@@ -326,6 +326,9 @@ button.long-list-item__content { min-height: 0; padding: 0 !important; border: 0
 .long-markdown code { font-family: "Cascadia Code", Consolas, monospace; }
 .long-markdown blockquote { margin-left: 0; padding-left: 14px; border-left: 3px solid var(--long-accent); color: var(--long-text-secondary); }
 .long-markdown a { color: var(--long-accent); }
+.long-markdown table { width: 100%; border-collapse: collapse; margin: 14px 0; }
+.long-markdown th, .long-markdown td { padding: 8px 10px; border: 1px solid var(--long-stroke); text-align: left; vertical-align: top; }
+.long-markdown th { background: var(--long-bg-raised); color: var(--long-text-primary); font-weight: 650; }
 @media (max-width: 760px) { .long-file-row { grid-template-columns: 1fr; } .long-file-row__arrow { display: none; } }
 
 @keyframes long-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }

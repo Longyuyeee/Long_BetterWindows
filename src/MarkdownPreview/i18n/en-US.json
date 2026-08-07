@@ -18,6 +18,8 @@
   "status.copied": "HTML copied",
   "status.refreshed": "Preview refreshed",
   "status.commandReady": "Markdown preview is ready",
+  "error.emptyPreview": "There is no preview content to copy",
+  "error.clipboardEmpty": "The clipboard does not contain text",
   "error.clipboardRead": "The clipboard could not be read",
   "error.copy": "Copy failed"
 }
