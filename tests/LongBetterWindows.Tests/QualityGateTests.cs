@@ -1079,10 +1079,17 @@ public class QualityGateTests
         var root = FindRepositoryRoot();
         var project = File.ReadAllText(Path.Combine(root, "src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj"));
         var manifest = File.ReadAllText(Path.Combine(root, "src", "LongBetterWindows.Host", "app.manifest"));
+        var pluginWindow = File.ReadAllText(Path.Combine(root, "src", "LongBetterWindows.Host", "Views", "PluginWindowHost.xaml.cs"));
+        var pluginPlacement = File.ReadAllText(Path.Combine(root, "src", "LongBetterWindows.Host", "Views", "PluginWindowPlacement.cs"));
 
         Assert.Contains("<ApplicationManifest>app.manifest</ApplicationManifest>", project);
         Assert.Contains("PerMonitorV2", manifest);
         Assert.Contains("True/PM", manifest);
+        Assert.DoesNotContain("SystemParameters.WorkArea", pluginWindow);
+        Assert.Contains("PluginWindowPlacement.TryApply", pluginWindow);
+        Assert.Contains("ContentRendered +=", pluginWindow);
+        Assert.Contains("GetDpiForWindow", pluginPlacement);
+        Assert.Contains("MonitorFromWindow", pluginPlacement);
         Assert.Contains("BuildNativePluginsForPublish", project);
         Assert.Contains("RemoveProperties=\"RuntimeIdentifier;SelfContained\"", project);
         Assert.Contains("原生插件仅发布运行所需的 Manifest 与 DLL", project);

@@ -13,6 +13,8 @@ namespace LongBetterWindows.Host.Views
         private Window? _returnTarget;
         private readonly Func<Task>? _endRequested;
         private readonly QualityWindowAutomation? _qualityAutomation;
+        private PluginWindowMode _windowMode = PluginWindowMode.Standard;
+        private bool _initialPlacementFinalized;
 
         public PluginWindowHost(
             string pluginId,
@@ -43,6 +45,14 @@ namespace LongBetterWindows.Host.Views
                     Log.Warning(
                         "Could not apply detached taskbar identity for plugin {PluginId}",
                         pluginId);
+                ApplyInitialPlacement(pluginId);
+            };
+            ContentRendered += (_, _) =>
+            {
+                if (_initialPlacementFinalized)
+                    return;
+                _initialPlacementFinalized = true;
+                ApplyInitialPlacement(pluginId);
             };
             _qualityAutomation = QualityWindowAutomation.Attach(
                 this,
@@ -54,9 +64,24 @@ namespace LongBetterWindows.Host.Views
         internal void SetReturnTarget(Window? target) => _returnTarget = target;
         internal bool ReturnRequested { get; private set; }
 
+        private void ApplyInitialPlacement(string pluginId)
+        {
+            if (!PluginWindowPlacement.TryApply(
+                    this,
+                    _returnTarget ?? Owner ?? Application.Current.MainWindow,
+                    _windowMode == PluginWindowMode.FullScreen))
+            {
+                Log.Debug(
+                    "Could not apply source-monitor placement for plugin {PluginId}",
+                    pluginId);
+            }
+        }
+
         private void ApplyWindowPreference(PluginWindowPreference? preference)
         {
             if (preference == null) return;
+
+            _windowMode = preference.Mode;
 
             (Width, Height) = preference.Mode switch
             {
@@ -64,7 +89,7 @@ namespace LongBetterWindows.Host.Views
                 PluginWindowMode.Wide => (1040, 680),
                 PluginWindowMode.Document => (980, 760),
                 PluginWindowMode.Overlay => (720, 520),
-                PluginWindowMode.FullScreen => (SystemParameters.WorkArea.Width, SystemParameters.WorkArea.Height),
+                PluginWindowMode.FullScreen => (720, 560),
                 _ => (720, 560),
             };
 
@@ -74,11 +99,7 @@ namespace LongBetterWindows.Host.Views
             if (preference.MinHeight is > 0) MinHeight = preference.MinHeight.Value;
 
             if (preference.Mode == PluginWindowMode.FullScreen)
-            {
                 WindowStartupLocation = WindowStartupLocation.Manual;
-                Left = SystemParameters.WorkArea.Left;
-                Top = SystemParameters.WorkArea.Top;
-            }
         }
 
         private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
