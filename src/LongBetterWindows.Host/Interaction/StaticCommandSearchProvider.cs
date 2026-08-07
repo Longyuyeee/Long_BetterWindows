@@ -69,7 +69,9 @@ namespace LongBetterWindows.Host.Interaction
                             out var commandKey))
                         continue;
                     var descriptor = _commands.Get(commandKey);
-                    if (descriptor is null || results.Any(item =>
+                    if (descriptor is null
+                        || !_commands.IsEnabled(commandKey)
+                        || results.Any(item =>
                             string.Equals(item.Id, resultId, StringComparison.OrdinalIgnoreCase)))
                         continue;
                     results.Add(CreateResult(descriptor, 80));

@@ -57,7 +57,7 @@ public sealed class PluginSettingsModuleProjectionTests
     }
 
     [Fact]
-    public void BuildCommands_ProjectsOnlyPluginCommandsWithSharedPinIdentity()
+    public async Task BuildCommands_ProjectsOnlyPluginCommandsWithSharedPreferences()
     {
         var entry = Entry("commands", new object(), PluginState.Loaded);
         var other = Entry("other", new object(), PluginState.Loaded);
@@ -69,6 +69,9 @@ public sealed class PluginSettingsModuleProjectionTests
             Title = "Localized command",
         };
         var pinnedId = CommandSearchResultIdentity.BuildResultId(descriptor.Key);
+        var commandPreferences = new CommandPreferenceService(new MemoryStorage());
+        await commandPreferences.SetEnabledAsync(descriptor.Key, false);
+        await commandPreferences.SetAliasesAsync(descriptor.Key, ["my alias"]);
 
         var items = PluginSettingsModuleProjection.BuildCommands(
             entry,
@@ -84,7 +87,8 @@ public sealed class PluginSettingsModuleProjectionTests
                 "plugins.command.input.file" => "Localized file",
                 "action.unpin" => "Remove pin",
                 _ => key,
-            });
+            },
+            commandPreferences);
 
         var item = Assert.Single(items);
         Assert.Equal("Localized command", item.Title);
@@ -93,6 +97,8 @@ public sealed class PluginSettingsModuleProjectionTests
         Assert.Equal("Inputs: Localized text · Localized file", item.InputSummary);
         Assert.True(item.IsPinned);
         Assert.Equal("Remove pin", item.PinText);
+        Assert.False(item.IsEnabled);
+        Assert.Equal("my alias", item.CustomAliasesText);
     }
 
     private static PluginEntry Entry(
@@ -146,5 +152,30 @@ public sealed class PluginSettingsModuleProjectionTests
         public void ShowMainUI()
         {
         }
+    }
+
+    private sealed class MemoryStorage : LongBetterWindows.Host.Capabilities.IStorageService
+    {
+        private readonly Dictionary<string, string> _values = new();
+
+        public Task<HostApiResponse<string?>> GetAsync(string key)
+            => Task.FromResult(HostApiResponse<string?>.Success(
+                _values.TryGetValue(key, out var value) ? value : null));
+
+        public Task<HostApiResponse> SetAsync(string key, string value)
+        {
+            _values[key] = value;
+            return Task.FromResult(HostApiResponse.Success());
+        }
+
+        public Task<HostApiResponse> DeleteAsync(string key)
+        {
+            _values.Remove(key);
+            return Task.FromResult(HostApiResponse.Success());
+        }
+
+        public Task<HostApiResponse<bool>> ContainsKeyAsync(string key)
+            => Task.FromResult(HostApiResponse<bool>.Success(
+                _values.ContainsKey(key)));
     }
 }

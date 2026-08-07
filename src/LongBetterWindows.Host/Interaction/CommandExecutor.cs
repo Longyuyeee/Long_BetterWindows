@@ -24,6 +24,9 @@ namespace LongBetterWindows.Host.Interaction
             var descriptor = _plugins.Commands.Get(commandKey);
             if (descriptor == null)
                 return PluginCommandResult.Failure($"未找到命令: {commandKey}");
+            if (!_plugins.Commands.IsEnabled(commandKey))
+                return PluginCommandResult.Failure(
+                    $"命令已在插件设置中停用: {descriptor.Title}");
 
             var entry = _plugins.Get(descriptor.PluginId);
             if (entry == null)

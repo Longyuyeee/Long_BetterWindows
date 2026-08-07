@@ -136,6 +136,10 @@
                          AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Tab.Commands"
                          Header="{DynamicResource i18n.plugins.commands}">
                     <Grid Margin="0,16,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <ItemsControl x:Name="CommandsList"
                                       AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Commands">
                             <ItemsControl.ItemTemplate>
@@ -143,6 +147,10 @@
                                     <Border Style="{StaticResource LongCard}"
                                             Margin="0,0,0,10">
                                         <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
@@ -165,24 +173,72 @@
                                                            Foreground="{DynamicResource Long.Brush.Text.Muted}"
                                                            TextWrapping="Wrap" />
                                             </StackPanel>
-                                            <Button Grid.Column="1"
-                                                    Tag="{Binding ResultId}"
-                                                    Content="{Binding PinText}"
-                                                    VerticalAlignment="Center"
-                                                    Style="{StaticResource LongButton}"
-                                                    Click="CommandPin_Click"
-                                                    AutomationProperties.Name="{Binding PinText}"
-                                                    AutomationProperties.ItemStatus="{Binding IsPinned}"
-                                                    AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.Command.{0}}" />
+                                            <StackPanel Grid.Column="1"
+                                                        VerticalAlignment="Center">
+                                                <CheckBox Tag="{Binding Key}"
+                                                          Content="{DynamicResource i18n.plugins.command.enabled}"
+                                                          IsChecked="{Binding IsEnabled, Mode=OneWay}"
+                                                          Margin="0,0,0,8"
+                                                          Click="CommandEnabled_Click"
+                                                          AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandEnabled.{0}}" />
+                                                <Button Tag="{Binding ResultId}"
+                                                        Content="{Binding PinText}"
+                                                        Style="{StaticResource LongButton}"
+                                                        Click="CommandPin_Click"
+                                                        AutomationProperties.Name="{Binding PinText}"
+                                                        AutomationProperties.ItemStatus="{Binding IsPinned}"
+                                                        AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.Command.{0}}" />
+                                            </StackPanel>
+                                            <Grid Grid.Row="1"
+                                                  Grid.ColumnSpan="2"
+                                                  Margin="0,12,0,0">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.ColumnSpan="2"
+                                                           Margin="0,0,0,5"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource Long.Brush.Text.Secondary}"
+                                                           Text="{DynamicResource i18n.plugins.command.customAliases}" />
+                                                <TextBox Grid.Row="1"
+                                                 Text="{Binding CustomAliasesText, UpdateSourceTrigger=PropertyChanged}"
+                                                         MinWidth="220"
+                                                         MaxLength="300"
+                                                         Style="{StaticResource LongTextBox}"
+                                                         ToolTip="{DynamicResource i18n.plugins.command.aliasesHint}"
+                                                         AutomationProperties.Name="{DynamicResource i18n.plugins.command.customAliases}"
+                                                         AutomationProperties.HelpText="{DynamicResource i18n.plugins.command.aliasesHint}"
+                                                         AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandAliases.{0}}" />
+                                                <Button Grid.Row="1"
+                                                        Grid.Column="1"
+                                                        Margin="8,0,0,0"
+                                                        Content="{DynamicResource i18n.action.save}"
+                                                        Style="{StaticResource LongButton}"
+                                                        Click="CommandAliasesSave_Click"
+                                                        AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandAliasesSave.{0}}" />
+                                            </Grid>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <TextBlock x:Name="CommandsEmptyText"
+                                   Grid.Row="0"
                                    Style="{StaticResource LongEmptyState}"
                                    Text="{DynamicResource i18n.plugins.commands.empty}"
                                    Visibility="Collapsed" />
+                        <TextBlock x:Name="CommandFeedbackText"
+                                   Grid.Row="1"
+                                   Margin="0,4,0,0"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}"
+                                   Visibility="Collapsed"
+                                   AutomationProperties.LiveSetting="Polite" />
                     </Grid>
                 </TabItem>
                 <TabItem x:Name="SettingsTab"

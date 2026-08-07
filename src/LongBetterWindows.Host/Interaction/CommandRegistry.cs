@@ -32,6 +32,7 @@ namespace LongBetterWindows.Host.Interaction
         private readonly Dictionary<string, CommandDescriptor> _commands =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly object _lock = new();
+        private CommandPreferenceService? _preferences;
 
         public int Count
         {
@@ -59,6 +60,15 @@ namespace LongBetterWindows.Host.Interaction
             if (string.IsNullOrWhiteSpace(pluginId)) return;
             lock (_lock) RemovePluginCommands(pluginId);
         }
+
+        public void AttachPreferences(CommandPreferenceService preferences)
+            => _preferences = preferences
+                ?? throw new ArgumentNullException(nameof(preferences));
+
+        public CommandPreferenceSnapshot GetPreference(string commandKey)
+            => _preferences?.Get(commandKey) ?? CommandPreferenceSnapshot.Default;
+
+        public bool IsEnabled(string commandKey) => GetPreference(commandKey).IsEnabled;
 
         internal void ApplyLocalization(
             string pluginId,
@@ -158,7 +168,15 @@ namespace LongBetterWindows.Host.Interaction
             lock (_lock) snapshot = _commands.Values.ToList();
 
             return snapshot
-                .Select(x => new CommandSearchResult(x, Score(x, normalized, inputTypes)))
+                .Select(x => new
+                {
+                    Descriptor = x,
+                    Preference = GetPreference(x.Key),
+                })
+                .Where(x => x.Preference.IsEnabled)
+                .Select(x => new CommandSearchResult(
+                    x.Descriptor,
+                    Score(x.Descriptor, normalized, inputTypes, x.Preference.Aliases)))
                 .Where(x => x.Score > 0)
                 .OrderByDescending(x => x.Score)
                 .ThenBy(x => x.Descriptor.Title, StringComparer.OrdinalIgnoreCase)
@@ -169,11 +187,17 @@ namespace LongBetterWindows.Host.Interaction
         private static int Score(
             CommandDescriptor descriptor,
             string query,
-            IReadOnlyCollection<AcceptedInputType> inputTypes)
+            IReadOnlyCollection<AcceptedInputType> inputTypes,
+            IReadOnlyCollection<string>? userAliases = null)
         {
             var command = descriptor.Command;
             var title = Normalize(descriptor.Title);
-            var aliases = command.Aliases.Select(Normalize).Where(x => x.Length > 0).ToList();
+            var aliases = command.Aliases
+                .Concat(userAliases ?? Array.Empty<string>())
+                .Select(Normalize)
+                .Where(x => x.Length > 0)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
             var score = 0;
 
             if (query.Length == 0)

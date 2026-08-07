@@ -60,6 +60,7 @@ namespace LongBetterWindows.Host.Services
         internal static WidgetLayoutCoordinator Widgets { get; private set; } = null!;
         public static string WorkflowReportsDirectory { get; private set; } = string.Empty;
         public static SearchPreferenceService SearchPreferences { get; private set; } = null!;
+        public static CommandPreferenceService CommandPreferences { get; private set; } = null!;
         public static SuperPanelGroupService SuperPanelGroups { get; private set; } = null!;
         public static MouseGestureService MouseGestures { get; private set; } = null!;
         internal static WorkspaceSessionCoordinator Workspace { get; private set; } = null!;
@@ -77,6 +78,9 @@ namespace LongBetterWindows.Host.Services
             provider.RegisterService<IStorageService>(Storage);
             SearchPreferences = new SearchPreferenceService(Storage);
             SearchPreferences.InitializeAsync().GetAwaiter().GetResult();
+            CommandPreferences = new CommandPreferenceService(Storage);
+            CommandPreferences.InitializeAsync().GetAwaiter().GetResult();
+            provider.PluginStore.Commands.AttachPreferences(CommandPreferences);
             SuperPanelGroups = new SuperPanelGroupService(Storage);
             SuperPanelGroups.InitializeAsync().GetAwaiter().GetResult();
             MouseGestures = new MouseGestureService(Storage);
@@ -155,7 +159,8 @@ namespace LongBetterWindows.Host.Services
                     new LocalFileSearchProvider(
                         localize: key => I18n.T(key)),
                 },
-                preferences: SearchPreferences);
+                preferences: SearchPreferences,
+                commandEnabled: provider.PluginStore.Commands.IsEnabled);
             provider.PluginStore.AttachSearchCoordinator(Search);
 
             Notification = new NotificationService();

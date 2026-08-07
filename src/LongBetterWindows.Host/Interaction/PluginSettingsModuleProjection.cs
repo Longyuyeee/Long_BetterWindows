@@ -30,7 +30,12 @@ namespace LongBetterWindows.Host.Interaction
         string AliasSummary,
         string InputSummary,
         bool IsPinned,
-        string PinText);
+        string PinText,
+        bool IsEnabled,
+        string CustomAliasesInitial)
+    {
+        public string CustomAliasesText { get; set; } = CustomAliasesInitial;
+    }
 
     internal static class PluginSettingsModuleProjection
     {
@@ -82,7 +87,8 @@ namespace LongBetterWindows.Host.Interaction
             PluginEntry entry,
             IEnumerable<CommandDescriptor> commands,
             IReadOnlyCollection<string>? pinnedResultIds = null,
-            Func<string, string>? localize = null)
+            Func<string, string>? localize = null,
+            CommandPreferenceService? commandPreferences = null)
         {
             ArgumentNullException.ThrowIfNull(entry);
             ArgumentNullException.ThrowIfNull(commands);
@@ -112,6 +118,8 @@ namespace LongBetterWindows.Host.Interaction
                             input.ToString()))
                         .ToArray();
                     var isPinned = pinned.Contains(resultId);
+                    var preference = commandPreferences?.Get(command.Key)
+                        ?? CommandPreferenceSnapshot.Default;
                     return new PluginCommandModuleItemState(
                         command.Key,
                         resultId,
@@ -138,7 +146,9 @@ namespace LongBetterWindows.Host.Interaction
                         Text(
                             localize,
                             isPinned ? "action.unpin" : "action.pin",
-                            isPinned ? "Unpin" : "Pin"));
+                            isPinned ? "Unpin" : "Pin"),
+                        preference.IsEnabled,
+                        string.Join(", ", preference.Aliases));
                 })
                 .ToArray();
         }

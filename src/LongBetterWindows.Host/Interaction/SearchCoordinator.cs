@@ -10,14 +10,17 @@ namespace LongBetterWindows.Host.Interaction
         private readonly object _lock = new();
         private readonly TimeSpan _providerTimeout;
         private readonly SearchPreferenceService? _preferences;
+        private readonly Func<string, bool>? _commandEnabled;
 
         public SearchCoordinator(
             IEnumerable<ISearchProvider> providers,
             TimeSpan? providerTimeout = null,
-            SearchPreferenceService? preferences = null)
+            SearchPreferenceService? preferences = null,
+            Func<string, bool>? commandEnabled = null)
         {
             _providerTimeout = providerTimeout ?? TimeSpan.FromMilliseconds(900);
             _preferences = preferences;
+            _commandEnabled = commandEnabled;
             foreach (var provider in providers)
                 RegisterProvider(provider);
         }
@@ -119,11 +122,17 @@ namespace LongBetterWindows.Host.Interaction
             {
                 var results = await provider.SearchAsync(request, timeout.Token)
                     .WaitAsync(timeout.Token);
-                return results.Select(item => item with
-                {
-                    ProviderId = provider.Id,
-                    ProviderPriority = provider.Priority,
-                }).ToList();
+                return results
+                    .Where(item => IsActionEnabled(item.PrimaryAction))
+                    .Select(item => item with
+                    {
+                        ProviderId = provider.Id,
+                        ProviderPriority = provider.Priority,
+                        SecondaryActions = item.SecondaryActions
+                            .Where(IsActionEnabled)
+                            .ToList(),
+                    })
+                    .ToList();
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -140,6 +149,10 @@ namespace LongBetterWindows.Host.Interaction
                 return Array.Empty<SearchResultItem>();
             }
         }
+
+        private bool IsActionEnabled(SearchResultAction action)
+            => action.Kind != SearchActionKind.ExecuteCommand
+                || _commandEnabled?.Invoke(action.Target) != false;
 
         private IReadOnlyList<SearchResultItem> Order(
             IEnumerable<SearchResultItem> results,

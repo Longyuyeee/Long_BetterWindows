@@ -14,6 +14,7 @@ namespace LongBetterWindows.Host.Views
     {
         private readonly PluginRegistry _plugins;
         private readonly SearchPreferenceService _preferences;
+        private readonly CommandPreferenceService _commandPreferences;
         private readonly string _pluginId;
         private FrameworkElement? _settingsContent;
         private long _settingsRevision = -1;
@@ -23,11 +24,14 @@ namespace LongBetterWindows.Host.Views
         internal PluginSettingsModuleControl(
             string pluginId,
             PluginRegistry? plugins = null,
-            SearchPreferenceService? preferences = null)
+            SearchPreferenceService? preferences = null,
+            CommandPreferenceService? commandPreferences = null)
         {
             _pluginId = pluginId;
             _plugins = plugins ?? HostProvider.Instance.PluginStore;
             _preferences = preferences ?? ServicesInitializer.SearchPreferences;
+            _commandPreferences = commandPreferences
+                ?? ServicesInitializer.CommandPreferences;
             InitializeComponent();
             Loaded += Module_Loaded;
             Unloaded += Module_Unloaded;
@@ -105,7 +109,8 @@ namespace LongBetterWindows.Host.Views
                 entry,
                 _plugins.Commands.GetAll(),
                 _preferences.GetPinnedResultIds(),
-                key => ServicesInitializer.I18n.T(key));
+                key => ServicesInitializer.I18n.T(key),
+                _commandPreferences);
             CommandsList.ItemsSource = commands;
             CommandsList.Visibility = commands.Count > 0
                 ? Visibility.Visible
@@ -219,6 +224,71 @@ namespace LongBetterWindows.Host.Views
                 if (Volatile.Read(ref _disposed) == 0)
                     button.IsEnabled = true;
             }
+        }
+
+        private async void CommandEnabled_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not CheckBox { Tag: string commandKey } checkBox)
+                return;
+            checkBox.IsEnabled = false;
+            try
+            {
+                await _commandPreferences.SetEnabledAsync(
+                    commandKey,
+                    checkBox.IsChecked == true);
+                ShowCommandFeedback(ServicesInitializer.I18n.T(
+                    "plugins.command.preferenceSaved"));
+                if (Volatile.Read(ref _disposed) == 0)
+                    Refresh();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Plugin command enabled state update failed for {CommandKey}",
+                    commandKey);
+                ShowCommandFeedback(ServicesInitializer.I18n.T(
+                    "plugins.command.preferenceSaveFailed"));
+                if (Volatile.Read(ref _disposed) == 0)
+                    checkBox.IsEnabled = true;
+            }
+        }
+
+        private async void CommandAliasesSave_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button
+                {
+                    DataContext: PluginCommandModuleItemState item,
+                } button)
+                return;
+            button.IsEnabled = false;
+            try
+            {
+                var aliases = CommandPreferenceService.ParseAliases(
+                    item.CustomAliasesText);
+                await _commandPreferences.SetAliasesAsync(item.Key, aliases);
+                ShowCommandFeedback(ServicesInitializer.I18n.T(
+                    "plugins.command.aliasesSaved"));
+                if (Volatile.Read(ref _disposed) == 0)
+                    Refresh();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Plugin command alias update failed for {CommandKey}",
+                    item.Key);
+                ShowCommandFeedback(ServicesInitializer.I18n.T(
+                    "plugins.command.aliasesInvalid"));
+                if (Volatile.Read(ref _disposed) == 0)
+                    button.IsEnabled = true;
+            }
+        }
+
+        private void ShowCommandFeedback(string message)
+        {
+            CommandFeedbackText.Text = message;
+            CommandFeedbackText.Visibility = Visibility.Visible;
         }
 
         private void ModuleTabs_SelectionChanged(

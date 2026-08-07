@@ -1294,11 +1294,102 @@ try {
         $null -ne $candidate -and
             [string]$candidate.Current.ItemStatus -eq $initialPinState
     } 'The Base64 encode pin state was not restored.' | Out-Null
+    $commandEnabledId = `
+        'Long.Workspace.PluginSettings.CommandEnabled.com.long.base64:base64.encode'
+    $commandEnabled = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandEnabledId
+    } 'The Base64 encode enabled-state control was not discoverable.'
+    $enabledPattern = $null
+    if (-not $commandEnabled.TryGetCurrentPattern(
+        [Windows.Automation.TogglePattern]::Pattern,
+        [ref]$enabledPattern)) {
+        throw 'The Base64 encode enabled-state control did not expose TogglePattern.'
+    }
+    $initialEnabledState = `
+        ([Windows.Automation.TogglePattern]$enabledPattern).Current.ToggleState
+    ([Windows.Automation.TogglePattern]$enabledPattern).Toggle()
+    $commandEnabled = Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandEnabledId
+        if ($null -eq $candidate) { return $null }
+        $candidatePattern = $null
+        if (-not $candidate.TryGetCurrentPattern(
+            [Windows.Automation.TogglePattern]::Pattern,
+            [ref]$candidatePattern)) { return $null }
+        if (([Windows.Automation.TogglePattern]$candidatePattern).Current.ToggleState `
+            -ne $initialEnabledState) { return $candidate }
+        return $null
+    } 'The Base64 encode enabled state did not change.'
+    $enabledPattern = $null
+    $commandEnabled.TryGetCurrentPattern(
+        [Windows.Automation.TogglePattern]::Pattern,
+        [ref]$enabledPattern) | Out-Null
+    ([Windows.Automation.TogglePattern]$enabledPattern).Toggle()
+    Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandEnabledId
+        if ($null -eq $candidate) { return $false }
+        $candidatePattern = $null
+        $candidate.TryGetCurrentPattern(
+            [Windows.Automation.TogglePattern]::Pattern,
+            [ref]$candidatePattern) | Out-Null
+        $null -ne $candidatePattern -and
+            ([Windows.Automation.TogglePattern]$candidatePattern).Current.ToggleState `
+                -eq $initialEnabledState
+    } 'The Base64 encode enabled state was not restored.' | Out-Null
+    $commandAliasesId = `
+        'Long.Workspace.PluginSettings.CommandAliases.com.long.base64:base64.encode'
+    $commandAliasesSaveId = `
+        'Long.Workspace.PluginSettings.CommandAliasesSave.com.long.base64:base64.encode'
+    $commandAliases = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandAliasesId
+    } 'The Base64 encode custom-alias editor was not discoverable.'
+    $aliasValue = [Windows.Automation.ValuePattern]$commandAliases.GetCurrentPattern(
+        [Windows.Automation.ValuePattern]::Pattern)
+    $initialAliases = [string]$aliasValue.Current.Value
+    $qualityAlias = 'quality-base64-alias'
+    $aliasValue.SetValue($qualityAlias)
+    $commandAliasesSave = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandAliasesSaveId
+    } 'The Base64 encode custom-alias save action was not discoverable.'
+    Invoke-AutomationElement $commandAliasesSave `
+        'The Base64 encode custom-alias save action did not support InvokePattern.'
+    $commandAliases = Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandAliasesId
+        if ($null -eq $candidate) { return $null }
+        $candidateValue = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
+            [Windows.Automation.ValuePattern]::Pattern)
+        if ([string]$candidateValue.Current.Value -eq $qualityAlias) {
+            return $candidate
+        }
+        return $null
+    } 'The Base64 encode custom alias was not persisted.'
+    $aliasValue = [Windows.Automation.ValuePattern]$commandAliases.GetCurrentPattern(
+        [Windows.Automation.ValuePattern]::Pattern)
+    $aliasValue.SetValue($initialAliases)
+    $commandAliasesSave = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandAliasesSaveId
+    } 'The Base64 encode custom-alias restore action was not discoverable.'
+    Invoke-AutomationElement $commandAliasesSave `
+        'The Base64 encode custom-alias restore action did not support InvokePattern.'
+    Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandAliasesId
+        if ($null -eq $candidate) { return $false }
+        $candidateValue = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
+            [Windows.Automation.ValuePattern]::Pattern)
+        [string]$candidateValue.Current.Value -eq $initialAliases
+    } 'The Base64 encode custom alias was not restored.' | Out-Null
     $report.automation_semantics['plugin_command_management'] = [ordered]@{
         commands_tab_discoverable = $null -ne $commandsTab
         stable_command_identity = $commandButtonId
         pin_state_changed = $true
         pin_state_restored = $true
+        enabled_state_changed = $true
+        enabled_state_restored = $true
+        custom_alias_persisted = $true
+        custom_alias_restored = $true
     }
     Stop-QualityHost $pluginSettingsProcess
     $pluginSettingsProcess = $null
