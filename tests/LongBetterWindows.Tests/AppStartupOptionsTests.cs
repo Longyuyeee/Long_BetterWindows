@@ -32,6 +32,7 @@ public class AppStartupOptionsTests
             "--quality-context", "IMAGE",
             "--quality-origin-window", "12345",
             "--quality-workflows-dir", "quality-workflows",
+            "--quality-storage-path", "quality-storage.json",
             "--quality-open-workflow", "workflow.quality.review",
             "--quality-edit-workflow", "workflow.quality.editor",
             "--quality-workflow-upgrade-package", "quality-v2.lpak",
@@ -82,6 +83,7 @@ public class AppStartupOptionsTests
         Assert.Equal("image", options.QualityContextProfile);
         Assert.Equal(new nint(12345), options.QualityOriginWindowHandle);
         Assert.Equal("quality-workflows", options.QualityWorkflowsDirectory);
+        Assert.Equal("quality-storage.json", options.QualityStoragePath);
         Assert.Equal("workflow.quality.review", options.QualityWorkflowReviewId);
         Assert.Equal("workflow.quality.editor", options.QualityWorkflowEditorId);
         Assert.Equal("quality-v2.lpak", options.QualityWorkflowUpgradePackagePath);

@@ -20,6 +20,7 @@ if (Test-Path -LiteralPath $outputRoot) {
 [IO.Directory]::CreateDirectory($outputRoot) | Out-Null
 $workflowRoot = Join-Path $outputRoot 'workflows'
 [IO.Directory]::CreateDirectory($workflowRoot) | Out-Null
+$qualityStoragePath = Join-Path $outputRoot 'storage.json'
 $exportMatrixRoot = Join-Path $outputRoot 'terminal-export-matrix'
 $exportWritableRoot = Join-Path $exportMatrixRoot 'writable'
 $exportDeniedRoot = Join-Path $exportMatrixRoot 'denied'
@@ -336,6 +337,28 @@ function Find-DescendantByControlType(
         $condition)
 }
 
+function Find-VisibleDescendantByAutomationId(
+    [Windows.Automation.AutomationElement] $root,
+    [string] $automationId) {
+    $condition = [Windows.Automation.PropertyCondition]::new(
+        [Windows.Automation.AutomationElement]::AutomationIdProperty,
+        $automationId)
+    $matches = $root.FindAll(
+        [Windows.Automation.TreeScope]::Descendants,
+        $condition)
+    foreach ($match in $matches) {
+        $bounds = $match.Current.BoundingRectangle
+        if ($match.Current.IsEnabled -and
+            -not $match.Current.IsOffscreen -and
+            -not $bounds.IsEmpty -and
+            $bounds.Width -gt 0 -and
+            $bounds.Height -gt 0) {
+            return $match
+        }
+    }
+    return $null
+}
+
 function Find-ProcessElementByAutomationId([int] $processId, [string] $automationId) {
     $windows = [LongDesktopInput]::TopLevelWindows($processId)
     foreach ($window in $windows) {
@@ -420,6 +443,41 @@ function Find-AncestorByControlType(
         if ($null -eq $candidate) { return $null }
     }
     return $null
+}
+
+function Set-AutomationFocus(
+    [scriptblock] $ResolveElement,
+    [string] $failureMessage) {
+    return Wait-Until {
+        $element = & $ResolveElement
+        if ($null -eq $element -or
+            -not $element.Current.IsEnabled -or
+            -not $element.Current.IsKeyboardFocusable -or
+            $element.Current.IsOffscreen) {
+            return $null
+        }
+        $element.SetFocus()
+        if ($element.Current.HasKeyboardFocus) { return $element }
+        return $null
+    } $failureMessage
+}
+
+function Wait-CommandFeedback(
+    [Windows.Automation.AutomationElement] $root,
+    [string] $previousRevision,
+    [string] $expectedName,
+    [string] $failureMessage) {
+    return Wait-Until {
+        $feedback = Find-DescendantByAutomationId `
+            $root 'Long.Workspace.PluginSettings.CommandFeedback'
+        if ($null -eq $feedback) { return $null }
+        $revision = [string]$feedback.Current.ItemStatus
+        if ($revision -ne $previousRevision -and
+            [string]$feedback.Current.Name -eq $expectedName) {
+            return $feedback
+        }
+        return $null
+    } $failureMessage
 }
 
 function Select-AutomationElement(
@@ -545,6 +603,7 @@ function Start-QualityHost([string[]] $viewArguments) {
         '--theme', 'dark',
         '--plugins-dir', $pluginsDirectory,
         '--quality-workflows-dir', $workflowRoot,
+        '--quality-storage-path', $qualityStoragePath,
         '--quality-window-automation'
     )
     $arguments += $viewArguments
@@ -705,8 +764,11 @@ try {
         Find-DescendantByName $menuResults 'Wi-Fi'
     } 'The menu-workflow Wi-Fi result did not appear.' | Out-Null
     Write-Stage 'Opening the result secondary-action menu through UI Automation.'
+    [LongDesktopInput]::Activate(
+        [IntPtr]$menuPalette.Current.NativeWindowHandle) | Out-Null
     $moreActions = Wait-Until {
-        $button = Find-DescendantByAutomationId $menuResults 'Long.Result.MoreActions'
+        $button = Find-VisibleDescendantByAutomationId `
+            $menuResults 'Long.Result.MoreActions'
         if ($null -eq $button) {
             $button = Find-DescendantByName $menuResults '更多结果操作'
         }
@@ -1060,14 +1122,9 @@ try {
         'Long.Management.Destination.Developer',
         'Long.Management.Destination.Settings')
     foreach ($destinationId in $destinationIds) {
-        $destination = Wait-Until {
+        $destination = Set-AutomationFocus {
             Find-DescendantByAutomationId $managementMain $destinationId
-        } "Management destination $destinationId was not discoverable."
-        $destination.SetFocus()
-        Wait-Until {
-            $destination.Current.HasKeyboardFocus
-        } "Management destination $destinationId could not receive keyboard focus." |
-            Out-Null
+        } "Management destination $destinationId could not receive keyboard focus."
         $destinationFocusOrder += $destination.Current.AutomationId
     }
     $report.automation_semantics['management_navigation'] = [ordered]@{
@@ -1354,13 +1411,19 @@ try {
     } 'The Base64 encode custom-alias save action was not discoverable.'
     Invoke-AutomationElement $commandAliasesSave `
         'The Base64 encode custom-alias save action did not support InvokePattern.'
+    Wait-CommandFeedback `
+        $pluginSettingsMain 'before-alias-save' 'Custom aliases saved.' `
+        'The Base64 encode custom-alias save did not complete.' | Out-Null
     $commandAliases = Wait-Until {
         $candidate = Find-DescendantByAutomationId `
             $pluginSettingsMain $commandAliasesId
         if ($null -eq $candidate) { return $null }
         $candidateValue = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
             [Windows.Automation.ValuePattern]::Pattern)
-        if ([string]$candidateValue.Current.Value -eq $qualityAlias) {
+        $candidateSave = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandAliasesSaveId
+        if ([string]$candidateValue.Current.Value -eq $qualityAlias -and
+            $null -ne $candidateSave -and $candidateSave.Current.IsEnabled) {
             return $candidate
         }
         return $null
@@ -1368,18 +1431,29 @@ try {
     $aliasValue = [Windows.Automation.ValuePattern]$commandAliases.GetCurrentPattern(
         [Windows.Automation.ValuePattern]::Pattern)
     $aliasValue.SetValue($initialAliases)
+    $commandFeedback = Wait-Until {
+        Find-DescendantByAutomationId `
+            $pluginSettingsMain 'Long.Workspace.PluginSettings.CommandFeedback'
+    } 'The plugin command feedback surface was not refreshed.'
+    $feedbackRevision = [string]$commandFeedback.Current.ItemStatus
     $commandAliasesSave = Wait-Until {
         Find-DescendantByAutomationId $pluginSettingsMain $commandAliasesSaveId
     } 'The Base64 encode custom-alias restore action was not discoverable.'
     Invoke-AutomationElement $commandAliasesSave `
         'The Base64 encode custom-alias restore action did not support InvokePattern.'
+    Wait-CommandFeedback `
+        $pluginSettingsMain $feedbackRevision 'Custom aliases saved.' `
+        'The Base64 encode custom-alias restore did not complete.' | Out-Null
     Wait-Until {
         $candidate = Find-DescendantByAutomationId `
             $pluginSettingsMain $commandAliasesId
         if ($null -eq $candidate) { return $false }
         $candidateValue = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
             [Windows.Automation.ValuePattern]::Pattern)
-        [string]$candidateValue.Current.Value -eq $initialAliases
+        $candidateSave = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandAliasesSaveId
+        [string]$candidateValue.Current.Value -eq $initialAliases -and
+            $null -ne $candidateSave -and $candidateSave.Current.IsEnabled
     } 'The Base64 encode custom alias was not restored.' | Out-Null
     $commandHotkeyId = `
         'Long.Workspace.PluginSettings.CommandHotkey.com.long.base64:base64.encode'

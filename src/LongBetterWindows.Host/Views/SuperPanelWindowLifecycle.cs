@@ -16,6 +16,7 @@ namespace LongBetterWindows.Host.Views
         private readonly Action<int> _cycleGroup;
         private IntPtr _foregroundWindow;
         private HwndSource? _windowSource;
+        private CancellationTokenSource? _focusRestoreCancellation;
 
         internal SuperPanelWindowLifecycle(
             Window window,
@@ -34,6 +35,7 @@ namespace LongBetterWindows.Host.Views
 
         internal void Present(bool animate)
         {
+            CancelPendingFocusRestore();
             if (!_window.IsVisible)
                 _window.Show();
             PositionNearCursor();
@@ -45,8 +47,16 @@ namespace LongBetterWindows.Host.Views
         internal void Dismiss(bool restoreFocus)
         {
             _window.Hide();
+            CancelPendingFocusRestore();
             if (restoreFocus && _foregroundWindow != IntPtr.Zero)
-                ForegroundWindowActivator.TryActivate(_foregroundWindow);
+            {
+                var target = _foregroundWindow;
+                _focusRestoreCancellation = new CancellationTokenSource();
+                _ = ForegroundActivationRetry.RunAsync(
+                    () => ForegroundWindowActivator.TryActivate(target),
+                    () => !_window.IsVisible,
+                    _focusRestoreCancellation.Token);
+            }
         }
 
         internal async Task ReleaseForegroundAsync()
@@ -143,9 +153,17 @@ namespace LongBetterWindows.Host.Views
 
         public void Dispose()
         {
+            CancelPendingFocusRestore();
             if (_windowSource is null) return;
             _windowSource.RemoveHook(WindowMessageHook);
             _windowSource = null;
+        }
+
+        private void CancelPendingFocusRestore()
+        {
+            _focusRestoreCancellation?.Cancel();
+            _focusRestoreCancellation?.Dispose();
+            _focusRestoreCancellation = null;
         }
     }
 }

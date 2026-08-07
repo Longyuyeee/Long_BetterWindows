@@ -299,6 +299,7 @@
                                    FontSize="12"
                                    Foreground="{DynamicResource Long.Brush.Text.Secondary}"
                                    Visibility="Collapsed"
+                                   AutomationProperties.AutomationId="Long.Workspace.PluginSettings.CommandFeedback"
                                    AutomationProperties.LiveSetting="Polite" />
                     </Grid>
                 </TabItem>

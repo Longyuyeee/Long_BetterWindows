@@ -114,7 +114,9 @@ namespace LongBetterWindows.Host
                 _startupTrace.Mark("options_parsed");
             }
             _startupTrace?.Mark("services_initialize_begin");
-            ServicesInitializer.Initialize(_startupOptions.QualityWorkflowsDirectory);
+            ServicesInitializer.Initialize(
+                _startupOptions.QualityWorkflowsDirectory,
+                _startupOptions.QualityStoragePath);
             _startupTrace?.Mark("services_initialize_end");
             ServicesInitializer.I18n.Initialize(_startupOptions.LanguageOverride);
             ServicesInitializer.InitializeWorkspace();

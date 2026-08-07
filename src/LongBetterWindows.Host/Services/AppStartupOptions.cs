@@ -51,6 +51,7 @@ namespace LongBetterWindows.Host.Services
         public string? QualityContextProfile { get; private init; }
         public nint QualityOriginWindowHandle { get; private init; }
         public string? QualityWorkflowsDirectory { get; private init; }
+        public string? QualityStoragePath { get; private init; }
         public string? QualityWorkflowReviewId { get; private init; }
         public string? QualityWorkflowEditorId { get; private init; }
         public string? QualityWorkflowUpgradePackagePath { get; private init; }
@@ -177,6 +178,7 @@ namespace LongBetterWindows.Host.Services
                     arguments,
                     "--quality-origin-window"),
                 QualityWorkflowsDirectory = ReadArgument(arguments, "--quality-workflows-dir"),
+                QualityStoragePath = ReadArgument(arguments, "--quality-storage-path"),
                 QualityWorkflowReviewId = ReadArgument(arguments, "--quality-open-workflow"),
                 QualityWorkflowEditorId = ReadArgument(arguments, "--quality-edit-workflow"),
                 QualityWorkflowUpgradePackagePath = ReadArgument(

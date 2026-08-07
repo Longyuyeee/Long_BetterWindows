@@ -21,6 +21,7 @@ namespace LongBetterWindows.Host.Views
         private long _settingsRevision = -1;
         private bool _subscribed;
         private int _disposed;
+        private int _commandFeedbackRevision;
 
         internal PluginSettingsModuleControl(
             string pluginId,
@@ -373,6 +374,9 @@ namespace LongBetterWindows.Host.Views
         private void ShowCommandFeedback(string message)
         {
             CommandFeedbackText.Text = message;
+            System.Windows.Automation.AutomationProperties.SetItemStatus(
+                CommandFeedbackText,
+                $"revision:{++_commandFeedbackRevision}");
             CommandFeedbackText.Visibility = Visibility.Visible;
         }
 

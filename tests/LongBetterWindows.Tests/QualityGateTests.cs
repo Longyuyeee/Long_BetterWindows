@@ -1941,6 +1941,13 @@ public class QualityGateTests
         Assert.Contains("$attempt -le 5", script);
         Assert.Contains("$selection.Current.IsSelected", script);
         Assert.Contains("$element.SetFocus()", script);
+        Assert.Contains("function Set-AutomationFocus", script);
+        Assert.Contains("Set-AutomationFocus {", script);
+        Assert.Contains("function Find-VisibleDescendantByAutomationId", script);
+        Assert.Contains("-not $match.Current.IsOffscreen", script);
+        Assert.Contains("--quality-storage-path", script);
+        Assert.Contains("function Wait-CommandFeedback", script);
+        Assert.Contains("Custom aliases saved.", script);
         Assert.Contains("Start-Sleep -Milliseconds 120", script);
         Assert.Contains("Long.Management.Destination.Market", script);
         Assert.Contains(

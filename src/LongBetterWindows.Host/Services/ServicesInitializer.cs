@@ -72,11 +72,13 @@ namespace LongBetterWindows.Host.Services
         internal static PluginWorkspaceSessionManager PluginSessions
             { get; private set; } = new();
 
-        public static void Initialize(string? workflowsDirectory = null)
+        public static void Initialize(
+            string? workflowsDirectory = null,
+            string? storagePath = null)
         {
             var provider = HostProvider.Instance;
 
-            Storage = new StorageService();
+            Storage = new StorageService(storagePath);
             provider.RegisterService<IStorageService>(Storage);
             SearchPreferences = new SearchPreferenceService(Storage);
             SearchPreferences.InitializeAsync().GetAwaiter().GetResult();
