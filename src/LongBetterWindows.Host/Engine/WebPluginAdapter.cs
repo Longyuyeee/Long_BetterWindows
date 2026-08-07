@@ -17,9 +17,8 @@ namespace LongBetterWindows.Host.Engine
         private readonly WebPluginRuntime _runtime;
         private readonly WebPluginPresentationCoordinator _presentation;
         private Task<bool>? _runtimeInitialization;
-
         public string Id { get; }
-        public string Name { get; }
+        public string Name { get; private set; }
         public string Version { get; }
         public PluginState State { get; private set; } = PluginState.Loaded;
 
@@ -30,15 +29,12 @@ namespace LongBetterWindows.Host.Engine
             Name = name;
             Version = version;
             _presentation = new WebPluginPresentationCoordinator(
-                runtime,
-                id,
-                name,
+                runtime, id, name,
                 () => HostProvider.Instance.PluginStore.HandleWindowClosedAsync(id));
         }
 
         public void ShowMainUI()
             => _ = ShowMainUIAsync();
-
         private async Task ShowMainUIAsync()
         {
             EnsureWindowVisible();
@@ -120,6 +116,12 @@ namespace LongBetterWindows.Host.Engine
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (context.Resources.TryGetValue("plugin.name", out var name)
+                && !string.IsNullOrWhiteSpace(name))
+            {
+                Name = name;
+                _presentation.UpdatePluginName(name);
+            }
             await _runtime.NotifyLanguageChangedAsync(context);
         }
     }

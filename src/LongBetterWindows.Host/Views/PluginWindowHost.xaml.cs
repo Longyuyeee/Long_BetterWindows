@@ -80,6 +80,17 @@ namespace LongBetterWindows.Host.Views
         internal void SetReturnTarget(Window? target) => _returnTarget = target;
         internal bool ReturnRequested { get; private set; }
 
+        internal void UpdateTitle(string title)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => UpdateTitle(title));
+                return;
+            }
+            Title = title;
+            PluginTitle.Text = title;
+        }
+
         private void ApplyInitialPlacement(string pluginId)
         {
             if (!PluginWindowPlacement.TryApply(

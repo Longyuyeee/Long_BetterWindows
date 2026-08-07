@@ -40,6 +40,30 @@ public sealed class PluginRuntimeLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task WebViewAdapter_ProjectsLocalizedNameIntoPresentation()
+    {
+        Directory.CreateDirectory(_root);
+        var manifest = Manifest("web-localized", "webview", "index.html");
+        using var adapter = new WebPluginAdapter(
+            new WebPluginRuntime(manifest, _root),
+            manifest.Id,
+            manifest.Name,
+            manifest.Version,
+            _root,
+            manifest.EntryPoint);
+
+        await adapter.OnLanguageChangedAsync(new PluginLanguageContext(
+            "en-US",
+            "en-US",
+            new Dictionary<string, string>
+            {
+                ["plugin.name"] = "Localized web plugin",
+            }));
+
+        Assert.Equal("Localized web plugin", adapter.Name);
+    }
+
+    [Fact]
     public async Task CSharpScriptManifest_ExecutesAndCreatesAdapter()
     {
         Directory.CreateDirectory(_root);

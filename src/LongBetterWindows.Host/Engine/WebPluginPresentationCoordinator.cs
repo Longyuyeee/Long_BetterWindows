@@ -9,7 +9,7 @@ namespace LongBetterWindows.Host.Engine
     {
         private readonly WebPluginRuntime _runtime;
         private readonly string _pluginId;
-        private readonly string _pluginName;
+        private string _pluginName;
         private readonly Func<Task> _windowClosed;
         private PluginWindowHost? _window;
         private PluginWorkspaceSession? _session;
@@ -32,6 +32,14 @@ namespace LongBetterWindows.Host.Engine
             _pluginId = pluginId;
             _pluginName = pluginName;
             _windowClosed = windowClosed;
+        }
+
+        internal void UpdatePluginName(string pluginName)
+        {
+            if (string.IsNullOrWhiteSpace(pluginName))
+                return;
+            _pluginName = pluginName;
+            _window?.UpdateTitle(pluginName);
         }
 
         internal void EnsureVisible()
