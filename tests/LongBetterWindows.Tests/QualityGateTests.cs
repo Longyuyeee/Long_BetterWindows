@@ -1301,6 +1301,7 @@ public class QualityGateTests
             "src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml");
         var settingsCode = Read(
             "src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml.cs");
+        var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
 
         Assert.Contains("x:Key=\"ManagementCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource LongCard}\"", xaml);
@@ -1344,6 +1345,10 @@ public class QualityGateTests
         Assert.Contains("i18n.settings.category.selector", settingsXaml);
         Assert.Contains("SettingsCategoryAccessibilityProjection.Build", settingsCode);
         Assert.Contains("AutomationProperties.SetItemStatus", settingsCode);
+        Assert.Contains("SettingsNavigationWidth", desktopSmoke);
+        Assert.Contains("SettingsNavigationExpectedMode", desktopSmoke);
+        Assert.Contains("Find-ProcessSelectionItemByAutomationId", desktopSmoke);
+        Assert.Contains("The compact Settings category", desktopSmoke);
         Assert.Contains("ExportBrokerDiagnostics_Click", settingsCode);
         Assert.Contains("VerticalAlignment=\"Top\"", settingsXaml);
         Assert.Contains("IDisposable", settingsCode);

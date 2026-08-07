@@ -9,7 +9,10 @@ param(
     [switch] $WorkflowSchemaOnly,
     [switch] $WorkflowExportMatrix,
     [switch] $PluginCommandManagementOnly,
-    [switch] $SettingsNavigationOnly
+    [switch] $SettingsNavigationOnly,
+    [ValidateRange(640,1920)] [int] $SettingsNavigationWidth = 1120,
+    [ValidateSet('auto','sidebar','compact')]
+    [string] $SettingsNavigationExpectedMode = 'auto'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -446,6 +449,32 @@ function Find-AncestorByControlType(
     return $null
 }
 
+function Find-ProcessSelectionItemByAutomationId(
+    [int] $processId,
+    [string] $automationId) {
+    $condition = [Windows.Automation.AndCondition]::new(@(
+        [Windows.Automation.PropertyCondition]::new(
+            [Windows.Automation.AutomationElement]::ProcessIdProperty,
+            $processId),
+        [Windows.Automation.PropertyCondition]::new(
+            [Windows.Automation.AutomationElement]::AutomationIdProperty,
+            $automationId)))
+    $matches = [Windows.Automation.AutomationElement]::RootElement.FindAll(
+        [Windows.Automation.TreeScope]::Descendants,
+        $condition)
+    foreach ($match in $matches) {
+        $pattern = $null
+        if ($match.Current.IsEnabled -and
+            -not $match.Current.IsOffscreen -and
+            $match.TryGetCurrentPattern(
+                [Windows.Automation.SelectionItemPattern]::Pattern,
+                [ref]$pattern)) {
+            return $match
+        }
+    }
+    return $null
+}
+
 function Set-AutomationFocus(
     [scriptblock] $ResolveElement,
     [string] $failureMessage) {
@@ -491,7 +520,13 @@ function Select-AutomationElement(
             if (-not $element.TryGetCurrentPattern(
                 [Windows.Automation.SelectionItemPattern]::Pattern,
                 [ref]$pattern)) {
-                throw $failureMessage
+                $supportedPatterns = $element.GetSupportedPatterns() |
+                    ForEach-Object { $_.ProgrammaticName }
+                throw ("SelectionItemPattern unavailable: " +
+                    "type='$($element.Current.ControlType.ProgrammaticName)', " +
+                    "class='$($element.Current.ClassName)', " +
+                    "framework='$($element.Current.FrameworkId)', " +
+                    "patterns='$($supportedPatterns -join ',')'.")
             }
             $selection = [Windows.Automation.SelectionItemPattern]$pattern
             if ($selection.Current.IsSelected) {
@@ -1094,7 +1129,7 @@ try {
     Write-Stage 'Starting Workspace management navigation workflow.'
     $managementProcess = Start-QualityHost @(
         '--language', 'en-US',
-        '--quality-width', '1120',
+        '--quality-width', [string]$SettingsNavigationWidth,
         '--quality-height', '760')
     $managementMain = Wait-Until {
         Find-WindowByAutomationId $managementProcess.Id 'Long.MainWindow'
@@ -1212,6 +1247,11 @@ try {
     } else {
         'compact'
     }
+    if ($SettingsNavigationExpectedMode -ne 'auto' -and
+        $settingsCategoryMode -ne $SettingsNavigationExpectedMode) {
+        throw ("Expected Settings category navigation mode " +
+            "'$SettingsNavigationExpectedMode', received '$settingsCategoryMode'.")
+    }
     $settingsCategoryNames = [ordered]@{
         appearance = 'Personalization'
         interaction = 'Interaction and panel'
@@ -1251,12 +1291,25 @@ try {
             }
             ([Windows.Automation.ExpandCollapsePattern]$expandPattern).Expand()
             $categoryItem = Wait-Until {
-                Find-ProcessElementByAutomationId `
+                Find-ProcessSelectionItemByAutomationId `
                     $managementProcess.Id `
                     "Long.Settings.CompactCategoryItem.$category"
             } "The compact Settings category '$category' was not discoverable."
             Select-AutomationElement $categoryItem `
                 "The compact Settings category '$category' could not be selected."
+            $compactItemSemantics = Get-AutomationSemantics `
+                $categoryItem 'ControlType.ListItem' `
+                "The compact Settings category '$category' semantics failed."
+            if ($compactItemSemantics.name -ne $settingsCategoryNames[$category]) {
+                throw "The compact Settings category '$category' exposed an inconsistent name."
+            }
+            $selectionPattern = [Windows.Automation.SelectionItemPattern]`
+                $categoryItem.GetCurrentPattern(
+                    [Windows.Automation.SelectionItemPattern]::Pattern)
+            if (-not $selectionPattern.Current.IsSelected) {
+                throw "The compact Settings category '$category' did not remain selected."
+            }
+            $compactItemSemantics['selected'] = $true
         }
         $categoryContent = Wait-Until {
             Find-DescendantByAutomationId `
@@ -1290,6 +1343,7 @@ try {
             }
         } else {
             $settingsCategorySemantics[$category] = [ordered]@{
+                item = $compactItemSemantics
                 heading = $contentSemantics
             }
         }
