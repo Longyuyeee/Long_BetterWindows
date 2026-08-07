@@ -22,6 +22,16 @@ namespace LongBetterWindows.Host.Interaction
         DateTime? LastCallTime,
         long RegistrationRevision);
 
+    internal sealed record PluginCommandModuleItemState(
+        string Key,
+        string ResultId,
+        string Title,
+        string Description,
+        string AliasSummary,
+        string InputSummary,
+        bool IsPinned,
+        string PinText);
+
     internal static class PluginSettingsModuleProjection
     {
         public static PluginSettingsModuleState Build(
@@ -66,6 +76,71 @@ namespace LongBetterWindows.Host.Interaction
                 usage?.TotalCalls ?? 0,
                 usage?.LastCallTime,
                 entry.RegistrationRevision);
+        }
+
+        public static IReadOnlyList<PluginCommandModuleItemState> BuildCommands(
+            PluginEntry entry,
+            IEnumerable<CommandDescriptor> commands,
+            IReadOnlyCollection<string>? pinnedResultIds = null,
+            Func<string, string>? localize = null)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            ArgumentNullException.ThrowIfNull(commands);
+            var pinned = new HashSet<string>(
+                pinnedResultIds ?? Array.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+
+            return commands
+                .Where(command => string.Equals(
+                    command.PluginId,
+                    entry.Id,
+                    StringComparison.OrdinalIgnoreCase))
+                .OrderBy(command => command.Title, StringComparer.OrdinalIgnoreCase)
+                .Select(command =>
+                {
+                    var resultId = CommandSearchResultIdentity.BuildResultId(
+                        command.Key);
+                    var aliases = command.Command.Aliases
+                        .Where(alias => !string.IsNullOrWhiteSpace(alias))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    var inputs = command.Command.AcceptedInputs
+                        .Distinct()
+                        .Select(input => Text(
+                            localize,
+                            $"plugins.command.input.{input.ToString().ToLowerInvariant()}",
+                            input.ToString()))
+                        .ToArray();
+                    var isPinned = pinned.Contains(resultId);
+                    return new PluginCommandModuleItemState(
+                        command.Key,
+                        resultId,
+                        command.Title,
+                        command.Description,
+                        aliases.Length == 0
+                            ? Text(
+                                localize,
+                                "plugins.command.aliases.none",
+                                "No declared keywords")
+                            : string.Format(
+                                Text(
+                                    localize,
+                                    "plugins.command.aliases",
+                                    "Keywords: {0}"),
+                                string.Join(" · ", aliases)),
+                        string.Format(
+                            Text(
+                                localize,
+                                "plugins.command.inputs",
+                                "Inputs: {0}"),
+                            string.Join(" · ", inputs)),
+                        isPinned,
+                        Text(
+                            localize,
+                            isPinned ? "action.unpin" : "action.pin",
+                            isPinned ? "Unpin" : "Pin"));
+                })
+                .ToArray();
         }
 
         private static string Text(

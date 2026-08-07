@@ -2080,8 +2080,13 @@ public class QualityGateTests
         var resolver = Read(
             "src", "LongBetterWindows.Host", "Interaction",
             "WorkspaceModuleAddress.cs");
+        var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
 
         Assert.Contains("Long.Workspace.PluginSettings.Tabs", xaml);
+        Assert.Contains("Long.Workspace.PluginSettings.Tab.Commands", xaml);
+        Assert.Contains("Long.Workspace.PluginSettings.Commands", xaml);
+        Assert.Contains("CommandPin_Click", code);
+        Assert.Contains("BuildCommands", code);
         Assert.Contains("Long.Workspace.PluginSettings.Content", xaml);
         Assert.Contains("<local:CapabilityDetailPanel", xaml);
         Assert.Contains("CreateSettingsUI()", code);
@@ -2093,6 +2098,8 @@ public class QualityGateTests
         Assert.Contains("OpenPluginSettingsModule", main);
         Assert.Contains("HandleMissingPluginModulesAsync", main);
         Assert.Contains("await plugin.EnsureActivatedAsync()", resolver);
+        Assert.Contains("PluginCommandManagementOnly", desktopSmoke);
+        Assert.Contains("pin_state_restored", desktopSmoke);
         Assert.DoesNotContain(
             "plugin.Instance is not IHasSettingsUI",
             resolver);

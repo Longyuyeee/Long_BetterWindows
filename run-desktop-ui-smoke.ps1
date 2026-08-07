@@ -7,7 +7,8 @@ param(
     [switch] $WorkflowOnly,
     [switch] $WorkflowOutputOnly,
     [switch] $WorkflowSchemaOnly,
-    [switch] $WorkflowExportMatrix
+    [switch] $WorkflowExportMatrix,
+    [switch] $PluginCommandManagementOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -615,6 +616,7 @@ $focusExpandProcess = $null
 $focusExecuteProcess = $null
 $superPanelTransitionProcess = $null
 $managementProcess = $null
+$pluginSettingsProcess = $null
 $workflowPaletteProcess = $null
 $workflowPanelProcess = $null
 $workflowSchemaWideProcess = $null
@@ -625,7 +627,10 @@ $marketProcess = $null
 $accessibilityProcess = $null
 
 try {
-    if (-not $WorkflowOnly -and -not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
+    if (-not $PluginCommandManagementOnly -and
+        -not $WorkflowOnly -and
+        -not $WorkflowOutputOnly -and
+        -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting Command Palette host.'
     Set-Clipboard -Value 'long-ui-smoke-pending'
     $paletteProcess = Start-QualityHost '--quality-open-palette'
@@ -1248,7 +1253,60 @@ try {
     $managementProcess = $null
     }
 
-    if (-not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
+    if ($PluginCommandManagementOnly -or
+        (-not $WorkflowOnly -and
+         -not $WorkflowOutputOnly -and
+         -not $WorkflowSchemaOnly)) {
+    Write-Stage 'Starting plugin command-management workflow.'
+    $pluginSettingsProcess = Start-QualityHost @(
+        '--language', 'en-US',
+        '--quality-open-plugin-settings', 'com.long.base64',
+        '--quality-width', '1120',
+        '--quality-height', '760')
+    $pluginSettingsMain = Wait-Until {
+        Find-WindowByAutomationId $pluginSettingsProcess.Id 'Long.MainWindow'
+    } 'The plugin command-management host did not appear.'
+    $commandsTab = Wait-Until {
+        Find-DescendantByAutomationId `
+            $pluginSettingsMain 'Long.Workspace.PluginSettings.Tab.Commands'
+    } 'The plugin Commands tab was not discoverable.'
+    $commandButtonId = `
+        'Long.Workspace.PluginSettings.Command.com.long.base64:base64.encode'
+    $commandPin = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandButtonId
+    } 'The Base64 encode command-management action was not discoverable.'
+    $initialPinState = [string]$commandPin.Current.ItemStatus
+    Invoke-AutomationElement $commandPin `
+        'The Base64 encode pin action did not support InvokePattern.'
+    $commandPin = Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandButtonId
+        if ($null -ne $candidate -and
+            [string]$candidate.Current.ItemStatus -ne $initialPinState) {
+            $candidate
+        }
+    } 'The Base64 encode pin state did not change.'
+    Invoke-AutomationElement $commandPin `
+        'The Base64 encode restore-pin action did not support InvokePattern.'
+    Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandButtonId
+        $null -ne $candidate -and
+            [string]$candidate.Current.ItemStatus -eq $initialPinState
+    } 'The Base64 encode pin state was not restored.' | Out-Null
+    $report.automation_semantics['plugin_command_management'] = [ordered]@{
+        commands_tab_discoverable = $null -ne $commandsTab
+        stable_command_identity = $commandButtonId
+        pin_state_changed = $true
+        pin_state_restored = $true
+    }
+    Stop-QualityHost $pluginSettingsProcess
+    $pluginSettingsProcess = $null
+    }
+
+    if (-not $PluginCommandManagementOnly -and
+        -not $WorkflowOutputOnly -and
+        -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting managed workflow review from Command Palette.'
     $workflowPaletteProcess = Start-QualityHost @(
         '--quality-open-palette',
@@ -1447,7 +1505,7 @@ try {
     $workflowPanelProcess = $null
     }
 
-    if (-not $WorkflowOutputOnly) {
+    if (-not $PluginCommandManagementOnly -and -not $WorkflowOutputOnly) {
     Write-Stage 'Validating UUID argument schema in the wide workflow editor.'
     $workflowSchemaWideProcess = Start-QualityHost @(
         '--quality-edit-workflow',
@@ -1563,7 +1621,7 @@ try {
     $workflowSchemaCompactProcess = $null
     }
 
-    if (-not $WorkflowSchemaOnly) {
+    if (-not $PluginCommandManagementOnly -and -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting approved long terminal-output workflow.'
     $workflowOutputArguments = @(
         '--quality-open-workflow',
@@ -1642,7 +1700,10 @@ try {
     $workflowOutputProcess = $null
     }
 
-    if (-not $WorkflowOnly -and -not $WorkflowOutputOnly -and -not $WorkflowSchemaOnly) {
+    if (-not $PluginCommandManagementOnly -and
+        -not $WorkflowOnly -and
+        -not $WorkflowOutputOnly -and
+        -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting Workspace Base64 plugin workflow.'
     $pluginProcess = Start-QualityHost @(
         '--quality-open-plugin-runtime', 'com.long.base64')
@@ -1897,6 +1958,7 @@ finally {
     Stop-QualityHost $focusProbeProcess
     Stop-QualityHost $superPanelTransitionProcess
     Stop-QualityHost $managementProcess
+    Stop-QualityHost $pluginSettingsProcess
     Stop-QualityHost $workflowPaletteProcess
     Stop-QualityHost $workflowPanelProcess
     Stop-QualityHost $workflowSchemaWideProcess

@@ -131,8 +131,63 @@
                         Style="{StaticResource PluginModuleTabControlStyle}"
                         SelectionChanged="ModuleTabs_SelectionChanged"
                         AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Tabs">
+                <TabItem x:Name="CommandsTab"
+                         Style="{StaticResource PluginModuleTabItemStyle}"
+                         AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Tab.Commands"
+                         Header="{DynamicResource i18n.plugins.commands}">
+                    <Grid Margin="0,16,0,0">
+                        <ItemsControl x:Name="CommandsList"
+                                      AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Commands">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource LongCard}"
+                                            Margin="0,0,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Margin="0,0,16,0">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="14"
+                                                           FontWeight="SemiBold"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Description}"
+                                                           Margin="0,4,0,0"
+                                                           Foreground="{DynamicResource Long.Brush.Text.Secondary}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding AliasSummary}"
+                                                           Margin="0,8,0,0"
+                                                           Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding InputSummary}"
+                                                           Margin="0,3,0,0"
+                                                           Foreground="{DynamicResource Long.Brush.Text.Muted}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1"
+                                                    Tag="{Binding ResultId}"
+                                                    Content="{Binding PinText}"
+                                                    VerticalAlignment="Center"
+                                                    Style="{StaticResource LongButton}"
+                                                    Click="CommandPin_Click"
+                                                    AutomationProperties.Name="{Binding PinText}"
+                                                    AutomationProperties.ItemStatus="{Binding IsPinned}"
+                                                    AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.Command.{0}}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="CommandsEmptyText"
+                                   Style="{StaticResource LongEmptyState}"
+                                   Text="{DynamicResource i18n.plugins.commands.empty}"
+                                   Visibility="Collapsed" />
+                    </Grid>
+                </TabItem>
                 <TabItem x:Name="SettingsTab"
                          Style="{StaticResource PluginModuleTabItemStyle}"
+                         AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Tab.Settings"
                          Header="{DynamicResource i18n.plugins.settings}">
                     <Grid Margin="0,16,0,0">
                         <ContentControl x:Name="SettingsHost"
@@ -147,6 +202,7 @@
                 </TabItem>
                 <TabItem x:Name="CapabilitiesTab"
                          Style="{StaticResource PluginModuleTabItemStyle}"
+                         AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Tab.Capabilities"
                          Header="{DynamicResource i18n.plugins.capabilities}">
                     <Grid Margin="0,16,0,0">
                         <local:CapabilityDetailPanel x:Name="CapabilityPanel"

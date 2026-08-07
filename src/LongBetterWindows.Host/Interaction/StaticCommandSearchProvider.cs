@@ -1,5 +1,28 @@
 namespace LongBetterWindows.Host.Interaction
 {
+    internal static class CommandSearchResultIdentity
+    {
+        private const string Prefix = "command:";
+
+        public static string BuildResultId(string commandKey)
+            => Prefix + commandKey;
+
+        public static bool TryGetCommandKey(
+            string resultId,
+            out string commandKey)
+        {
+            commandKey = string.Empty;
+            if (string.IsNullOrWhiteSpace(resultId)
+                || !resultId.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            commandKey = resultId[Prefix.Length..];
+            return !string.IsNullOrWhiteSpace(commandKey);
+        }
+    }
+
     public sealed class StaticCommandSearchProvider : ISearchProvider
     {
         private readonly CommandRegistry _commands;
@@ -41,10 +64,11 @@ namespace LongBetterWindows.Host.Interaction
                     .Concat(request.AdditionalPreferredResultIds ?? Array.Empty<string>());
                 foreach (var resultId in preferredIds)
                 {
-                    const string prefix = "command:";
-                    if (!resultId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    if (!CommandSearchResultIdentity.TryGetCommandKey(
+                            resultId,
+                            out var commandKey))
                         continue;
-                    var descriptor = _commands.Get(resultId[prefix.Length..]);
+                    var descriptor = _commands.Get(commandKey);
                     if (descriptor is null || results.Any(item =>
                             string.Equals(item.Id, resultId, StringComparison.OrdinalIgnoreCase)))
                         continue;
@@ -58,7 +82,7 @@ namespace LongBetterWindows.Host.Interaction
         private SearchResultItem CreateResult(CommandDescriptor descriptor, int score)
             => new()
             {
-                Id = "command:" + descriptor.Key,
+                Id = CommandSearchResultIdentity.BuildResultId(descriptor.Key),
                 ProviderId = Id,
                 Title = descriptor.Title,
                 Subtitle = descriptor.Description,

@@ -56,6 +56,45 @@ public sealed class PluginSettingsModuleProjectionTests
         Assert.Equal(PluginState.Running, entry.State);
     }
 
+    [Fact]
+    public void BuildCommands_ProjectsOnlyPluginCommandsWithSharedPinIdentity()
+    {
+        var entry = Entry("commands", new object(), PluginState.Loaded);
+        var other = Entry("other", new object(), PluginState.Loaded);
+        var registry = new CommandRegistry();
+        registry.RegisterManifest(entry.Manifest);
+        registry.RegisterManifest(other.Manifest);
+        var descriptor = registry.Get("commands:commands.open")! with
+        {
+            Title = "Localized command",
+        };
+        var pinnedId = CommandSearchResultIdentity.BuildResultId(descriptor.Key);
+
+        var items = PluginSettingsModuleProjection.BuildCommands(
+            entry,
+            registry.GetAll().Select(item => item.Key == descriptor.Key
+                ? descriptor
+                : item),
+            [pinnedId],
+            key => key switch
+            {
+                "plugins.command.aliases" => "Aliases: {0}",
+                "plugins.command.inputs" => "Inputs: {0}",
+                "plugins.command.input.text" => "Localized text",
+                "plugins.command.input.file" => "Localized file",
+                "action.unpin" => "Remove pin",
+                _ => key,
+            });
+
+        var item = Assert.Single(items);
+        Assert.Equal("Localized command", item.Title);
+        Assert.Equal("command:commands:commands.open", item.ResultId);
+        Assert.Equal("Aliases: open · launch", item.AliasSummary);
+        Assert.Equal("Inputs: Localized text · Localized file", item.InputSummary);
+        Assert.True(item.IsPinned);
+        Assert.Equal("Remove pin", item.PinText);
+    }
+
     private static PluginEntry Entry(
         string id,
         object instance,
@@ -75,6 +114,22 @@ public sealed class PluginSettingsModuleProjectionTests
                         .RootElement
                         .Clone(),
                 },
+                Commands =
+                [
+                    new PluginCommand
+                    {
+                        Id = $"{id}.open",
+                        Title = $"Open {id}",
+                        Description = $"Open {id} content",
+                        Aliases = ["open", "launch", "OPEN"],
+                        AcceptedInputs =
+                        [
+                            AcceptedInputType.Text,
+                            AcceptedInputType.File,
+                            AcceptedInputType.Text,
+                        ],
+                    },
+                ],
             },
             instance,
             Path.GetTempPath(),

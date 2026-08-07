@@ -13,6 +13,7 @@ namespace LongBetterWindows.Host.Views
     public partial class PluginSettingsModuleControl : UserControl, IDisposable
     {
         private readonly PluginRegistry _plugins;
+        private readonly SearchPreferenceService _preferences;
         private readonly string _pluginId;
         private FrameworkElement? _settingsContent;
         private long _settingsRevision = -1;
@@ -21,10 +22,12 @@ namespace LongBetterWindows.Host.Views
 
         internal PluginSettingsModuleControl(
             string pluginId,
-            PluginRegistry? plugins = null)
+            PluginRegistry? plugins = null,
+            SearchPreferenceService? preferences = null)
         {
             _pluginId = pluginId;
             _plugins = plugins ?? HostProvider.Instance.PluginStore;
+            _preferences = preferences ?? ServicesInitializer.SearchPreferences;
             InitializeComponent();
             Loaded += Module_Loaded;
             Unloaded += Module_Unloaded;
@@ -91,8 +94,25 @@ namespace LongBetterWindows.Host.Views
                 entry.Id,
                 entry.DisplayName,
                 entry.Manifest.Capabilities);
+            RefreshCommands(entry);
             RefreshSettingsContent(entry, state);
             StateChanged?.Invoke(state);
+        }
+
+        private void RefreshCommands(PluginEntry entry)
+        {
+            var commands = PluginSettingsModuleProjection.BuildCommands(
+                entry,
+                _plugins.Commands.GetAll(),
+                _preferences.GetPinnedResultIds(),
+                key => ServicesInitializer.I18n.T(key));
+            CommandsList.ItemsSource = commands;
+            CommandsList.Visibility = commands.Count > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            CommandsEmptyText.Visibility = commands.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private void RefreshSettingsContent(
@@ -179,6 +199,28 @@ namespace LongBetterWindows.Host.Views
             PluginToggleRequested?.Invoke(_pluginId);
         }
 
+        private async void CommandPin_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string resultId } button)
+                return;
+            button.IsEnabled = false;
+            try
+            {
+                await _preferences.TogglePinnedAsync(resultId);
+                if (Volatile.Read(ref _disposed) == 0)
+                    Refresh();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Plugin command pin update failed for {ResultId}",
+                    resultId);
+                if (Volatile.Read(ref _disposed) == 0)
+                    button.IsEnabled = true;
+            }
+        }
+
         private void ModuleTabs_SelectionChanged(
             object sender,
             SelectionChangedEventArgs e)
@@ -192,6 +234,7 @@ namespace LongBetterWindows.Host.Views
             ToggleButton.IsEnabled = false;
             RunButton.IsEnabled = false;
             SettingsHost.Content = null;
+            CommandsList.ItemsSource = null;
             _settingsContent = null;
         }
 
