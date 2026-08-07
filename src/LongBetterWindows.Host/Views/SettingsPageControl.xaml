@@ -127,7 +127,8 @@
                 </StackPanel>
                 <Button x:Name="ThemeButton" Grid.Column="1"
                         Style="{StaticResource LongButton}"
-                        Click="ThemeToggle_Click" />
+                        Click="ThemeToggle_Click"
+                        AutomationProperties.AutomationId="Long.Settings.Theme.Toggle" />
             </Grid>
         </Border>
 

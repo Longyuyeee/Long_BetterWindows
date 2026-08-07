@@ -24,6 +24,10 @@ public class DesignSystemTests
             "Long.Brush.Text.Primary",
             "Long.Brush.Text.Secondary",
             "Long.Brush.Text.Muted",
+            "Long.Brush.Text.OnAccent",
+            "Long.Brush.Text.OnAccentMuted",
+            "Long.Brush.Surface.OnAccent",
+            "Long.Brush.Stroke.OnAccent",
             "Long.Brush.Accent.Primary",
             "Long.Brush.Accent.Hover",
             "Long.Brush.Accent.Soft",
@@ -33,6 +37,9 @@ public class DesignSystemTests
         };
 
         Assert.All(required, key => Assert.Contains(key, keys));
+        Assert.DoesNotContain(
+            "Long.Brush.Text.OnAccent\" Color=\"{StaticResource",
+            document.ToString());
     }
 
     [Fact]

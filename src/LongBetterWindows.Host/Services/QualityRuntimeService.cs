@@ -865,6 +865,7 @@ namespace LongBetterWindows.Host.Services
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
         {
             var originalTheme = App.IsLightTheme;
+            var highContrast = App.IsHighContrastEnabled;
             var dialog = UIService.CreatePromptDialogForQuality();
             var fullPath = Path.GetFullPath(reportPath);
             var reportDirectory = Path.GetDirectoryName(fullPath)!;
@@ -878,7 +879,7 @@ namespace LongBetterWindows.Host.Services
             try
             {
                 dialog.Show();
-                App.UpdateThemeResources(isLight: false);
+                App.ApplyTheme(isLight: false);
                 await _application.Dispatcher.InvokeAsync(
                     () => { },
                     DispatcherPriority.Render);
@@ -886,7 +887,7 @@ namespace LongBetterWindows.Host.Services
                 var dark = CaptureDialogTheme(dialog, "dark");
                 await CaptureWindowAsync(dialog, darkScreenshotPath);
 
-                App.UpdateThemeResources(isLight: true);
+                App.ApplyTheme(isLight: true);
                 await _application.Dispatcher.InvokeAsync(
                     () => { },
                     DispatcherPriority.Render);
@@ -899,7 +900,8 @@ namespace LongBetterWindows.Host.Services
                     && dark.InputBackground != light.InputBackground
                     && dark.SecondaryButtonBackground
                         != light.SecondaryButtonBackground;
-                var passed = changed && dark.Passed && light.Passed;
+                var themeBehaviorPassed = highContrast ? !changed : changed;
+                var passed = themeBehaviorPassed && dark.Passed && light.Passed;
                 await File.WriteAllTextAsync(
                     fullPath,
                     JsonSerializer.Serialize(
@@ -908,7 +910,9 @@ namespace LongBetterWindows.Host.Services
                             schema_version = 1,
                             captured_at = DateTimeOffset.UtcNow,
                             passed,
+                            high_contrast = highContrast,
                             runtime_theme_changed = changed,
+                            system_palette_preserved = highContrast && !changed,
                             screenshots = new
                             {
                                 dark = Path.GetFileName(darkScreenshotPath),
@@ -928,13 +932,14 @@ namespace LongBetterWindows.Host.Services
             finally
             {
                 dialog.Close();
-                App.UpdateThemeResources(originalTheme);
+                App.ApplyTheme(originalTheme);
             }
         }
 
         public async Task RunThemedMessageDialogProbeAsync(string reportPath)
         {
             var originalTheme = App.IsLightTheme;
+            var highContrast = App.IsHighContrastEnabled;
             var dialog = ThemedMessageDialog.CreateForQuality();
             var fullPath = Path.GetFullPath(reportPath);
             var reportDirectory = Path.GetDirectoryName(fullPath)!;
@@ -948,7 +953,7 @@ namespace LongBetterWindows.Host.Services
             try
             {
                 dialog.Show();
-                App.UpdateThemeResources(isLight: false);
+                App.ApplyTheme(isLight: false);
                 await _application.Dispatcher.InvokeAsync(
                     () => { },
                     DispatcherPriority.Render);
@@ -958,7 +963,7 @@ namespace LongBetterWindows.Host.Services
                     VerifyThemedMessageDialogLayout(dialog);
                 await CaptureWindowAsync(dialog, darkScreenshotPath);
 
-                App.UpdateThemeResources(isLight: true);
+                App.ApplyTheme(isLight: true);
                 await _application.Dispatcher.InvokeAsync(
                     () => { },
                     DispatcherPriority.Render);
@@ -970,7 +975,8 @@ namespace LongBetterWindows.Host.Services
                     dark.Surface != light.Surface
                     && dark.SecondaryButtonBackground
                         != light.SecondaryButtonBackground;
-                var passed = changed
+                var themeBehaviorPassed = highContrast ? !changed : changed;
+                var passed = themeBehaviorPassed
                     && compactLongTextLayoutPassed
                     && dark.Passed
                     && light.Passed;
@@ -982,7 +988,9 @@ namespace LongBetterWindows.Host.Services
                             schema_version = 1,
                             captured_at = DateTimeOffset.UtcNow,
                             passed,
+                            high_contrast = highContrast,
                             runtime_theme_changed = changed,
+                            system_palette_preserved = highContrast && !changed,
                             default_action = "cancel",
                             compact_long_text_layout_passed =
                                 compactLongTextLayoutPassed,
@@ -1010,12 +1018,13 @@ namespace LongBetterWindows.Host.Services
             finally
             {
                 dialog.Close();
-                App.UpdateThemeResources(originalTheme);
+                App.ApplyTheme(originalTheme);
             }
         }
 
         public async Task RunPluginSettingsProbeAsync(string reportPath)
         {
+            var highContrast = App.IsHighContrastEnabled;
             var expectedControls = new Dictionary<string, int>(
                 StringComparer.OrdinalIgnoreCase)
             {
@@ -1068,7 +1077,7 @@ namespace LongBetterWindows.Host.Services
                         window.WindowStartupLocation =
                             WindowStartupLocation.CenterScreen;
                         window.Show();
-                        App.UpdateThemeResources(isLight: false);
+                        App.ApplyTheme(isLight: false);
                         await _application.Dispatcher.InvokeAsync(
                             () => { },
                             DispatcherPriority.Render);
@@ -1082,7 +1091,7 @@ namespace LongBetterWindows.Host.Services
                             darkAccessible);
                         await CaptureWindowAsync(window, darkScreenshotPath);
 
-                        App.UpdateThemeResources(isLight: true);
+                        App.ApplyTheme(isLight: true);
                         await _application.Dispatcher.InvokeAsync(
                             () => { },
                             DispatcherPriority.Render);
@@ -1102,7 +1111,9 @@ namespace LongBetterWindows.Host.Services
                             expected.Key,
                             expected.Value,
                             dark.ControlCount,
-                            changed && dark.Passed && light.Passed,
+                            (highContrast ? !changed : changed)
+                                && dark.Passed
+                                && light.Passed,
                             changed,
                             Path.GetFileName(darkScreenshotPath),
                             GetFileSha256(darkScreenshotPath),
@@ -1152,6 +1163,10 @@ namespace LongBetterWindows.Host.Services
                             schema_version = 1,
                             captured_at = DateTimeOffset.UtcNow,
                             passed,
+                            high_contrast = highContrast,
+                            system_palette_preserved = highContrast
+                                && results.All(result =>
+                                    !result.RuntimeThemeChanged),
                             same_plugin_conflict = new
                             {
                                 current_hotkey = currentHotkey,
@@ -1170,7 +1185,7 @@ namespace LongBetterWindows.Host.Services
             }
             finally
             {
-                App.UpdateThemeResources(originalTheme);
+                App.ApplyTheme(originalTheme);
             }
         }
 

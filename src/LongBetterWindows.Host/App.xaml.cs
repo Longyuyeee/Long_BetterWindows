@@ -147,9 +147,7 @@ namespace LongBetterWindows.Host
                     "AppsUseLightTheme", 1);
                 isLight = appsUseLight is 1;
             }
-            ApplicationThemeManager.Apply(isLight ? ApplicationTheme.Light : ApplicationTheme.Dark);
-            _currentIsLight = isLight;
-            UpdateThemeResources(isLight);
+            ApplyTheme(isLight);
             UpdateMotionResources();
             SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
             _startupTrace?.Mark("theme_applied");
@@ -727,6 +725,15 @@ namespace LongBetterWindows.Host
             catch { /* best effort */ }
         }
 
+        public static void ApplyTheme(bool isLight, bool persist = false)
+        {
+            ApplicationThemeManager.Apply(
+                isLight ? ApplicationTheme.Light : ApplicationTheme.Dark);
+            UpdateThemeResources(isLight);
+            if (persist)
+                SaveThemeSetting(isLight);
+        }
+
         /// <summary>动态更新自定义主题资源，使 DynamicResource 绑定响应主题切换</summary>
         public static void UpdateThemeResources(bool isLight)
         {
@@ -774,6 +781,10 @@ namespace LongBetterWindows.Host
                 ["Long.Brush.Text.Primary"] = "Long.Color.Text.Primary",
                 ["Long.Brush.Text.Secondary"] = "Long.Color.Text.Secondary",
                 ["Long.Brush.Text.Muted"] = "Long.Color.Text.Muted",
+                ["Long.Brush.Text.OnAccent"] = "Long.Color.Text.OnAccent",
+                ["Long.Brush.Text.OnAccentMuted"] = "Long.Color.Text.OnAccentMuted",
+                ["Long.Brush.Surface.OnAccent"] = "Long.Color.Surface.OnAccent",
+                ["Long.Brush.Stroke.OnAccent"] = "Long.Color.Stroke.OnAccent",
                 ["Long.Brush.Accent.Primary"] = "Long.Color.Accent.Primary",
                 ["Long.Brush.Accent.Hover"] = "Long.Color.Accent.Hover",
                 ["Long.Brush.Accent.Pressed"] = "Long.Color.Accent.Pressed",
@@ -859,6 +870,10 @@ namespace LongBetterWindows.Host
                 ["Long.Color.Text.Primary"] = "#F4F6FB",
                 ["Long.Color.Text.Secondary"] = "#B2BACB",
                 ["Long.Color.Text.Muted"] = "#7C879E",
+                ["Long.Color.Text.OnAccent"] = "#FFFFFF",
+                ["Long.Color.Text.OnAccentMuted"] = "#E9E5FF",
+                ["Long.Color.Surface.OnAccent"] = "#28FFFFFF",
+                ["Long.Color.Stroke.OnAccent"] = "#40FFFFFF",
                 ["Long.Color.Accent.Primary"] = "#7059F5",
                 ["Long.Color.Accent.Hover"] = "#765EE8",
                 ["Long.Color.Accent.Pressed"] = "#6248DE",
@@ -885,6 +900,10 @@ namespace LongBetterWindows.Host
                 ["Long.Color.Text.Primary"] = "#171A22",
                 ["Long.Color.Text.Secondary"] = "#505B70",
                 ["Long.Color.Text.Muted"] = "#667085",
+                ["Long.Color.Text.OnAccent"] = "#FFFFFF",
+                ["Long.Color.Text.OnAccentMuted"] = "#F3F0FF",
+                ["Long.Color.Surface.OnAccent"] = "#28FFFFFF",
+                ["Long.Color.Stroke.OnAccent"] = "#40FFFFFF",
                 ["Long.Color.Accent.Primary"] = "#6847F5",
                 ["Long.Color.Accent.Hover"] = "#7354F0",
                 ["Long.Color.Accent.Pressed"] = "#5637D8",
@@ -911,14 +930,18 @@ namespace LongBetterWindows.Host
                 ["Long.Color.Text.Primary"] = SystemColors.WindowTextColor.ToString(),
                 ["Long.Color.Text.Secondary"] = SystemColors.WindowTextColor.ToString(),
                 ["Long.Color.Text.Muted"] = SystemColors.GrayTextColor.ToString(),
+                ["Long.Color.Text.OnAccent"] = SystemColors.HighlightTextColor.ToString(),
+                ["Long.Color.Text.OnAccentMuted"] = SystemColors.HighlightTextColor.ToString(),
+                ["Long.Color.Surface.OnAccent"] = SystemColors.HighlightColor.ToString(),
+                ["Long.Color.Stroke.OnAccent"] = SystemColors.HighlightTextColor.ToString(),
                 ["Long.Color.Accent.Primary"] = SystemColors.HighlightColor.ToString(),
                 ["Long.Color.Accent.Hover"] = SystemColors.HighlightColor.ToString(),
                 ["Long.Color.Accent.Pressed"] = SystemColors.HighlightColor.ToString(),
                 ["Long.Color.Accent.Soft"] = SystemColors.ControlColor.ToString(),
                 ["Long.Color.Focus"] = SystemColors.HighlightColor.ToString(),
-                ["Long.Color.State.Success"] = SystemColors.WindowTextColor.ToString(),
-                ["Long.Color.State.Warning"] = SystemColors.WindowTextColor.ToString(),
-                ["Long.Color.State.Danger"] = SystemColors.WindowTextColor.ToString(),
+                ["Long.Color.State.Success"] = SystemColors.HighlightColor.ToString(),
+                ["Long.Color.State.Warning"] = SystemColors.HighlightColor.ToString(),
+                ["Long.Color.State.Danger"] = SystemColors.HighlightColor.ToString(),
                 ["Long.Color.ScrollThumb"] = SystemColors.WindowTextColor.ToString(),
                 ["Long.Color.ScrollThumbHover"] = SystemColors.HighlightColor.ToString(),
             };

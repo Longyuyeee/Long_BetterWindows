@@ -1423,6 +1423,14 @@ public class QualityGateTests
 
         Assert.Contains("SystemParameters.HighContrast", app);
         Assert.Contains("HighContrastPalette", app);
+        Assert.Contains("SystemColors.HighlightTextColor", app);
+        Assert.Contains("public static void ApplyTheme(bool isLight", app);
+        Assert.Contains("highContrast ? !changed : changed", quality);
+        Assert.Contains("system_palette_preserved", quality);
+        Assert.Contains("App.ApplyTheme(_isLightMode, persist: true)",
+            Read("src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml.cs"));
+        Assert.Contains("Long.Settings.Theme.Toggle",
+            Read("src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml"));
         Assert.Contains("--quality-high-contrast", options);
         Assert.Contains("--quality-reduce-motion", options);
         Assert.Contains("SystemParameters.HighContrast || _forceHighContrast", app);

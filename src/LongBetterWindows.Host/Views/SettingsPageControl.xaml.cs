@@ -252,12 +252,7 @@ namespace LongBetterWindows.Host.Views
         private void ThemeToggle_Click(object sender, RoutedEventArgs e)
         {
             _isLightMode = !_isLightMode;
-            var theme = _isLightMode
-                ? Wpf.Ui.Appearance.ApplicationTheme.Light
-                : Wpf.Ui.Appearance.ApplicationTheme.Dark;
-            Wpf.Ui.Appearance.ApplicationThemeManager.Apply(theme);
-            App.SaveThemeSetting(_isLightMode);
-            App.UpdateThemeResources(_isLightMode);
+            App.ApplyTheme(_isLightMode, persist: true);
             RefreshThemeButton();
         }
 

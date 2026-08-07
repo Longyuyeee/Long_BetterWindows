@@ -85,6 +85,33 @@ public sealed class ReleaseBlockingRegressionTests
             css);
     }
 
+    [Fact]
+    public void HighContrastActionsUseSystemForegroundBackgroundPair()
+    {
+        var root = FindRepositoryRoot();
+        var app = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "App.xaml.cs"));
+        var colors = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Themes",
+            "Colors.xaml"));
+
+        Assert.Contains(
+            "[\"Long.Color.Text.OnAccent\"] = SystemColors.HighlightTextColor.ToString()",
+            app);
+        Assert.Contains(
+            "[\"Long.Color.State.Danger\"] = SystemColors.HighlightColor.ToString()",
+            app);
+        Assert.Contains(
+            "Long.Brush.Text.OnAccent\" Color=\"{DynamicResource Long.Color.Text.OnAccent}",
+            colors);
+    }
+
     private static void AssertPrimaryButtonContrastAndParity(
         string palette,
         string css)

@@ -22,6 +22,10 @@
     <Color x:Key="Long.Color.Text.Primary">#F4F6FB</Color>
     <Color x:Key="Long.Color.Text.Secondary">#B2BACB</Color>
     <Color x:Key="Long.Color.Text.Muted">#7C879E</Color>
+    <Color x:Key="Long.Color.Text.OnAccent">#FFFFFF</Color>
+    <Color x:Key="Long.Color.Text.OnAccentMuted">#E9E5FF</Color>
+    <Color x:Key="Long.Color.Surface.OnAccent">#28FFFFFF</Color>
+    <Color x:Key="Long.Color.Stroke.OnAccent">#40FFFFFF</Color>
     <Color x:Key="Long.Color.Accent.Primary">#7059F5</Color>
     <Color x:Key="Long.Color.Accent.Hover">#765EE8</Color>
     <Color x:Key="Long.Color.Accent.Pressed">#6248DE</Color>
@@ -55,10 +59,10 @@
     <SolidColorBrush x:Key="Long.Brush.State.Danger" Color="{DynamicResource Long.Color.State.Danger}" />
     <SolidColorBrush x:Key="Long.Brush.ScrollThumb" Color="{DynamicResource Long.Color.ScrollThumb}" />
     <SolidColorBrush x:Key="Long.Brush.ScrollThumbHover" Color="{DynamicResource Long.Color.ScrollThumbHover}" />
-    <SolidColorBrush x:Key="Long.Brush.Text.OnAccent" Color="{StaticResource Long.Color.Brand.White}" />
-    <SolidColorBrush x:Key="Long.Brush.Text.OnAccentMuted" Color="#E9E5FF" />
-    <SolidColorBrush x:Key="Long.Brush.Surface.OnAccent" Color="#28FFFFFF" />
-    <SolidColorBrush x:Key="Long.Brush.Stroke.OnAccent" Color="#40FFFFFF" />
+    <SolidColorBrush x:Key="Long.Brush.Text.OnAccent" Color="{DynamicResource Long.Color.Text.OnAccent}" />
+    <SolidColorBrush x:Key="Long.Brush.Text.OnAccentMuted" Color="{DynamicResource Long.Color.Text.OnAccentMuted}" />
+    <SolidColorBrush x:Key="Long.Brush.Surface.OnAccent" Color="{DynamicResource Long.Color.Surface.OnAccent}" />
+    <SolidColorBrush x:Key="Long.Brush.Stroke.OnAccent" Color="{DynamicResource Long.Color.Stroke.OnAccent}" />
 
     <LinearGradientBrush x:Key="Long.Brush.Accent.Gradient" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="{DynamicResource Long.Color.Accent.Primary}" Offset="0" />
