@@ -86,6 +86,14 @@ public sealed class PluginSettingsModuleProjectionTests
                 "plugins.command.input.text" => "Localized text",
                 "plugins.command.input.file" => "Localized file",
                 "action.unpin" => "Remove pin",
+                "plugins.command.enabledA11y" => "{0}: enabled control",
+                "plugins.command.pinA11y" => "{0}: {1}",
+                "plugins.command.aliasesA11y" => "{0}: aliases editor",
+                "plugins.command.aliasesSaveA11y" => "{0}: save aliases",
+                "plugins.command.hotkeyA11y" => "{0}: shortcut editor",
+                "plugins.command.hotkeySaveA11y" => "{0}: save shortcut",
+                "plugins.command.hotkeyClearA11y" => "{0}: clear shortcut",
+                "plugins.command.hotkeyStatusA11y" => "{0}: status {1}",
                 _ => key,
             },
             commandPreferences);
@@ -101,6 +109,16 @@ public sealed class PluginSettingsModuleProjectionTests
         Assert.Equal("my alias", item.CustomAliasesText);
         Assert.Equal(string.Empty, item.HotkeyText);
         Assert.False(item.CanClearHotkey);
+        Assert.Equal("Localized command: enabled control", item.EnabledAutomationName);
+        Assert.Equal("Localized command: Remove pin", item.PinAutomationName);
+        Assert.Equal("Localized command: aliases editor", item.AliasesAutomationName);
+        Assert.Equal("Localized command: save aliases", item.AliasesSaveAutomationName);
+        Assert.Equal("Localized command: shortcut editor", item.HotkeyAutomationName);
+        Assert.Equal("Localized command: save shortcut", item.HotkeySaveAutomationName);
+        Assert.Equal("Localized command: clear shortcut", item.HotkeyClearAutomationName);
+        Assert.Equal(
+            "Localized command: status No command shortcut",
+            item.HotkeyStatusAutomationName);
     }
 
     private static PluginEntry Entry(

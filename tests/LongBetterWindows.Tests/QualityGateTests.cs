@@ -2111,6 +2111,12 @@ public class QualityGateTests
         Assert.Contains("Long.Workspace.PluginSettings.Tab.Commands", xaml);
         Assert.Contains("Long.Workspace.PluginSettings.Commands", xaml);
         Assert.Contains("Long.Workspace.PluginSettings.CommandHotkey.", xaml);
+        Assert.Contains("{Binding EnabledAutomationName}", xaml);
+        Assert.Contains("{Binding AliasesAutomationName}", xaml);
+        Assert.Contains("{Binding HotkeyAutomationName}", xaml);
+        Assert.Contains("{Binding HotkeyStatusAutomationName}", xaml);
+        Assert.Contains("Long.Workspace.PluginSettings.CommandHotkeyStatus.", xaml);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", xaml);
         Assert.Contains("CommandHotkeySave_Click", code);
         Assert.Contains("CommandHotkeyClear_Click", code);
         Assert.Contains("CommandPin_Click", code);
@@ -2130,6 +2136,8 @@ public class QualityGateTests
         Assert.Contains("pin_state_restored", desktopSmoke);
         Assert.Contains("command_hotkey_persisted", desktopSmoke);
         Assert.Contains("command_hotkey_restored", desktopSmoke);
+        Assert.Contains("unique command context", desktopSmoke);
+        Assert.Contains("controls = $commandSemanticSnapshot", desktopSmoke);
         Assert.DoesNotContain(
             "plugin.Instance is not IHasSettingsUI",
             resolver);

@@ -141,6 +141,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <ItemsControl x:Name="CommandsList"
+                                      AutomationProperties.Name="{DynamicResource i18n.plugins.commands}"
                                       AutomationProperties.AutomationId="Long.Workspace.PluginSettings.Commands">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -181,12 +182,13 @@
                                                           IsChecked="{Binding IsEnabled, Mode=OneWay}"
                                                           Margin="0,0,0,8"
                                                           Click="CommandEnabled_Click"
+                                                          AutomationProperties.Name="{Binding EnabledAutomationName}"
                                                           AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandEnabled.{0}}" />
                                                 <Button Tag="{Binding ResultId}"
                                                         Content="{Binding PinText}"
                                                         Style="{StaticResource LongButton}"
                                                         Click="CommandPin_Click"
-                                                        AutomationProperties.Name="{Binding PinText}"
+                                                        AutomationProperties.Name="{Binding PinAutomationName}"
                                                         AutomationProperties.ItemStatus="{Binding IsPinned}"
                                                         AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.Command.{0}}" />
                                             </StackPanel>
@@ -212,7 +214,7 @@
                                                          MaxLength="300"
                                                          Style="{StaticResource LongTextBox}"
                                                          ToolTip="{DynamicResource i18n.plugins.command.aliasesHint}"
-                                                         AutomationProperties.Name="{DynamicResource i18n.plugins.command.customAliases}"
+                                                         AutomationProperties.Name="{Binding AliasesAutomationName}"
                                                          AutomationProperties.HelpText="{DynamicResource i18n.plugins.command.aliasesHint}"
                                                          AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandAliases.{0}}" />
                                                 <Button Grid.Row="1"
@@ -221,6 +223,7 @@
                                                         Content="{DynamicResource i18n.action.save}"
                                                         Style="{StaticResource LongButton}"
                                                         Click="CommandAliasesSave_Click"
+                                                        AutomationProperties.Name="{Binding AliasesSaveAutomationName}"
                                                         AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandAliasesSave.{0}}" />
                                             </Grid>
                                             <Grid Grid.Row="2"
@@ -248,7 +251,7 @@
                                                          MinWidth="220"
                                                          Style="{StaticResource LongTextBox}"
                                                          ToolTip="{DynamicResource i18n.plugins.command.hotkey.hint}"
-                                                         AutomationProperties.Name="{DynamicResource i18n.plugins.command.hotkey}"
+                                                         AutomationProperties.Name="{Binding HotkeyAutomationName}"
                                                          AutomationProperties.HelpText="{DynamicResource i18n.plugins.command.hotkey.hint}"
                                                          AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandHotkey.{0}}" />
                                                 <Button Grid.Row="1"
@@ -258,6 +261,7 @@
                                                         IsEnabled="{Binding CanEditHotkey}"
                                                         Style="{StaticResource LongButton}"
                                                         Click="CommandHotkeySave_Click"
+                                                        AutomationProperties.Name="{Binding HotkeySaveAutomationName}"
                                                         AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandHotkeySave.{0}}" />
                                                 <Button Grid.Row="1"
                                                         Grid.Column="2"
@@ -268,7 +272,7 @@
                                                         Style="{StaticResource LongIconButton}"
                                                         ToolTip="{DynamicResource i18n.plugins.command.hotkey.clear}"
                                                         Click="CommandHotkeyClear_Click"
-                                                        AutomationProperties.Name="{DynamicResource i18n.plugins.command.hotkey.clear}"
+                                                        AutomationProperties.Name="{Binding HotkeyClearAutomationName}"
                                                         AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandHotkeyClear.{0}}">
                                                     <Path Data="{StaticResource Long.Icon.Close}"
                                                           Style="{StaticResource LongIcon}"
@@ -281,6 +285,9 @@
                                                            FontSize="11"
                                                            Foreground="{DynamicResource Long.Brush.Text.Muted}"
                                                            Text="{Binding HotkeyStatus}"
+                                                           AutomationProperties.Name="{Binding HotkeyStatusAutomationName}"
+                                                           AutomationProperties.LiveSetting="Polite"
+                                                           AutomationProperties.AutomationId="{Binding Key, StringFormat=Long.Workspace.PluginSettings.CommandHotkeyStatus.{0}}"
                                                            TextWrapping="Wrap" />
                                             </Grid>
                                         </Grid>

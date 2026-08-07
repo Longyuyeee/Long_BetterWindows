@@ -583,6 +583,8 @@ function Get-AutomationSemantics(
         control_type = $controlType
         enabled = [bool]$element.Current.IsEnabled
         keyboard_focusable = [bool]$element.Current.IsKeyboardFocusable
+        help_text = [string]$element.Current.HelpText
+        item_status = [string]$element.Current.ItemStatus
     }
 }
 
@@ -1516,6 +1518,82 @@ try {
             [string]$candidateValue.Current.Value -eq $initialHotkey
         } 'The Base64 encode command shortcut was not restored.' | Out-Null
     }
+    $commandsTab = Wait-Until {
+        Find-DescendantByAutomationId `
+            $pluginSettingsMain 'Long.Workspace.PluginSettings.Tab.Commands'
+    } 'The plugin Commands tab was not available for semantic validation.'
+    $commandPin = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandButtonId
+    } 'The Base64 encode pin action was not available for semantic validation.'
+    $commandEnabled = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandEnabledId
+    } 'The Base64 encode toggle was not available for semantic validation.'
+    $decodeEnabled = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain `
+            'Long.Workspace.PluginSettings.CommandEnabled.com.long.base64:base64.decode'
+    } 'The Base64 decode toggle was not available for semantic validation.'
+    $commandAliases = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandAliasesId
+    } 'The Base64 encode aliases editor was not available for semantic validation.'
+    $commandAliasesSave = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandAliasesSaveId
+    } 'The Base64 encode aliases save action was not available for semantic validation.'
+    $commandHotkey = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandHotkeyId
+    } 'The Base64 encode shortcut editor was not available for semantic validation.'
+    $commandHotkeySave = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandHotkeySaveId
+    } 'The Base64 encode shortcut save action was not available for semantic validation.'
+    $commandHotkeyClear = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandHotkeyClearId
+    } 'The Base64 encode shortcut clear action was not available for semantic validation.'
+    $commandHotkeyStatus = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain `
+            'Long.Workspace.PluginSettings.CommandHotkeyStatus.com.long.base64:base64.encode'
+    } 'The Base64 encode shortcut status was not available for semantic validation.'
+    $commandFeedback = Wait-Until {
+        Find-DescendantByAutomationId `
+            $pluginSettingsMain 'Long.Workspace.PluginSettings.CommandFeedback'
+    } 'The plugin command feedback was not available for semantic validation.'
+    $commandSemanticSnapshot = [ordered]@{
+        tab = Get-AutomationSemantics $commandsTab 'ControlType.TabItem' `
+            'Plugin Commands tab semantics failed.'
+        pin = Get-AutomationSemantics $commandPin 'ControlType.Button' `
+            'Plugin command pin semantics failed.'
+        enabled = Get-AutomationSemantics $commandEnabled 'ControlType.CheckBox' `
+            'Plugin command enabled-state semantics failed.'
+        decode_enabled = Get-AutomationSemantics $decodeEnabled 'ControlType.CheckBox' `
+            'Second plugin command enabled-state semantics failed.'
+        aliases = Get-AutomationSemantics $commandAliases 'ControlType.Edit' `
+            'Plugin command aliases semantics failed.'
+        aliases_save = Get-AutomationSemantics $commandAliasesSave 'ControlType.Button' `
+            'Plugin command aliases save semantics failed.'
+        hotkey = Get-AutomationSemantics $commandHotkey 'ControlType.Edit' `
+            'Plugin command shortcut semantics failed.'
+        hotkey_save = Get-AutomationSemantics $commandHotkeySave 'ControlType.Button' `
+            'Plugin command shortcut save semantics failed.'
+        hotkey_clear = Get-AutomationSemantics $commandHotkeyClear 'ControlType.Button' `
+            'Plugin command shortcut clear semantics failed.'
+        hotkey_status = Get-AutomationSemantics $commandHotkeyStatus 'ControlType.Text' `
+            'Plugin command shortcut status semantics failed.'
+        feedback = Get-AutomationSemantics $commandFeedback 'ControlType.Text' `
+            'Plugin command feedback semantics failed.'
+    }
+    if ($commandSemanticSnapshot.enabled.name -eq
+        $commandSemanticSnapshot.decode_enabled.name) {
+        throw 'Plugin command controls did not include unique command context.'
+    }
+    foreach ($semanticKey in @(
+        'pin', 'enabled', 'aliases', 'aliases_save',
+        'hotkey', 'hotkey_save', 'hotkey_clear', 'hotkey_status')) {
+        if ($commandSemanticSnapshot[$semanticKey].name -notlike '*:*') {
+            throw "Plugin command semantic '$semanticKey' omitted command context."
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($commandSemanticSnapshot.aliases.help_text) -or
+        [string]::IsNullOrWhiteSpace($commandSemanticSnapshot.hotkey.help_text)) {
+        throw 'Plugin command editors did not expose usage guidance.'
+    }
     $report.automation_semantics['plugin_command_management'] = [ordered]@{
         commands_tab_discoverable = $null -ne $commandsTab
         stable_command_identity = $commandButtonId
@@ -1528,6 +1606,7 @@ try {
         command_hotkey_persisted = $true
         command_hotkey_cleared = $true
         command_hotkey_restored = $true
+        controls = $commandSemanticSnapshot
     }
     Stop-QualityHost $pluginSettingsProcess
     $pluginSettingsProcess = $null

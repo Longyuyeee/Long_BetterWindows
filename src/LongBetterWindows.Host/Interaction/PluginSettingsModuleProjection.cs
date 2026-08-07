@@ -36,7 +36,15 @@ namespace LongBetterWindows.Host.Interaction
         string HotkeyStatus,
         bool CanEditHotkey,
         bool CanClearHotkey,
-        string HotkeyInitial)
+        string HotkeyInitial,
+        string EnabledAutomationName,
+        string PinAutomationName,
+        string AliasesAutomationName,
+        string AliasesSaveAutomationName,
+        string HotkeyAutomationName,
+        string HotkeySaveAutomationName,
+        string HotkeyClearAutomationName,
+        string HotkeyStatusAutomationName)
     {
         public string CustomAliasesText { get; set; } = CustomAliasesInitial;
         public string HotkeyText { get; set; } = HotkeyInitial;
@@ -159,6 +167,10 @@ namespace LongBetterWindows.Host.Interaction
                                         localize,
                                         "plugins.command.hotkey.pending",
                                         "Waiting for registration");
+                    var pinText = Text(
+                        localize,
+                        isPinned ? "action.unpin" : "action.pin",
+                        isPinned ? "Unpin" : "Pin");
                     return new PluginCommandModuleItemState(
                         command.Key,
                         resultId,
@@ -182,19 +194,65 @@ namespace LongBetterWindows.Host.Interaction
                                 "Inputs: {0}"),
                             string.Join(" · ", inputs)),
                         isPinned,
-                        Text(
-                            localize,
-                            isPinned ? "action.unpin" : "action.pin",
-                            isPinned ? "Unpin" : "Pin"),
+                        pinText,
                         preference.IsEnabled,
                         string.Join(", ", preference.Aliases),
                         hotkeyStatus,
                         preference.IsEnabled,
                         hotkey.Hotkey.Length > 0,
-                        hotkey.Hotkey);
+                        hotkey.Hotkey,
+                        FormatText(
+                            localize,
+                            "plugins.command.enabledA11y",
+                            "{0}: enabled in search and workflows",
+                            command.Title),
+                        FormatText(
+                            localize,
+                            "plugins.command.pinA11y",
+                            "{0}: {1}",
+                            command.Title,
+                            pinText),
+                        FormatText(
+                            localize,
+                            "plugins.command.aliasesA11y",
+                            "{0}: custom aliases",
+                            command.Title),
+                        FormatText(
+                            localize,
+                            "plugins.command.aliasesSaveA11y",
+                            "{0}: save custom aliases",
+                            command.Title),
+                        FormatText(
+                            localize,
+                            "plugins.command.hotkeyA11y",
+                            "{0}: command shortcut",
+                            command.Title),
+                        FormatText(
+                            localize,
+                            "plugins.command.hotkeySaveA11y",
+                            "{0}: apply command shortcut",
+                            command.Title),
+                        FormatText(
+                            localize,
+                            "plugins.command.hotkeyClearA11y",
+                            "{0}: clear command shortcut",
+                            command.Title),
+                        FormatText(
+                            localize,
+                            "plugins.command.hotkeyStatusA11y",
+                            "{0}: {1}",
+                            command.Title,
+                            hotkeyStatus));
                 })
                 .ToArray();
         }
+
+        private static string FormatText(
+            Func<string, string>? localize,
+            string key,
+            string fallback,
+            params object[] arguments)
+            => string.Format(Text(localize, key, fallback), arguments);
 
         private static string Text(
             Func<string, string>? localize,
