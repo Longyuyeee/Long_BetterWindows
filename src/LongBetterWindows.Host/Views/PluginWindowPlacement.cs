@@ -35,6 +35,26 @@ internal static class PluginWindowPlacement
         return new NativeWindowRect(left, top, left + width, top + height);
     }
 
+    internal static NativeWindowRect Constrain(
+        NativeWindowRect bounds,
+        NativeWindowRect workArea)
+    {
+        if (!IsValid(workArea))
+            return bounds;
+
+        var width = Math.Clamp(bounds.Width, 1, workArea.Width);
+        var height = Math.Clamp(bounds.Height, 1, workArea.Height);
+        var left = Math.Clamp(
+            bounds.Left,
+            workArea.Left,
+            workArea.Right - width);
+        var top = Math.Clamp(
+            bounds.Top,
+            workArea.Top,
+            workArea.Bottom - height);
+        return new NativeWindowRect(left, top, left + width, top + height);
+    }
+
     internal static bool TryApply(
         Window window,
         Window? source,
@@ -54,7 +74,8 @@ internal static class PluginWindowPlacement
             || !nativeApi.TryGetMonitorWorkArea(
                 monitor,
                 out var workArea,
-                out _))
+                out _)
+            || !IsValid(workArea))
         {
             return false;
         }
@@ -75,6 +96,45 @@ internal static class PluginWindowPlacement
             SwpNoActivate | SwpNoZOrder,
             out _);
     }
+
+    internal static bool TryConstrainToNearestWorkArea(Window window)
+    {
+        if (window.WindowState != WindowState.Normal)
+            return true;
+
+        var windowHandle = new WindowInteropHelper(window).Handle;
+        if (windowHandle == IntPtr.Zero)
+            return false;
+
+        var nativeApi = new WindowNativeApi();
+        if (!nativeApi.TryGetWindowRect(windowHandle, out var bounds, out _))
+            return false;
+
+        var monitor = nativeApi.MonitorFromWindow(windowHandle);
+        if (monitor == IntPtr.Zero
+            || !nativeApi.TryGetMonitorWorkArea(
+                monitor,
+                out var workArea,
+                out _)
+            || !IsValid(workArea))
+        {
+            return false;
+        }
+
+        var constrained = Constrain(bounds, workArea);
+        if (constrained == bounds)
+            return true;
+
+        return nativeApi.TrySetWindowPosition(
+            windowHandle,
+            IntPtr.Zero,
+            constrained,
+            SwpNoActivate | SwpNoZOrder,
+            out _);
+    }
+
+    private static bool IsValid(NativeWindowRect workArea)
+        => workArea.Width > 0 && workArea.Height > 0;
 
     [DllImport("user32.dll", EntryPoint = "GetDpiForWindow")]
     private static extern uint NativeGetDpiForWindow(IntPtr window);

@@ -1088,6 +1088,9 @@ public class QualityGateTests
         Assert.DoesNotContain("SystemParameters.WorkArea", pluginWindow);
         Assert.Contains("PluginWindowPlacement.TryApply", pluginWindow);
         Assert.Contains("ContentRendered +=", pluginWindow);
+        Assert.Contains("WmDisplayChange", pluginWindow);
+        Assert.Contains("SpiSetWorkArea", pluginWindow);
+        Assert.Contains("TryConstrainToNearestWorkArea", pluginWindow);
         Assert.Contains("GetDpiForWindow", pluginPlacement);
         Assert.Contains("MonitorFromWindow", pluginPlacement);
         Assert.Contains("BuildNativePluginsForPublish", project);

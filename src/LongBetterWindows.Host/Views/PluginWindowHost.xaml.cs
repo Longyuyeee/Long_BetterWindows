@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
@@ -15,6 +17,12 @@ namespace LongBetterWindows.Host.Views
         private readonly QualityWindowAutomation? _qualityAutomation;
         private PluginWindowMode _windowMode = PluginWindowMode.Standard;
         private bool _initialPlacementFinalized;
+        private bool _placementRefreshPending;
+        private HwndSource? _windowSource;
+
+        private const int WmSettingChange = 0x001A;
+        private const int WmDisplayChange = 0x007E;
+        private const int SpiSetWorkArea = 0x002F;
 
         public PluginWindowHost(
             string pluginId,
@@ -41,6 +49,9 @@ namespace LongBetterWindows.Host.Views
             Icon = PluginTaskbarIdentity.CreateIcon(pluginId, title);
             SourceInitialized += (_, _) =>
             {
+                _windowSource = HwndSource.FromHwnd(
+                    new WindowInteropHelper(this).Handle);
+                _windowSource?.AddHook(WindowMessageHook);
                 if (!PluginTaskbarIdentity.Apply(this, pluginId))
                     Log.Warning(
                         "Could not apply detached taskbar identity for plugin {PluginId}",
@@ -57,7 +68,12 @@ namespace LongBetterWindows.Host.Views
             _qualityAutomation = QualityWindowAutomation.Attach(
                 this,
                 ExecuteQualityWindowAction);
-            Closed += (_, _) => _qualityAutomation?.Dispose();
+            Closed += (_, _) =>
+            {
+                _windowSource?.RemoveHook(WindowMessageHook);
+                _windowSource = null;
+                _qualityAutomation?.Dispose();
+            };
             ApplyWindowPreference(preference);
         }
 
@@ -75,6 +91,37 @@ namespace LongBetterWindows.Host.Views
                     "Could not apply source-monitor placement for plugin {PluginId}",
                     pluginId);
             }
+        }
+
+        private IntPtr WindowMessageHook(
+            IntPtr window,
+            int message,
+            IntPtr wParam,
+            IntPtr lParam,
+            ref bool handled)
+        {
+            if (message == WmDisplayChange
+                || (message == WmSettingChange
+                    && wParam.ToInt64() == SpiSetWorkArea))
+            {
+                SchedulePlacementRefresh();
+            }
+            return IntPtr.Zero;
+        }
+
+        private void SchedulePlacementRefresh()
+        {
+            if (_placementRefreshPending)
+                return;
+            _placementRefreshPending = true;
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                () =>
+                {
+                    _placementRefreshPending = false;
+                    if (IsLoaded)
+                        PluginWindowPlacement.TryConstrainToNearestWorkArea(this);
+                });
         }
 
         private void ApplyWindowPreference(PluginWindowPreference? preference)
