@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
@@ -61,6 +62,7 @@ namespace LongBetterWindows.Host.Services
         public static string WorkflowReportsDirectory { get; private set; } = string.Empty;
         public static SearchPreferenceService SearchPreferences { get; private set; } = null!;
         public static CommandPreferenceService CommandPreferences { get; private set; } = null!;
+        internal static CommandHotkeyCoordinator CommandHotkeys { get; private set; } = null!;
         public static SuperPanelGroupService SuperPanelGroups { get; private set; } = null!;
         public static MouseGestureService MouseGestures { get; private set; } = null!;
         internal static WorkspaceSessionCoordinator Workspace { get; private set; } = null!;
@@ -90,6 +92,15 @@ namespace LongBetterWindows.Host.Services
 
             HotKey = new HotKeyService();
             provider.RegisterService<IHotKeyService>(HotKey);
+            CommandHotkeys = new CommandHotkeyCoordinator(
+                Storage,
+                HotKey,
+                provider.PluginStore,
+                new CommandExecutor(provider.PluginStore),
+                Dispatcher.CurrentDispatcher);
+            CommandHotkeys.InitializeAsync().GetAwaiter().GetResult();
+            CommandPreferences.Changed += commandKey =>
+                _ = CommandHotkeys.RefreshCommandAsync(commandKey);
             provider.PluginStore.AttachHostResourceReleaser(
                 async pluginId => { await HotKey.UnregisterPluginAsync(pluginId); });
 

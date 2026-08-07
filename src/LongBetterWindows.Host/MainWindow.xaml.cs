@@ -1145,8 +1145,14 @@ namespace LongBetterWindows.Host
             HwndSource.FromHwnd(hwnd)?.AddHook(WorkflowAutomationWndProc);
             ServicesInitializer.HotKey.Initialize(hwnd);
             ServicesInitializer.MouseGestures.Start();
-            _ = RegisterCommandPaletteHotkeyAsync();
+            _ = RegisterGlobalHotkeysAsync();
             (Application.Current as App)?.StartPluginRuntime();
+        }
+
+        private async Task RegisterGlobalHotkeysAsync()
+        {
+            await RegisterCommandPaletteHotkeyAsync();
+            await ServicesInitializer.CommandHotkeys.ActivateAsync();
         }
 
         private IntPtr WorkflowAutomationWndProc(

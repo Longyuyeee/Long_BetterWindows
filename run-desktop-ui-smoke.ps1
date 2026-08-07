@@ -1381,6 +1381,67 @@ try {
             [Windows.Automation.ValuePattern]::Pattern)
         [string]$candidateValue.Current.Value -eq $initialAliases
     } 'The Base64 encode custom alias was not restored.' | Out-Null
+    $commandHotkeyId = `
+        'Long.Workspace.PluginSettings.CommandHotkey.com.long.base64:base64.encode'
+    $commandHotkeySaveId = `
+        'Long.Workspace.PluginSettings.CommandHotkeySave.com.long.base64:base64.encode'
+    $commandHotkeyClearId = `
+        'Long.Workspace.PluginSettings.CommandHotkeyClear.com.long.base64:base64.encode'
+    $commandHotkey = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandHotkeyId
+    } 'The Base64 encode command-shortcut editor was not discoverable.'
+    $hotkeyValue = [Windows.Automation.ValuePattern]$commandHotkey.GetCurrentPattern(
+        [Windows.Automation.ValuePattern]::Pattern)
+    $initialHotkey = [string]$hotkeyValue.Current.Value
+    $qualityHotkey = 'Ctrl+Alt+Shift+F12'
+    $hotkeyValue.SetValue($qualityHotkey)
+    $commandHotkeySave = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandHotkeySaveId
+    } 'The Base64 encode command-shortcut save action was not discoverable.'
+    Invoke-AutomationElement $commandHotkeySave `
+        'The Base64 encode command-shortcut save action did not support InvokePattern.'
+    Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandHotkeyId
+        if ($null -eq $candidate) { return $false }
+        $candidateValue = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
+            [Windows.Automation.ValuePattern]::Pattern)
+        [string]$candidateValue.Current.Value -eq $qualityHotkey
+    } 'The Base64 encode command shortcut was not persisted.' | Out-Null
+    $commandHotkeyClear = Wait-Until {
+        Find-DescendantByAutomationId $pluginSettingsMain $commandHotkeyClearId
+    } 'The Base64 encode command-shortcut clear action was not discoverable.'
+    Invoke-AutomationElement $commandHotkeyClear `
+        'The Base64 encode command-shortcut clear action did not support InvokePattern.'
+    Wait-Until {
+        $candidate = Find-DescendantByAutomationId `
+            $pluginSettingsMain $commandHotkeyId
+        if ($null -eq $candidate) { return $false }
+        $candidateValue = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
+            [Windows.Automation.ValuePattern]::Pattern)
+        [string]$candidateValue.Current.Value -eq ''
+    } 'The Base64 encode command shortcut was not cleared.' | Out-Null
+    if (-not [string]::IsNullOrWhiteSpace($initialHotkey)) {
+        $commandHotkey = Wait-Until {
+            Find-DescendantByAutomationId $pluginSettingsMain $commandHotkeyId
+        } 'The Base64 encode command-shortcut editor was not restored.'
+        $hotkeyValue = [Windows.Automation.ValuePattern]$commandHotkey.GetCurrentPattern(
+            [Windows.Automation.ValuePattern]::Pattern)
+        $hotkeyValue.SetValue($initialHotkey)
+        $commandHotkeySave = Wait-Until {
+            Find-DescendantByAutomationId $pluginSettingsMain $commandHotkeySaveId
+        } 'The Base64 encode command-shortcut restore action was not discoverable.'
+        Invoke-AutomationElement $commandHotkeySave `
+            'The Base64 encode command-shortcut restore action did not support InvokePattern.'
+        Wait-Until {
+            $candidate = Find-DescendantByAutomationId `
+                $pluginSettingsMain $commandHotkeyId
+            if ($null -eq $candidate) { return $false }
+            $candidateValue = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
+                [Windows.Automation.ValuePattern]::Pattern)
+            [string]$candidateValue.Current.Value -eq $initialHotkey
+        } 'The Base64 encode command shortcut was not restored.' | Out-Null
+    }
     $report.automation_semantics['plugin_command_management'] = [ordered]@{
         commands_tab_discoverable = $null -ne $commandsTab
         stable_command_identity = $commandButtonId
@@ -1390,6 +1451,9 @@ try {
         enabled_state_restored = $true
         custom_alias_persisted = $true
         custom_alias_restored = $true
+        command_hotkey_persisted = $true
+        command_hotkey_cleared = $true
+        command_hotkey_restored = $true
     }
     Stop-QualityHost $pluginSettingsProcess
     $pluginSettingsProcess = $null

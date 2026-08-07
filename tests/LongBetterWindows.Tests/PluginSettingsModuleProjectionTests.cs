@@ -99,6 +99,8 @@ public sealed class PluginSettingsModuleProjectionTests
         Assert.Equal("Remove pin", item.PinText);
         Assert.False(item.IsEnabled);
         Assert.Equal("my alias", item.CustomAliasesText);
+        Assert.Equal(string.Empty, item.HotkeyText);
+        Assert.False(item.CanClearHotkey);
     }
 
     private static PluginEntry Entry(

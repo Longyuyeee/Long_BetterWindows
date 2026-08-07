@@ -15,6 +15,7 @@ namespace LongBetterWindows.Host.Views
         private readonly PluginRegistry _plugins;
         private readonly SearchPreferenceService _preferences;
         private readonly CommandPreferenceService _commandPreferences;
+        private readonly CommandHotkeyCoordinator _commandHotkeys;
         private readonly string _pluginId;
         private FrameworkElement? _settingsContent;
         private long _settingsRevision = -1;
@@ -25,13 +26,16 @@ namespace LongBetterWindows.Host.Views
             string pluginId,
             PluginRegistry? plugins = null,
             SearchPreferenceService? preferences = null,
-            CommandPreferenceService? commandPreferences = null)
+            CommandPreferenceService? commandPreferences = null,
+            CommandHotkeyCoordinator? commandHotkeys = null)
         {
             _pluginId = pluginId;
             _plugins = plugins ?? HostProvider.Instance.PluginStore;
             _preferences = preferences ?? ServicesInitializer.SearchPreferences;
             _commandPreferences = commandPreferences
                 ?? ServicesInitializer.CommandPreferences;
+            _commandHotkeys = commandHotkeys
+                ?? ServicesInitializer.CommandHotkeys;
             InitializeComponent();
             Loaded += Module_Loaded;
             Unloaded += Module_Unloaded;
@@ -110,7 +114,8 @@ namespace LongBetterWindows.Host.Views
                 _plugins.Commands.GetAll(),
                 _preferences.GetPinnedResultIds(),
                 key => ServicesInitializer.I18n.T(key),
-                _commandPreferences);
+                _commandPreferences,
+                _commandHotkeys);
             CommandsList.ItemsSource = commands;
             CommandsList.Visibility = commands.Count > 0
                 ? Visibility.Visible
@@ -236,6 +241,7 @@ namespace LongBetterWindows.Host.Views
                 await _commandPreferences.SetEnabledAsync(
                     commandKey,
                     checkBox.IsChecked == true);
+                await _commandHotkeys.RefreshCommandAsync(commandKey);
                 ShowCommandFeedback(ServicesInitializer.I18n.T(
                     "plugins.command.preferenceSaved"));
                 if (Volatile.Read(ref _disposed) == 0)
@@ -251,6 +257,85 @@ namespace LongBetterWindows.Host.Views
                     "plugins.command.preferenceSaveFailed"));
                 if (Volatile.Read(ref _disposed) == 0)
                     checkBox.IsEnabled = true;
+            }
+        }
+
+        private async void CommandHotkeySave_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button
+                {
+                    DataContext: PluginCommandModuleItemState item,
+                } button)
+                return;
+            button.IsEnabled = false;
+            try
+            {
+                var result = await _commandHotkeys.ChangeAsync(
+                    item.Key,
+                    item.HotkeyText);
+                if (result.IsSuccess)
+                {
+                    ShowCommandFeedback(ServicesInitializer.I18n.T(
+                        "plugins.command.hotkey.saved"));
+                }
+                else if (result.ErrorCode == Contracts.ApiErrorCode.HotKeyConflict)
+                {
+                    ShowCommandFeedback(string.Format(
+                        ServicesInitializer.I18n.T(
+                            "plugins.command.hotkey.conflict"),
+                        result.ConflictOwner
+                            ?? ServicesInitializer.I18n.T(
+                                "plugins.command.hotkey.externalOwner")));
+                }
+                else
+                {
+                    ShowCommandFeedback(ServicesInitializer.I18n.T(
+                        "plugins.command.hotkey.failed"));
+                }
+                if (Volatile.Read(ref _disposed) == 0)
+                    Refresh();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Plugin command hotkey update failed for {CommandKey}",
+                    item.Key);
+                ShowCommandFeedback(ServicesInitializer.I18n.T(
+                    "plugins.command.hotkey.failed"));
+                if (Volatile.Read(ref _disposed) == 0)
+                    button.IsEnabled = true;
+            }
+        }
+
+        private async void CommandHotkeyClear_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button
+                {
+                    DataContext: PluginCommandModuleItemState item,
+                } button)
+                return;
+            button.IsEnabled = false;
+            try
+            {
+                var result = await _commandHotkeys.ChangeAsync(item.Key, null);
+                ShowCommandFeedback(ServicesInitializer.I18n.T(
+                    result.IsSuccess
+                        ? "plugins.command.hotkey.cleared"
+                        : "plugins.command.hotkey.failed"));
+                if (Volatile.Read(ref _disposed) == 0)
+                    Refresh();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Plugin command hotkey removal failed for {CommandKey}",
+                    item.Key);
+                ShowCommandFeedback(ServicesInitializer.I18n.T(
+                    "plugins.command.hotkey.failed"));
+                if (Volatile.Read(ref _disposed) == 0)
+                    button.IsEnabled = true;
             }
         }
 

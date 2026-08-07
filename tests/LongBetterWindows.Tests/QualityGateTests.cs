@@ -2085,6 +2085,9 @@ public class QualityGateTests
         Assert.Contains("Long.Workspace.PluginSettings.Tabs", xaml);
         Assert.Contains("Long.Workspace.PluginSettings.Tab.Commands", xaml);
         Assert.Contains("Long.Workspace.PluginSettings.Commands", xaml);
+        Assert.Contains("Long.Workspace.PluginSettings.CommandHotkey.", xaml);
+        Assert.Contains("CommandHotkeySave_Click", code);
+        Assert.Contains("CommandHotkeyClear_Click", code);
         Assert.Contains("CommandPin_Click", code);
         Assert.Contains("BuildCommands", code);
         Assert.Contains("Long.Workspace.PluginSettings.Content", xaml);
@@ -2100,6 +2103,8 @@ public class QualityGateTests
         Assert.Contains("await plugin.EnsureActivatedAsync()", resolver);
         Assert.Contains("PluginCommandManagementOnly", desktopSmoke);
         Assert.Contains("pin_state_restored", desktopSmoke);
+        Assert.Contains("command_hotkey_persisted", desktopSmoke);
+        Assert.Contains("command_hotkey_restored", desktopSmoke);
         Assert.DoesNotContain(
             "plugin.Instance is not IHasSettingsUI",
             resolver);

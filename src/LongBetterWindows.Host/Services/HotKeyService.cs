@@ -198,8 +198,7 @@ namespace LongBetterWindows.Host.Services
             lock (_lock)
             {
                 var owned = _entries
-                    .Where(pair => string.Equals(
-                        pair.Value.PluginId, pluginId, StringComparison.OrdinalIgnoreCase))
+                    .Where(pair => IsOwnedByPlugin(pair.Value.PluginId, pluginId))
                     .ToList();
                 foreach (var pair in owned)
                 {
@@ -231,6 +230,12 @@ namespace LongBetterWindows.Host.Services
                 pluginId,
                 callback));
         }
+
+        private static bool IsOwnedByPlugin(string ownerId, string pluginId)
+            => string.Equals(ownerId, pluginId, StringComparison.OrdinalIgnoreCase)
+                || ownerId.StartsWith(
+                    "command:" + pluginId + ":",
+                    StringComparison.OrdinalIgnoreCase);
 
         private HostApiResponse ChangeHotkeyCore(
             string oldHotkey,

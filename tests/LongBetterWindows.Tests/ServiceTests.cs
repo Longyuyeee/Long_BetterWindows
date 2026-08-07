@@ -317,6 +317,17 @@ public class ServiceTests
                 Assert.DoesNotContain(first, service.GetAllHotkeys().Keys);
                 Assert.Contains(second, service.GetAllHotkeys().Keys);
                 Assert.Contains(replacement, service.GetAllHotkeys().Keys);
+
+                Assert.True(service.RegisterAsync(
+                    "Ctrl+Alt+Shift+F9",
+                    "command:com.long.quality-hotkey:open",
+                    () => { }).GetAwaiter().GetResult().IsSuccess);
+                Assert.Equal(
+                    3,
+                    service.UnregisterPluginAsync(pluginId)
+                        .GetAwaiter()
+                        .GetResult());
+                Assert.Empty(service.GetAllHotkeys());
             }
             catch (Exception exception)
             {

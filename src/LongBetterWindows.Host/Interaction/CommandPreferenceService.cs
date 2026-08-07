@@ -25,6 +25,8 @@ namespace LongBetterWindows.Host.Interaction
         private Dictionary<string, PreferenceEntry> _entries =
             new(StringComparer.OrdinalIgnoreCase);
 
+        public event Action<string>? Changed;
+
         public CommandPreferenceService(IStorageService storage)
             => _storage = storage ?? throw new ArgumentNullException(nameof(storage));
 
@@ -86,6 +88,7 @@ namespace LongBetterWindows.Host.Interaction
                 StoreOrRemoveDefaultUnsafe(current with { IsEnabled = isEnabled });
             }
             await PersistAsync().ConfigureAwait(false);
+            Changed?.Invoke(commandKey);
         }
 
         public async Task<IReadOnlyList<string>> SetAliasesAsync(
@@ -100,6 +103,7 @@ namespace LongBetterWindows.Host.Interaction
                 StoreOrRemoveDefaultUnsafe(current with { Aliases = normalized });
             }
             await PersistAsync().ConfigureAwait(false);
+            Changed?.Invoke(commandKey);
             return normalized;
         }
 

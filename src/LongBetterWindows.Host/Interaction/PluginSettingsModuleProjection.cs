@@ -32,9 +32,14 @@ namespace LongBetterWindows.Host.Interaction
         bool IsPinned,
         string PinText,
         bool IsEnabled,
-        string CustomAliasesInitial)
+        string CustomAliasesInitial,
+        string HotkeyStatus,
+        bool CanEditHotkey,
+        bool CanClearHotkey,
+        string HotkeyInitial)
     {
         public string CustomAliasesText { get; set; } = CustomAliasesInitial;
+        public string HotkeyText { get; set; } = HotkeyInitial;
     }
 
     internal static class PluginSettingsModuleProjection
@@ -88,7 +93,8 @@ namespace LongBetterWindows.Host.Interaction
             IEnumerable<CommandDescriptor> commands,
             IReadOnlyCollection<string>? pinnedResultIds = null,
             Func<string, string>? localize = null,
-            CommandPreferenceService? commandPreferences = null)
+            CommandPreferenceService? commandPreferences = null,
+            CommandHotkeyCoordinator? commandHotkeys = null)
         {
             ArgumentNullException.ThrowIfNull(entry);
             ArgumentNullException.ThrowIfNull(commands);
@@ -120,6 +126,39 @@ namespace LongBetterWindows.Host.Interaction
                     var isPinned = pinned.Contains(resultId);
                     var preference = commandPreferences?.Get(command.Key)
                         ?? CommandPreferenceSnapshot.Default;
+                    var hotkey = commandHotkeys?.GetState(command.Key)
+                        ?? new CommandHotkeyState(
+                            command.Key,
+                            string.Empty,
+                            false,
+                            !preference.IsEnabled,
+                            null);
+                    var hotkeyStatus = hotkey.Hotkey.Length == 0
+                        ? Text(
+                            localize,
+                            "plugins.command.hotkey.none",
+                            "No command shortcut")
+                        : hotkey.IsPaused
+                            ? Text(
+                                localize,
+                                "plugins.command.hotkey.paused",
+                                "Paused while command is disabled")
+                            : hotkey.IsRegistered
+                                ? Text(
+                                    localize,
+                                    "plugins.command.hotkey.registered",
+                                    "Shortcut registered")
+                                : hotkey.ConflictOwner is not null
+                                    ? string.Format(
+                                        Text(
+                                            localize,
+                                            "plugins.command.hotkey.conflict",
+                                            "Unavailable: used by {0}"),
+                                        hotkey.ConflictOwner)
+                                    : Text(
+                                        localize,
+                                        "plugins.command.hotkey.pending",
+                                        "Waiting for registration");
                     return new PluginCommandModuleItemState(
                         command.Key,
                         resultId,
@@ -148,7 +187,11 @@ namespace LongBetterWindows.Host.Interaction
                             isPinned ? "action.unpin" : "action.pin",
                             isPinned ? "Unpin" : "Pin"),
                         preference.IsEnabled,
-                        string.Join(", ", preference.Aliases));
+                        string.Join(", ", preference.Aliases),
+                        hotkeyStatus,
+                        preference.IsEnabled,
+                        hotkey.Hotkey.Length > 0,
+                        hotkey.Hotkey);
                 })
                 .ToArray();
         }
