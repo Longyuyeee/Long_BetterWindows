@@ -22,6 +22,8 @@
   "status.formatted": "JSON formatting complete",
   "status.minified": "JSON minification complete",
   "status.copied": "Result copied",
+  "error.emptyInput": "Enter JSON content",
+  "error.clipboardEmpty": "The clipboard does not contain text",
   "error.outputTooLong": "The result exceeds 65,536 characters and cannot be returned as command output",
   "error.commandOutputTooLong": "The JSON result exceeds the command output limit",
   "error.parse": "JSON parsing failed: {detail}",

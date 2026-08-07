@@ -234,6 +234,24 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.DoesNotContain("output.value = ''", source);
     }
 
+    [Fact]
+    public void JsonFormatter_InvalidatesStaleResultsAndReportsClipboardFailures()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "JsonFormatterPlugin",
+            "index.html"));
+
+        Assert.Contains("function clearResult()", source);
+        Assert.Contains("copyButton.disabled = true", source);
+        Assert.Contains("copyButton.disabled = false", source);
+        Assert.Contains("input.addEventListener('input', invalidateResult)", source);
+        Assert.Contains("if (!result || !result.success)", source);
+        Assert.Contains("error.clipboardEmpty", source);
+        Assert.Contains("error.emptyInput", source);
+    }
+
     [Theory]
     [InlineData("ClipboardTool", "content.value = text", "let currentTab = 'history'")]
     [InlineData("QuickNotePlugin", "if (input.value.trim() === text) input.value = ''", "let notes = []")]

@@ -31,7 +31,7 @@
       <button class="long-button long-button--primary btn-primary" id="formatButton" type="button" data-i18n="action.format">格式化</button>
       <button class="long-button long-button--secondary btn-secondary" id="minifyButton" type="button" data-i18n="action.minify">压缩</button>
       <button class="long-button long-button--secondary btn-secondary" id="pasteButton" type="button" data-i18n="action.paste">粘贴</button>
-      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制结果</button>
+      <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy" disabled>复制结果</button>
       <span class="long-toolbar__spacer"></span>
       <span class="long-kbd">Ctrl Enter</span>
     </div>
@@ -43,6 +43,7 @@
     const output = document.getElementById('output');
     const status = document.getElementById('status');
     const stat = document.getElementById('stat');
+    const copyButton = document.getElementById('copyButton');
     let strings = {};
     let hasResult = false;
     let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
@@ -71,6 +72,20 @@
       return message;
     }
 
+    function clearResult() {
+      output.value = '';
+      hasResult = false;
+      copyButton.disabled = true;
+      renderStat();
+    }
+
+    function invalidateResult() {
+      clearResult();
+      currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+      status.textContent = '';
+      status.className = 'long-status';
+    }
+
     function applyLocalization(message) {
       strings = message.resources || {};
       document.documentElement.lang = message.resolved_language || 'zh-CN';
@@ -96,10 +111,19 @@
     }
 
     function transform(spaces) {
+      if (!input.value.trim()) {
+        clearResult();
+        const message = setStatus(
+          'error.emptyInput',
+          'danger',
+          '请输入 JSON 内容');
+        return { success: false, message: message, outputs: {} };
+      }
       try {
         const result = JSON.stringify(JSON.parse(input.value), null, spaces);
         output.value = result;
         hasResult = true;
+        copyButton.disabled = false;
         renderStat();
         if (result.length > 65536) {
           setStatus('error.outputTooLong', 'danger', '处理结果超过 65,536 个字符，无法作为命令输出');
@@ -118,6 +142,7 @@
           outputs: { result: { type: 'text', value: result } }
         };
       } catch (error) {
+        clearResult();
         const message = setStatus(
           'error.parse',
           'danger',
@@ -130,7 +155,17 @@
     async function paste() {
       try {
         const result = await long.clipboard.getText();
-        if (result.success && result.data) { input.value = result.data; transform(2); }
+        if (!result || !result.success) throw new Error(result && result.error);
+        const text = typeof result.data === 'string' ? result.data : '';
+        input.value = text;
+        if (!text.trim()) {
+          clearResult();
+          setStatus('error.clipboardEmpty', 'danger', '剪贴板中没有文本内容');
+          input.focus();
+          return;
+        }
+        transform(2);
+        input.focus();
       } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); }
     }
 
@@ -144,6 +179,7 @@
     document.getElementById('minifyButton').addEventListener('click', function () { transform(0); });
     document.getElementById('pasteButton').addEventListener('click', paste);
     document.getElementById('copyButton').addEventListener('click', copy);
+    input.addEventListener('input', invalidateResult);
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); transform(event.shiftKey ? 0 : 2); }
     });
