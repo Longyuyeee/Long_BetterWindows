@@ -178,8 +178,10 @@ namespace LongBetterWindows.Host.Views
         private void SynchronizeCategorySelectors()
         {
             _categorySelectorReady = false;
-            foreach (var button in DesktopCategoryList.Children.OfType<Button>())
+            var buttons = DesktopCategoryList.Children.OfType<Button>().ToArray();
+            for (var index = 0; index < buttons.Length; index++)
             {
+                var button = buttons[index];
                 var selected = string.Equals(
                     button.Tag?.ToString(),
                     _activeCategory,
@@ -189,9 +191,17 @@ namespace LongBetterWindows.Host.Views
                     selected
                         ? "SettingsCategoryButton.Selected"
                         : "SettingsCategoryButton");
+                var category = button.Tag?.ToString() ?? string.Empty;
+                var accessibility = SettingsCategoryAccessibilityProjection.Build(
+                    I18n($"settings.category.{category}"),
+                    selected,
+                    index + 1,
+                    buttons.Length,
+                    I18n);
+                AutomationProperties.SetName(button, accessibility.Name);
                 AutomationProperties.SetItemStatus(
                     button,
-                    selected ? "selected" : "");
+                    accessibility.ItemStatus);
             }
             CompactCategorySelector.SelectedItem = CompactCategorySelector.Items
                 .OfType<ComboBoxItem>()
@@ -242,6 +252,7 @@ namespace LongBetterWindows.Host.Views
             {
                 if (_disposed) return;
                 InitializeLanguageSelector();
+                SynchronizeCategorySelectors();
                 RefreshThemeButton();
                 RefreshMouseGestureControls();
                 RefreshBrokerControls();

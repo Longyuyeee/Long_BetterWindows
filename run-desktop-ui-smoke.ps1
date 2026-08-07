@@ -8,7 +8,8 @@ param(
     [switch] $WorkflowOutputOnly,
     [switch] $WorkflowSchemaOnly,
     [switch] $WorkflowExportMatrix,
-    [switch] $PluginCommandManagementOnly
+    [switch] $PluginCommandManagementOnly,
+    [switch] $SettingsNavigationOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -585,6 +586,8 @@ function Get-AutomationSemantics(
         keyboard_focusable = [bool]$element.Current.IsKeyboardFocusable
         help_text = [string]$element.Current.HelpText
         item_status = [string]$element.Current.ItemStatus
+        position_in_set = [int]$element.Current.PositionInSet
+        size_of_set = [int]$element.Current.SizeOfSet
     }
 }
 
@@ -688,10 +691,12 @@ $marketProcess = $null
 $accessibilityProcess = $null
 
 try {
-    if (-not $PluginCommandManagementOnly -and
-        -not $WorkflowOnly -and
-        -not $WorkflowOutputOnly -and
-        -not $WorkflowSchemaOnly) {
+    if ($SettingsNavigationOnly -or
+        (-not $PluginCommandManagementOnly -and
+         -not $WorkflowOnly -and
+         -not $WorkflowOutputOnly -and
+         -not $WorkflowSchemaOnly)) {
+    if (-not $SettingsNavigationOnly) {
     Write-Stage 'Starting Command Palette host.'
     Set-Clipboard -Value 'long-ui-smoke-pending'
     $paletteProcess = Start-QualityHost '--quality-open-palette'
@@ -1084,6 +1089,7 @@ try {
     $report.super_panel['preserved_selection_id'] = $transitionSelectedId
     Stop-QualityHost $superPanelTransitionProcess
     $superPanelTransitionProcess = $null
+    }
 
     Write-Stage 'Starting Workspace management navigation workflow.'
     $managementProcess = Start-QualityHost @(
@@ -1206,6 +1212,28 @@ try {
     } else {
         'compact'
     }
+    $settingsCategoryNames = [ordered]@{
+        appearance = 'Personalization'
+        interaction = 'Interaction and panel'
+        connections = 'Connections and privacy'
+        updates = 'Updates'
+    }
+    $settingsCategoryPositions = @{
+        appearance = 1
+        interaction = 2
+        connections = 3
+        updates = 4
+    }
+    $settingsCategorySemantics = [ordered]@{}
+    if ($settingsCategoryMode -eq 'compact') {
+        $selectorSemantics = Get-AutomationSemantics `
+            $settingsCompactCategories 'ControlType.ComboBox' `
+            'The compact Settings category selector semantics failed.'
+        if ($selectorSemantics.name -ne 'Settings category') {
+            throw "Unexpected compact Settings category name '$($selectorSemantics.name)'."
+        }
+        $settingsCategorySemantics['selector'] = $selectorSemantics
+    }
     foreach ($category in @('interaction', 'connections', 'updates', 'appearance')) {
         if ($settingsCategoryMode -eq 'sidebar') {
             $categoryItem = Wait-Until {
@@ -1230,15 +1258,62 @@ try {
             Select-AutomationElement $categoryItem `
                 "The compact Settings category '$category' could not be selected."
         }
-        Wait-Until {
-            $null -ne (Find-DescendantByAutomationId `
-                $managementMain "Long.Settings.CategoryContent.$category")
-        } "The Settings category '$category' content did not become visible." | Out-Null
+        $categoryContent = Wait-Until {
+            Find-DescendantByAutomationId `
+                $managementMain "Long.Settings.CategoryContent.$category"
+        } "The Settings category '$category' content did not become visible."
+        $contentSemantics = Get-AutomationSemantics `
+            $categoryContent 'ControlType.Text' `
+            "The Settings category '$category' heading semantics failed."
+        if ($contentSemantics.name -ne $settingsCategoryNames[$category]) {
+            throw "Unexpected Settings category heading '$($contentSemantics.name)'."
+        }
+        if ($settingsCategoryMode -eq 'sidebar') {
+            $categoryItem = Wait-Until {
+                $candidate = Find-DescendantByAutomationId `
+                    $managementMain "Long.Settings.CategoryItem.$category"
+                if ($null -ne $candidate -and
+                    $candidate.Current.ItemStatus -eq (
+                        "Selected, $($settingsCategoryPositions[$category]) of 4")) {
+                    $candidate
+                }
+            } "The Settings category '$category' did not expose its selected state."
+            $itemSemantics = Get-AutomationSemantics `
+                $categoryItem 'ControlType.Button' `
+                "The Settings category '$category' semantics failed."
+            if ($itemSemantics.name -ne $settingsCategoryNames[$category]) {
+                throw "The Settings category '$category' exposed an inconsistent name."
+            }
+            $settingsCategorySemantics[$category] = [ordered]@{
+                item = $itemSemantics
+                heading = $contentSemantics
+            }
+        } else {
+            $settingsCategorySemantics[$category] = [ordered]@{
+                heading = $contentSemantics
+            }
+        }
+    }
+    if ($settingsCategoryMode -eq 'sidebar') {
+        foreach ($category in $settingsCategoryNames.Keys) {
+            $categoryItem = Find-DescendantByAutomationId `
+                $managementMain "Long.Settings.CategoryItem.$category"
+            $expectedStatus = if ($category -eq 'appearance') {
+                "Selected, $($settingsCategoryPositions[$category]) of 4"
+            } else {
+                "Not selected, $($settingsCategoryPositions[$category]) of 4"
+            }
+            if ($categoryItem.Current.ItemStatus -ne $expectedStatus) {
+                throw "The Settings category '$category' did not expose '$expectedStatus'."
+            }
+        }
     }
     $report.automation_semantics.management_navigation[
         'settings_categories_selectable'] = $true
     $report.automation_semantics.management_navigation[
         'settings_category_navigation_mode'] = $settingsCategoryMode
+    $report.automation_semantics.management_navigation[
+        'settings_category_semantics'] = $settingsCategorySemantics
     $settingsClose = Wait-Until {
         Find-ProcessElementByAutomationId `
             $managementProcess.Id `
@@ -1312,10 +1387,11 @@ try {
     $managementProcess = $null
     }
 
-    if ($PluginCommandManagementOnly -or
-        (-not $WorkflowOnly -and
-         -not $WorkflowOutputOnly -and
-         -not $WorkflowSchemaOnly)) {
+    if (-not $SettingsNavigationOnly -and
+        ($PluginCommandManagementOnly -or
+         (-not $WorkflowOnly -and
+          -not $WorkflowOutputOnly -and
+          -not $WorkflowSchemaOnly))) {
     Write-Stage 'Starting plugin command-management workflow.'
     $pluginSettingsProcess = Start-QualityHost @(
         '--language', 'en-US',
@@ -1612,7 +1688,8 @@ try {
     $pluginSettingsProcess = $null
     }
 
-    if (-not $PluginCommandManagementOnly -and
+    if (-not $SettingsNavigationOnly -and
+        -not $PluginCommandManagementOnly -and
         -not $WorkflowOutputOnly -and
         -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting managed workflow review from Command Palette.'
@@ -1813,7 +1890,9 @@ try {
     $workflowPanelProcess = $null
     }
 
-    if (-not $PluginCommandManagementOnly -and -not $WorkflowOutputOnly) {
+    if (-not $SettingsNavigationOnly -and
+        -not $PluginCommandManagementOnly -and
+        -not $WorkflowOutputOnly) {
     Write-Stage 'Validating UUID argument schema in the wide workflow editor.'
     $workflowSchemaWideProcess = Start-QualityHost @(
         '--quality-edit-workflow',
@@ -1929,7 +2008,9 @@ try {
     $workflowSchemaCompactProcess = $null
     }
 
-    if (-not $PluginCommandManagementOnly -and -not $WorkflowSchemaOnly) {
+    if (-not $SettingsNavigationOnly -and
+        -not $PluginCommandManagementOnly -and
+        -not $WorkflowSchemaOnly) {
     Write-Stage 'Starting approved long terminal-output workflow.'
     $workflowOutputArguments = @(
         '--quality-open-workflow',
@@ -2008,7 +2089,8 @@ try {
     $workflowOutputProcess = $null
     }
 
-    if (-not $PluginCommandManagementOnly -and
+    if (-not $SettingsNavigationOnly -and
+        -not $PluginCommandManagementOnly -and
         -not $WorkflowOnly -and
         -not $WorkflowOutputOnly -and
         -not $WorkflowSchemaOnly) {

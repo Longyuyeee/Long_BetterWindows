@@ -1341,6 +1341,9 @@ public class QualityGateTests
         Assert.Contains("NavigateToCategory", settingsCode);
         Assert.Contains("settings.category.appearance", settingsXaml);
         Assert.Contains("Long.Settings.CategoryItem.updates", settingsXaml);
+        Assert.Contains("i18n.settings.category.selector", settingsXaml);
+        Assert.Contains("SettingsCategoryAccessibilityProjection.Build", settingsCode);
+        Assert.Contains("AutomationProperties.SetItemStatus", settingsCode);
         Assert.Contains("ExportBrokerDiagnostics_Click", settingsCode);
         Assert.Contains("VerticalAlignment=\"Top\"", settingsXaml);
         Assert.Contains("IDisposable", settingsCode);
