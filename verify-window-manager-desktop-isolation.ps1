@@ -29,29 +29,66 @@ New-Item -ItemType Directory -Path $temporaryBase -Force | Out-Null
 $runRoot = [System.IO.Path]::GetFullPath((Join-Path $temporaryBase (
     [Guid]::NewGuid().ToString("N"))))
 New-Item -ItemType Directory -Path $runRoot | Out-Null
-$trxPath = Join-Path $runRoot "window-manager-desktop.trx"
+$testGroups = @(
+    [ordered]@{
+        id = "layout"
+        filter = "FullyQualifiedName~WindowManagerDesktopIsolationTests.Layout_UsesExactMonitorWorkAreaOnDisposableWindow"
+        expected_case_count = 9
+    },
+    [ordered]@{
+        id = "topmost"
+        filter = "FullyQualifiedName=LongBetterWindows.Tests.WindowManagerDesktopIsolationTests.Topmost_RoundTripPreservesDisposableWindowGeometry"
+        expected_case_count = 1
+    }
+)
 
 try {
-    $testOutput = @(& $DotnetPath test $projectPath `
-        -c Release `
-        --no-build `
-        --filter "FullyQualifiedName~WindowManagerDesktopIsolationTests" `
-        --logger "trx;LogFileName=window-manager-desktop.trx" `
-        --results-directory $runRoot 2>&1)
-    $testExitCode = $LASTEXITCODE
-    if (-not (Test-Path -LiteralPath $trxPath -PathType Leaf)) {
-        throw "WindowManager isolation tests produced no TRX report. Exit code: $testExitCode`n$($testOutput -join "`n")"
+    $caseResults = @()
+    $groupResults = @()
+    $testExitCode = 0
+    foreach ($group in $testGroups) {
+        $trxName = "$($group.id).trx"
+        $trxPath = Join-Path $runRoot $trxName
+        $testOutput = @(& $DotnetPath test $projectPath `
+            -c Release `
+            --no-build `
+            --filter $group.filter `
+            --logger "trx;LogFileName=$trxName" `
+            --results-directory $runRoot 2>&1)
+        $groupExitCode = $LASTEXITCODE
+        if (-not (Test-Path -LiteralPath $trxPath -PathType Leaf)) {
+            throw "WindowManager $($group.id) tests produced no TRX report. Exit code: $groupExitCode`n$($testOutput -join "`n")"
+        }
+
+        [xml]$trx = Get-Content -LiteralPath $trxPath -Raw -Encoding UTF8
+        $groupCases = @($trx.TestRun.Results.UnitTestResult |
+            ForEach-Object {
+                [PSCustomObject]@{
+                    name = [string]$_.testName
+                    outcome = ([string]$_.outcome).ToLowerInvariant()
+                    duration = [string]$_.duration
+                }
+            } | Sort-Object name)
+        $groupPassedCount = @($groupCases |
+            Where-Object { $_.outcome -eq "passed" }).Count
+        $groupPassed = $groupExitCode -eq 0 -and
+            $groupCases.Count -eq $group.expected_case_count -and
+            $groupPassedCount -eq $group.expected_case_count
+        if (-not $groupPassed) {
+            $testExitCode = 1
+        }
+        $caseResults += $groupCases
+        $groupResults += [ordered]@{
+            id = $group.id
+            expected_case_count = $group.expected_case_count
+            executed_case_count = $groupCases.Count
+            passed_case_count = $groupPassedCount
+            test_exit_code = $groupExitCode
+            passed = $groupPassed
+        }
     }
 
-    [xml]$trx = Get-Content -LiteralPath $trxPath -Raw -Encoding UTF8
-    $results = @($trx.TestRun.Results.UnitTestResult)
-    $caseResults = @($results | ForEach-Object {
-        [PSCustomObject]@{
-            name = [string]$_.testName
-            outcome = ([string]$_.outcome).ToLowerInvariant()
-            duration = [string]$_.duration
-        }
-    } | Sort-Object name)
+    $caseResults = @($caseResults | Sort-Object name)
     $passedCount = @($caseResults |
         Where-Object { $_.outcome -eq "passed" }).Count
     $failedCases = @($caseResults |
@@ -72,9 +109,10 @@ try {
         source_dirty = -not [string]::IsNullOrWhiteSpace($trackedStatus)
         isolated = $true
         disposable_native_window_only = $true
-        visible_window_created = $false
+        visible_window_created = $true
         foreground_activation_attempted = $false
         pointer_or_keyboard_input_generated = $false
+        test_process_count = $testGroups.Count
         test_assembly_sha256 = if (Test-Path -LiteralPath $testAssembly) {
             (Get-FileHash -LiteralPath $testAssembly -Algorithm SHA256).
                 Hash.ToLowerInvariant()
@@ -85,6 +123,7 @@ try {
         failed_case_count = $failedCases.Count
         test_exit_code = $testExitCode
         passed = $passed
+        test_groups = $groupResults
         cases = $caseResults
     }
 }

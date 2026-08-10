@@ -7,6 +7,7 @@ namespace LongBetterWindows.Tests;
 public sealed class WindowManagerDesktopIsolationTests
 {
     private const uint WsOverlapped = 0;
+    private const uint WsVisible = 0x10000000;
 
     [Theory]
     [InlineData(WindowLayout.Left)]
@@ -107,7 +108,7 @@ public sealed class WindowManagerDesktopIsolationTests
             0,
             "STATIC",
             "LongAssistant WindowManager isolation target",
-            WsOverlapped,
+            WsOverlapped | WsVisible,
             -32000,
             -32000,
             320,

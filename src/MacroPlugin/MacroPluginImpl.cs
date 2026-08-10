@@ -35,7 +35,7 @@ public class MacroPluginImpl :
 
     public string Id => "com.long.macro";
     public string Name => Text("plugin.name", "宏录制器");
-    public string Version => "1.1.7";
+    public string Version => "1.1.8";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)

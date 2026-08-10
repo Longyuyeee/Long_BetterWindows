@@ -2,7 +2,7 @@ param(
     [string]$TestProject = "tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj",
     [string]$OutputPath,
     [string]$DotnetPath = "C:\Program Files\dotnet\dotnet.exe",
-    [int]$ExpectedCaseCount = 35
+    [int]$ExpectedCaseCount = 39
 )
 
 $ErrorActionPreference = "Stop"

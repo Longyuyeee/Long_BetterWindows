@@ -231,6 +231,95 @@ public sealed class MacroEngineTests
     }
 
     [Fact]
+    public async Task Recording_IgnoresInjectedKeyboardAndMouseTransitions()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = CreateEngine(native);
+        Assert.True(engine.StartRecording());
+
+        native.RaiseKeyboard(0x0100, 0x41, isInjected: true);
+        native.RaiseKeyboard(0x0101, 0x41, isInjected: true);
+        native.RaiseMouse(0x0201, 20, 30, isInjected: true);
+        native.RaiseMouse(0x0202, 20, 30, isInjected: true);
+        Assert.True(engine.StopRecording());
+
+        Assert.Equal(0, engine.ActionCount);
+    }
+
+    [Fact]
+    public async Task RecordingAndPlayback_PreserveExtendedKeyIdentity()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = new MacroEngine(
+            native,
+            TimeSpan.Zero,
+            TimeSpan.FromMilliseconds(10));
+        Assert.True(engine.StartRecording());
+
+        native.RaiseKeyboard(0x0100, 0x0D, isExtended: true);
+        native.RaiseKeyboard(0x0101, 0x0D, isExtended: true);
+        Assert.True(engine.StopRecording());
+
+        var actions = JsonSerializer.Deserialize<List<MacroAction>>(
+            engine.SaveToJson());
+        Assert.All(actions!, action => Assert.True(action.IsExtendedKey));
+        var legacyAction = JsonSerializer.Deserialize<MacroAction>(
+            """{"Type":1,"KeyCode":13,"DelayMs":0}""");
+        Assert.False(legacyAction!.IsExtendedKey);
+        Assert.True(await engine.PlayOnceAsync());
+        Assert.Equal(
+            new[]
+            {
+                new KeyInputCall(0x0D, IsDown: true, IsExtended: true),
+                new KeyInputCall(0x0D, IsDown: false, IsExtended: true),
+            },
+            native.KeyInputs);
+    }
+
+    [Fact]
+    public async Task StopPlayAsync_ReleasesCanceledExtendedKeyIdentity()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = CreateEngine(native);
+        Load(engine, MacroAction.Key(
+            0x0D,
+            delay: 0,
+            isExtended: true));
+
+        var playback = engine.PlayOnceAsync();
+        await native.KeyDown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(await engine.StopPlayAsync());
+        Assert.False(await playback);
+        Assert.Equal(
+            new[]
+            {
+                new KeyInputCall(0x0D, IsDown: true, IsExtended: true),
+                new KeyInputCall(0x0D, IsDown: false, IsExtended: true),
+            },
+            native.KeyInputs);
+    }
+
+    [Fact]
+    public void NativeHookFlags_MapInjectedExtendedAndReleaseIdentity()
+    {
+        Assert.True(MacroNativeApi.IsMouseInjected(0x0001));
+        Assert.True(MacroNativeApi.IsMouseInjected(0x0002));
+        Assert.True(MacroNativeApi.IsKeyboardExtended(0x0001));
+        Assert.True(MacroNativeApi.IsKeyboardInjected(0x0010));
+        Assert.True(MacroNativeApi.IsKeyboardInjected(0x0002));
+        Assert.Equal(
+            0x0001u,
+            MacroNativeApi.CreateKeyboardInputFlags(
+                isDown: true,
+                isExtended: true));
+        Assert.Equal(
+            0x0003u,
+            MacroNativeApi.CreateKeyboardInputFlags(
+                isDown: false,
+                isExtended: true));
+    }
+
+    [Fact]
     public async Task StopRecording_RemovesTrailingActivationChord()
     {
         var native = new FakeMacroNativeApi();
@@ -464,7 +553,7 @@ public sealed class MacroEngineTests
         private MacroHookProc? _mouseHook;
         private MacroHookProc? _keyboardHook;
         private MacroMouseHookData _mouseData;
-        private uint _keyboardVirtualKey;
+        private MacroKeyboardHookData _keyboardData;
 
         public Queue<HookResult> HookResults { get; } = new();
         public Queue<NativeResult> UninstallResults { get; } = new();
@@ -529,9 +618,16 @@ public sealed class MacroEngineTests
         public void ResumeHookRead()
             => _resumeHookRead.TrySetResult();
 
-        public void RaiseMouse(int message, int x, int y)
+        public void RaiseMouse(
+            int message,
+            int x,
+            int y,
+            bool isInjected = false)
         {
-            _mouseData = new MacroMouseHookData(x, y);
+            _mouseData = new MacroMouseHookData(
+                x,
+                y,
+                isInjected);
             Assert.NotNull(_mouseHook);
             _mouseHook(0, new IntPtr(message), IntPtr.Zero);
         }
@@ -539,12 +635,19 @@ public sealed class MacroEngineTests
         public MacroKeyboardHookData ReadKeyboardHookData(IntPtr data)
         {
             WaitForHookRead();
-            return new(_keyboardVirtualKey);
+            return _keyboardData;
         }
 
-        public void RaiseKeyboard(int message, uint virtualKey)
+        public void RaiseKeyboard(
+            int message,
+            uint virtualKey,
+            bool isExtended = false,
+            bool isInjected = false)
         {
-            _keyboardVirtualKey = virtualKey;
+            _keyboardData = new(
+                virtualKey,
+                isExtended,
+                isInjected);
             Assert.NotNull(_keyboardHook);
             _keyboardHook(0, new IntPtr(message), IntPtr.Zero);
         }
@@ -580,10 +683,14 @@ public sealed class MacroEngineTests
         public bool TrySendKey(
             int virtualKey,
             bool isDown,
+            bool isExtended,
             out int error)
         {
             KeyInputTimestamps.Add(Stopwatch.GetTimestamp());
-            KeyInputs.Add(new KeyInputCall(virtualKey, isDown));
+            KeyInputs.Add(new KeyInputCall(
+                virtualKey,
+                isDown,
+                isExtended));
             if (isDown)
                 KeyDown.TrySetResult();
             var result = Next(KeyResults);
@@ -627,5 +734,6 @@ public sealed class MacroEngineTests
 
     private readonly record struct KeyInputCall(
         int VirtualKey,
-        bool IsDown);
+        bool IsDown,
+        bool IsExtended = false);
 }

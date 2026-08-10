@@ -28,6 +28,7 @@ public class MacroAction
     public int Y { get; init; }
     public bool IsRightButton { get; init; }
     public int KeyCode { get; init; }
+    public bool IsExtendedKey { get; init; }
     public int DelayMs { get; set; }
 
     public static MacroAction Mouse(
@@ -44,24 +45,30 @@ public class MacroAction
             DelayMs = delay,
         };
 
-    public static MacroAction Key(int virtualKey, int delay)
+    public static MacroAction Key(
+        int virtualKey,
+        int delay,
+        bool isExtended = false)
         => new()
         {
             Type = MacroActionType.KeyPress,
             KeyCode = virtualKey,
+            IsExtendedKey = isExtended,
             DelayMs = delay,
         };
 
     public static MacroAction KeyTransition(
         int virtualKey,
         bool isDown,
-        int delay)
+        int delay,
+        bool isExtended = false)
         => new()
         {
             Type = isDown
                 ? MacroActionType.KeyDown
                 : MacroActionType.KeyUp,
             KeyCode = virtualKey,
+            IsExtendedKey = isExtended,
             DelayMs = delay,
         };
 
@@ -108,7 +115,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     private readonly MacroHookProc _mouseHookCallback;
     private readonly MacroHookProc _keyboardHookCallback;
     private readonly List<MacroAction> _actions = [];
-    private readonly HashSet<int> _pendingKeyReleases = [];
+    private readonly HashSet<MacroKeyIdentity> _pendingKeyReleases = [];
     private readonly Dictionary<
         MacroMouseButton,
         (int X, int Y)> _pendingMouseReleases = [];
@@ -648,26 +655,32 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         if (!_native.TrySendKey(
                 action.KeyCode,
                 isDown: true,
+                isExtended: action.IsExtendedKey,
                 out var downError))
         {
             throw new InvalidOperationException(
                 NativeFailure("SendInput(key down)", downError));
         }
         lock (_sync)
-            _pendingKeyReleases.Add(action.KeyCode);
+            _pendingKeyReleases.Add(new(
+                action.KeyCode,
+                action.IsExtendedKey));
         await Task.Delay(
             _pressDuration,
             cancellationToken).ConfigureAwait(false);
         if (!_native.TrySendKey(
                 action.KeyCode,
                 isDown: false,
+                isExtended: action.IsExtendedKey,
                 out var upError))
         {
             throw new InvalidOperationException(
                 NativeFailure("SendInput(key up)", upError));
         }
         lock (_sync)
-            _pendingKeyReleases.Remove(action.KeyCode);
+            _pendingKeyReleases.Remove(new(
+                action.KeyCode,
+                action.IsExtendedKey));
     }
 
     private void PlayKeyTransition(MacroAction action, bool isDown)
@@ -675,6 +688,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         if (!_native.TrySendKey(
                 action.KeyCode,
                 isDown,
+                isExtended: action.IsExtendedKey,
                 out var error))
         {
             throw new InvalidOperationException(
@@ -688,16 +702,20 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         lock (_sync)
         {
             if (isDown)
-                _pendingKeyReleases.Add(action.KeyCode);
+                _pendingKeyReleases.Add(new(
+                    action.KeyCode,
+                    action.IsExtendedKey));
             else
-                _pendingKeyReleases.Remove(action.KeyCode);
+                _pendingKeyReleases.Remove(new(
+                    action.KeyCode,
+                    action.IsExtendedKey));
         }
     }
 
     private List<string> ReleasePressedInputs()
     {
         var errors = new List<string>();
-        List<int> pressedKeys;
+        List<MacroKeyIdentity> pressedKeys;
         List<KeyValuePair<MacroMouseButton, (int X, int Y)>>
             pressedButtons;
         lock (_sync)
@@ -714,8 +732,9 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                 attempt++)
             {
                 released = _native.TrySendKey(
-                    key,
+                    key.VirtualKey,
                     isDown: false,
+                    isExtended: key.IsExtended,
                     out error);
             }
             if (!released)
@@ -774,6 +793,8 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             && TryCaptureRecordingSession(out var recordingSession))
         {
             var hookData = _native.ReadMouseHookData(data);
+            if (hookData.IsInjected)
+                return _native.CallNextHook(code, message, data);
             var now = DateTime.UtcNow;
             lock (_sync)
             {
@@ -809,6 +830,8 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             && TryCaptureRecordingSession(out var recordingSession))
         {
             var hookData = _native.ReadKeyboardHookData(data);
+            if (hookData.IsInjected)
+                return _native.CallNextHook(code, message, data);
             var now = DateTime.UtcNow;
             lock (_sync)
             {
@@ -819,7 +842,8 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                         checked((int)hookData.VirtualKey),
                         messageCode == KeyDownMessage
                             || messageCode == SystemKeyDownMessage,
-                        ElapsedMilliseconds(now)));
+                        ElapsedMilliseconds(now),
+                        hookData.IsExtended));
                     _lastEvent = now;
                 }
             }
@@ -914,4 +938,8 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             return _state == MacroState.Recording;
         }
     }
+
+    private readonly record struct MacroKeyIdentity(
+        int VirtualKey,
+        bool IsExtended);
 }

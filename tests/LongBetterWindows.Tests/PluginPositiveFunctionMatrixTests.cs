@@ -525,9 +525,12 @@ public sealed class PluginPositiveFunctionMatrixTests
         Assert.True(File.Exists(scriptPath));
         Assert.True(File.Exists(testPath));
         Assert.Contains("disposable_native_window_only = $true", script);
-        Assert.Contains("visible_window_created = $false", script);
+        Assert.Contains("visible_window_created = $true", script);
         Assert.Contains("foreground_activation_attempted = $false", script);
         Assert.Contains("pointer_or_keyboard_input_generated = $false", script);
+        Assert.Contains("test_process_count = $testGroups.Count", script);
+        Assert.Contains("expected_case_count = 9", script);
+        Assert.Contains("expected_case_count = 1", script);
         Assert.Equal(
             10,
             policy.GetProperty(
@@ -587,9 +590,11 @@ public sealed class PluginPositiveFunctionMatrixTests
                 .GetInt32(),
             commandCount);
         Assert.Equal(
-            115,
+            119,
             policy.GetProperty("high_risk_boundary_required_case_count")
                 .GetInt32());
+        Assert.Contains("expected_case_count = $expectedCaseCount", script);
+        Assert.Contains("executed_case_count = $executedCaseCount", script);
         Assert.Contains("verify-high-risk-plugin-transactions.ps1", script);
         Assert.Contains("verify-capture-delivery-isolation.ps1", script);
         Assert.Contains("verify-quick-launch-isolation.ps1", script);

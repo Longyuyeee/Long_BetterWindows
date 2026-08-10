@@ -5,8 +5,9 @@ param(
         "src/LongBetterWindows.Host/bin/Release/net8.0-windows",
     [string]$OutputPath,
     [string]$DotnetPath = "C:\Program Files\dotnet\dotnet.exe",
+    [int]$ExpectedTransactionCaseCount = 7,
     [int]$ExpectedServiceCaseCount = 40,
-    [int]$ExpectedDesktopLifecycleCaseCount = 35,
+    [int]$ExpectedDesktopLifecycleCaseCount = 39,
     [int]$ExpectedWindowManagerCaseCount = 10
 )
 
@@ -129,12 +130,27 @@ try {
     $quickLaunch = Read-JsonReport $quickLaunchPath
     $desktopLifecycle = Read-JsonReport $desktopLifecyclePath
     $windowManager = Read-JsonReport $windowManagerPath
+    $expectedCaseCount =
+        $ExpectedTransactionCaseCount +
+        [int]$capture.expected_case_count +
+        [int]$quickLaunch.expected_case_count +
+        [int]$desktopLifecycle.expected_case_count +
+        [int]$windowManager.expected_case_count +
+        $ExpectedServiceCaseCount
+    $executedCaseCount =
+        @($transactions.cases).Count +
+        [int]$capture.executed_case_count +
+        [int]$quickLaunch.executed_case_count +
+        [int]$desktopLifecycle.executed_case_count +
+        [int]$windowManager.executed_case_count +
+        $serviceCases.Count
     $allPassed = [bool]$transactions.passed -and
         [bool]$capture.passed -and
         [bool]$quickLaunch.passed -and
         [bool]$desktopLifecycle.passed -and
         [bool]$windowManager.passed -and
-        $servicePassed
+        $servicePassed -and
+        $executedCaseCount -eq $expectedCaseCount
 
     $plugins = @(
         [ordered]@{
@@ -218,14 +234,8 @@ try {
         disposable_process_only = $true
         required_plugin_count = 9
         covered_plugin_count = $plugins.Count
-        expected_case_count = 115
-        executed_case_count =
-            [int]$transactions.passed_case_count +
-            [int]$capture.executed_case_count +
-            [int]$quickLaunch.executed_case_count +
-            [int]$desktopLifecycle.executed_case_count +
-            [int]$windowManager.executed_case_count +
-            $serviceCases.Count
+        expected_case_count = $expectedCaseCount
+        executed_case_count = $executedCaseCount
         passed = $allPassed
         plugins = $plugins
         transaction_commands = $transactions

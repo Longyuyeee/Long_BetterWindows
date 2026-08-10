@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-07-27",
+  "updated_at": "2026-08-10",
   "policy": {
     "required_plugin_count": 25,
     "required_command_count": 42,
@@ -33,7 +33,7 @@
     ],
     "high_risk_boundary_required_plugin_count": 9,
     "high_risk_boundary_required_command_count": 23,
-    "high_risk_boundary_required_case_count": 115,
+    "high_risk_boundary_required_case_count": 119,
     "quick_launch_isolation_script": "verify-quick-launch-isolation.ps1",
     "quick_launch_isolation_test_path": "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
     "quick_launch_isolation_required_case_count": 9,
@@ -432,6 +432,26 @@
             "symbol": "StopPlayAsync_ReleasesCanceledMouseTransition"
           },
           {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "Recording_IgnoresInjectedKeyboardAndMouseTransitions"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "RecordingAndPlayback_PreserveExtendedKeyIdentity"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "StopPlayAsync_ReleasesCanceledExtendedKeyIdentity"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "NativeHookFlags_MapInjectedExtendedAndReleaseIdentity"
+          },
+          {
             "level": "integration",
             "path": "tests/LongBetterWindows.Tests/WindowInfoServiceTests.cs",
             "symbol": "PluginStop_MacroCleansEngineAndRetainsFailedHotkeyForRetry"
@@ -446,7 +466,7 @@
         {
           "id": "record-play-cancel",
           "commands": ["macro.record-toggle", "macro.play-once", "macro.loop-toggle"],
-          "description": "In a disposable target, record text with a modifier chord, a left-button drag and a right-button action; play once, start/stop loop playback and confirm timing is preserved with no key/button left pressed.",
+          "description": "In a disposable target, record text with a modifier chord, an extended key such as ArrowRight or numpad Enter, a left-button drag and a right-button action; play once, start/stop loop playback and confirm timing is preserved with no key/button left pressed.",
           "status": "pending",
           "required_for_release": true,
           "evidence_path": null,

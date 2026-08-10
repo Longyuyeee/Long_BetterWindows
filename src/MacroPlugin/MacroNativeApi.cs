@@ -14,8 +14,14 @@ internal enum MacroMouseButton
     Right,
 }
 
-internal readonly record struct MacroMouseHookData(int X, int Y);
-internal readonly record struct MacroKeyboardHookData(uint VirtualKey);
+internal readonly record struct MacroMouseHookData(
+    int X,
+    int Y,
+    bool IsInjected);
+internal readonly record struct MacroKeyboardHookData(
+    uint VirtualKey,
+    bool IsExtended,
+    bool IsInjected);
 
 internal interface IMacroNativeApi
 {
@@ -40,6 +46,7 @@ internal interface IMacroNativeApi
     bool TrySendKey(
         int virtualKey,
         bool isDown,
+        bool isExtended,
         out int error);
 }
 
@@ -54,6 +61,12 @@ internal sealed class MacroNativeApi : IMacroNativeApi
     private const uint MouseEventRightUp = 0x0010;
     private const uint MouseEventVirtualDesk = 0x4000;
     private const uint MouseEventAbsolute = 0x8000;
+    private const uint LowLevelMouseInjected = 0x0001;
+    private const uint LowLevelMouseLowerIntegrityInjected = 0x0002;
+    private const uint LowLevelKeyboardExtended = 0x0001;
+    private const uint LowLevelKeyboardLowerIntegrityInjected = 0x0002;
+    private const uint LowLevelKeyboardInjected = 0x0010;
+    private const uint KeyEventExtendedKey = 0x0001;
     private const uint KeyEventKeyUp = 0x0002;
     private const int SmXVirtualScreen = 76;
     private const int SmYVirtualScreen = 77;
@@ -95,13 +108,19 @@ internal sealed class MacroNativeApi : IMacroNativeApi
     public MacroMouseHookData ReadMouseHookData(IntPtr data)
     {
         var value = Marshal.PtrToStructure<MouseHookData>(data);
-        return new MacroMouseHookData(value.Point.X, value.Point.Y);
+        return new MacroMouseHookData(
+            value.Point.X,
+            value.Point.Y,
+            IsMouseInjected(value.Flags));
     }
 
     public MacroKeyboardHookData ReadKeyboardHookData(IntPtr data)
     {
         var value = Marshal.PtrToStructure<KeyboardHookData>(data);
-        return new MacroKeyboardHookData(value.VirtualKey);
+        return new MacroKeyboardHookData(
+            value.VirtualKey,
+            IsKeyboardExtended(value.Flags),
+            IsKeyboardInjected(value.Flags));
     }
 
     public bool TrySetCursorPosition(
@@ -164,6 +183,7 @@ internal sealed class MacroNativeApi : IMacroNativeApi
     public bool TrySendKey(
         int virtualKey,
         bool isDown,
+        bool isExtended,
         out int error)
     {
         var input = new NativeInput
@@ -174,12 +194,31 @@ internal sealed class MacroNativeApi : IMacroNativeApi
                 Keyboard = new NativeKeyboardInput
                 {
                     VirtualKey = checked((ushort)virtualKey),
-                    Flags = isDown ? 0 : KeyEventKeyUp,
+                    Flags = CreateKeyboardInputFlags(
+                        isDown,
+                        isExtended),
                 },
             },
         };
         return TrySend(input, out error);
     }
+
+    internal static bool IsMouseInjected(uint flags)
+        => (flags & (LowLevelMouseInjected
+            | LowLevelMouseLowerIntegrityInjected)) != 0;
+
+    internal static bool IsKeyboardExtended(uint flags)
+        => (flags & LowLevelKeyboardExtended) != 0;
+
+    internal static bool IsKeyboardInjected(uint flags)
+        => (flags & (LowLevelKeyboardInjected
+            | LowLevelKeyboardLowerIntegrityInjected)) != 0;
+
+    internal static uint CreateKeyboardInputFlags(
+        bool isDown,
+        bool isExtended)
+        => (isExtended ? KeyEventExtendedKey : 0)
+            | (isDown ? 0 : KeyEventKeyUp);
 
     internal static int NormalizeAbsoluteCoordinate(
         int coordinate,
