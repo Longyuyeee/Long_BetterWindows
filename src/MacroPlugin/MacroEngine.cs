@@ -111,7 +111,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
 
     private readonly IMacroNativeApi _native;
     private readonly TimeSpan _pressDuration;
-    private readonly TimeSpan _loopInterval;
+    private TimeSpan _loopInterval;
     private readonly MacroHookProc _mouseHookCallback;
     private readonly MacroHookProc _keyboardHookCallback;
     private readonly List<MacroAction> _actions = [];
@@ -166,6 +166,25 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             lock (_sync)
                 return _lastError;
         }
+    }
+
+    internal TimeSpan LoopInterval
+    {
+        get
+        {
+            lock (_sync)
+                return _loopInterval;
+        }
+    }
+
+    internal void SetLoopInterval(TimeSpan loopInterval)
+    {
+        if (loopInterval <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(loopInterval));
+
+        ThrowIfDisposed();
+        lock (_sync)
+            _loopInterval = loopInterval;
     }
 
     public int ActionCount
@@ -451,7 +470,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                 if (loop)
                 {
                     await Task.Delay(
-                        _loopInterval,
+                        LoopInterval,
                         cancellation.Token).ConfigureAwait(false);
                 }
             }

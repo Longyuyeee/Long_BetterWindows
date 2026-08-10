@@ -556,6 +556,11 @@ public sealed class BuiltInPluginLocalizationTests
             "src",
             "MacroPlugin",
             "MacroPlugin.csproj"));
+        var intervalControl = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "MacroPlugin",
+            "MacroLoopIntervalSettingsControl.cs"));
         var hostProject = File.ReadAllText(Path.Combine(
             root,
             "src",
@@ -574,9 +579,13 @@ public sealed class BuiltInPluginLocalizationTests
         var languageBody = source[start..end];
         Assert.Contains("IPluginLanguageLifecycle", source);
         Assert.Contains("ApplyLocalization", languageBody);
+        Assert.Contains("intervalControl.ApplyLocalization", languageBody);
         Assert.DoesNotContain("RegisterAsync", languageBody);
         Assert.DoesNotContain("ToggleRecording", languageBody);
         Assert.DoesNotContain("PlayOnce", languageBody);
+        Assert.Contains("\"LongTextBox\"", intervalControl);
+        Assert.Contains("RenderStatus();", intervalControl);
+        Assert.DoesNotContain("\"LongComboBox\"", intervalControl);
         Assert.Contains("PluginLocalization Include=\"i18n\\*.json\"", project);
         Assert.Contains("MacroPlugin\\i18n", hostProject);
     }

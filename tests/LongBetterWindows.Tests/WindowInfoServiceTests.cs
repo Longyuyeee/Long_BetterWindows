@@ -500,6 +500,59 @@ public sealed class WindowInfoServiceTests
         Assert.True(await plugin.StopAsync());
     }
 
+    [Theory]
+    [InlineData("250", 250)]
+    [InlineData("49", 100)]
+    [InlineData("10001", 100)]
+    [InlineData("invalid", 100)]
+    public async Task MacroPluginInitialization_UsesValidatedLoopIntervalSetting(
+        string persistedValue,
+        int expectedMilliseconds)
+    {
+        var settings = new StubPluginSettingsService(
+            new Dictionary<string, string>
+            {
+                ["loop_interval"] = persistedValue,
+            });
+        var plugin = new MacroPluginImpl();
+
+        Assert.True(await plugin.InitializeAsync(new StubHostApi(
+            new StubWindowInfoService(),
+            settings: settings)));
+
+        Assert.Equal(
+            TimeSpan.FromMilliseconds(expectedMilliseconds),
+            Assert.IsType<MacroEngine>(GetMacroEngine(plugin)).LoopInterval);
+        Assert.True(await plugin.StopAsync());
+    }
+
+    [Fact]
+    public async Task MacroPluginLoopInterval_PersistenceFailureLeavesEngineUnchanged()
+    {
+        var settings = new StubPluginSettingsService();
+        var plugin = new MacroPluginImpl();
+        Assert.True(await plugin.InitializeAsync(new StubHostApi(
+            new StubWindowInfoService(),
+            settings: settings)));
+        var engine = Assert.IsType<MacroEngine>(GetMacroEngine(plugin));
+        settings.FailNextSet = true;
+
+        var failed = await plugin.ApplyLoopIntervalAsync(500);
+
+        Assert.False(failed.IsSuccess);
+        Assert.Equal(TimeSpan.FromMilliseconds(100), engine.LoopInterval);
+
+        var applied = await plugin.ApplyLoopIntervalAsync(500);
+        var invalid = await plugin.ApplyLoopIntervalAsync(10);
+
+        Assert.True(applied.IsSuccess);
+        Assert.False(invalid.IsSuccess);
+        Assert.Equal(ApiErrorCode.InvalidArgument, invalid.ErrorCode);
+        Assert.Equal(TimeSpan.FromMilliseconds(500), engine.LoopInterval);
+        Assert.Equal("500", settings.Values["loop_interval"]);
+        Assert.True(await plugin.StopAsync());
+    }
+
     [Fact]
     public void ApplyLayout_WorksAgainstIsolatedNativeWindow()
     {
@@ -723,12 +776,37 @@ public sealed class WindowInfoServiceTests
 
     private sealed class StubPluginSettingsService : IPluginSettingsService
     {
+        public StubPluginSettingsService(
+            IReadOnlyDictionary<string, string>? values = null)
+        {
+            Values = values is null
+                ? new Dictionary<string, string>(StringComparer.Ordinal)
+                : new Dictionary<string, string>(
+                    values,
+                    StringComparer.Ordinal);
+        }
+
+        public Dictionary<string, string> Values { get; }
+        public bool FailNextSet { get; set; }
+
         public Task<HostApiResponse<string?>> GetAsync(string key)
             => Task.FromResult(
-                HostApiResponse<string?>.Success(null));
+                HostApiResponse<string?>.Success(
+                    Values.GetValueOrDefault(key)));
 
         public Task<HostApiResponse> SetAsync(string key, string value)
-            => Task.FromResult(HostApiResponse.Success());
+        {
+            if (FailNextSet)
+            {
+                FailNextSet = false;
+                return Task.FromResult(HostApiResponse.Failure(
+                    ApiErrorCode.Unknown,
+                    "Injected settings persistence failure."));
+            }
+
+            Values[key] = value;
+            return Task.FromResult(HostApiResponse.Success());
+        }
     }
 
     private sealed class StubHotKeyService : IHotKeyService
@@ -818,17 +896,18 @@ public sealed class WindowInfoServiceTests
     {
         public StubHostApi(
             IWindowInfoService windowInfo,
-            IHotKeyService? hotKey = null)
+            IHotKeyService? hotKey = null,
+            IPluginSettingsService? settings = null)
         {
             WindowInfo = windowInfo;
             HotKey = hotKey ?? new StubHotKeyService();
+            Settings = settings ?? new StubPluginSettingsService();
         }
 
         public string? LastAccessError => null;
         public bool HasCapability(string capability) => true;
         public IHotKeyService HotKey { get; }
-        public IPluginSettingsService Settings { get; } =
-            new StubPluginSettingsService();
+        public IPluginSettingsService Settings { get; }
         public IShellSelectionService ShellSelection => null!;
         public IADSService ADS => null!;
         public IRegistryService Registry => null!;

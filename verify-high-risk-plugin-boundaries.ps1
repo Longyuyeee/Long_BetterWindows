@@ -7,7 +7,7 @@ param(
     [string]$DotnetPath = "C:\Program Files\dotnet\dotnet.exe",
     [int]$ExpectedTransactionCaseCount = 7,
     [int]$ExpectedServiceCaseCount = 40,
-    [int]$ExpectedDesktopLifecycleCaseCount = 39,
+    [int]$ExpectedDesktopLifecycleCaseCount = 40,
     [int]$ExpectedWindowManagerCaseCount = 10
 )
 

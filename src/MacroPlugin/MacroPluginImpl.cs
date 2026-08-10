@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using LongBetterWindows.Host.Capabilities;
@@ -24,18 +25,23 @@ public class MacroPluginImpl :
     private string _configuredRecordHotkey = "F6";
     private string _configuredPlayHotkey = "F7";
     private string _configuredLoopHotkey = "F8";
+    private int _configuredLoopIntervalMs =
+        MacroLoopIntervalPolicy.DefaultMilliseconds;
     private string? _registeredRecordHotkey;
     private string? _registeredPlayHotkey;
     private string? _registeredLoopHotkey;
     private readonly List<(
         WeakReference<HotkeySettingsControl> Reference,
         string LabelKey)> _settings = [];
+    private readonly List<WeakReference<MacroLoopIntervalSettingsControl>>
+        _loopIntervalSettings = [];
+    private readonly SemaphoreSlim _loopIntervalChangeGate = new(1, 1);
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.macro";
     public string Name => Text("plugin.name", "宏录制器");
-    public string Version => "1.1.8";
+    public string Version => "1.1.9";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -60,6 +66,7 @@ public class MacroPluginImpl :
         _configuredLoopHotkey = await ReadHotkeyAsync(
             "play_loop_hotkey",
             _configuredLoopHotkey);
+        _configuredLoopIntervalMs = await ReadLoopIntervalAsync();
         EnsureEngine();
 
         Log.Information("[Macro] 初始化完成");
@@ -101,6 +108,8 @@ public class MacroPluginImpl :
             return;
 
         _engine = new MacroEngine();
+        _engine.SetLoopInterval(
+            TimeSpan.FromMilliseconds(_configuredLoopIntervalMs));
         _engine.StateChanged += OnStateChanged;
         _engine.PlaybackFailed += OnPlaybackFailed;
     }
@@ -402,6 +411,17 @@ public class MacroPluginImpl :
                 _configuredLoopHotkey = value;
                 _registeredLoopHotkey = value;
             });
+
+        var intervalControl = new MacroLoopIntervalSettingsControl(
+            _configuredLoopIntervalMs,
+            ApplyLoopIntervalAsync,
+            CreateLoopIntervalLocalization());
+        _loopIntervalSettings.RemoveAll(
+            reference => !reference.TryGetTarget(out _));
+        _loopIntervalSettings.Add(
+            new WeakReference<MacroLoopIntervalSettingsControl>(
+                intervalControl));
+        panel.Children.Add(intervalControl);
         return panel;
     }
 
@@ -444,6 +464,74 @@ public class MacroPluginImpl :
         return result.IsSuccess && !string.IsNullOrWhiteSpace(result.Data)
             ? result.Data
             : fallback;
+    }
+
+    private async Task<int> ReadLoopIntervalAsync()
+    {
+        var result = await _pluginSettings.GetAsync("loop_interval");
+        if (result.IsSuccess
+            && MacroLoopIntervalPolicy.TryParse(
+                result.Data,
+                out var milliseconds))
+        {
+            return milliseconds;
+        }
+
+        if (result.IsSuccess && !string.IsNullOrWhiteSpace(result.Data))
+        {
+            Log.Warning(
+                "[Macro] Invalid loop interval {Interval}; using {Default} ms",
+                result.Data,
+                MacroLoopIntervalPolicy.DefaultMilliseconds);
+        }
+        return MacroLoopIntervalPolicy.DefaultMilliseconds;
+    }
+
+    internal async Task<HostApiResponse> ApplyLoopIntervalAsync(
+        int milliseconds)
+    {
+        if (!MacroLoopIntervalPolicy.IsValid(milliseconds))
+        {
+            return HostApiResponse.Failure(
+                ApiErrorCode.InvalidArgument,
+                string.Format(
+                    CultureInfo.CurrentCulture,
+                    Text(
+                        "settings.loopIntervalInvalid",
+                        "Enter an integer from {0} to {1}."),
+                    MacroLoopIntervalPolicy.MinimumMilliseconds,
+                    MacroLoopIntervalPolicy.MaximumMilliseconds));
+        }
+
+        await _loopIntervalChangeGate.WaitAsync();
+        try
+        {
+            HostApiResponse result;
+            try
+            {
+                result = await _pluginSettings.SetAsync(
+                    "loop_interval",
+                    milliseconds.ToString(CultureInfo.InvariantCulture));
+            }
+            catch (Exception exception)
+            {
+                return HostApiResponse.Failure(
+                    ApiErrorCode.Unknown,
+                    exception.Message);
+            }
+
+            if (!result.IsSuccess)
+                return result;
+
+            _configuredLoopIntervalMs = milliseconds;
+            _engine?.SetLoopInterval(
+                TimeSpan.FromMilliseconds(milliseconds));
+            return HostApiResponse.Success();
+        }
+        finally
+        {
+            _loopIntervalChangeGate.Release();
+        }
     }
 
     private void ReplaceRegisteredHotkey(string? previous, string current)
@@ -521,6 +609,17 @@ public class MacroPluginImpl :
                         CreateSettingsLocalization());
                 }
             }
+
+            _loopIntervalSettings.RemoveAll(
+                reference => !reference.TryGetTarget(out _));
+            foreach (var reference in _loopIntervalSettings)
+            {
+                if (reference.TryGetTarget(out var intervalControl))
+                {
+                    intervalControl.ApplyLocalization(
+                        CreateLoopIntervalLocalization());
+                }
+            }
         });
         return Task.CompletedTask;
     }
@@ -543,6 +642,24 @@ public class MacroPluginImpl :
             Text(
                 "settings.formatHint",
                 "格式: Ctrl+K  Alt+M  Win+N  Ctrl+Shift+Space  F6"));
+
+    private MacroLoopIntervalLocalization CreateLoopIntervalLocalization()
+        => new(
+            Text("settings.loopInterval", "Loop interval"),
+            Text(
+                "settings.loopIntervalDescription",
+                "Pause between completed loop playback cycles."),
+            Text("settings.milliseconds", "ms"),
+            Text("settings.apply", "Apply"),
+            Text("settings.unchanged", "No changes"),
+            Text("settings.updated", "Updated"),
+            Text(
+                "settings.loopIntervalInvalid",
+                "Enter an integer from {0} to {1}."),
+            Text("settings.changeFailed", "Update failed: {0}"),
+            Text(
+                "settings.loopIntervalHint",
+                "Range: 50-10000 ms; applies before the next cycle."));
 
     private string Text(string key, string fallback)
         => _strings.TryGetValue(key, out var value)

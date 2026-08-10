@@ -152,6 +152,26 @@ public sealed class MacroEngineTests
     }
 
     [Fact]
+    public async Task LoopPlayback_AppliesUpdatedIntervalToNextCycle()
+    {
+        var native = new FakeMacroNativeApi();
+        await using var engine = new MacroEngine(
+            native,
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromMinutes(1));
+        Load(engine, MacroAction.Key(0x41, delay: 0));
+
+        Assert.True(engine.PlayLoop());
+        await native.KeyDown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        engine.SetLoopInterval(TimeSpan.FromMilliseconds(10));
+        await native.SecondKeyDown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(TimeSpan.FromMilliseconds(10), engine.LoopInterval);
+        Assert.True(await engine.StopPlayAsync());
+        Assert.Equal(MacroState.Idle, engine.State);
+    }
+
+    [Fact]
     public async Task PartialHookInstallationFailure_UnhooksInstalledHook()
     {
         var native = new FakeMacroNativeApi();
@@ -550,6 +570,7 @@ public sealed class MacroEngineTests
     private sealed class FakeMacroNativeApi : IMacroNativeApi
     {
         private int _nextHook = 10;
+        private int _keyDownCount;
         private MacroHookProc? _mouseHook;
         private MacroHookProc? _keyboardHook;
         private MacroMouseHookData _mouseData;
@@ -566,6 +587,8 @@ public sealed class MacroEngineTests
         public TaskCompletionSource MouseDown { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource KeyDown { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource SecondKeyDown { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource HookReadStarted { get; private set; } =
             CompletedSignal();
@@ -692,7 +715,11 @@ public sealed class MacroEngineTests
                 isDown,
                 isExtended));
             if (isDown)
+            {
                 KeyDown.TrySetResult();
+                if (Interlocked.Increment(ref _keyDownCount) == 2)
+                    SecondKeyDown.TrySetResult();
+            }
             var result = Next(KeyResults);
             error = result.Error;
             return result.Succeeded;
