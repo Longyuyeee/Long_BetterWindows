@@ -253,6 +253,11 @@ public sealed class ReleaseBlockingRegressionTests
             "src",
             "QuickLaunchPlugin",
             "LaunchWindow.xaml.cs"));
+        var diskSearch = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "QuickLaunchPlugin",
+            "QuickLaunchDiskSearchEngine.cs"));
 
         Assert.Contains("private CancellationTokenSource? _searchCancellation", source);
         Assert.Contains("await Task.Delay(180, cancellationToken)", source);
@@ -260,6 +265,8 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains("cancellationToken.ThrowIfCancellationRequested()", source);
         Assert.Contains("QuickLaunchDiskSearchEngine", source);
         Assert.Contains("_queryGeneration.IsCurrent(generation)", source);
+        Assert.Contains("FairFileEnumerator", diskSearch);
+        Assert.Contains("cancellationToken.ThrowIfCancellationRequested()", diskSearch);
     }
 
     [Fact]

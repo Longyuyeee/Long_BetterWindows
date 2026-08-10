@@ -66,7 +66,7 @@ try {
         -TestProject $TestProject `
         -DotnetPath $DotnetPath `
         -OutputPath $quickLaunchPath `
-        -ExpectedCaseCount 7
+        -ExpectedCaseCount 9
     if ($LASTEXITCODE -ne 0) {
         throw "QuickLaunch isolation matrix failed."
     }
@@ -162,7 +162,7 @@ try {
         disposable_process_only = $true
         required_plugin_count = 7
         covered_plugin_count = $plugins.Count
-        expected_case_count = 57
+        expected_case_count = 59
         executed_case_count =
             [int]$transactions.passed_case_count +
             [int]$capture.executed_case_count +

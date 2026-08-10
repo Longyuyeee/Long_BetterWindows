@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 
 namespace QuickLaunchPlugin;
 
@@ -56,55 +57,38 @@ public sealed class QuickLaunchDiskSearchEngine
 
         var entries = new List<SmartEntry>();
         var inspected = 0;
-        var limitReached = false;
-        foreach (var root in _fileRoots)
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var candidates = new FairFileEnumerator(_fileRoots);
+        while (inspected < _maximumFileCandidates
+               && candidates.TryGetNext(out var path))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!Directory.Exists(root))
+            if (!seenPaths.Add(path))
                 continue;
 
-            try
-            {
-                foreach (var path in EnumerateFiles(root))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (inspected >= _maximumFileCandidates)
-                    {
-                        limitReached = true;
-                        break;
-                    }
-                    inspected++;
-                    if (!Path.GetFileName(path).Contains(
-                            query,
-                            StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    if (QuickLaunchTargetPolicy.IsPotentiallyExecutablePath(path))
-                        continue;
+            inspected++;
+            if (!Path.GetFileName(path).Contains(
+                    query,
+                    StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (QuickLaunchTargetPolicy.IsPotentiallyExecutablePath(path))
+                continue;
 
-                    entries.Add(CreateFileEntry(path, root));
-                    if (entries.Count >= maximumResults)
-                        return new QuickLaunchDiskSearchResult(
-                            entries,
-                            inspected,
-                            limitReached);
-                }
-            }
-            catch (Exception exception) when (
-                exception is IOException
-                    or UnauthorizedAccessException
-                    or DirectoryNotFoundException)
-            {
-                // A root can disappear or become inaccessible while searching.
-            }
-
-            if (limitReached)
-                break;
+            entries.Add(CreateFileEntry(
+                path,
+                FindContainingRoot(path, _fileRoots)));
+            if (entries.Count >= maximumResults)
+                return new QuickLaunchDiskSearchResult(
+                    entries,
+                    inspected,
+                    inspected >= _maximumFileCandidates
+                    && candidates.HasRemaining);
         }
 
         return new QuickLaunchDiskSearchResult(
             entries,
             inspected,
-            limitReached);
+            inspected >= _maximumFileCandidates && candidates.HasRemaining);
     }
 
     public QuickLaunchDiskSearchResult SearchContent(
@@ -117,74 +101,92 @@ public sealed class QuickLaunchDiskSearchEngine
 
         var entries = new List<SmartEntry>();
         var inspected = 0;
-        var limitReached = false;
-        foreach (var root in _contentRoots)
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var candidates = new FairFileEnumerator(_contentRoots);
+        while (inspected < _maximumContentCandidates
+               && candidates.TryGetNext(out var path))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!Directory.Exists(root))
+            if (!seenPaths.Add(path))
+                continue;
+
+            inspected++;
+            if (!ContentExtensions.Contains(Path.GetExtension(path)))
+                continue;
+            if (QuickLaunchTargetPolicy.IsPotentiallyExecutablePath(path))
                 continue;
 
             try
             {
-                foreach (var path in EnumerateFiles(root))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (inspected >= _maximumContentCandidates)
-                    {
-                        limitReached = true;
-                        break;
-                    }
-                    inspected++;
-                    if (!ContentExtensions.Contains(Path.GetExtension(path)))
-                        continue;
-                    if (QuickLaunchTargetPolicy.IsPotentiallyExecutablePath(path))
-                        continue;
+                var info = new FileInfo(path);
+                if (info.Length > _maximumContentFileBytes)
+                    continue;
+                var content = ReadText(path, cancellationToken);
+                var match = content.IndexOf(
+                    query,
+                    StringComparison.OrdinalIgnoreCase);
+                if (match < 0)
+                    continue;
 
-                    try
-                    {
-                        var info = new FileInfo(path);
-                        if (info.Length > _maximumContentFileBytes)
-                            continue;
-                        var content = File.ReadAllText(path);
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var match = content.IndexOf(
-                            query,
-                            StringComparison.OrdinalIgnoreCase);
-                        if (match < 0)
-                            continue;
-
-                        entries.Add(CreateContentEntry(path, content, match));
-                        if (entries.Count >= maximumResults)
-                            return new QuickLaunchDiskSearchResult(
-                                entries,
-                                inspected,
-                                limitReached);
-                    }
-                    catch (Exception exception) when (
-                        exception is IOException
-                            or UnauthorizedAccessException)
-                    {
-                        // A single changing file must not fail the whole query.
-                    }
-                }
+                entries.Add(CreateContentEntry(path, content, match));
+                if (entries.Count >= maximumResults)
+                    return new QuickLaunchDiskSearchResult(
+                        entries,
+                        inspected,
+                        inspected >= _maximumContentCandidates
+                        && candidates.HasRemaining);
             }
             catch (Exception exception) when (
                 exception is IOException
-                    or UnauthorizedAccessException
-                    or DirectoryNotFoundException)
+                    or UnauthorizedAccessException)
             {
-                // A root can disappear or become inaccessible while searching.
+                // A single changing file must not fail the whole query.
             }
-
-            if (limitReached)
-                break;
         }
 
         return new QuickLaunchDiskSearchResult(
             entries,
             inspected,
-            limitReached);
+            inspected >= _maximumContentCandidates && candidates.HasRemaining);
     }
+
+    private static string ReadText(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete,
+            bufferSize: 4_096,
+            FileOptions.SequentialScan);
+        using var reader = new StreamReader(
+            stream,
+            Encoding.UTF8,
+            detectEncodingFromByteOrderMarks: true);
+        var content = new StringBuilder();
+        var buffer = new char[4_096];
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var read = reader.Read(buffer, 0, buffer.Length);
+            if (read == 0)
+                return content.ToString();
+            content.Append(buffer, 0, read);
+        }
+    }
+
+    private static string FindContainingRoot(
+        string path,
+        IReadOnlyList<string> roots)
+        => roots.FirstOrDefault(root =>
+               path.StartsWith(
+                   Path.TrimEndingDirectorySeparator(root)
+                       + Path.DirectorySeparatorChar,
+                   StringComparison.OrdinalIgnoreCase))
+           ?? Path.GetDirectoryName(path)
+           ?? string.Empty;
 
     private static IEnumerable<string> EnumerateFiles(string root)
         => Directory.EnumerateFiles(
@@ -198,6 +200,65 @@ public sealed class QuickLaunchDiskSearchEngine
                     FileAttributes.System | FileAttributes.ReparsePoint,
                 ReturnSpecialDirectories = false,
             });
+
+    private sealed class FairFileEnumerator : IDisposable
+    {
+        private readonly Queue<IEnumerator<string>> _enumerators = new();
+
+        public FairFileEnumerator(IEnumerable<string> roots)
+        {
+            foreach (var root in roots.Where(Directory.Exists))
+            {
+                try
+                {
+                    _enumerators.Enqueue(EnumerateFiles(root).GetEnumerator());
+                }
+                catch (Exception exception) when (
+                    exception is IOException
+                        or UnauthorizedAccessException
+                        or DirectoryNotFoundException)
+                {
+                    // A root can disappear or become inaccessible while searching.
+                }
+            }
+        }
+
+        public bool HasRemaining => _enumerators.Count > 0;
+
+        public bool TryGetNext(out string path)
+        {
+            while (_enumerators.TryDequeue(out var enumerator))
+            {
+                try
+                {
+                    if (enumerator.MoveNext())
+                    {
+                        path = enumerator.Current;
+                        _enumerators.Enqueue(enumerator);
+                        return true;
+                    }
+                }
+                catch (Exception exception) when (
+                    exception is IOException
+                        or UnauthorizedAccessException
+                        or DirectoryNotFoundException)
+                {
+                    // Continue with the remaining roots.
+                }
+
+                enumerator.Dispose();
+            }
+
+            path = string.Empty;
+            return false;
+        }
+
+        public void Dispose()
+        {
+            while (_enumerators.TryDequeue(out var enumerator))
+                enumerator.Dispose();
+        }
+    }
 
     private static SmartEntry CreateFileEntry(string path, string root)
     {

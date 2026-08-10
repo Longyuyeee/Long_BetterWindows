@@ -17,6 +17,7 @@
   "window.searchAutomationName": "Search apps, files, links, or calculations",
   "window.emptyHint": "Enter an app, file, link, or expression",
   "window.resultCount": "{0} results",
+  "window.resultLimitReached": "{0} results; search scope limit reached, refine your query",
   "window.noMatches": "No matching results",
   "window.navigationHint": "↑↓ Select · Enter to open",
   "window.openLink": "Open {0}",

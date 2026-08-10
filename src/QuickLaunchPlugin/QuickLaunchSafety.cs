@@ -14,7 +14,13 @@ public sealed class QuickLaunchTargetPolicy
         {
             ".exe", ".com", ".bat", ".cmd", ".ps1", ".msi", ".msp",
             ".scr", ".lnk", ".url", ".reg", ".js", ".jse", ".vbs",
-            ".vbe", ".wsf", ".wsh", ".hta", ".cpl",
+            ".vbe", ".wsf", ".wsh", ".hta", ".cpl", ".pif", ".scf",
+            ".application", ".appref-ms", ".settingcontent-ms", ".msc",
+            ".psm1", ".psd1", ".py", ".pyw", ".jar", ".chm", ".mht",
+            ".mhtml", ".diagcab", ".diagpkg", ".gadget", ".appx",
+            ".appxbundle", ".msix", ".msixbundle", ".iso", ".vhd",
+            ".vhdx", ".theme", ".themepack", ".docm", ".dotm", ".xlsm",
+            ".xlam", ".xll", ".pptm", ".potm", ".ppam", ".sldm",
         };
 
     private readonly IReadOnlyList<string> _applicationRoots;

@@ -1,6 +1,8 @@
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows.Media.Imaging;
+using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.PluginSdk.Testing;
 using QuickLaunchPlugin;
@@ -74,6 +76,33 @@ public sealed class QuickLaunchIsolationTests : IDisposable
     }
 
     [Fact]
+    public void FileSearch_RotatesAcrossRootsBeforeCandidateLimit()
+    {
+        var crowdedRoot = Directory.CreateDirectory(
+            Path.Combine(_root, "crowded")).FullName;
+        var laterRoot = Directory.CreateDirectory(
+            Path.Combine(_root, "later")).FullName;
+        for (var index = 0; index < 100; index++)
+        {
+            File.WriteAllText(
+                Path.Combine(crowdedRoot, $"candidate-{index:D3}.txt"),
+                "fixture");
+        }
+        var target = Path.Combine(laterRoot, "project-needle.txt");
+        File.WriteAllText(target, "fixture");
+        var engine = new QuickLaunchDiskSearchEngine(
+            [crowdedRoot, laterRoot],
+            [crowdedRoot, laterRoot],
+            maximumFileCandidates: 2);
+
+        var result = engine.SearchFiles("needle", 1);
+
+        var entry = Assert.Single(result.Entries);
+        Assert.Equal(Path.GetFullPath(target), entry.Path);
+        Assert.Equal(2, result.InspectedCount);
+    }
+
+    [Fact]
     public void DiskSearch_ObservesSupersedingCancellation()
     {
         File.WriteAllText(Path.Combine(_root, "needle.txt"), "fixture");
@@ -131,6 +160,37 @@ public sealed class QuickLaunchIsolationTests : IDisposable
     }
 
     [Fact]
+    public async Task CommandExecution_UsesHostServicesOnlyForValidatedTargets()
+    {
+        var document = Path.Combine(_root, "document.txt");
+        var blocked = Path.Combine(_root, "installer.application");
+        File.WriteAllText(document, "document fixture");
+        File.WriteAllText(blocked, "deployment fixture");
+        var shell = new RecordingShellExecuteService();
+        var clipboard = new RecordingClipboardService();
+        var host = new PluginTestHost()
+            .Grant<IShellExecuteService>(shell)
+            .Grant<IClipboardService>(clipboard);
+        var plugin = new QuickLaunchPluginImpl();
+        Assert.True(await plugin.InitializeAsync(host));
+        Assert.True(await plugin.StartAsync());
+
+        var fileResult = await plugin.ExecuteCommandAsync(
+            CreateTargetInvocation("file", document));
+        var calculationResult = await plugin.ExecuteCommandAsync(
+            CreateTargetInvocation("calculation", "42"));
+        var blockedResult = await plugin.ExecuteCommandAsync(
+            CreateTargetInvocation("file", blocked));
+
+        Assert.True(fileResult.IsSuccess);
+        Assert.True(calculationResult.IsSuccess);
+        Assert.False(blockedResult.IsSuccess);
+        Assert.Equal([Path.GetFullPath(document)], shell.OpenedTargets);
+        Assert.Equal(["42"], clipboard.WrittenTexts);
+        Assert.True(await plugin.StopAsync());
+    }
+
+    [Fact]
     public void TargetPolicy_AllowsOnlyProducedHarmlessTargetShapes()
     {
         var startMenu = Directory.CreateDirectory(
@@ -174,7 +234,32 @@ public sealed class QuickLaunchIsolationTests : IDisposable
             "unknown",
             outsideShortcut).IsValid);
         Assert.False(policy.Validate("file", executable).IsValid);
+
+        foreach (var extension in new[]
+                 {
+                     ".application", ".appref-ms", ".pif", ".scf", ".msc",
+                     ".pyw", ".jar", ".chm", ".msix", ".iso", ".docm",
+                 })
+        {
+            var launchSurface = Path.Combine(_root, "forged" + extension);
+            File.WriteAllText(launchSurface, "unsafe fixture");
+            Assert.False(policy.Validate("file", launchSurface).IsValid);
+        }
     }
+
+    private static PluginCommandInvocation CreateTargetInvocation(
+        string category,
+        string target)
+        => new()
+        {
+            CommandId = "launcher.open",
+            Text = target,
+            Arguments = new Dictionary<string, string>
+            {
+                ["action"] = "open-result",
+                ["category"] = category,
+            },
+        };
 
     private static string GetFingerprint(string root)
     {
@@ -203,5 +288,57 @@ public sealed class QuickLaunchIsolationTests : IDisposable
     {
         if (Directory.Exists(_root))
             Directory.Delete(_root, recursive: true);
+    }
+
+    private sealed class RecordingShellExecuteService : IShellExecuteService
+    {
+        public List<string> OpenedTargets { get; } = [];
+
+        public Task<HostApiResponse> OpenUrlAsync(string url)
+            => Task.FromResult(HostApiResponse.Success());
+
+        public Task<HostApiResponse> OpenFolderAsync(string path)
+            => Task.FromResult(HostApiResponse.Success());
+
+        public Task<HostApiResponse> OpenWithDefaultAsync(string path)
+        {
+            OpenedTargets.Add(path);
+            return Task.FromResult(HostApiResponse.Success());
+        }
+    }
+
+    private sealed class RecordingClipboardService : IClipboardService
+    {
+        public List<string> WrittenTexts { get; } = [];
+        public bool IsMonitoring => false;
+        public event EventHandler<ClipboardChangedEventArgs>? ClipboardChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public Task<HostApiResponse<string?>> GetTextAsync()
+            => Task.FromResult(HostApiResponse<string?>.Success(null));
+
+        public Task<HostApiResponse<BitmapSource?>> GetImageAsync()
+            => Task.FromResult(HostApiResponse<BitmapSource?>.Success(null));
+
+        public Task<HostApiResponse> SetTextAsync(string text)
+        {
+            WrittenTexts.Add(text);
+            return Task.FromResult(HostApiResponse.Success());
+        }
+
+        public Task<HostApiResponse> SetImageAsync(BitmapSource image)
+            => Task.FromResult(HostApiResponse.Success());
+
+        public Task<HostApiResponse> ClearAsync()
+            => Task.FromResult(HostApiResponse.Success());
+
+        public Task<HostApiResponse> StartMonitoringAsync()
+            => Task.FromResult(HostApiResponse.Success());
+
+        public Task<HostApiResponse> StopMonitoringAsync()
+            => Task.FromResult(HostApiResponse.Success());
     }
 }

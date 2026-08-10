@@ -1020,9 +1020,15 @@ public class DesignSystemTests
         var root = FindRepositoryRoot();
         var folder = Path.Combine(root, "src", "QuickLaunchPlugin");
         var implementation = File.ReadAllText(Path.Combine(folder, "QuickLaunchPluginImpl.cs"));
+        var window = File.ReadAllText(Path.Combine(folder, "LaunchWindow.xaml.cs"));
+        var xaml = File.ReadAllText(Path.Combine(folder, "LaunchWindow.xaml"));
         var manifest = File.ReadAllText(Path.Combine(folder, "manifest.json"));
 
         Assert.Contains("IPluginCommandHandler", implementation);
+        Assert.Contains("activeWindow.ActivateSearch(initialQuery)", implementation);
+        Assert.Contains("CompleteSelection", window);
+        Assert.Contains("LimitedResultCountFormat", window);
+        Assert.Contains("PreviewKeyDown=\"ResultsList_PreviewKeyDown\"", xaml);
         Assert.Contains("launcher.open", manifest);
         Assert.DoesNotContain("system.hotkey", manifest);
         Assert.DoesNotContain("RegisterAsync", implementation);

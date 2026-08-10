@@ -61,6 +61,7 @@
             <ListBox x:Name="ResultsList" Grid.Row="2"
                      BorderThickness="0" Background="Transparent"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     PreviewKeyDown="ResultsList_PreviewKeyDown"
                      MouseDoubleClick="ResultsList_MouseDoubleClick">
                 <ListBox.Resources>
                     <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBarStyle}" />

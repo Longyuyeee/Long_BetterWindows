@@ -24,7 +24,7 @@ public class QuickLaunchPluginImpl :
 
     public string Id => "com.long.quicklaunch";
     public string Name => Text("plugin.name", "快捷启动器");
-    public string Version => "1.1.1";
+    public string Version => "1.2.0";
     public int Priority => 180;
     public PluginState State { get; private set; } = PluginState.Loaded;
 
@@ -217,21 +217,40 @@ public class QuickLaunchPluginImpl :
 
     private void ShowLauncher(string? initialQuery = null)
     {
-        if (_isActive) return;
-        _isActive = true;
-        Application.Current.Dispatcher.Invoke(() =>
+        var application = Application.Current;
+        if (application is null)
+            return;
+
+        application.Dispatcher.Invoke(() =>
         {
-            var window = LaunchWindow.Show(
-                OnEntrySelected,
-                CreateWindowLocalization(),
-                initialQuery);
-            _window = window;
-            window.Closed += (_, _) =>
+            if (_window is { IsVisible: true } activeWindow)
             {
-                if (ReferenceEquals(_window, window))
-                    _window = null;
+                activeWindow.ActivateSearch(initialQuery);
+                return;
+            }
+            if (_isActive)
+                return;
+
+            _isActive = true;
+            try
+            {
+                var window = LaunchWindow.Show(
+                    OnEntrySelected,
+                    CreateWindowLocalization(),
+                    initialQuery);
+                _window = window;
+                window.Closed += (_, _) =>
+                {
+                    if (ReferenceEquals(_window, window))
+                        _window = null;
+                    _isActive = false;
+                };
+            }
+            catch
+            {
                 _isActive = false;
-            };
+                throw;
+            }
         });
     }
 
@@ -324,6 +343,7 @@ public class QuickLaunchPluginImpl :
             Text("window.searchAutomationName", "搜索应用、文件、链接或计算"),
             Text("window.emptyHint", "输入应用、文件、链接或算式"),
             Text("window.resultCount", "{0} 个结果"),
+            Text("window.resultLimitReached", "{0} 个结果，已达到搜索范围上限，请缩小关键词"),
             Text("window.noMatches", "无匹配结果"),
             Text("window.navigationHint", "↑↓ 选择 · Enter 打开"),
             Text("window.openLink", "打开 {0}"),

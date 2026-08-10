@@ -15,6 +15,7 @@ public sealed record LaunchWindowLocalization(
     string SearchAutomationName,
     string EmptyHint,
     string ResultCountFormat,
+    string LimitedResultCountFormat,
     string NoMatches,
     string NavigationHint,
     string OpenLinkFormat,
@@ -36,6 +37,7 @@ public partial class LaunchWindow : Window
     private CancellationTokenSource? _searchCancellation;
     private readonly QuickLaunchDiskSearchEngine _diskSearch;
     private readonly QuickLaunchQueryGeneration _queryGeneration = new();
+    private bool _candidateLimitReached;
 
     public LaunchWindow(
         LaunchWindowLocalization localization,
@@ -68,11 +70,19 @@ public partial class LaunchWindow : Window
             Top = area.Top + area.Height * 0.25,
         };
         window.Show();
-        if (!string.IsNullOrWhiteSpace(initialQuery))
-            window.SearchBox.Text = initialQuery;
-        window.SearchBox.Focus();
-        window.SearchBox.CaretIndex = window.SearchBox.Text.Length;
+        window.ActivateSearch(initialQuery);
         return window;
+    }
+
+    public void ActivateSearch(string? initialQuery = null)
+    {
+        if (!string.IsNullOrWhiteSpace(initialQuery))
+            SearchBox.Text = initialQuery;
+        if (!IsVisible)
+            Show();
+        Activate();
+        SearchBox.Focus();
+        SearchBox.CaretIndex = SearchBox.Text.Length;
     }
 
     private static List<SmartEntry>? _cachedApps;
@@ -158,6 +168,7 @@ public partial class LaunchWindow : Window
             _currentResults = [];
             ResultsList.ItemsSource = null;
             ResultsList.Visibility = Visibility.Collapsed;
+            _candidateLimitReached = false;
             HintText.Text = _localization.EmptyHint;
             return;
         }
@@ -196,7 +207,7 @@ public partial class LaunchWindow : Window
             .ToList();
         immediateResults.AddRange(appResults);
 
-        ApplySearchResults(immediateResults);
+        ApplySearchResults(immediateResults, candidateLimitReached: false);
 
         try
         {
@@ -223,7 +234,7 @@ public partial class LaunchWindow : Window
                 return;
 
             var results = immediateResults.Concat(diskResult.Entries).ToList();
-            ApplySearchResults(results);
+            ApplySearchResults(results, diskResult.CandidateLimitReached);
         }
         catch (OperationCanceledException)
         {
@@ -231,9 +242,12 @@ public partial class LaunchWindow : Window
         }
     }
 
-    private void ApplySearchResults(List<SmartEntry> results)
+    private void ApplySearchResults(
+        List<SmartEntry> results,
+        bool candidateLimitReached)
     {
         _currentResults = results;
+        _candidateLimitReached = candidateLimitReached;
         ApplyResultsProjection();
         ResultsList.ItemsSource = _currentResults;
         ResultsList.Visibility = results.Count > 0
@@ -242,9 +256,7 @@ public partial class LaunchWindow : Window
         if (results.Count > 0)
             ResultsList.SelectedIndex = 0;
 
-        HintText.Text = results.Count > 0
-            ? string.Format(_localization.ResultCountFormat, results.Count)
-            : _localization.NoMatches;
+        UpdateHint();
     }
 
     private static bool TryEvaluateMath(string expr, out string result)
@@ -283,18 +295,30 @@ public partial class LaunchWindow : Window
             localization.SearchAutomationName);
         NavigationHintText.Text = localization.NavigationHint;
         ApplyResultsProjection();
+        UpdateHint();
+    }
+
+    private void UpdateHint()
+    {
         if (string.IsNullOrWhiteSpace(SearchBox.Text))
         {
-            HintText.Text = localization.EmptyHint;
+            HintText.Text = _localization.EmptyHint;
+            return;
         }
-        else
+
+        if (_candidateLimitReached)
         {
-            HintText.Text = _currentResults.Count > 0
-                ? string.Format(
-                    localization.ResultCountFormat,
-                    _currentResults.Count)
-                : localization.NoMatches;
+            HintText.Text = string.Format(
+                _localization.LimitedResultCountFormat,
+                _currentResults.Count);
+            return;
         }
+
+        HintText.Text = _currentResults.Count > 0
+            ? string.Format(
+                _localization.ResultCountFormat,
+                _currentResults.Count)
+            : _localization.NoMatches;
     }
 
     private void ApplyResultsProjection()
@@ -331,7 +355,29 @@ public partial class LaunchWindow : Window
         }
         else if (e.Key == Key.Escape)
         {
-            _onSelect?.Invoke(null);
+            CompleteSelection(null);
+            Close();
+            e.Handled = true;
+        }
+    }
+
+    private void ResultsList_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            if (ResultsList.SelectedItem is SmartEntry entry)
+                SelectEntry(entry);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Up && ResultsList.SelectedIndex <= 0)
+        {
+            SearchBox.Focus();
+            SearchBox.CaretIndex = SearchBox.Text.Length;
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            CompleteSelection(null);
             Close();
             e.Handled = true;
         }
@@ -347,15 +393,16 @@ public partial class LaunchWindow : Window
     {
         if (e.Key == Key.Escape && !SearchBox.IsFocused)
         {
-            _onSelect?.Invoke(null);
+            CompleteSelection(null);
             Close();
+            e.Handled = true;
         }
     }
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
         _searchCancellation?.Cancel();
-        _onSelect?.Invoke(null);
+        CompleteSelection(null);
         Close();
     }
 
@@ -382,8 +429,14 @@ public partial class LaunchWindow : Window
 
     private void SelectEntry(SmartEntry entry)
     {
-        _onSelect?.Invoke(entry);
+        CompleteSelection(entry);
         Close();
+    }
+
+    private void CompleteSelection(SmartEntry? entry)
+    {
+        var callback = Interlocked.Exchange(ref _onSelect, null);
+        callback?.Invoke(entry);
     }
 }
 

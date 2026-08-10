@@ -17,6 +17,7 @@
   "window.searchAutomationName": "搜索应用、文件、链接或计算",
   "window.emptyHint": "输入应用、文件、链接或算式",
   "window.resultCount": "{0} 个结果",
+  "window.resultLimitReached": "{0} 个结果，已达到搜索范围上限，请缩小关键词",
   "window.noMatches": "无匹配结果",
   "window.navigationHint": "↑↓ 选择 · Enter 打开",
   "window.openLink": "打开 {0}",
