@@ -809,6 +809,7 @@ public class DesignSystemTests
             root, "src", "TranslatePlugin", "manifest.json"));
         var html = File.ReadAllText(Path.Combine(
             root, "src", "TranslatePlugin", "index.html"));
+        var normalizedHtml = html.ReplaceLineEndings("\n");
 
         Assert.Contains("\"version\": \"1.2.0\"", manifest);
         Assert.Contains("\"max_input_characters\": 5000", manifest);
@@ -819,7 +820,9 @@ public class DesignSystemTests
         Assert.Contains("if (generation !== requestGeneration) return false", html);
         Assert.Contains("if (generation === requestGeneration) setTranslating(false)", html);
         Assert.Contains("input.value = typeof response.data === 'string' ? response.data : ''", html);
-        Assert.Contains("invalidateTranslation(false);\n      const success = await translate()", html);
+        Assert.Contains(
+            "invalidateTranslation(false);\n      const success = await translate()",
+            normalizedHtml);
         Assert.DoesNotContain("const text = input.value.trim()", html);
     }
 
