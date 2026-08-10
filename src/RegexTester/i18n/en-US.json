@@ -18,6 +18,9 @@
   "count.error": "Expression error",
   "match.position": "Position {index}",
   "match.groups": "{count} capture groups",
+  "match.groupValue": "Group {index}: {value}",
+  "match.unmatched": "(unmatched)",
+  "match.emptyGroup": "(empty)",
   "state.waiting": "Waiting to match",
   "state.waitingDetail": "Enter an expression and test text, then run the match",
   "state.empty": "No matches found",
@@ -26,6 +29,10 @@
   "status.completed": "Matching complete",
   "status.noMatches": "The expression is valid but has no matches",
   "status.commandReady": "Regex tester is ready",
+  "status.matching": "Matching…",
   "error.expression": "Regular expression error: {detail}",
+  "error.timeout": "The expression timed out; use less text or simplify it",
+  "error.worker": "The regular expression task could not start",
+  "error.clipboardEmpty": "The clipboard does not contain text",
   "error.clipboardRead": "The clipboard could not be read"
 }

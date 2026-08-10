@@ -18,6 +18,9 @@
   "count.error": "表达式错误",
   "match.position": "位置 {index}",
   "match.groups": "捕获组 {count}",
+  "match.groupValue": "捕获组 {index}：{value}",
+  "match.unmatched": "（未参与匹配）",
+  "match.emptyGroup": "（空）",
   "state.waiting": "等待匹配",
   "state.waitingDetail": "输入表达式和测试文本后开始匹配",
   "state.empty": "没有找到匹配内容",
@@ -26,6 +29,10 @@
   "status.completed": "匹配完成",
   "status.noMatches": "表达式有效，但没有匹配",
   "status.commandReady": "正则测试器已就绪",
+  "status.matching": "正在匹配…",
   "error.expression": "正则表达式错误：{detail}",
+  "error.timeout": "表达式执行超时，请缩小文本或简化表达式",
+  "error.worker": "无法启动正则测试任务",
+  "error.clipboardEmpty": "剪贴板中没有文本内容",
   "error.clipboardRead": "无法读取剪贴板"
 }

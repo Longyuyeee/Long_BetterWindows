@@ -13,11 +13,14 @@
     </section>
   </main>
   <script>
-    const pattern = document.getElementById('pattern'); const flags = document.getElementById('flags'); const input = document.getElementById('input'); const matches = document.getElementById('matches'); const count = document.getElementById('count'); const status = document.getElementById('status');
+    const pattern = document.getElementById('pattern'); const flags = document.getElementById('flags'); const input = document.getElementById('input'); const matches = document.getElementById('matches'); const count = document.getElementById('count'); const status = document.getElementById('status'); const testButton = document.getElementById('testButton');
     let strings = {};
     let matchState = 'idle';
     let matchSnapshot = [];
     let matchErrorDetail = '';
+    let matchRevision = 0;
+    let activeWorker = null;
+    let activeWorkerCancel = null;
     let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
 
     function t(key, fallback, values) {
@@ -73,18 +76,34 @@
         row.className = 'long-list-item';
         const content = document.createElement('div');
         content.className = 'long-list-item__content';
-        content.textContent = (index + 1) + '. ' + match.text;
+        const value = document.createElement('div');
+        value.textContent = (index + 1) + '. ' + match.text;
+        content.appendChild(value);
+        match.groups.forEach(function (group, groupIndex) {
+          const groupLine = document.createElement('div');
+          groupLine.className = 'long-list-item__meta';
+          const displayValue = group === null
+            ? t('match.unmatched', '(未参与匹配)')
+            : group === ''
+              ? t('match.emptyGroup', '(空)')
+              : group;
+          groupLine.textContent = t(
+            'match.groupValue',
+            '捕获组 {index}：{value}',
+            { index: groupIndex + 1, value: displayValue });
+          content.appendChild(groupLine);
+        });
         const meta = document.createElement('div');
         meta.className = 'long-list-item__meta';
         meta.textContent = t(
           'match.position',
           '位置 {index}',
           { index: match.index });
-        if (match.groupCount > 0) {
+        if (match.groups.length > 0) {
           meta.textContent += ' · ' + t(
             'match.groups',
             '捕获组 {count}',
-            { count: match.groupCount });
+            { count: match.groups.length });
         }
         row.append(content, meta);
         matches.appendChild(row);
@@ -117,27 +136,100 @@
       }
     }
 
-    function test() {
-      try {
-        const normalizedFlags = flags.value.includes('g') ? flags.value : flags.value + 'g';
-        const expression = new RegExp(pattern.value, normalizedFlags);
-        const found = Array.from(input.value.matchAll(expression)).slice(0, 200);
-        matchSnapshot = found.map(function (match) {
-          return {
-            text: match[0],
-            index: match.index,
-            groupCount: match.length - 1
-          };
+    function executeMatch(patternValue, flagsValue, inputValue) {
+      const workerSource = `
+        self.onmessage = function (event) {
+          try {
+            const normalizedFlags = event.data.flags.includes('g')
+              ? event.data.flags
+              : event.data.flags + 'g';
+            const expression = new RegExp(event.data.pattern, normalizedFlags);
+            const matches = [];
+            for (const match of event.data.input.matchAll(expression)) {
+              matches.push({
+                text: match[0],
+                index: match.index,
+                groups: Array.from(match).slice(1).map(function (value) {
+                  return value === undefined ? null : value;
+                })
+              });
+              if (matches.length >= 200) break;
+            }
+            self.postMessage({ success: true, matches: matches });
+          } catch (error) {
+            self.postMessage({
+              success: false,
+              error: error && error.message ? error.message : String(error)
+            });
+          }
+        };
+      `;
+      const workerUrl = URL.createObjectURL(new Blob(
+        [workerSource],
+        { type: 'text/javascript' }));
+      const worker = new Worker(workerUrl);
+      URL.revokeObjectURL(workerUrl);
+      activeWorker = worker;
+      return new Promise(function (resolve, reject) {
+        const finish = function (callback, value) {
+          clearTimeout(timeout);
+          worker.terminate();
+          if (activeWorker === worker) activeWorker = null;
+          activeWorkerCancel = null;
+          callback(value);
+        };
+        const timeout = setTimeout(function () {
+          finish(reject, new Error(t(
+            'error.timeout',
+            '表达式执行超时，请缩小文本或简化表达式')));
+        }, 750);
+        worker.onmessage = function (event) {
+          finish(resolve, event.data);
+        };
+        worker.onerror = function () {
+          finish(reject, new Error(t('error.worker', '无法启动正则测试任务')));
+        };
+        activeWorkerCancel = function () {
+          finish(reject, new Error('Match cancelled'));
+        };
+        worker.postMessage({
+          pattern: patternValue,
+          flags: flagsValue,
+          input: inputValue
         });
+      });
+    }
+
+    function cancelActiveMatch() {
+      if (activeWorkerCancel) activeWorkerCancel();
+      activeWorkerCancel = null;
+      activeWorker = null;
+    }
+
+    async function test() {
+      cancelActiveMatch();
+      const revision = ++matchRevision;
+      matchState = 'idle';
+      matchSnapshot = [];
+      matchErrorDetail = '';
+      renderMatches();
+      testButton.disabled = true;
+      setStatus('status.matching', '', '正在匹配…');
+      try {
+        const result = await executeMatch(pattern.value, flags.value, input.value);
+        if (revision !== matchRevision) return;
+        if (!result.success) throw new Error(result.error);
+        matchSnapshot = result.matches;
         matchState = 'success';
         matchErrorDetail = '';
         renderMatches();
-        if (found.length) {
+        if (matchSnapshot.length) {
           setStatus('status.completed', 'success', '匹配完成');
         } else {
           setStatus('status.noMatches', 'success', '表达式有效，但没有匹配');
         }
       } catch (error) {
+        if (revision !== matchRevision) return;
         matchState = 'error';
         matchSnapshot = [];
         matchErrorDetail = error && error.message ? error.message : String(error);
@@ -147,14 +239,50 @@
           'danger',
           '正则表达式错误：{detail}',
           { detail: matchErrorDetail });
+      } finally {
+        if (revision === matchRevision) testButton.disabled = false;
       }
     }
-    async function paste() { try { const value = await long.clipboard.getText(); if (value.success) input.value = value.data || ''; else setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } }
+
+    function resetResults() {
+      matchRevision += 1;
+      cancelActiveMatch();
+      testButton.disabled = false;
+      matchState = 'idle';
+      matchSnapshot = [];
+      matchErrorDetail = '';
+      currentStatus = { key: '', fallback: '', values: {}, kind: '' };
+      status.textContent = '';
+      status.className = 'long-status';
+      renderMatches();
+    }
+
+    async function paste() {
+      try {
+        const value = await long.clipboard.getText();
+        if (value.success) {
+          input.value = value.data || '';
+          resetResults();
+          if (!input.value) {
+            setStatus('error.clipboardEmpty', 'danger', '剪贴板中没有文本内容');
+          }
+          input.focus();
+        } else {
+          setStatus('error.clipboardRead', 'danger', '无法读取剪贴板');
+        }
+      } catch (_) {
+        setStatus('error.clipboardRead', 'danger', '无法读取剪贴板');
+      }
+    }
+    [pattern, flags, input].forEach(function (field) {
+      field.addEventListener('input', resetResults);
+    });
     document.getElementById('testButton').addEventListener('click', test); document.getElementById('pasteButton').addEventListener('click', paste);
     document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); test(); } });
     window.LongUI?.onCommand(function (command) {
       const text = window.LongUI.commandText(command);
       if (text) input.value = text;
+      resetResults();
       pattern.focus();
       return {
         success: true,

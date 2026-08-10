@@ -820,6 +820,29 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void RegexTester_RendersCaptureValuesAndInvalidatesStaleResults()
+    {
+        var root = FindRepositoryRoot();
+        var html = File.ReadAllText(Path.Combine(
+            root, "src", "RegexTester", "index.html"));
+
+        Assert.Contains("groups: Array.from(match).slice(1)", html);
+        Assert.Contains("match.groupValue", html);
+        Assert.Contains("match.unmatched", html);
+        Assert.Contains("match.emptyGroup", html);
+        Assert.Contains("function resetResults()", html);
+        Assert.Contains("field.addEventListener('input', resetResults)", html);
+        Assert.Contains("error.clipboardEmpty", html);
+        Assert.Contains("const worker = new Worker(workerUrl)", html);
+        Assert.Contains("if (matches.length >= 200) break", html);
+        Assert.Contains("}, 750)", html);
+        Assert.Contains("function cancelActiveMatch()", html);
+        Assert.Contains("activeWorkerCancel = function ()", html);
+        Assert.DoesNotContain("groupCount: match.length - 1", html);
+        Assert.DoesNotContain("Array.from(input.value.matchAll(expression))", html);
+    }
+
+    [Fact]
     public void FileRenamer_UsesDeclaredFileOperationsCapability()
     {
         var root = FindRepositoryRoot();

@@ -1,6 +1,6 @@
 {
   "id": "com.long.regex-tester",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "正则测试器",
   "author": "Long",
   "entry_point": "index.html",
