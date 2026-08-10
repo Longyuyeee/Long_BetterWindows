@@ -802,6 +802,28 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void TranslatePlugin_BoundsInputAndRejectsStaleNetworkResults()
+    {
+        var root = FindRepositoryRoot();
+        var manifest = File.ReadAllText(Path.Combine(
+            root, "src", "TranslatePlugin", "manifest.json"));
+        var html = File.ReadAllText(Path.Combine(
+            root, "src", "TranslatePlugin", "index.html"));
+
+        Assert.Contains("\"version\": \"1.2.0\"", manifest);
+        Assert.Contains("\"max_input_characters\": 5000", manifest);
+        Assert.Contains("maxlength=\"5000\"", html);
+        Assert.Contains("const maxInputCharacters = 5000", html);
+        Assert.Contains("function clearTranslationResult()", html);
+        Assert.Contains("const wasTranslating = isTranslating", html);
+        Assert.Contains("if (generation !== requestGeneration) return false", html);
+        Assert.Contains("if (generation === requestGeneration) setTranslating(false)", html);
+        Assert.Contains("input.value = typeof response.data === 'string' ? response.data : ''", html);
+        Assert.Contains("invalidateTranslation(false);\n      const success = await translate()", html);
+        Assert.DoesNotContain("const text = input.value.trim()", html);
+    }
+
+    [Fact]
     public void MarkdownPreview_UsesSafeDomRenderingAndRestrictedLinks()
     {
         var root = FindRepositoryRoot();

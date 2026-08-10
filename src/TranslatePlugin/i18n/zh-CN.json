@@ -24,6 +24,7 @@
   "status.copied": "翻译结果已复制",
   "command.opened": "翻译工具已打开",
   "error.enterText": "请输入需要翻译的文本",
+  "error.tooLong": "原文不能超过 {count} 个字符",
   "error.network": "网络请求失败",
   "error.emptyResponse": "服务没有返回翻译内容",
   "error.translate": "翻译失败：{detail}",

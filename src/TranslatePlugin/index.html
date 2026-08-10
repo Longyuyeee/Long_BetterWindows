@@ -35,7 +35,7 @@
 
       <div class="long-field">
         <label class="long-field-label" for="inputText" data-i18n="field.input">原文</label>
-        <textarea class="long-editor" id="inputText" placeholder="输入文本，或从命令中心携带剪贴板内容…" autofocus></textarea>
+        <textarea class="long-editor" id="inputText" maxlength="5000" placeholder="输入文本，或从命令中心携带剪贴板内容…" autofocus></textarea>
       </div>
 
       <div class="long-toolbar">
@@ -54,6 +54,7 @@
   </main>
 
   <script>
+    const maxInputCharacters = 5000;
     const input = document.getElementById('inputText');
     const result = document.getElementById('result');
     const status = document.getElementById('status');
@@ -92,6 +93,19 @@
         : t('page.autoDetect', '自动检测');
     }
 
+    function clearTranslationResult() {
+      result.textContent = '';
+      result.hidden = true;
+      copyButton.disabled = true;
+      detectedLanguage = '';
+    }
+
+    function setTranslating(value) {
+      isTranslating = value;
+      window.LongUI?.setBusy(translateButton, value);
+      renderRequestState();
+    }
+
     function applyLocalization(message) {
       strings = message.resources || {};
       document.documentElement.lang = message.resolved_language || 'zh-CN';
@@ -123,18 +137,24 @@
 
     async function translate() {
       if (isTranslating) return false;
-      const text = input.value.trim();
-      if (!text) {
+      const text = input.value;
+      if (!text.trim()) {
         setStatus('error.enterText', 'warning', '请输入需要翻译的文本');
         input.focus();
         return false;
       }
+      if (text.length > maxInputCharacters) {
+        setStatus(
+          'error.tooLong',
+          'warning',
+          '原文不能超过 {count} 个字符',
+          { count: maxInputCharacters });
+        input.focus();
+        return false;
+      }
       const generation = ++requestGeneration;
-      isTranslating = true;
-      window.LongUI?.setBusy(translateButton, true);
-      renderRequestState();
-      result.hidden = true;
-      copyButton.disabled = true;
+      setTranslating(true);
+      clearTranslationResult();
       setStatus('status.connecting', '', '正在连接翻译服务');
       try {
         const target = document.getElementById('targetLanguage').value;
@@ -142,7 +162,11 @@
         const response = await long.http.get(url);
         if (!response.success) throw new Error(response.error || t('error.network', '网络请求失败'));
         const data = JSON.parse(response.data);
-        const translated = Array.isArray(data[0]) ? data[0].map(function (part) { return part[0] || ''; }).join('') : '';
+        const translated = Array.isArray(data[0])
+          ? data[0].filter(Array.isArray).map(function (part) {
+            return typeof part[0] === 'string' ? part[0] : '';
+          }).join('')
+          : '';
         if (!translated) throw new Error(t('error.emptyResponse', '服务没有返回翻译内容'));
         if (generation !== requestGeneration) return false;
         result.textContent = translated;
@@ -161,33 +185,39 @@
           { detail: error && error.message ? error.message : String(error) });
         return false;
       } finally {
-        isTranslating = false;
-        window.LongUI?.setBusy(translateButton, false);
-        renderRequestState();
+        if (generation === requestGeneration) setTranslating(false);
       }
     }
 
     function invalidateTranslation(showWarning) {
+      const wasTranslating = isTranslating;
       requestGeneration += 1;
-      result.textContent = '';
-      result.hidden = true;
-      copyButton.disabled = true;
-      detectedLanguage = '';
-      renderRequestState();
-      if (showWarning && isTranslating) {
+      clearTranslationResult();
+      setTranslating(false);
+      if (showWarning && wasTranslating) {
         setStatus(
           'status.sourceChanged',
           'warning',
           '原文或目标语言已改变，请重新翻译');
+      } else {
+        setStatus('', '', '');
       }
     }
 
     async function pasteAndTranslate() {
       try {
         const response = await long.clipboard.getText();
-        if (response.success && response.data) { input.value = response.data; await translate(); }
-        else setStatus('error.clipboardEmpty', 'warning', '剪贴板中没有文本');
+        if (!response.success) throw new Error(response.error || t('error.clipboardRead', '无法读取剪贴板'));
+        input.value = typeof response.data === 'string' ? response.data : '';
+        invalidateTranslation(false);
+        if (!input.value.trim()) {
+          setStatus('error.clipboardEmpty', 'warning', '剪贴板中没有文本');
+          input.focus();
+          return false;
+        }
+        return await translate();
       } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); }
+      return false;
     }
 
     async function copyResult() {
@@ -222,6 +252,7 @@
         };
       }
       input.value = text;
+      invalidateTranslation(false);
       const success = await translate();
       return {
         success: success,

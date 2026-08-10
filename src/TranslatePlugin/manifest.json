@@ -1,6 +1,6 @@
 {
   "id": "com.long.translate",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "翻译工具",
   "author": "Long",
   "entry_point": "index.html",
@@ -39,5 +39,8 @@
       "en-US": "i18n/en-US.json"
     }
   },
-  "default_settings": {"auto_start": false}
+  "default_settings": {
+    "auto_start": false,
+    "max_input_characters": 5000
+  }
 }

@@ -667,6 +667,11 @@
       "commands": ["translate.text"],
       "automated_evidence": [
         {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/DesignSystemTests.cs",
+          "symbol": "TranslatePlugin_BoundsInputAndRejectsStaleNetworkResults"
+        },
+        {
           "level": "integration",
           "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
           "symbol": "SideEffectingPluginCommands_ReportActualCompletion"

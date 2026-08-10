@@ -24,6 +24,7 @@
   "status.copied": "Translation copied",
   "command.opened": "Translator opened",
   "error.enterText": "Enter text to translate",
+  "error.tooLong": "Source text cannot exceed {count} characters",
   "error.network": "The network request failed",
   "error.emptyResponse": "The service returned no translated content",
   "error.translate": "Translation failed: {detail}",
