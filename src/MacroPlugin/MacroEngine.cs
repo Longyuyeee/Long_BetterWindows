@@ -112,7 +112,9 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     private readonly IMacroNativeApi _native;
     private readonly TimeSpan _pressDuration;
     private readonly TimeProvider _timeProvider;
+    private readonly Func<TimeSpan, CancellationToken, Task> _loopDelayAsync;
     private TimeSpan _loopInterval;
+    private CancellationTokenSource _loopIntervalChanged = new();
     private readonly MacroHookProc _mouseHookCallback;
     private readonly MacroHookProc _keyboardHookCallback;
     private readonly List<MacroAction> _actions = [];
@@ -143,12 +145,16 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         IMacroNativeApi native,
         TimeSpan pressDuration,
         TimeSpan loopInterval,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        Func<TimeSpan, CancellationToken, Task>? loopDelayAsync = null)
     {
         _native = native ?? throw new ArgumentNullException(nameof(native));
         _pressDuration = pressDuration;
         _loopInterval = loopInterval;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _loopDelayAsync = loopDelayAsync
+            ?? (static (delay, cancellationToken) =>
+                Task.Delay(delay, cancellationToken));
         _mouseHookCallback = MouseHookCallback;
         _keyboardHookCallback = KeyboardHookCallback;
     }
@@ -185,9 +191,20 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         if (loopInterval <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(loopInterval));
 
-        ThrowIfDisposed();
+        CancellationTokenSource intervalChanged;
         lock (_sync)
+        {
+            ThrowIfDisposed();
+            if (_loopInterval == loopInterval)
+                return;
+
             _loopInterval = loopInterval;
+            intervalChanged = _loopIntervalChanged;
+            _loopIntervalChanged = new CancellationTokenSource();
+        }
+
+        intervalChanged.Cancel();
+        intervalChanged.Dispose();
     }
 
     public int ActionCount
@@ -439,7 +456,11 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             throw new InvalidOperationException(
                 LastError ?? "Macro engine cleanup failed.");
         }
-        _disposed = true;
+        lock (_sync)
+        {
+            _disposed = true;
+            _loopIntervalChanged.Dispose();
+        }
         GC.SuppressFinalize(this);
     }
 
@@ -453,7 +474,11 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             throw new InvalidOperationException(
                 LastError ?? "Macro engine cleanup failed.");
         }
-        _disposed = true;
+        lock (_sync)
+        {
+            _disposed = true;
+            _loopIntervalChanged.Dispose();
+        }
         GC.SuppressFinalize(this);
     }
 
@@ -472,8 +497,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                     cancellation.Token).ConfigureAwait(false);
                 if (loop)
                 {
-                    await Task.Delay(
-                        LoopInterval,
+                    await WaitForNextLoopAsync(
                         cancellation.Token).ConfigureAwait(false);
                 }
             }
@@ -512,6 +536,39 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         }
 
         return succeeded;
+    }
+
+    private async Task WaitForNextLoopAsync(
+        CancellationToken playbackCancellation)
+    {
+        while (true)
+        {
+            TimeSpan interval;
+            CancellationToken intervalChanged;
+            lock (_sync)
+            {
+                interval = _loopInterval;
+                intervalChanged = _loopIntervalChanged.Token;
+            }
+
+            using var delayCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    playbackCancellation,
+                    intervalChanged);
+            try
+            {
+                await _loopDelayAsync(
+                    interval,
+                    delayCancellation.Token).ConfigureAwait(false);
+                return;
+            }
+            catch (OperationCanceledException)
+                when (!playbackCancellation.IsCancellationRequested
+                    && intervalChanged.IsCancellationRequested)
+            {
+                // Restart the pending interval with the latest saved value.
+            }
+        }
     }
 
     private async Task PlayActionsAsync(

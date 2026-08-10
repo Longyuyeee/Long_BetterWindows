@@ -155,17 +155,32 @@ public sealed class MacroEngineTests
     public async Task LoopPlayback_AppliesUpdatedIntervalToNextCycle()
     {
         var native = new FakeMacroNativeApi();
+        var loopDelay = new ControllableLoopDelay(
+            TimeSpan.FromMinutes(1),
+            TimeSpan.FromMilliseconds(10));
         await using var engine = new MacroEngine(
             native,
             TimeSpan.FromMilliseconds(100),
-            TimeSpan.FromMinutes(1));
+            TimeSpan.FromMinutes(1),
+            loopDelayAsync: loopDelay.DelayAsync);
         Load(engine, MacroAction.Key(0x41, delay: 0));
 
         Assert.True(engine.PlayLoop());
-        await native.KeyDown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await loopDelay.InitialDelayStarted.Task
+            .WaitAsync(TimeSpan.FromSeconds(2));
         engine.SetLoopInterval(TimeSpan.FromMilliseconds(10));
+        await loopDelay.UpdatedDelayStarted.Task
+            .WaitAsync(TimeSpan.FromSeconds(2));
+        loopDelay.CompleteUpdatedDelay();
         await native.SecondKeyDown.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
+        Assert.Equal(
+            new[]
+            {
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMilliseconds(10),
+            },
+            loopDelay.GetObservedIntervals().Take(2));
         Assert.Equal(TimeSpan.FromMilliseconds(10), engine.LoopInterval);
         Assert.True(await engine.StopPlayAsync());
         Assert.Equal(MacroState.Idle, engine.State);
@@ -603,6 +618,66 @@ public sealed class MacroEngineTests
 
         public void Advance(TimeSpan elapsed)
             => _timestamp = checked(_timestamp + elapsed.Ticks);
+    }
+
+    private sealed class ControllableLoopDelay(
+        TimeSpan initialInterval,
+        TimeSpan updatedInterval)
+    {
+        private readonly TaskCompletionSource _completeUpdatedDelay = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly List<TimeSpan> _observedIntervals = [];
+        private int _updatedDelayCount;
+
+        public TaskCompletionSource InitialDelayStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource UpdatedDelayStarted { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task DelayAsync(
+            TimeSpan interval,
+            CancellationToken cancellationToken)
+        {
+            lock (_observedIntervals)
+                _observedIntervals.Add(interval);
+
+            if (interval == initialInterval)
+            {
+                InitialDelayStarted.TrySetResult();
+                await Task.Delay(
+                    Timeout.InfiniteTimeSpan,
+                    cancellationToken);
+                return;
+            }
+
+            if (interval != updatedInterval)
+            {
+                throw new InvalidOperationException(
+                    $"Unexpected loop interval: {interval}.");
+            }
+
+            UpdatedDelayStarted.TrySetResult();
+            if (Interlocked.Increment(ref _updatedDelayCount) == 1)
+            {
+                await _completeUpdatedDelay.Task
+                    .WaitAsync(cancellationToken);
+                return;
+            }
+
+            await Task.Delay(
+                Timeout.InfiniteTimeSpan,
+                cancellationToken);
+        }
+
+        public void CompleteUpdatedDelay()
+            => _completeUpdatedDelay.TrySetResult();
+
+        public TimeSpan[] GetObservedIntervals()
+        {
+            lock (_observedIntervals)
+                return [.. _observedIntervals];
+        }
     }
 
     private sealed class FakeMacroNativeApi : IMacroNativeApi
