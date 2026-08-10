@@ -159,6 +159,55 @@ public sealed class FileSystemOrganizationTests : IDisposable
     }
 
     [Fact]
+    public async Task Execute_RejectsEmptyPlanWithoutCreatingDirectories()
+    {
+        var service = new FileSystemService();
+
+        var execution = await service.ExecuteFileOrganizationAsync(
+            _root,
+            ClassifyMode.ByExtension,
+            []);
+
+        Assert.True(execution.IsSuccess, execution.ErrorMessage);
+        Assert.Equal(0, execution.Data!.MovedCount);
+        Assert.Single(execution.Data.Failures);
+        Assert.False(Directory.Exists(Path.Combine(_root, "Long Organized")));
+    }
+
+    [Fact]
+    public async Task Execute_RollsBackEarlierMovesWhenLaterMoveFails()
+    {
+        var first = Path.Combine(_root, "a.txt");
+        var second = Path.Combine(_root, "b.txt");
+        File.WriteAllText(first, "first");
+        File.WriteAllText(second, "second");
+        var service = new FileSystemService();
+        var plan = await service.PlanFileOrganizationAsync(
+            _root,
+            ClassifyMode.ByExtension);
+        var planned = Assert.IsType<List<FileOrganizationItem>>(plan.Data);
+        Assert.Equal(
+            new[] { "a.txt", "b.txt" },
+            planned.Select(item => item.Name));
+
+        using (File.Open(second, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var execution = await service.ExecuteFileOrganizationAsync(
+                _root,
+                ClassifyMode.ByExtension,
+                planned);
+
+            Assert.True(execution.IsSuccess, execution.ErrorMessage);
+            Assert.Equal(0, execution.Data!.MovedCount);
+            Assert.Single(execution.Data.Failures);
+        }
+
+        Assert.Equal("first", File.ReadAllText(first));
+        Assert.Equal("second", File.ReadAllText(second));
+        Assert.False(Directory.Exists(Path.Combine(_root, "Long Organized")));
+    }
+
+    [Fact]
     public async Task BatchRename_PreflightsWholeBatchBeforeMovingFiles()
     {
         var first = Path.Combine(_root, "first.txt");

@@ -1,15 +1,14 @@
 {
   "id": "com.long.fileorganizer",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "name": "文件整理器",
   "author": "Long",
-  "description": "自动整理指定文件夹，支持按类型/日期分类、查找大文件、删除重复文件、批量重命名",
+  "description": "分析文件夹顶层文件，并按扩展名、修改月份或文件大小生成可确认的整理计划",
   "entry_point": "index.html",
   "runtime": "webview",
   "capabilities": [
     "filesystem.advanced",
-    "shell.selection",
-    "storage.local"
+    "shell.selection"
   ],
   "commands": [
     {
@@ -48,9 +47,5 @@
     "close_behavior": "stop",
     "default_presentation": "embedded",
     "search_in_background": false
-  },
-  "default_settings": {
-    "large_file_threshold": 104857600,
-    "auto_backup": true
   }
 }

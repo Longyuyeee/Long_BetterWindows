@@ -5,7 +5,7 @@ param(
         "src/LongBetterWindows.Host/bin/Release/net8.0-windows",
     [string]$OutputPath,
     [string]$DotnetPath = "C:\Program Files\dotnet\dotnet.exe",
-    [int]$ExpectedServiceCaseCount = 26
+    [int]$ExpectedServiceCaseCount = 28
 )
 
 $ErrorActionPreference = "Stop"
@@ -162,7 +162,7 @@ try {
         disposable_process_only = $true
         required_plugin_count = 7
         covered_plugin_count = $plugins.Count
-        expected_case_count = 43
+        expected_case_count = 45
         executed_case_count =
             [int]$transactions.passed_case_count +
             [int]$capture.executed_case_count +

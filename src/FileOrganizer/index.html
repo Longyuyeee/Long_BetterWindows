@@ -48,6 +48,13 @@
         <div class="long-toolbar">
           <h2 class="long-section-title" id="planTitle" data-i18n="plan.title">整理预览</h2>
           <span class="long-toolbar__spacer"></span>
+          <div class="long-toolbar" id="planPagination" hidden>
+            <button class="long-button long-button--secondary btn-secondary" id="previousPageButton" type="button"
+                    aria-label="上一页" title="上一页">←</button>
+            <span class="long-secondary" id="planPageLabel">1 / 1</span>
+            <button class="long-button long-button--secondary btn-secondary" id="nextPageButton" type="button"
+                    aria-label="下一页" title="下一页">→</button>
+          </div>
           <span class="long-badge long-badge--neutral" id="conflictBadge">0 个冲突</span>
         </div>
         <div class="long-data-grid" role="table" id="planGrid" aria-label="文件整理预览">
@@ -89,6 +96,7 @@
   </dialog>
 
   <script>
+    const planPageSize = 100;
     const folderPath = document.getElementById('folderPath');
     const organizeMode = document.getElementById('organizeMode');
     const analyzeButton = document.getElementById('analyzeButton');
@@ -97,9 +105,13 @@
     const executeDialog = document.getElementById('executeDialog');
     const confirmButton = document.getElementById('confirmButton');
     const planRows = document.getElementById('planRows');
+    const planPagination = document.getElementById('planPagination');
+    const previousPageButton = document.getElementById('previousPageButton');
+    const nextPageButton = document.getElementById('nextPageButton');
     const status = document.getElementById('status');
     let strings = {};
     let plan = [];
+    let planPage = 0;
     let planState = 'empty';
     let planErrorDetail = '';
     let isAnalyzing = false;
@@ -210,6 +222,15 @@
       if (updateStatus === undefined) updateStatus = true;
       planRows.replaceChildren();
       const conflicts = plan.filter(function (item) { return item.hasConflict; }).length;
+      const totalPages = Math.max(1, Math.ceil(plan.length / planPageSize));
+      planPage = Math.min(planPage, totalPages - 1);
+      planPagination.hidden = planState !== 'ready' || plan.length <= planPageSize;
+      previousPageButton.disabled = isAnalyzing || isExecuting || planPage === 0;
+      nextPageButton.disabled = isAnalyzing || isExecuting || planPage >= totalPages - 1;
+      document.getElementById('planPageLabel').textContent = t(
+        'plan.page',
+        '{current} / {total}',
+        { current: planPage + 1, total: totalPages });
       document.getElementById('planBadge').textContent = t('plan.count', '{count} 个文件', { count: plan.length });
       document.getElementById('conflictBadge').textContent = t('plan.conflicts', '{count} 个冲突', { count: conflicts });
       if (planState !== 'ready' || !plan.length) {
@@ -237,7 +258,8 @@
         };
         window.LongUI?.renderState(planRows, states[planState] || states.empty);
       } else {
-        plan.forEach(function (item) {
+        const pageStart = planPage * planPageSize;
+        plan.slice(pageStart, pageStart + planPageSize).forEach(function (item) {
           const row = document.createElement('div');
           row.className = 'long-data-grid__row';
           row.setAttribute('role', 'row');
@@ -269,6 +291,15 @@
       }
     }
 
+    function invalidatePlan(clearStatus) {
+      plan = [];
+      planPage = 0;
+      planState = 'empty';
+      planErrorDetail = '';
+      renderPlanState(false);
+      if (clearStatus !== false) setStatus('', '', '');
+    }
+
     function renderDialog() {
       document.getElementById('executeDialogMessage').textContent = t(
         'dialog.message',
@@ -291,6 +322,10 @@
         element.placeholder = t(element.dataset.i18nPlaceholder, element.placeholder);
       });
       document.getElementById('planGrid').setAttribute('aria-label', t('plan.ariaLabel', '文件整理预览'));
+      previousPageButton.setAttribute('aria-label', t('plan.previousPage', '上一页'));
+      previousPageButton.title = t('plan.previousPage', '上一页');
+      nextPageButton.setAttribute('aria-label', t('plan.nextPage', '下一页'));
+      nextPageButton.title = t('plan.nextPage', '下一页');
       renderPlanState(false);
       renderDialog();
       if (currentStatus.key || currentStatus.fallback) {
@@ -305,7 +340,7 @@
           t('error.activeFolder', '无法读取 Explorer 当前文件夹'));
         if (!path) throw new Error(t('error.activeFolderEmpty', 'Explorer 当前没有可用文件夹'));
         folderPath.value = path;
-        renderActionState();
+        invalidatePlan(false);
         setStatus('status.folderLoaded', 'success', '已读取 Explorer 当前文件夹');
         return { success: true };
       } catch (error) {
@@ -326,6 +361,7 @@
       }
       isAnalyzing = true;
       plan = [];
+      planPage = 0;
       planState = 'loading';
       planErrorDetail = '';
       renderPlanState(false);
@@ -378,6 +414,8 @@
             detail: detail
           });
         } else {
+          plan = [];
+          planPage = 0;
           planState = 'empty';
           setStatus('status.completed', 'success', '已完成 {count} 个文件的整理', { count: moved });
         }
@@ -400,23 +438,19 @@
     });
     document.getElementById('cancelButton').addEventListener('click', function () { executeDialog.close(); });
     confirmButton.addEventListener('click', executePlan);
-    document.getElementById('resetButton').addEventListener('click', function () {
-      plan = [];
-      planState = 'empty';
-      planErrorDetail = '';
-      renderPlanState(false);
-      setStatus('', '', '');
-    });
-    folderPath.addEventListener('input', function () {
-      plan = [];
-      planState = 'empty';
+    previousPageButton.addEventListener('click', function () {
+      if (planPage === 0) return;
+      planPage -= 1;
       renderPlanState(false);
     });
-    organizeMode.addEventListener('change', function () {
-      plan = [];
-      planState = 'empty';
+    nextPageButton.addEventListener('click', function () {
+      if ((planPage + 1) * planPageSize >= plan.length) return;
+      planPage += 1;
       renderPlanState(false);
     });
+    document.getElementById('resetButton').addEventListener('click', invalidatePlan);
+    folderPath.addEventListener('input', invalidatePlan);
+    organizeMode.addEventListener('change', invalidatePlan);
     document.addEventListener('keydown', function (event) {
       if (!event.ctrlKey || event.key !== 'Enter') return;
       if (!executeButton.disabled) {
@@ -432,7 +466,7 @@
       const paths = window.LongUI.commandPaths(command);
       if (paths.length) {
         folderPath.value = paths[0];
-        renderActionState();
+        invalidatePlan(false);
         setStatus('status.contextLoaded', 'success', '已从命令上下文读取文件夹');
       } else {
         const loaded = await loadActiveFolder();

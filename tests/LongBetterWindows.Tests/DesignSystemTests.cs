@@ -612,6 +612,11 @@ public class DesignSystemTests
         Assert.Contains("long.fileSystem.executeOrganization(", page);
         Assert.Contains("executeDialog.showModal()", page);
         Assert.Contains("LongUI?.onCommand", page);
+        Assert.Contains("const planPageSize = 100", page);
+        Assert.Contains("plan.slice(pageStart, pageStart + planPageSize)", page);
+        Assert.Contains("function invalidatePlan(clearStatus)", page);
+        Assert.Contains("folderPath.value = path;\n        invalidatePlan(false);", page.ReplaceLineEndings("\n"));
+        Assert.Contains("plan = [];\n          planPage = 0;\n          planState = 'empty';", page.ReplaceLineEndings("\n"));
 
         var capabilities = manifest.RootElement.GetProperty("capabilities")
             .EnumerateArray()
@@ -619,7 +624,9 @@ public class DesignSystemTests
             .ToArray();
         Assert.Contains("filesystem.advanced", capabilities);
         Assert.Contains("shell.selection", capabilities);
+        Assert.DoesNotContain("storage.local", capabilities);
         Assert.DoesNotContain("file.ops", capabilities);
+        Assert.Equal("1.1.0", manifest.RootElement.GetProperty("version").GetString());
     }
 
     [Fact]

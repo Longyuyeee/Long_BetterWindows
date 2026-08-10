@@ -369,6 +369,15 @@ namespace LongBetterWindows.Host.Services
                     var seenDestinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     var planned = new List<(string Source, string Destination)>();
 
+                    if (items.Count == 0)
+                    {
+                        result.Failures.Add(new FileOrganizationFailure
+                        {
+                            Detail = "Organization plan must contain at least one file.",
+                        });
+                        return HostApiResponse<FileOrganizationResult>.Success(result);
+                    }
+
                     foreach (var requested in items)
                     {
                         if (requested is null)
@@ -385,33 +394,10 @@ namespace LongBetterWindows.Host.Services
                             var source = Path.GetFullPath(requested.SourcePath);
                             if (!seenSources.Add(source))
                                 throw new IOException("Duplicate source path.");
-                            if (!File.Exists(source))
-                                throw new FileNotFoundException("Source file no longer exists.", source);
-                            if (!Path.GetDirectoryName(source)!.Equals(
-                                    root,
-                                    StringComparison.OrdinalIgnoreCase))
-                                throw new UnauthorizedAccessException(
-                                    "Source must be a top-level file in the selected folder.");
-                            if ((File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
-                                throw new UnauthorizedAccessException(
-                                    "Reparse-point files cannot be organized.");
-
-                            var expected = BuildOrganizationItem(root, new FileInfo(source), mode);
                             var destination = Path.GetFullPath(requested.DestinationPath);
-                            if (!destination.Equals(
-                                    expected.DestinationPath,
-                                    StringComparison.OrdinalIgnoreCase))
-                                throw new UnauthorizedAccessException(
-                                    "Destination does not match the current organization rule.");
                             if (!seenDestinations.Add(destination))
                                 throw new IOException("Duplicate destination path.");
-
-                            var destinationDirectory = Path.GetDirectoryName(destination)!;
-                            EnsureDirectoryIsNotReparsePoint(
-                                Path.Combine(root, OrganizedDirectoryName));
-                            EnsureDirectoryIsNotReparsePoint(destinationDirectory);
-                            if (File.Exists(destination))
-                                throw new IOException("Destination file already exists.");
+                            ValidateOrganizationMove(root, mode, source, destination);
 
                             planned.Add((source, destination));
                         }
@@ -437,6 +423,11 @@ namespace LongBetterWindows.Host.Services
                     {
                         foreach (var item in planned)
                         {
+                            ValidateOrganizationMove(
+                                root,
+                                mode,
+                                item.Source,
+                                item.Destination);
                             var destinationDirectory =
                                 Path.GetDirectoryName(item.Destination)!;
                             if (!Directory.Exists(destinationDirectory))
@@ -457,6 +448,11 @@ namespace LongBetterWindows.Host.Services
                                     createdDirectories.Add(createdDirectory);
                             }
                             EnsureDirectoryIsNotReparsePoint(destinationDirectory);
+                            ValidateOrganizationMove(
+                                root,
+                                mode,
+                                item.Source,
+                                item.Destination);
                             File.Move(item.Source, item.Destination);
                             completed.Add(item);
                         }
@@ -556,6 +552,52 @@ namespace LongBetterWindows.Host.Services
                 Size = file.Length,
                 HasConflict = File.Exists(destination),
             };
+        }
+
+        private static void ValidateOrganizationMove(
+            string root,
+            ClassifyMode mode,
+            string source,
+            string destination)
+        {
+            if (!Directory.Exists(root)
+                || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new UnauthorizedAccessException(
+                    "Selected folder is no longer a valid organization root.");
+            }
+            if (!File.Exists(source))
+                throw new FileNotFoundException(
+                    "Source file no longer exists.",
+                    source);
+            if (!Path.GetDirectoryName(source)!.Equals(
+                    root,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException(
+                    "Source must be a top-level file in the selected folder.");
+            }
+            if ((File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new UnauthorizedAccessException(
+                    "Reparse-point files cannot be organized.");
+            }
+
+            var expected = BuildOrganizationItem(root, new FileInfo(source), mode);
+            if (!destination.Equals(
+                    expected.DestinationPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException(
+                    "Destination does not match the current organization rule.");
+            }
+
+            var destinationDirectory = Path.GetDirectoryName(destination)!;
+            EnsureDirectoryIsNotReparsePoint(
+                Path.Combine(root, OrganizedDirectoryName));
+            EnsureDirectoryIsNotReparsePoint(destinationDirectory);
+            if (File.Exists(destination))
+                throw new IOException("Destination file already exists.");
         }
 
         private static string ExtensionCategory(string extension)

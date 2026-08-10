@@ -203,6 +203,11 @@
       "commands": ["file-organizer.open"],
       "automated_evidence": [
         {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/FileSystemOrganizationTests.cs",
+          "symbol": "Execute_RollsBackEarlierMovesWhenLaterMoveFails"
+        },
+        {
           "level": "contract",
           "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
           "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
