@@ -567,6 +567,14 @@ public class DesignSystemTests
         Assert.Contains("long.performance.getTopByMemory(10)", page);
         Assert.DoesNotContain("Math.random", page);
         Assert.Contains("visibilitychange", page);
+        Assert.Contains("window.addEventListener('pagehide', stopPolling)", page);
+        Assert.Contains("const detailRefreshInterval = 10000", page);
+        Assert.Contains("Promise.allSettled(requests)", page);
+        Assert.Contains("now - lastDetailRefreshAt >= detailRefreshInterval", page);
+        Assert.Contains("applyMetricResult(next, results[0]", page);
+        Assert.Contains("queuedManualRefresh = refreshPromise", page);
+        Assert.Contains("return updateMetrics(true);", page);
+        Assert.DoesNotContain("const results = await Promise.all([", page);
         Assert.Contains("LongUI?.onCommand", page);
         Assert.Contains("event.key === 'F5'", page);
         var capabilities = manifest.RootElement.GetProperty("capabilities")

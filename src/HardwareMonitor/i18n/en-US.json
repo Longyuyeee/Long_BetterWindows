@@ -48,6 +48,7 @@
   "disk.usageAriaLabel": "{name} usage",
   "process.unknown": "Unknown process",
   "status.refreshed": "Hardware information refreshed",
+  "status.partialFailed": "Some performance data is temporarily unavailable: {detail}",
   "status.refreshFailed": "Failed to refresh hardware information: {detail}",
   "status.systemInfoFailed": "Failed to load system information: {detail}",
   "error.systemInfo": "Failed to load system information",

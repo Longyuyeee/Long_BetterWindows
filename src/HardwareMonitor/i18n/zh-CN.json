@@ -48,6 +48,7 @@
   "disk.usageAriaLabel": "{name} 使用率",
   "process.unknown": "未知进程",
   "status.refreshed": "硬件信息已刷新",
+  "status.partialFailed": "部分性能数据暂不可用：{detail}",
   "status.refreshFailed": "硬件信息刷新失败：{detail}",
   "status.systemInfoFailed": "系统信息加载失败：{detail}",
   "error.systemInfo": "系统信息加载失败",

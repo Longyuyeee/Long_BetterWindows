@@ -253,6 +253,11 @@
           "level": "contract",
           "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
           "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
+        },
+        {
+          "level": "contract",
+          "path": "tests/LongBetterWindows.Tests/DesignSystemTests.cs",
+          "symbol": "HardwareMonitor_UsesRealPerformanceApisAndUiKit"
         }
       ],
       "manual_checks": [

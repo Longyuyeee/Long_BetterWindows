@@ -101,23 +101,33 @@
 
   <script>
     const refreshInterval = 2000;
+    const detailRefreshInterval = 10000;
     const cpuWarningThreshold = 80;
     const memWarningThreshold = 85;
     const refreshButton = document.getElementById('refreshButton');
     const status = document.getElementById('status');
     let refreshTimer = 0;
     let refreshPromise = null;
+    let queuedManualRefresh = null;
+    let lastDetailRefreshAt = 0;
     let strings = {};
     let isRefreshing = false;
     let systemInfoState = { kind: 'loading', info: null, detail: '' };
     let metricsState = {
       kind: 'loading',
-      cpuUsage: 0,
+      cpuUsage: null,
       memory: null,
       disks: [],
       processes: [],
+      cpuAvailable: false,
+      memoryAvailable: false,
+      disksAvailable: false,
+      processesAvailable: false,
+      cpuError: '',
+      memoryError: '',
+      disksError: '',
+      processesError: '',
       updatedAt: 0,
-      detail: ''
     };
     let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
 
@@ -129,13 +139,17 @@
     }
 
     function setStatus(key, kind, fallback, values) {
+      const previousMessage = status.textContent;
+      const previousKind = currentStatus.kind;
       currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
       const message = key
         ? t(key, fallback, currentStatus.values)
         : currentStatus.fallback;
       status.textContent = message;
       status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      if (message) window.LongUI?.announce(message);
+      if (message && (message !== previousMessage || kind !== previousKind)) {
+        window.LongUI?.announce(message);
+      }
       return message;
     }
 
@@ -195,14 +209,22 @@
         renderLoadingStates();
         return;
       }
-      if (metricsState.kind === 'error') {
-        renderMetricsError(metricsState.detail);
-        return;
+      if (metricsState.cpuAvailable) updateCpu(metricsState.cpuUsage);
+      else renderMetricUnavailable('cpuValue', 'cpuProgress', 'cpuBar');
+      if (metricsState.memoryAvailable) updateMemory(metricsState.memory || {});
+      else {
+        renderMetricUnavailable('memValue', 'memProgress', 'memBar');
+        document.getElementById('memLabel').textContent =
+          t('value.unavailable', '不可用');
       }
-      updateCpu(metricsState.cpuUsage);
-      updateMemory(metricsState.memory || {});
-      updateDisks(metricsState.disks);
-      updateProcesses(metricsState.processes);
+      updateDisks(
+        metricsState.disks,
+        metricsState.disksAvailable,
+        metricsState.disksError);
+      updateProcesses(
+        metricsState.processes,
+        metricsState.processesAvailable,
+        metricsState.processesError);
     }
 
     function applyLocalization(message) {
@@ -272,7 +294,15 @@
     }
 
     function updateMetrics(manual) {
-      if (refreshPromise) return refreshPromise;
+      if (refreshPromise) {
+        if (!manual) return refreshPromise;
+        if (!queuedManualRefresh) {
+          queuedManualRefresh = refreshPromise
+            .then(function () { return updateMetrics(true); })
+            .finally(function () { queuedManualRefresh = null; });
+        }
+        return queuedManualRefresh;
+      }
       refreshPromise = performMetricsUpdate(!!manual).finally(function () {
         refreshPromise = null;
       });
@@ -284,32 +314,63 @@
       window.LongUI?.setBusy(refreshButton, true);
       renderRefreshState();
       try {
-        const results = await Promise.all([
-          long.performance.getCpuUsage(),
-          long.performance.getMemoryInfo(),
-          long.performance.getDiskInfo(),
-          long.performance.getTopByMemory(10)
-        ]);
-        const cpuUsage = unwrap(results[0], t('error.cpu', 'CPU 数据加载失败'));
-        const memory = unwrap(results[1], t('error.memory', '内存数据加载失败'));
-        const disks = unwrap(results[2], t('error.disks', '磁盘数据加载失败'));
-        const processes = unwrap(results[3], t('error.processes', '进程数据加载失败'));
-        metricsState = {
-          kind: 'ready',
-          cpuUsage: cpuUsage,
-          memory: memory || {},
-          disks: Array.isArray(disks) ? disks : [],
-          processes: Array.isArray(processes) ? processes : [],
-          updatedAt: Date.now(),
-          detail: ''
-        };
+        const now = Date.now();
+        const includeDetails = manual
+          || !lastDetailRefreshAt
+          || now - lastDetailRefreshAt >= detailRefreshInterval;
+        if (includeDetails) lastDetailRefreshAt = now;
+
+        const requests = [
+          readMetric(
+            function () { return long.performance.getCpuUsage(); },
+            t('error.cpu', 'CPU 数据加载失败')),
+          readMetric(
+            function () { return long.performance.getMemoryInfo(); },
+            t('error.memory', '内存数据加载失败'))
+        ];
+        if (includeDetails) {
+          requests.push(
+            readMetric(
+              function () { return long.performance.getDiskInfo(); },
+              t('error.disks', '磁盘数据加载失败')),
+            readMetric(
+              function () { return long.performance.getTopByMemory(10); },
+              t('error.processes', '进程数据加载失败')));
+        }
+
+        const results = await Promise.allSettled(requests);
+        const next = { ...metricsState, kind: 'ready' };
+        applyMetricResult(next, results[0], 'cpuUsage', 'cpuAvailable', 'cpuError');
+        applyMetricResult(next, results[1], 'memory', 'memoryAvailable', 'memoryError');
+        if (includeDetails) {
+          applyMetricResult(next, results[2], 'disks', 'disksAvailable', 'disksError', true);
+          applyMetricResult(next, results[3], 'processes', 'processesAvailable', 'processesError', true);
+        }
+        if (results.some(function (result) { return result.status === 'fulfilled'; })) {
+          next.updatedAt = now;
+        }
+        const activeFailures = [...new Set([
+          next.cpuError,
+          next.memoryError,
+          next.disksError,
+          next.processesError
+        ].filter(Boolean))];
+        metricsState = next;
         renderMetricsProjection();
-        if (manual) setStatus('status.refreshed', 'success', '硬件信息已刷新');
-        return true;
+        if (activeFailures.length) {
+          setStatus(
+            'status.partialFailed',
+            'danger',
+            '部分性能数据暂不可用：{detail}',
+            { detail: activeFailures.join('; ') });
+        } else if (manual) {
+          setStatus('status.refreshed', 'success', '硬件信息已刷新');
+        } else if (currentStatus.key === 'status.partialFailed') {
+          setStatus('', '', '');
+        }
+        return activeFailures.length === 0;
       } catch (error) {
         const detail = errorMessage(error, t('error.metrics', '性能数据加载失败'));
-        metricsState = { ...metricsState, kind: 'error', detail: detail };
-        renderMetricsProjection();
         setStatus(
           'status.refreshFailed',
           'danger',
@@ -323,19 +384,35 @@
       }
     }
 
-    function renderMetricsError(detail) {
-      window.LongUI?.renderState(document.getElementById('diskList'), {
-        kind: 'error',
-        title: t('state.diskFailed', '磁盘信息加载失败'),
-        detail: detail,
-        actionLabel: t('action.retry', '重试'),
-        onAction: function () { void updateMetrics(true); }
-      });
-      window.LongUI?.renderState(document.getElementById('processList'), {
-        kind: 'error',
-        title: t('state.processFailed', '进程信息加载失败'),
-        detail: detail
-      });
+    async function readMetric(request, fallback) {
+      return unwrap(await request(), fallback);
+    }
+
+    function applyMetricResult(
+      target,
+      result,
+      valueKey,
+      availableKey,
+      errorKey,
+      expectArray) {
+      if (result.status === 'fulfilled') {
+        target[valueKey] = expectArray && !Array.isArray(result.value) ? [] : result.value;
+        target[availableKey] = true;
+        target[errorKey] = '';
+        return;
+      }
+      const detail = errorMessage(result.reason, t('error.metrics', '性能数据加载失败'));
+      target[errorKey] = detail;
+    }
+
+    function renderMetricUnavailable(valueId, progressId, barId) {
+      const value = document.getElementById(valueId);
+      value.textContent = '--';
+      value.classList.remove('long-metric__value--warning');
+      const bar = document.getElementById(barId);
+      bar.style.width = '0%';
+      bar.classList.remove('long-progress__fill--warning');
+      document.getElementById(progressId).setAttribute('aria-valuenow', '0');
     }
 
     function updateCpu(value) {
@@ -360,9 +437,19 @@
       document.getElementById('memProgress').setAttribute('aria-valuenow', String(Math.round(usage)));
     }
 
-    function updateDisks(disks) {
+    function updateDisks(disks, available, detail) {
       const list = document.getElementById('diskList');
       list.replaceChildren();
+      if (!available) {
+        window.LongUI?.renderState(list, {
+          kind: 'error',
+          title: t('state.diskFailed', '磁盘信息加载失败'),
+          detail: detail,
+          actionLabel: t('action.retry', '重试'),
+          onAction: function () { void updateMetrics(true); }
+        });
+        return;
+      }
       if (!disks.length) {
         window.LongUI?.renderState(list, {
           kind: 'empty',
@@ -415,9 +502,19 @@
       });
     }
 
-    function updateProcesses(processes) {
+    function updateProcesses(processes, available, detail) {
       const list = document.getElementById('processList');
       list.replaceChildren();
+      if (!available) {
+        window.LongUI?.renderState(list, {
+          kind: 'error',
+          title: t('state.processFailed', '进程信息加载失败'),
+          detail: detail,
+          actionLabel: t('action.retry', '重试'),
+          onAction: function () { void updateMetrics(true); }
+        });
+        return;
+      }
       if (!processes.length) {
         window.LongUI?.renderState(list, {
           kind: 'empty',
@@ -523,6 +620,7 @@
         startPolling();
       }
     });
+    window.addEventListener('pagehide', stopPolling);
     window.LongUI?.onCommand(async function () {
       const success = await updateMetrics(true);
       return {

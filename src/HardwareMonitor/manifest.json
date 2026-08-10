@@ -1,6 +1,6 @@
 {
   "id": "com.long.hardwaremonitor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "硬件监控",
   "author": "Long",
   "description": "实时监控 CPU/内存/磁盘状态，查看系统信息和进程资源占用，异常提醒与问题排查",
