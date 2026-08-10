@@ -22,6 +22,7 @@
   "state.emptyDetail": "New notes will appear here",
   "preview.empty": "There is nothing to preview",
   "status.enterContent": "Enter some note content",
+  "status.tooLong": "A note cannot exceed {count} characters",
   "status.saved": "Note saved · {count} characters",
   "status.loaded": "Note loaded into the editor",
   "status.removed": "Note deleted",

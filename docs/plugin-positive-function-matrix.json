@@ -498,6 +498,11 @@
       "commands": ["note.new"],
       "automated_evidence": [
         {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/DesignSystemTests.cs",
+          "symbol": "QuickNote_UsesBoundedIdentityBasedStorageAndPreservesDrafts"
+        },
+        {
           "level": "contract",
           "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
           "symbol": "BuiltInManifest_CommandContract_IsValid"

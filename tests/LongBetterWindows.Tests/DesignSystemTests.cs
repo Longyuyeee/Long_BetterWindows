@@ -925,6 +925,29 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void QuickNote_UsesBoundedIdentityBasedStorageAndPreservesDrafts()
+    {
+        var root = FindRepositoryRoot();
+        var manifest = File.ReadAllText(Path.Combine(root, "src", "QuickNotePlugin", "manifest.json"));
+        var html = File.ReadAllText(Path.Combine(root, "src", "QuickNotePlugin", "index.html"));
+
+        Assert.Contains("\"version\": \"1.2.0\"", manifest);
+        Assert.Contains("\"storage.local\"", manifest);
+        Assert.DoesNotContain("system.notification", manifest);
+        Assert.Contains("const maxItemCharacters = 65536", html);
+        Assert.Contains("const maxCollectionCharacters = 500000", html);
+        Assert.Contains("maxlength=\"65536\"", html);
+        Assert.Contains("class=\"long-section-title\" id=\"historyTitle\"", html);
+        Assert.Contains("function createNoteId()", html);
+        Assert.Contains("notes = normalizeNotes(result.data ? JSON.parse(result.data) : [])", html);
+        Assert.Contains("items.unshift({ id: noteId, text: text", html);
+        Assert.Contains("if (input.value === text) input.value = ''", html);
+        Assert.Contains("return entry.id !== note.id", html);
+        Assert.Contains("if (!preview.hidden) renderPreviewContent()", html);
+        Assert.DoesNotContain("const text = input.value.trim()", html);
+    }
+
+    [Fact]
     public void NativeUiBatch_UsesSemanticStylesAndDeclaresCommandEntries()
     {
         var root = FindRepositoryRoot();

@@ -1,11 +1,11 @@
 {
   "id": "com.long.quick-note",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "快速便签",
   "author": "Long",
   "entry_point": "index.html",
   "runtime": "webview",
-  "capabilities": ["storage.local", "system.notification"],
+  "capabilities": ["storage.local"],
   "commands": [
     {
       "id": "note.new",
@@ -32,5 +32,10 @@
       "en-US": "i18n/en-US.json"
     }
   },
-  "default_settings": {"auto_start": false}
+  "default_settings": {
+    "auto_start": false,
+    "max_items": 30,
+    "max_item_characters": 65536,
+    "max_collection_characters": 500000
+  }
 }

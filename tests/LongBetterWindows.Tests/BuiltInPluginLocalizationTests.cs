@@ -381,7 +381,7 @@ public sealed class BuiltInPluginLocalizationTests
 
     [Theory]
     [InlineData("ClipboardTool", "content.value = text", "let currentTab = 'history'")]
-    [InlineData("QuickNotePlugin", "if (input.value.trim() === text) input.value = ''", "let notes = []")]
+    [InlineData("QuickNotePlugin", "if (input.value === text) input.value = ''", "let notes = []")]
     public void StatefulWebPlugin_RefreshesLocalizationWithoutReloading(
         string plugin,
         string stateMutationMarker,

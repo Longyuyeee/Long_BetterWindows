@@ -19,7 +19,7 @@
     <section class="long-stack">
       <div class="long-card long-field">
         <label class="long-field-label" for="noteInput" data-i18n="field.newNote">新便签</label>
-        <textarea class="long-editor" id="noteInput" placeholder="写点什么，支持简单 Markdown…" autofocus></textarea>
+        <textarea class="long-editor" id="noteInput" maxlength="65536" placeholder="写点什么，支持简单 Markdown…" autofocus></textarea>
         <div class="long-toolbar">
           <button class="long-button long-button--primary btn-primary" id="saveButton" type="button" data-i18n="action.save">保存便签</button>
           <button class="long-button long-button--secondary btn-secondary" id="previewButton" type="button" data-i18n="action.preview">预览</button>
@@ -27,13 +27,13 @@
           <span class="long-toolbar__spacer"></span>
           <span class="long-kbd">Ctrl Enter</span>
         </div>
-        <div class="long-preview" id="preview" hidden></div>
+        <div class="long-preview" id="preview" role="region" aria-live="polite" hidden></div>
         <div class="long-status" id="status" role="status" aria-live="polite"></div>
       </div>
 
       <section class="long-card long-stack" aria-labelledby="historyTitle">
         <div class="long-toolbar">
-          <h2 class="long-page-title" id="historyTitle" data-i18n="history.title">历史便签</h2>
+          <h2 class="long-section-title" id="historyTitle" data-i18n="history.title">历史便签</h2>
           <span class="long-toolbar__spacer"></span>
           <span class="long-secondary" data-i18n="history.limit">最多保留 30 条</span>
         </div>
@@ -43,6 +43,9 @@
   </main>
 
   <script>
+    const maxItems = 30;
+    const maxItemCharacters = 65536;
+    const maxCollectionCharacters = 500000;
     const input = document.getElementById('noteInput');
     const preview = document.getElementById('preview');
     const status = document.getElementById('status');
@@ -112,17 +115,48 @@
 
     function normalizeNotes(value) {
       if (!Array.isArray(value)) return [];
-      return value
+      const ids = new Set();
+      return trimNotes(value
         .filter(function (note) {
           return note && typeof note.text === 'string' && note.text.trim();
         })
         .map(function (note) {
+          let id = typeof note.id === 'string' && note.id.trim()
+            ? note.id.trim().slice(0, 128)
+            : createNoteId();
+          while (ids.has(id)) id = createNoteId();
+          ids.add(id);
           return {
+            id: id,
             text: note.text,
             time: Number.isFinite(Number(note.time)) ? Number(note.time) : Date.now()
           };
-        })
-        .slice(0, 30);
+        }), maxItems);
+    }
+
+    function trimNotes(items, limit) {
+      const limited = [];
+      let totalCharacters = 0;
+      for (const note of items) {
+        if (limited.length >= limit) break;
+        if (note.text.length > maxItemCharacters
+          || totalCharacters + note.text.length > maxCollectionCharacters) {
+          continue;
+        }
+        limited.push(note);
+        totalCharacters += note.text.length;
+      }
+      return limited;
+    }
+
+    function createNoteId() {
+      if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      return Array.from(bytes, function (value) {
+        return value.toString(16).padStart(2, '0');
+      }).join('').replace(/^(........)(....)(....)(....)(............)$/, '$1-$2-$3-$4-$5');
     }
 
     async function initialize() {
@@ -131,7 +165,7 @@
       try {
         const result = await long.storage.get('quick_notes');
         if (!result.success) throw new Error(result.error || t('error.load', '历史便签读取失败'));
-        if (result.data) notes = normalizeNotes(JSON.parse(result.data));
+        notes = normalizeNotes(result.data ? JSON.parse(result.data) : []);
       } catch (error) {
         listState = 'error';
         loadErrorDetail = error && error.message ? error.message : String(error);
@@ -156,7 +190,7 @@
         const previous = notes;
         const next = transform(notes.slice());
         if (!next) return true;
-        notes = next.slice(0, 30);
+        notes = trimNotes(next, maxItems);
         renderNotes();
         try {
           await persistSnapshot(notes);
@@ -181,15 +215,25 @@
 
     async function saveNote() {
       if (saveButton.disabled) return;
-      const text = input.value.trim();
-      if (!text) {
+      const text = input.value;
+      if (!text.trim()) {
         setStatus('status.enterContent', 'warning', '请输入便签内容');
         input.focus();
         return;
       }
+      if (text.length > maxItemCharacters) {
+        setStatus(
+          'status.tooLong',
+          'warning',
+          '便签不能超过 {count} 个字符',
+          { count: maxItemCharacters });
+        input.focus();
+        return;
+      }
       window.LongUI?.setBusy(saveButton, true);
+      const noteId = createNoteId();
       const saved = await mutateNotes(function (items) {
-        items.unshift({ text: text, time: Date.now() });
+        items.unshift({ id: noteId, text: text, time: Date.now() });
         return items;
       }, {
         key: 'status.saved',
@@ -198,7 +242,7 @@
       });
       window.LongUI?.setBusy(saveButton, false);
       if (saved) {
-        if (input.value.trim() === text) input.value = '';
+        if (input.value === text) input.value = '';
         preview.hidden = true;
       }
       input.focus();
@@ -244,6 +288,7 @@
         content.textContent = note.text.length > 180 ? note.text.slice(0, 180) + '…' : note.text;
         content.addEventListener('click', function () {
           input.value = note.text;
+          if (!preview.hidden) renderPreviewContent();
           input.focus();
           setStatus('status.loaded', 'success', '便签已载入编辑区');
         });
@@ -260,8 +305,7 @@
           window.LongUI?.setBusy(remove, true);
           await mutateNotes(function (items) {
             return items.filter(function (entry) {
-              return entry !== note
-                && (entry.time !== note.time || entry.text !== note.text);
+              return entry.id !== note.id;
             });
           }, {
             key: 'status.removed',
@@ -289,6 +333,9 @@
     }
 
     saveButton.addEventListener('click', saveNote);
+    input.addEventListener('input', function () {
+      if (!preview.hidden) renderPreviewContent();
+    });
     document.getElementById('previewButton').addEventListener('click', renderPreview);
     document.getElementById('clearButton').addEventListener('click', function () { input.value = ''; preview.hidden = true; input.focus(); });
     document.addEventListener('keydown', function (event) {
@@ -302,7 +349,10 @@
         };
       }
       const text = window.LongUI.commandText(command);
-      if (text) input.value = text;
+      if (text) {
+        input.value = text;
+        if (!preview.hidden) renderPreviewContent();
+      }
       input.focus();
       return {
         success: true,

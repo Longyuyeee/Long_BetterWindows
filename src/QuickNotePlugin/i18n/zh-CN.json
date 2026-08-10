@@ -22,6 +22,7 @@
   "state.emptyDetail": "新建的便签会显示在这里",
   "preview.empty": "没有可预览的内容",
   "status.enterContent": "请输入便签内容",
+  "status.tooLong": "便签不能超过 {count} 个字符",
   "status.saved": "便签已保存 · {count} 字符",
   "status.loaded": "便签已载入编辑区",
   "status.removed": "便签已删除",
