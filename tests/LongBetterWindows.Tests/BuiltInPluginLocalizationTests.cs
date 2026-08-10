@@ -274,6 +274,32 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.Contains("diff.unchangedLine", source);
     }
 
+    [Fact]
+    public void TimestampConverter_ReportsUnitsTimezoneAndInvalidatesStaleResults()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "TimestampConverter",
+            "index.html"));
+
+        Assert.Contains("function clearConversion()", source);
+        Assert.Contains("input.addEventListener('input', invalidateConversion)", source);
+        Assert.Contains("copyButton.disabled = true", source);
+        Assert.Contains("copyButton.disabled = false", source);
+        Assert.Contains("function inputKindLabel(kind)", source);
+        Assert.Contains("inputKind.seconds", source);
+        Assert.Contains("inputKind.milliseconds", source);
+        Assert.Contains("inputKind.localDate", source);
+        Assert.Contains("inputKind.zonedDate", source);
+        Assert.Contains("Intl.DateTimeFormat().resolvedOptions().timeZone", source);
+        Assert.Contains("function parseLocalDateText(text)", source);
+        Assert.Contains("date.getFullYear() === parts[0]", source);
+        Assert.Contains("Math.abs(milliseconds) > maxDateMilliseconds", source);
+        Assert.Contains("status.emptyInput", source);
+        Assert.Contains("status.outOfRange", source);
+    }
+
     [Theory]
     [InlineData("ClipboardTool", "content.value = text", "let currentTab = 'history'")]
     [InlineData("QuickNotePlugin", "if (input.value.trim() === text) input.value = ''", "let notes = []")]

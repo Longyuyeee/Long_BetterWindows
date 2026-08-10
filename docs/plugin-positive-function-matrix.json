@@ -601,6 +601,11 @@
           "level": "contract",
           "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
           "symbol": "BuiltInManifest_CommandContract_IsValid"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/BuiltInPluginLocalizationTests.cs",
+          "symbol": "TimestampConverter_ReportsUnitsTimezoneAndInvalidatesStaleResults"
         }
       ],
       "manual_checks": [
