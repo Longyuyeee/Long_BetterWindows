@@ -1,6 +1,6 @@
 {
   "id": "com.long.devtoolkit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "开发者工具箱",
   "author": "Long",
   "description": "面向开发者的编码、解码、转换与识别工具，支持 Base64、时间戳、UUID、Hash、URL、进制、Unicode 等一站式转换",
@@ -41,7 +41,6 @@
     "search_in_background": false
   },
   "default_settings": {
-    "theme": "dark",
-    "auto_copy": true
+    "auto_start": false
   }
 }

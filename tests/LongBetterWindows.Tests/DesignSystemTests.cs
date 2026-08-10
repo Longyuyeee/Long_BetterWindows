@@ -901,6 +901,30 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void DeveloperToolkit_UsesStrictConversionsAndExplicitClipboardWrites()
+    {
+        var root = FindRepositoryRoot();
+        var manifest = File.ReadAllText(Path.Combine(root, "src", "DevToolkit", "manifest.json"));
+        var html = File.ReadAllText(Path.Combine(root, "src", "DevToolkit", "index.html"));
+
+        Assert.Contains("\"version\": \"1.1.0\"", manifest);
+        Assert.Contains("new TextDecoder('utf-8', { fatal: true", html);
+        Assert.Contains("function parseLocalDate(value)", html);
+        Assert.Contains("function parseInteger(value, base)", html);
+        Assert.Contains("const parsed = BigInt", html);
+        Assert.Contains("crypto.getRandomValues", html);
+        Assert.Contains("function invalidateResult(id)", html);
+        Assert.Contains("data-copy-result=\"base64Result\"", html);
+        Assert.Contains("button.disabled = !copyable", html);
+        Assert.Contains("['value', 'date', 'timestamp-pair', 'bases'].includes(state.kind)", html);
+        Assert.DoesNotContain("hashMD5", html);
+        Assert.DoesNotContain("Math.random", html);
+        Assert.DoesNotContain("autoCopy", html);
+        Assert.DoesNotContain("unescape(", html);
+        Assert.DoesNotContain("escape(atob", html);
+    }
+
+    [Fact]
     public void NativeUiBatch_UsesSemanticStylesAndDeclaresCommandEntries()
     {
         var root = FindRepositoryRoot();
