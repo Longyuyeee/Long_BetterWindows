@@ -14,6 +14,8 @@ public sealed class ClipboardHistoryBackgroundPlugin :
     private const string StorageKey = "clipboard_history";
     private const string Hotkey = "Ctrl+Shift+V";
     private const int MaxItems = 500;
+    private const int MaxItemCharacters = 65536;
+    private const int MaxTotalCharacters = 1000000;
     private const int MaxStorageAttempts = 8;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -30,7 +32,7 @@ public sealed class ClipboardHistoryBackgroundPlugin :
 
     public string Id => "com.long.clipboardhistory";
     public string Name => "Clipboard history background";
-    public string Version => "1.1.0";
+    public string Version => "1.2.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
     public event Action? OpenRequested;
 
@@ -111,6 +113,14 @@ public sealed class ClipboardHistoryBackgroundPlugin :
         {
             return;
         }
+        if (args.Text.Length > MaxItemCharacters)
+        {
+            Log.Warning(
+                "[ClipboardHistory.Background] 忽略超限剪贴板文本，Characters={Characters}, Limit={Limit}",
+                args.Text.Length,
+                MaxItemCharacters);
+            return;
+        }
 
         lock (_queueLock)
         {
@@ -146,8 +156,7 @@ public sealed class ClipboardHistoryBackgroundPlugin :
                     Type = "text",
                     Timestamp = DateTimeOffset.UtcNow,
                 });
-                if (items.Count > MaxItems)
-                    items.RemoveRange(MaxItems, items.Count - MaxItems);
+                TrimHistory(items);
 
                 var result = await _storage.CompareExchangeAsync(
                     StorageKey,
@@ -203,8 +212,31 @@ public sealed class ClipboardHistoryBackgroundPlugin :
         {
             Log.Warning(
                 exception,
-                "[ClipboardHistory.Background] 现有历史格式无效，将从新记录恢复");
-            return new HistorySnapshot(true, result.Data, []);
+                "[ClipboardHistory.Background] 现有历史格式无效，拒绝覆盖原数据");
+            return new HistorySnapshot(false, result.Data, []);
+        }
+    }
+
+    private static void TrimHistory(List<HistoryItem> items)
+    {
+        var totalCharacters = 0;
+        var acceptedItems = 0;
+        for (var index = 0; index < items.Count;)
+        {
+            var content = items[index].Content;
+            var keep = !string.IsNullOrWhiteSpace(content)
+                && content.Length <= MaxItemCharacters
+                && acceptedItems < MaxItems
+                && totalCharacters + content.Length <= MaxTotalCharacters;
+            if (!keep)
+            {
+                items.RemoveAt(index);
+                continue;
+            }
+
+            totalCharacters += content.Length;
+            acceptedItems++;
+            index++;
         }
     }
 

@@ -61,6 +61,8 @@
     const storageKey = 'clipboard_history';
     const hotkey = 'Ctrl+Shift+V';
     const maxItems = 500;
+    const maxItemCharacters = 65536;
+    const maxTotalCharacters = 1000000;
     const maxStorageAttempts = 8;
     const fallbackIntervalMs = 15000;
     const historyList = document.getElementById('historyList');
@@ -210,7 +212,7 @@
 
     function normalizeHistory(value) {
       if (!Array.isArray(value)) return [];
-      return value
+      return trimHistory(value
         .filter(function (item) {
           return item && typeof item.content === 'string' && item.content.trim();
         })
@@ -224,8 +226,23 @@
               ? new Date().toISOString()
               : timestamp.toISOString()
           };
-        })
-        .slice(0, maxItems);
+        }));
+    }
+
+    function trimHistory(items) {
+      const limited = [];
+      let totalCharacters = 0;
+      for (const item of items) {
+        if (limited.length >= maxItems) break;
+        const length = item.content.length;
+        if (length > maxItemCharacters
+          || totalCharacters + length > maxTotalCharacters) {
+          continue;
+        }
+        limited.push(item);
+        totalCharacters += length;
+      }
+      return limited;
     }
 
     function createId() {
@@ -294,7 +311,7 @@
               settings.successFallback || settings.successKey,
               settings.successValues);
           }
-          return result.changed;
+          return { success: true, changed: result.changed };
         } catch (error) {
           try {
             history = await loadHistory();
@@ -311,7 +328,7 @@
                 ? error.message
                 : t('error.historySave', '历史记录保存失败')
             });
-          return false;
+          return { success: false, changed: false };
         }
       });
       mutationQueue = operation.catch(function () { });
@@ -319,7 +336,12 @@
     }
 
     function addText(content, announce) {
-      if (typeof content !== 'string' || !content.trim()) return Promise.resolve(false);
+      if (typeof content !== 'string' || !content.trim()) {
+        return Promise.resolve('empty');
+      }
+      if (content.length > maxItemCharacters) {
+        return Promise.resolve('too-large');
+      }
       return queueMutation(function (items) {
         if (items[0] && items[0].content === content) return null;
         const next = items.filter(function (item) { return item.content !== content; });
@@ -329,13 +351,16 @@
           type: 'text',
           timestamp: new Date().toISOString()
         });
-        return next.slice(0, maxItems);
+        return trimHistory(next);
       }, announce
         ? {
           successKey: 'status.currentAdded',
           successFallback: '当前剪贴板已加入历史'
         }
-        : {});
+        : {}).then(function (result) {
+          if (!result.success) return 'failed';
+          return result.changed ? 'added' : 'duplicate';
+        });
     }
 
     function inSelectedRange(item) {
@@ -363,19 +388,23 @@
           'aria-selected',
           String(button.dataset.range === currentRange));
       });
-      countBadge.textContent = t(
-        'history.count',
-        '{count} 条记录',
-        { count: history.length });
+      countBadge.textContent = history.length === 1
+        ? t('history.countOne', '1 条记录')
+        : t(
+          'history.count',
+          '{count} 条记录',
+          { count: history.length });
       resultSummary.textContent = hasFilter
         ? t(
           'history.filteredSummary',
           '显示 {visible} / {total} 条',
           { visible: visible.length, total: history.length })
-        : t(
-          'history.totalSummary',
-          '共 {count} 条本地记录',
-          { count: history.length });
+        : history.length === 1
+          ? t('history.totalSummaryOne', '共 1 条本地记录')
+          : t(
+            'history.totalSummary',
+            '共 {count} 条本地记录',
+            { count: history.length });
       clearButton.disabled = history.length === 0;
       historyList.replaceChildren();
 
@@ -435,12 +464,19 @@
       try {
         const response = await long.clipboard.setText(item.content);
         responseData(response, t('error.clipboardWrite', '写入剪贴板失败'));
-        await addText(item.content, false);
-        setStatus(
-          'status.copied',
-          'success',
-          '已复制 · {count} 个字符',
-          { count: item.content.length });
+        const outcome = await addText(item.content, false);
+        if (outcome === 'failed') {
+          setStatus(
+            'status.copiedHistoryFailed',
+            'warning',
+            '已复制，但历史记录更新失败');
+        } else {
+          setStatus(
+            'status.copied',
+            'success',
+            '已复制 · {count} 个字符',
+            { count: item.content.length });
+        }
       } catch (error) {
         setStatus(
           'status.writeFailed',
@@ -481,13 +517,19 @@
           const text = responseData(
             response,
             t('error.clipboardRead', '读取剪贴板失败')) || '';
-          const added = await addText(text, announce);
+          const outcome = await addText(text, announce);
           if (announce && !text.trim()) {
             setStatus(
               'status.clipboardEmpty',
               'warning',
               '当前剪贴板没有文本内容');
-          } else if (announce && !added) {
+          } else if (announce && outcome === 'too-large') {
+            setStatus(
+              'status.clipboardTooLarge',
+              'danger',
+              '当前剪贴板文本过长，最多保存 {count} 个字符',
+              { count: maxItemCharacters });
+          } else if (announce && outcome === 'duplicate') {
             setStatus(
               'status.alreadyLatest',
               'success',
@@ -632,7 +674,7 @@
       isClearing = false;
       window.LongUI?.setBusy(confirmClearButton, false);
       renderActionState();
-      if (cleared) clearDialog.close();
+      if (cleared.success && cleared.changed) clearDialog.close();
     });
     document.querySelectorAll('[data-range]').forEach(function (button) {
       button.addEventListener('click', function () {

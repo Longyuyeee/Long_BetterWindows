@@ -237,6 +237,12 @@ public class DesignSystemTests
         Assert.Contains("kind: 'error'", clipboardHistory);
         Assert.Contains("long.clipboard.startMonitoring(handleClipboardChanged)", clipboardHistory);
         Assert.Contains("long.clipboard.stopMonitoring()", clipboardHistory);
+        Assert.Contains("const maxItemCharacters = 65536", clipboardHistory);
+        Assert.Contains("const maxTotalCharacters = 1000000", clipboardHistory);
+        Assert.Contains("return Promise.resolve('too-large')", clipboardHistory);
+        Assert.Contains("return { success: false, changed: false }", clipboardHistory);
+        Assert.Contains("if (!result.success) return 'failed'", clipboardHistory);
+        Assert.Contains("outcome === 'duplicate'", clipboardHistory);
         Assert.Contains("mutationQueue", clipboardHistory);
         Assert.Contains("history = previous", clipboardHistory);
         Assert.DoesNotContain("long.hotkey.register", clipboardHistory);

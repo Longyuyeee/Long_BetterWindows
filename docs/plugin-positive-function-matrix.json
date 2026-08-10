@@ -80,6 +80,21 @@
           "level": "component",
           "path": "tests/LongBetterWindows.Tests/ClipboardMonitoringLeaseManagerTests.cs",
           "symbol": "MultipleConsumers_StartOnceAndStopAfterLastRelease"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ClipboardHistoryBackgroundTests.cs",
+          "symbol": "OversizedClipboardText_IsNotPersisted"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ClipboardHistoryBackgroundTests.cs",
+          "symbol": "MalformedHistory_IsNotOverwrittenByClipboardEvent"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ClipboardHistoryBackgroundTests.cs",
+          "symbol": "PersistedHistory_RespectsAggregateCharacterBudget"
         }
       ],
       "manual_checks": [

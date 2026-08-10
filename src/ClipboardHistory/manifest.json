@@ -1,6 +1,6 @@
 {
   "id": "com.long.clipboardhistory",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "剪贴板历史",
   "author": "Long",
   "description": "在后台记录文本剪贴板历史，支持按关键词和时间检索并快速重新复制",
@@ -50,6 +50,8 @@
   "default_settings": {
     "hotkey": "Ctrl+Shift+V",
     "max_items": 500,
+    "max_item_characters": 65536,
+    "max_total_characters": 1000000,
     "auto_start": true
   }
 }
