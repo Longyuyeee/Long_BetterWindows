@@ -63,19 +63,27 @@
       "input": "fixture command text",
       "fixture": {
         "schema_version": 1,
-        "clipboard": { "text": "fixture clipboard seed" },
+        "clipboard": { "text": "  fixture clipboard seed  " },
         "storage": { "values": {} }
       },
       "expected_success": true,
-      "allowed_api_methods": ["storage.get", "storage.set"],
+      "allowed_api_methods": [
+        "storage.get",
+        "storage.set",
+        "clipboard.startMonitoring",
+        "clipboard.getText"
+      ],
       "expected_fixture_calls": {
         "storage.get": 2,
-        "storage.set": 1
+        "storage.set": 2,
+        "clipboard.startMonitoring": 1,
+        "clipboard.getText": 1
       },
       "expected_storage_contains": [
-        { "key": "clip_history", "contains": "fixture command text" }
+        { "key": "clip_history", "contains": "fixture command text" },
+        { "key": "clip_history", "contains": "  fixture clipboard seed  " }
       ],
-      "expected_monitoring_lease_count": 0
+      "expected_monitoring_lease_count": 1
     },
     {
       "id": "clipboard-tool-write-failure",
@@ -92,12 +100,19 @@
         }
       },
       "expected_success": false,
-      "allowed_api_methods": ["storage.get", "storage.set"],
+      "allowed_api_methods": [
+        "storage.get",
+        "storage.set",
+        "clipboard.startMonitoring",
+        "clipboard.getText"
+      ],
       "expected_fixture_calls": {
         "storage.get": 2,
-        "storage.set": 1
+        "storage.set": 1,
+        "clipboard.startMonitoring": 1,
+        "clipboard.getText": 1
       },
-      "expected_monitoring_lease_count": 0
+      "expected_monitoring_lease_count": 1
     },
     {
       "id": "developer-toolkit-open",

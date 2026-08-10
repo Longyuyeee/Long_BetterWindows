@@ -1,11 +1,11 @@
 {
   "id": "com.long.clipboard-tool",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "剪贴板工具箱",
   "author": "Long",
   "entry_point": "index.html",
   "runtime": "webview",
-  "capabilities": ["system.clipboard", "storage.local"],
+  "capabilities": ["system.clipboard", "system.clipboard.monitor", "storage.local"],
   "commands": [
     {
       "id": "clipboard.open",
@@ -32,5 +32,10 @@
       "en-US": "i18n/en-US.json"
     }
   },
-  "default_settings": {"auto_start": false}
+  "default_settings": {
+    "auto_start": false,
+    "max_items": 50,
+    "max_item_characters": 65536,
+    "max_collection_characters": 500000
+  }
 }

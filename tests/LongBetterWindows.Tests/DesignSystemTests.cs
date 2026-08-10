@@ -879,7 +879,7 @@ public class DesignSystemTests
     }
 
     [Fact]
-    public void ClipboardTool_DoesNotClaimUnusedGlobalHotkey()
+    public void ClipboardTool_UsesEventMonitoringAndBoundedHistory()
     {
         var root = FindRepositoryRoot();
         var manifest = File.ReadAllText(Path.Combine(
@@ -888,7 +888,15 @@ public class DesignSystemTests
             root, "src", "ClipboardTool", "index.html"));
 
         Assert.DoesNotContain("system.hotkey", manifest);
+        Assert.Contains("system.clipboard.monitor", manifest);
         Assert.Contains("visibilitychange", html);
+        Assert.Contains("long.clipboard.startMonitoring(handleClipboardChanged)", html);
+        Assert.Contains("long.clipboard.stopMonitoring()", html);
+        Assert.Contains("const fallbackIntervalMs = 15000", html);
+        Assert.Contains("const maxItemCharacters = 65536", html);
+        Assert.Contains("const maxCollectionCharacters = 500000", html);
+        Assert.DoesNotContain("setInterval(captureClipboard, 1800)", html);
+        Assert.DoesNotContain("|| '').trim()", html);
         Assert.Contains("replaceChildren", html);
     }
 

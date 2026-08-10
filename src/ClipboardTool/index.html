@@ -46,6 +46,10 @@
   <script>
     const historyKey = 'clip_history';
     const pinnedKey = 'clip_pinned';
+    const maxItems = 50;
+    const maxItemCharacters = 65536;
+    const maxCollectionCharacters = 500000;
+    const fallbackIntervalMs = 15000;
     const listElement = document.getElementById('clipList');
     const searchInput = document.getElementById('searchInput');
     const content = document.getElementById('content');
@@ -54,7 +58,8 @@
     let pinned = [];
     let currentTab = 'history';
     let lastClipboard = '';
-    let monitor = 0;
+    let monitorStarted = false;
+    let fallbackTimer = 0;
     let captureRequest = null;
     let mutationQueue = Promise.resolve();
     let strings = {};
@@ -82,7 +87,7 @@
     function setStatus(key, kind, fallback, values) {
       currentStatus = { key, kind, fallback: fallback || '', values: values || {} };
       const message = renderStatus();
-      window.LongUI?.announce(message);
+      if (message) window.LongUI?.announce(message);
     }
 
     function renderListState() {
@@ -125,7 +130,7 @@
 
     function normalizeItems(value, limit) {
       if (!Array.isArray(value)) return [];
-      return value
+      return trimItems(value
         .filter(function (item) {
           return item && typeof item.text === 'string' && item.text.trim();
         })
@@ -134,8 +139,23 @@
             text: item.text,
             time: Number.isFinite(Number(item.time)) ? Number(item.time) : Date.now()
           };
-        })
-        .slice(0, limit);
+        }), limit);
+    }
+
+    function trimItems(items, limit) {
+      const limited = [];
+      let totalCharacters = 0;
+      for (const item of items) {
+        if (limited.length >= limit) break;
+        const length = item.text.length;
+        if (length > maxItemCharacters
+          || totalCharacters + length > maxCollectionCharacters) {
+          continue;
+        }
+        limited.push(item);
+        totalCharacters += length;
+      }
+      return limited;
     }
 
     function responseData(response, fallbackMessage) {
@@ -147,14 +167,20 @@
 
     async function initialize() {
       listState = 'loading';
+      stopFallbackPolling();
       renderListState();
       try {
         const historyResult = await long.storage.get(historyKey);
         const pinnedResult = await long.storage.get(pinnedKey);
         if (!historyResult.success) throw new Error(historyResult.error || t('error.historyRead', '历史记录读取失败'));
         if (!pinnedResult.success) throw new Error(pinnedResult.error || t('error.pinnedRead', '固定记录读取失败'));
-        if (historyResult.data) history = normalizeItems(JSON.parse(historyResult.data), 50);
-        if (pinnedResult.data) pinned = normalizeItems(JSON.parse(pinnedResult.data), 50);
+        history = normalizeItems(
+          historyResult.data ? JSON.parse(historyResult.data) : [],
+          maxItems);
+        pinned = normalizeItems(
+          pinnedResult.data ? JSON.parse(pinnedResult.data) : [],
+          maxItems);
+        lastClipboard = '';
       } catch (error) {
         listState = 'error';
         loadErrorDetail = error && error.message ? error.message : String(error);
@@ -164,26 +190,74 @@
       }
       listState = 'ready';
       render();
-      startMonitor();
+      await startMonitor();
       return true;
     }
 
-    function startMonitor() {
-      if (monitor || document.hidden) return;
-      monitor = window.setInterval(captureClipboard, 1800);
+    async function startMonitor() {
+      if (monitorStarted || fallbackTimer || document.hidden) return;
+      try {
+        const response = await long.clipboard.startMonitoring(handleClipboardChanged);
+        responseData(response, t('error.monitor', '剪贴板监听启动失败'));
+        monitorStarted = true;
+      } catch (error) {
+        startFallbackPolling();
+        setStatus(
+          'status.monitorFallback',
+          'warning',
+          '剪贴板事件监听不可用，已启用低频同步：{detail}',
+          {
+            detail: error && error.message
+              ? error.message
+              : t('error.monitor', '剪贴板监听启动失败')
+          });
+      }
+      await captureClipboard();
     }
 
-    function stopMonitor() { window.clearInterval(monitor); monitor = 0; }
+    function startFallbackPolling() {
+      if (fallbackTimer) return;
+      fallbackTimer = window.setInterval(captureClipboard, fallbackIntervalMs);
+    }
+
+    function stopFallbackPolling() {
+      window.clearInterval(fallbackTimer);
+      fallbackTimer = 0;
+    }
+
+    async function stopMonitor() {
+      stopFallbackPolling();
+      if (!monitorStarted) return;
+      monitorStarted = false;
+      try {
+        const response = await long.clipboard.stopMonitoring();
+        responseData(response, t('error.monitorStop', '剪贴板监听停止失败'));
+      } catch (_) { }
+    }
+
+    async function storeCapturedText(text) {
+      if (typeof text !== 'string' || !text.trim()) return 'empty';
+      if (text === lastClipboard) return 'duplicate';
+      const outcome = await addHistory(text);
+      if (outcome === 'added' || outcome === 'duplicate') lastClipboard = text;
+      return outcome;
+    }
+
+    function handleClipboardChanged(event) {
+      if (event && event.content_type === 'text' && typeof event.text === 'string') {
+        void storeCapturedText(event.text);
+      }
+    }
 
     async function captureClipboard() {
       if (captureRequest) return captureRequest;
       captureRequest = (async function () {
         try {
           const response = await long.clipboard.getText();
-          const text = (responseData(response, t('error.clipboardRead', '读取剪贴板失败')) || '').trim();
-          if (text && text !== lastClipboard && await addHistory(text)) {
-            lastClipboard = text;
-          }
+          const text = responseData(
+            response,
+            t('error.clipboardRead', '读取剪贴板失败')) || '';
+          await storeCapturedText(text);
         } catch (_) { }
         finally { captureRequest = null; }
       })();
@@ -229,12 +303,17 @@
     }
 
     function addHistory(text) {
-      if (typeof text !== 'string' || !text.trim()) return Promise.resolve(true);
+      if (typeof text !== 'string' || !text.trim()) return Promise.resolve('empty');
+      if (text.length > maxItemCharacters) return Promise.resolve('too-large');
+      if (history[0] && history[0].text === text) return Promise.resolve('duplicate');
       return mutateCollection('history', function (items) {
         if (items[0] && items[0].text === text) return null;
         const next = items.filter(function (item) { return item.text !== text; });
         next.unshift({ text: text, time: Date.now() });
-        return next.slice(0, 50);
+        return trimItems(next, maxItems);
+      }).then(function (success) {
+        if (!success) return 'failed';
+        return history[0] && history[0].text === text ? 'added' : 'duplicate';
       });
     }
 
@@ -307,7 +386,13 @@
       try {
         const response = await long.clipboard.setText(item.text);
         responseData(response, t('error.clipboardWrite', '写入剪贴板失败'));
-        if (await addHistory(item.text)) {
+        const outcome = await addHistory(item.text);
+        if (outcome === 'failed') {
+          setStatus(
+            'status.copiedHistoryFailed',
+            'warning',
+            '已复制，但历史记录更新失败');
+        } else {
           lastClipboard = item.text;
           setStatus('status.copied', 'success', '已复制 · {count} 字符', { count: item.text.length });
         }
@@ -321,7 +406,7 @@
       await mutateCollection('pinned', function (items) {
         const next = items.filter(function (entry) { return entry.text !== item.text; });
         if (!isPinned) next.unshift({ text: item.text, time: Date.now() });
-        return next.slice(0, 50);
+        return trimItems(next, maxItems);
       }, isPinned
         ? { key: 'status.unpinned', fallback: '已取消固定', values: {} }
         : { key: 'status.pinned', fallback: '记录已固定', values: {} });
@@ -348,7 +433,19 @@
       try {
         const response = await long.clipboard.setText(content.value);
         responseData(response, t('error.clipboardWrite', '写入剪贴板失败'));
-        if (await addHistory(content.value)) {
+        const outcome = await addHistory(content.value);
+        if (outcome === 'failed') {
+          setStatus(
+            'status.writtenHistoryFailed',
+            'warning',
+            '已写入剪贴板，但历史记录保存失败');
+        } else if (outcome === 'too-large') {
+          setStatus(
+            'status.writtenHistorySkipped',
+            'warning',
+            '已写入剪贴板；文本超过 {count} 字符，未加入历史',
+            { count: maxItemCharacters });
+        } else {
           lastClipboard = content.value;
           setStatus('status.written', 'success', '内容已写入剪贴板');
         }
@@ -381,7 +478,10 @@
       if (event.ctrlKey && event.key.toLocaleLowerCase() === 'f') { event.preventDefault(); selectTab('history'); searchInput.focus(); }
       else if (event.ctrlKey && event.key === 'Enter' && currentTab === 'tools') { event.preventDefault(); writeClipboard(); }
     });
-    document.addEventListener('visibilitychange', function () { document.hidden ? stopMonitor() : startMonitor(); });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) void stopMonitor();
+      else void startMonitor();
+    });
     window.LongUI?.onCommand(async function (command) {
       if (!await initializationPromise) {
         return {
@@ -393,7 +493,17 @@
       selectTab('tools');
       if (text) {
         content.value = text;
-        if (!await addHistory(text)) {
+        const outcome = await addHistory(text);
+        if (outcome === 'too-large') {
+          return {
+            success: false,
+            message: t(
+              'status.historyTooLarge',
+              '文本超过 {count} 字符，未加入历史',
+              { count: maxItemCharacters })
+          };
+        }
+        if (outcome === 'failed') {
           return {
             success: false,
             message: t('status.localSaveFailed', '本地记录保存失败')
@@ -409,6 +519,8 @@
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });
+    window.addEventListener('pagehide', function () { void stopMonitor(); });
+    window.addEventListener('beforeunload', function () { void stopMonitor(); });
     const initializationPromise = initialize();
   </script>
 </body>
