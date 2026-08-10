@@ -300,6 +300,27 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.Contains("status.outOfRange", source);
     }
 
+    [Fact]
+    public void UrlToolkit_InvalidatesStaleResultsAndSeparatesEncodingErrors()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "UrlToolkit",
+            "index.html"));
+
+        Assert.Contains("function clearResult()", source);
+        Assert.Contains("input.addEventListener('input', invalidateResult)", source);
+        Assert.Contains("copyButton.disabled = true", source);
+        Assert.Contains("copyButton.disabled = false", source);
+        Assert.Contains("Array.from(output.value).length", source);
+        Assert.Contains("setStatus('error.emptyInput'", source);
+        Assert.Contains("setStatus('error.decode'", source);
+        Assert.Contains("setStatus('error.encode'", source);
+        Assert.Contains("setStatus('error.clipboardEmpty'", source);
+        Assert.Contains("input.value = window.LongUI.commandText(command) || ''", source);
+    }
+
     [Theory]
     [InlineData("ClipboardTool", "content.value = text", "let currentTab = 'history'")]
     [InlineData("QuickNotePlugin", "if (input.value.trim() === text) input.value = ''", "let notes = []")]

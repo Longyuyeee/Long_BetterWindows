@@ -690,7 +690,7 @@ public class DesignSystemTests
             Assert.Equal(PluginCommandOutputType.Text, output.Type);
         });
         Assert.Contains("outputs: { result: { type: 'text', value: output.value } }", page);
-        Assert.Contains("output.value.length > 65536", page);
+        Assert.Contains("transformed.length > 65536", page);
         Assert.Contains("return transform(command.command_id === 'url.decode'", page);
     }
 

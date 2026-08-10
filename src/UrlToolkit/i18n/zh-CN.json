@@ -22,9 +22,12 @@
   "status.encoded": "URL 编码完成",
   "status.decoded": "URL 解码完成",
   "status.copied": "结果已复制",
+  "error.emptyInput": "请输入要处理的内容",
   "error.outputTooLong": "处理结果超过 65,536 个字符，无法作为命令输出",
   "error.commandOutputTooLong": "URL 处理结果超过命令输出上限",
-  "error.decode": "内容无法解码：{detail}",
+  "error.decode": "内容不是有效的 URL 编码",
+  "error.encode": "内容包含无法进行 URL 编码的字符",
+  "error.clipboardEmpty": "剪贴板中没有文本",
   "error.clipboardRead": "无法读取剪贴板",
   "error.copy": "复制失败"
 }

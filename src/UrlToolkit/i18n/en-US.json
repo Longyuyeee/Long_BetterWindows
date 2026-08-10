@@ -22,9 +22,12 @@
   "status.encoded": "URL encoding complete",
   "status.decoded": "URL decoding complete",
   "status.copied": "Result copied",
+  "error.emptyInput": "Enter content to process",
   "error.outputTooLong": "The result exceeds 65,536 characters and cannot be returned as command output",
   "error.commandOutputTooLong": "The URL result exceeds the command output limit",
-  "error.decode": "This content could not be decoded: {detail}",
+  "error.decode": "The content is not valid URL encoding",
+  "error.encode": "The content contains characters that cannot be URL-encoded",
+  "error.clipboardEmpty": "The clipboard does not contain text",
   "error.clipboardRead": "The clipboard could not be read",
   "error.copy": "Copy failed"
 }

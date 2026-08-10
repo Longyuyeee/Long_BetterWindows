@@ -29,7 +29,7 @@
       <div class="long-card long-field">
         <label class="long-field-label" for="output" data-i18n="field.output">结果</label>
         <textarea class="long-editor" id="output" placeholder="处理结果将在这里显示" readonly></textarea>
-        <div class="long-toolbar"><div id="status" class="long-status" role="status" aria-live="polite"></div><span class="long-toolbar__spacer"></span><button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制结果</button></div>
+        <div class="long-toolbar"><div id="status" class="long-status" role="status" aria-live="polite"></div><span class="long-toolbar__spacer"></span><button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy" disabled>复制结果</button></div>
       </div>
     </section>
   </main>
@@ -38,6 +38,7 @@
     const output = document.getElementById('output');
     const status = document.getElementById('status');
     const stat = document.getElementById('stat');
+    const copyButton = document.getElementById('copyButton');
     let strings = {};
     let hasResult = false;
     let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
@@ -52,7 +53,7 @@
     function renderStat() {
       stat.textContent = hasResult
         ? t('stat.characters', '{count} 字符', {
-            count: output.value.length.toLocaleString(document.documentElement.lang)
+            count: Array.from(output.value).length.toLocaleString(document.documentElement.lang)
           })
         : t('page.waiting', '等待输入');
     }
@@ -62,7 +63,7 @@
       const message = t(key, fallback, currentStatus.values);
       status.textContent = message;
       status.className = 'long-status ' + (kind ? 'long-status--' + kind : '');
-      window.LongUI?.announce(message);
+      if (message) window.LongUI?.announce(message);
       return message;
     }
 
@@ -92,12 +93,29 @@
       }
     }
 
+    function clearResult() {
+      output.value = '';
+      hasResult = false;
+      copyButton.disabled = true;
+      renderStat();
+    }
+
+    function invalidateResult() {
+      clearResult();
+      setStatus('', '', '');
+    }
+
     function transform(mode) {
+      clearResult();
+      if (input.value.length === 0) {
+        const message = setStatus('error.emptyInput', 'danger', '请输入要处理的内容');
+        return { success: false, message: message, outputs: {} };
+      }
       try {
-        output.value = mode === 'decode' ? decodeURIComponent(input.value.replace(/\+/g, ' ')) : encodeURIComponent(input.value);
-        hasResult = true;
-        renderStat();
-        if (output.value.length > 65536) {
+        const transformed = mode === 'decode'
+          ? decodeURIComponent(input.value.replace(/\+/g, ' '))
+          : encodeURIComponent(input.value);
+        if (transformed.length > 65536) {
           setStatus('error.outputTooLong', 'danger', '处理结果超过 65,536 个字符，无法作为命令输出');
           return {
             success: false,
@@ -105,6 +123,10 @@
             outputs: {}
           };
         }
+        output.value = transformed;
+        hasResult = true;
+        copyButton.disabled = false;
+        renderStat();
         const message = mode === 'decode'
           ? setStatus('status.decoded', 'success', 'URL 解码完成')
           : setStatus('status.encoded', 'success', 'URL 编码完成');
@@ -114,22 +136,21 @@
           outputs: { result: { type: 'text', value: output.value } }
         };
       } catch (error) {
-        const message = setStatus(
-          'error.decode',
-          'danger',
-          '内容无法解码：{detail}',
-          { detail: error && error.message ? error.message : String(error) });
+        const message = mode === 'decode'
+          ? setStatus('error.decode', 'danger', '内容不是有效的 URL 编码')
+          : setStatus('error.encode', 'danger', '内容包含无法进行 URL 编码的字符');
         return { success: false, message: message, outputs: {} };
       }
     }
-    async function paste() { try { const result = await long.clipboard.getText(); if (result.success) input.value = result.data || ''; else setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } }
+    async function paste() { try { const result = await long.clipboard.getText(); if (result.success) { input.value = result.data || ''; invalidateResult(); if (!input.value) setStatus('error.clipboardEmpty', 'danger', '剪贴板中没有文本'); } else setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); } }
     async function copy() { if (!output.value) return; try { const response = await long.clipboard.setText(output.value); if (!response || !response.success) throw new Error(response && response.error); setStatus('status.copied', 'success', '结果已复制'); } catch (_) { setStatus('error.copy', 'danger', '复制失败'); } }
     document.getElementById('encodeButton').addEventListener('click', function () { transform('encode'); });
     document.getElementById('decodeButton').addEventListener('click', function () { transform('decode'); });
     document.getElementById('pasteButton').addEventListener('click', paste);
     document.getElementById('copyButton').addEventListener('click', copy);
+    input.addEventListener('input', invalidateResult);
     document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); transform(event.shiftKey ? 'decode' : 'encode'); } });
-    window.LongUI?.onCommand(function (command) { const text = window.LongUI.commandText(command); if (text) input.value = text; return transform(command.command_id === 'url.decode' ? 'decode' : 'encode'); });
+    window.LongUI?.onCommand(function (command) { input.value = window.LongUI.commandText(command) || ''; return transform(command.command_id === 'url.decode' ? 'decode' : 'encode'); });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });
