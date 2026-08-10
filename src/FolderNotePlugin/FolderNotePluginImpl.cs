@@ -24,13 +24,14 @@ public class FolderNotePluginImpl :
     private string _configuredHotkey = "Alt+M";
     private string? _registeredHotkey;
     private AnchoredTextEditorWindow? _activeHud;
+    private readonly SemaphoreSlim _openGate = new(1, 1);
     private readonly List<WeakReference<HotkeySettingsControl>> _settings = [];
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.folder-note";
     public string Name => Text("plugin.name", "文件夹备注助手");
-    public string Version => "1.1.0";
+    public string Version => "1.2.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -85,21 +86,25 @@ public class FolderNotePluginImpl :
         if (_registeredHotkey != null)
             await _hotKey.UnregisterAsync(_registeredHotkey);
         _registeredHotkey = null;
-        Application.Current.Dispatcher.Invoke(() => _activeHud?.Close());
-        _activeHud = null;
 
-        State = PluginState.Stopped;
+        await _openGate.WaitAsync();
+        try
+        {
+            State = PluginState.Stopped;
+            Application.Current.Dispatcher.Invoke(() => _activeHud?.Close());
+            _activeHud = null;
+        }
+        finally
+        {
+            _openGate.Release();
+        }
+
         Log.Information("[FolderNotePlugin] 已停止");
         return true;
     }
 
-    private bool _isActive;
-
     private async void OnHotkeyTriggered()
     {
-        if (_isActive) return;
-        _isActive = true;
-
         try
         {
             await ShowNoteHudAsync();
@@ -108,14 +113,52 @@ public class FolderNotePluginImpl :
         {
             Log.Error(ex, "[FolderNotePlugin] 执行失败");
         }
-        finally
-        {
-            _isActive = false;
-        }
     }
 
     private async Task<PluginCommandResult> ShowNoteHudAsync(
-        string? requestedFolderPath = null)
+        string? requestedFolderPath = null,
+        CancellationToken cancellationToken = default)
+    {
+        await _openGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (State != PluginState.Running)
+            {
+                return PluginCommandResult.Failure(Text(
+                    "error.notRunning",
+                    "文件夹备注插件当前未运行。"));
+            }
+
+            var hasActiveEditor = Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (_activeHud is not { IsVisible: true })
+                {
+                    _activeHud = null;
+                    return false;
+                }
+
+                _activeHud.Activate();
+                return true;
+            });
+            if (hasActiveEditor)
+            {
+                var message = Text(
+                    "error.editorOpen",
+                    "已有文件夹备注编辑器打开，请先完成或关闭当前编辑。");
+                _ = _notification.ShowAsync(Name, message);
+                return PluginCommandResult.Failure(message);
+            }
+
+            return await OpenNoteHudAsync(requestedFolderPath);
+        }
+        finally
+        {
+            _openGate.Release();
+        }
+    }
+
+    private async Task<PluginCommandResult> OpenNoteHudAsync(
+        string? requestedFolderPath)
     {
         var shell = _host.ShellSelection;
         var ads = _host.ADS;
@@ -147,6 +190,8 @@ public class FolderNotePluginImpl :
                 "目标文件夹不存在。"));
         }
 
+        folderPath = Path.GetFullPath(folderPath);
+
         var noteResult = await ads.ReadAsync(folderPath, "long_note");
 
         string? existingNote = null;
@@ -160,9 +205,13 @@ public class FolderNotePluginImpl :
                 "[FolderNotePlugin] 备注读取失败: {Path}, {Error}",
                 folderPath,
                 noteResult.ErrorMessage);
-            var message = Text(
-                "error.loadFailed",
-                "文件夹备注读取失败，请检查权限后重试。");
+            var message = noteResult.ErrorCode == ApiErrorCode.NotNTFSVolume
+                ? Text(
+                    "error.notNTFS",
+                    "文件夹备注仅支持 NTFS 磁盘，当前文件系统无法保存备注。")
+                : Text(
+                    "error.loadFailed",
+                    "文件夹备注读取失败，请检查权限后重试。");
             _ = _notification.ShowAsync(Name, message);
             return PluginCommandResult.Failure(message);
         }
@@ -200,9 +249,14 @@ public class FolderNotePluginImpl :
                             "[FolderNotePlugin] 备注保存失败: {Path}, {Error}",
                             folderPath,
                             result.ErrorMessage);
-                        throw new InvalidOperationException(Text(
-                            "error.saveFailed",
-                            "文件夹备注保存失败，请重试。"));
+                        throw new InvalidOperationException(
+                            result.ErrorCode == ApiErrorCode.NotNTFSVolume
+                                ? Text(
+                                    "error.notNTFS",
+                                    "文件夹备注仅支持 NTFS 磁盘，当前文件系统无法保存备注。")
+                                : Text(
+                                    "error.saveFailed",
+                                    "文件夹备注保存失败，请重试。"));
                     }
 
                     Log.Information("[FolderNotePlugin] 备注已保存: {Path}", folderPath);
@@ -244,7 +298,7 @@ public class FolderNotePluginImpl :
             : invocation.InputType == LongBetterWindows.Host.Contracts.AcceptedInputType.ExplorerSelection
                 ? invocation.Paths.FirstOrDefault(Directory.Exists)
                 : null;
-        return await ShowNoteHudAsync(folderPath);
+        return await ShowNoteHudAsync(folderPath, cancellationToken);
     }
 
     public void ShowMainUI() => OnHotkeyTriggered();

@@ -31,7 +31,7 @@
     ],
     "high_risk_boundary_required_plugin_count": 7,
     "high_risk_boundary_required_command_count": 8,
-    "high_risk_boundary_required_case_count": 43,
+    "high_risk_boundary_required_case_count": 54,
     "quick_launch_isolation_script": "verify-quick-launch-isolation.ps1",
     "quick_launch_isolation_test_path": "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
     "quick_launch_isolation_required_case_count": 7,
@@ -270,11 +270,26 @@
       "risk": "high",
       "commands": ["folder-note.edit"],
       "automated_evidence": [
-        {
-          "level": "integration",
-          "path": "tests/LongBetterWindows.Tests/AdsServiceTransactionTests.cs",
-          "symbol": "WriteAsync_OverwritesAndReadsBackLargeUnicodeContent"
-        }
+          {
+            "level": "integration",
+            "path": "tests/LongBetterWindows.Tests/AdsServiceTransactionTests.cs",
+            "symbol": "WriteAsync_OverwritesAndReadsBackLargeUnicodeContent"
+          },
+          {
+            "level": "integration",
+            "path": "tests/LongBetterWindows.Tests/AdsServiceTransactionTests.cs",
+            "symbol": "ReadWriteDelete_UserLongNoteJsonIsIgnoredAndPreserved"
+          },
+          {
+            "level": "integration",
+            "path": "tests/LongBetterWindows.Tests/AdsServiceTransactionTests.cs",
+            "symbol": "RollbackAsync_RejectsLegacySidecarTargetsWithoutTouchingUserFile"
+          },
+          {
+            "level": "integration",
+            "path": "tests/LongBetterWindows.Tests/AdsServiceTransactionTests.cs",
+            "symbol": "ConcurrentWrites_AreSerializedWithoutPartialReads"
+          }
       ],
       "manual_checks": [
         {

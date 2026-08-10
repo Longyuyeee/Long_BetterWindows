@@ -153,7 +153,7 @@ public partial class AnchoredTextEditorWindow : Window
         try
         {
             if (_dirty)
-                await _onSave(Editor.Text.Trim());
+                await _onSave(Editor.Text);
             AnimateOpacity(1, 0, "Long.Motion.Fast", 150, closeOnComplete: true);
         }
         catch (Exception exception)

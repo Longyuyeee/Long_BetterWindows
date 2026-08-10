@@ -144,8 +144,7 @@ namespace LongBetterWindows.Host.Views
             {
                 if (_dirty && _onSave != null)
                 {
-                    var text = NoteTextBox.Text.Trim();
-                    await _onSave(text);
+                    await _onSave(NoteTextBox.Text);
                 }
 
                 Helpers.AnimationHelper.FadeOut(this, durationMs: 150);

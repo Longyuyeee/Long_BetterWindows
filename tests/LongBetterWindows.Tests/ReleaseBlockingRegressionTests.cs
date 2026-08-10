@@ -514,7 +514,9 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains(
             "Task<PluginCommandResult> CaptureFullScreenAsync(",
             screenshot);
-        Assert.Contains("return await ShowNoteHudAsync(folderPath)", folderNote);
+        Assert.Contains(
+            "return await ShowNoteHudAsync(folderPath, cancellationToken)",
+            folderNote);
         Assert.Contains("Application.Current.Dispatcher.Invoke(() => _activeHud?.Close())", folderNote);
     }
 
@@ -583,16 +585,65 @@ public sealed class ReleaseBlockingRegressionTests
             "src",
             "FolderNotePlugin",
             "FolderNotePluginImpl.cs"));
+        var floatingHud = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "FloatingHudWindow.xaml.cs"));
+        var adsService = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "ADSService.cs"));
+        var rollback = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "RollbackEngine.cs"));
+        var qualityRuntime = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "QualityRuntimeService.cs"));
+        var app = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "App.xaml.cs"));
 
         Assert.Contains("Func<string, Task> _onSave", hud);
-        Assert.Contains("await _onSave(Editor.Text.Trim())", hud);
+        Assert.Contains("await _onSave(Editor.Text)", hud);
+        Assert.DoesNotContain("Editor.Text.Trim()", hud);
+        Assert.Contains("await _onSave(NoteTextBox.Text)", floatingHud);
+        Assert.DoesNotContain("NoteTextBox.Text.Trim()", floatingHud);
         Assert.Contains("catch (Exception exception)", hud);
         Assert.Contains("if (!result.IsSuccess)", folderNote);
+        Assert.Contains("SemaphoreSlim _openGate", folderNote);
+        Assert.Contains("State != PluginState.Running", folderNote);
+        Assert.Contains("await _openGate.WaitAsync()", folderNote);
+        Assert.Contains("error.editorOpen", folderNote);
+        Assert.Contains("ApiErrorCode.NotNTFSVolume", folderNote);
         Assert.Contains(
             "noteResult.ErrorCode != ApiErrorCode.StreamNotFound",
             folderNote);
         Assert.Contains("\"error.loadFailed\"", folderNote);
         Assert.Contains("\"error.saveFailed\"", folderNote);
+        Assert.Contains("EnsureNoReparsePoint", adsService);
+        Assert.DoesNotContain("GetFallbackPath", adsService);
+        Assert.DoesNotContain("FolderNoteFallbackFileName", adsService);
+        Assert.Contains("ResolveAdsRollbackTarget", rollback);
+        Assert.Contains("ValidateRollbackTarget", rollback);
+        Assert.Contains("ValidateRollbackTarget", adsService);
+        Assert.Contains("rollback.AdsMutationGate", adsService);
+        Assert.Contains("lock (AdsMutationGate)", rollback);
+        Assert.Contains("\"folder-note\"", qualityRuntime);
+        Assert.Contains("OfType<AnchoredTextEditorWindow>()", qualityRuntime);
+        Assert.Contains("TaskCompletionSource", app);
+        Assert.Contains("await closed.Task", app);
     }
 
     [Fact]

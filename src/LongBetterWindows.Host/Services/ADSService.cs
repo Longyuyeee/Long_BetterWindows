@@ -1,6 +1,5 @@
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
@@ -13,14 +12,16 @@ namespace LongBetterWindows.Host.Services
     public sealed class ADSService : IADSService
     {
         private const string DefaultStreamName = "long_note";
-        private const string FolderNoteFallbackFileName = "long_note.json";
         private const int MaxContentBytes = 1024 * 1024;
+        private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
         private readonly RollbackEngine _rollback;
+        private readonly object _mutationGate;
 
         public ADSService(RollbackEngine rollback)
         {
             _rollback = rollback;
+            _mutationGate = rollback.AdsMutationGate;
         }
 
         public Task<HostApiResponse<string>> ReadAsync(
@@ -28,34 +29,26 @@ namespace LongBetterWindows.Host.Services
             string streamName)
             => Task.Run(() =>
             {
-                try
+                lock (_mutationGate)
                 {
-                    ValidateTarget(filePath);
-                    var snapshot = ReadSnapshot(filePath, streamName);
-                    return snapshot.Exists
-                        ? HostApiResponse<string>.Success(snapshot.Content ?? string.Empty)
-                        : HostApiResponse<string>.Failure(
-                            ApiErrorCode.StreamNotFound,
-                            "备用数据流不存在。");
-                }
-                catch (FileNotFoundException ex)
-                {
-                    return HostApiResponse<string>.Failure(
-                        ApiErrorCode.NotFound,
-                        ex.Message);
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    return HostApiResponse<string>.Failure(
-                        ApiErrorCode.PermissionDenied,
-                        ex.Message);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "ADS 读取失败: {Path}:{Stream}", filePath, streamName);
-                    return HostApiResponse<string>.Failure(
-                        ApiErrorCode.Win32Error,
-                        ex.Message);
+                    try
+                    {
+                        var targetPath = ResolveTarget(filePath);
+                        EnsureNtfsVolume(targetPath);
+                        var snapshot = ReadSnapshot(targetPath, streamName);
+                        return snapshot.Exists
+                            ? HostApiResponse<string>.Success(snapshot.Content ?? string.Empty)
+                            : HostApiResponse<string>.Failure(
+                                ApiErrorCode.StreamNotFound,
+                                "备用数据流不存在。");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "ADS 读取失败: {Path}:{Stream}", filePath, streamName);
+                        return HostApiResponse<string>.Failure(
+                            MapError(ex),
+                            ex.Message);
+                    }
                 }
             });
 
@@ -65,61 +58,59 @@ namespace LongBetterWindows.Host.Services
             string content)
             => Task.Run(() =>
             {
-                StorageSnapshot? oldSnapshot = null;
-                try
+                lock (_mutationGate)
                 {
-                    ArgumentNullException.ThrowIfNull(content);
-                    ValidateTarget(filePath);
-                    var bytes = Encoding.UTF8.GetBytes(content);
-                    if (bytes.Length > MaxContentBytes)
+                    StorageSnapshot? oldSnapshot = null;
+                    string? targetPath = null;
+                    try
                     {
+                        ArgumentNullException.ThrowIfNull(content);
+                        targetPath = ResolveTarget(filePath);
+                        EnsureNtfsVolume(targetPath);
+                        var bytes = StrictUtf8.GetBytes(content);
+                        if (bytes.Length > MaxContentBytes)
+                        {
+                            return HostApiResponse.Failure(
+                                ApiErrorCode.InvalidArgument,
+                                $"ADS 内容不能超过 {MaxContentBytes} 字节。");
+                        }
+
+                        oldSnapshot = ReadSnapshot(targetPath, streamName);
+                        ResolveTarget(targetPath);
+                        var target = BuildAdsPath(targetPath, streamName);
+
+                        WriteStorage(target, bytes);
+                        var written = ReadStorage(target);
+                        if (!written.AsSpan().SequenceEqual(bytes))
+                            throw new IOException("ADS 写入后的回读校验失败。");
+
+                        RecordAdsChange(
+                            ChangeAction.AdsWrite,
+                            targetPath,
+                            streamName,
+                            target,
+                            oldSnapshot,
+                            content);
+                        return HostApiResponse.Success();
+                    }
+                    catch (Exception ex)
+                    {
+                        var restored = RestoreSnapshotAfterFailure(
+                            targetPath ?? filePath,
+                            streamName,
+                            oldSnapshot);
+                        Log.Error(
+                            ex,
+                            "ADS 写入失败: {Path}:{Stream}; Restored={Restored}",
+                            filePath,
+                            streamName,
+                            restored);
                         return HostApiResponse.Failure(
-                            ApiErrorCode.InvalidArgument,
-                            $"ADS 内容不能超过 {MaxContentBytes} 字节。");
+                            MapError(ex),
+                            restored
+                                ? ex.Message
+                                : $"{ex.Message} 原备注恢复失败，请勿关闭编辑窗口。");
                     }
-
-                    oldSnapshot = ReadSnapshot(filePath, streamName);
-                    var target = IsNtfsVolume(filePath)
-                        ? BuildAdsPath(filePath, streamName)
-                        : GetFallbackPath(filePath, streamName);
-
-                    WriteStorage(target, bytes, IsAdsPath(target));
-                    var written = ReadStorage(target, IsAdsPath(target));
-                    if (!written.AsSpan().SequenceEqual(bytes))
-                        throw new IOException("ADS 写入后的回读校验失败。");
-
-                    if (oldSnapshot.Exists
-                        && !PathEquals(oldSnapshot.StoragePath, target))
-                    {
-                        DeleteStorage(oldSnapshot.StoragePath);
-                    }
-
-                    RecordAdsChange(
-                        ChangeAction.AdsWrite,
-                        filePath,
-                        streamName,
-                        target,
-                        oldSnapshot,
-                        content);
-                    return HostApiResponse.Success();
-                }
-                catch (Exception ex)
-                {
-                    var restored = RestoreSnapshotAfterFailure(
-                        filePath,
-                        streamName,
-                        oldSnapshot);
-                    Log.Error(
-                        ex,
-                        "ADS 写入失败: {Path}:{Stream}; Restored={Restored}",
-                        filePath,
-                        streamName,
-                        restored);
-                    return HostApiResponse.Failure(
-                        MapError(ex),
-                        restored
-                            ? ex.Message
-                            : $"{ex.Message} 原备注恢复失败，请勿关闭编辑窗口。");
                 }
             });
 
@@ -128,47 +119,53 @@ namespace LongBetterWindows.Host.Services
             string streamName)
             => Task.Run(() =>
             {
-                StorageSnapshot? oldSnapshot = null;
-                var storageDeleted = false;
-                try
+                lock (_mutationGate)
                 {
-                    ValidateTarget(filePath);
-                    oldSnapshot = ReadSnapshot(filePath, streamName);
-                    if (!oldSnapshot.Exists)
+                    StorageSnapshot? oldSnapshot = null;
+                    var storageDeleted = false;
+                    string? targetPath = null;
+                    try
+                    {
+                        targetPath = ResolveTarget(filePath);
+                        EnsureNtfsVolume(targetPath);
+                        oldSnapshot = ReadSnapshot(targetPath, streamName);
+                        if (!oldSnapshot.Exists)
+                            return HostApiResponse.Success();
+
+                        ResolveTarget(targetPath);
+                        DeleteStorage(oldSnapshot.StoragePath);
+                        storageDeleted = true;
+                        if (StorageExists(oldSnapshot.StoragePath))
+                            throw new IOException("删除备注后存储仍然存在。");
+
+                        RecordAdsChange(
+                            ChangeAction.AdsDelete,
+                            targetPath,
+                            streamName,
+                            oldSnapshot.StoragePath,
+                            oldSnapshot,
+                            null);
                         return HostApiResponse.Success();
-
-                    DeleteStorage(oldSnapshot.StoragePath);
-                    storageDeleted = true;
-                    if (StorageExists(oldSnapshot.StoragePath))
-                        throw new IOException("删除备注后存储仍然存在。");
-
-                    RecordAdsChange(
-                        ChangeAction.AdsDelete,
-                        filePath,
-                        streamName,
-                        oldSnapshot.StoragePath,
-                        oldSnapshot,
-                        null);
-                    return HostApiResponse.Success();
-                }
-                catch (Exception ex)
-                {
-                    var restored = !storageDeleted
-                        || RestoreSnapshotAfterFailure(
+                    }
+                    catch (Exception ex)
+                    {
+                        var restored = !storageDeleted
+                            || RestoreSnapshotAfterFailure(
+                                targetPath ?? filePath,
+                                streamName,
+                                oldSnapshot);
+                        Log.Error(
+                            ex,
+                            "ADS 删除失败: {Path}:{Stream}; Restored={Restored}",
                             filePath,
                             streamName,
-                            oldSnapshot);
-                    Log.Error(
-                        ex,
-                        "ADS 删除失败: {Path}:{Stream}; Restored={Restored}",
-                        filePath,
-                        streamName,
-                        restored);
-                    return HostApiResponse.Failure(
-                        MapError(ex),
-                        restored
-                            ? ex.Message
-                            : $"{ex.Message} 原备注恢复失败，请勿关闭编辑窗口。");
+                            restored);
+                        return HostApiResponse.Failure(
+                            MapError(ex),
+                            restored
+                                ? ex.Message
+                                : $"{ex.Message} 原备注恢复失败，请勿关闭编辑窗口。");
+                    }
                 }
             });
 
@@ -177,16 +174,20 @@ namespace LongBetterWindows.Host.Services
             string streamName)
             => Task.Run(() =>
             {
-                try
+                lock (_mutationGate)
                 {
-                    ValidateTarget(filePath);
-                    return HostApiResponse<bool>.Success(
-                        ReadSnapshot(filePath, streamName).Exists);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "ADS 存在检查失败: {Path}:{Stream}", filePath, streamName);
-                    return HostApiResponse<bool>.Failure(MapError(ex), ex.Message);
+                    try
+                    {
+                        var targetPath = ResolveTarget(filePath);
+                        EnsureNtfsVolume(targetPath);
+                        return HostApiResponse<bool>.Success(
+                            ReadSnapshot(targetPath, streamName).Exists);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "ADS 存在检查失败: {Path}:{Stream}", filePath, streamName);
+                        return HostApiResponse<bool>.Failure(MapError(ex), ex.Message);
+                    }
                 }
             });
 
@@ -195,8 +196,8 @@ namespace LongBetterWindows.Host.Services
             {
                 try
                 {
-                    ValidateTarget(filePath);
-                    return HostApiResponse<bool>.Success(IsNtfsVolume(filePath));
+                    var targetPath = ResolveTarget(filePath);
+                    return HostApiResponse<bool>.Success(IsNtfsVolume(targetPath));
                 }
                 catch (Exception ex)
                 {
@@ -209,23 +210,7 @@ namespace LongBetterWindows.Host.Services
             string streamName)
         {
             var adsPath = BuildAdsPath(filePath, streamName);
-            if (IsNtfsVolume(filePath))
-            {
-                var ads = TryReadAds(adsPath);
-                if (ads.Exists)
-                    return ads;
-            }
-
-            var fallbackPath = GetFallbackPath(filePath, streamName);
-            if (File.Exists(fallbackPath))
-            {
-                return new StorageSnapshot(
-                    true,
-                    Encoding.UTF8.GetString(ReadStorage(fallbackPath, false)),
-                    fallbackPath);
-            }
-
-            return new StorageSnapshot(false, null, adsPath);
+            return TryReadAds(adsPath);
         }
 
         private static StorageSnapshot TryReadAds(string adsPath)
@@ -251,7 +236,7 @@ namespace LongBetterWindows.Host.Services
                 var bytes = ReadHandle(handle);
                 return new StorageSnapshot(
                     true,
-                    Encoding.UTF8.GetString(bytes),
+                    StrictUtf8.GetString(bytes),
                     adsPath);
             }
             finally
@@ -262,15 +247,8 @@ namespace LongBetterWindows.Host.Services
 
         private static void WriteStorage(
             string storagePath,
-            byte[] bytes,
-            bool isAds)
+            byte[] bytes)
         {
-            if (!isAds)
-            {
-                WriteFallbackAtomically(storagePath, bytes);
-                return;
-            }
-
             var handle = CreateFileW(
                 storagePath,
                 GENERIC_WRITE,
@@ -312,15 +290,12 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
-        private static byte[] ReadStorage(string storagePath, bool isAds)
+        private static byte[] ReadStorage(string storagePath)
         {
-            if (!isAds)
-                return File.ReadAllBytes(storagePath);
-
             var snapshot = TryReadAds(storagePath);
             if (!snapshot.Exists)
                 throw new FileNotFoundException("ADS 回读时不存在。", storagePath);
-            return Encoding.UTF8.GetBytes(snapshot.Content ?? string.Empty);
+            return StrictUtf8.GetBytes(snapshot.Content ?? string.Empty);
         }
 
         private static byte[] ReadHandle(IntPtr handle)
@@ -344,29 +319,12 @@ namespace LongBetterWindows.Host.Services
                 if (bytesRead == 0)
                     break;
                 stream.Write(buffer, 0, checked((int)bytesRead));
+                if (stream.Length > MaxContentBytes)
+                    throw new InvalidDataException(
+                        $"ADS 内容不能超过 {MaxContentBytes} 字节。");
             }
 
             return stream.ToArray();
-        }
-
-        private static void WriteFallbackAtomically(string path, byte[] bytes)
-        {
-            var directory = Path.GetDirectoryName(path)
-                ?? throw new InvalidOperationException("回退文件目录无效。");
-            Directory.CreateDirectory(directory);
-            var temporaryPath = Path.Combine(
-                directory,
-                $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
-            try
-            {
-                File.WriteAllBytes(temporaryPath, bytes);
-                File.Move(temporaryPath, path, true);
-            }
-            finally
-            {
-                if (File.Exists(temporaryPath))
-                    File.Delete(temporaryPath);
-            }
         }
 
         private static bool RestoreSnapshotAfterFailure(
@@ -380,23 +338,14 @@ namespace LongBetterWindows.Host.Services
             try
             {
                 var adsPath = BuildAdsPath(filePath, streamName);
-                var fallbackPath = GetFallbackPath(filePath, streamName);
                 if (snapshot.Exists)
                 {
-                    var bytes = Encoding.UTF8.GetBytes(snapshot.Content ?? string.Empty);
-                    WriteStorage(
-                        snapshot.StoragePath,
-                        bytes,
-                        IsAdsPath(snapshot.StoragePath));
-                    if (!PathEquals(snapshot.StoragePath, adsPath))
-                        DeleteStorage(adsPath);
-                    if (!PathEquals(snapshot.StoragePath, fallbackPath))
-                        DeleteStorage(fallbackPath);
+                    var bytes = StrictUtf8.GetBytes(snapshot.Content ?? string.Empty);
+                    WriteStorage(snapshot.StoragePath, bytes);
                 }
                 else
                 {
                     DeleteStorage(adsPath);
-                    DeleteStorage(fallbackPath);
                 }
 
                 return true;
@@ -435,12 +384,35 @@ namespace LongBetterWindows.Host.Services
             });
         }
 
-        private static void ValidateTarget(string filePath)
+        private static string ResolveTarget(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentException("目标路径不能为空。", nameof(filePath));
-            if (!File.Exists(filePath) && !Directory.Exists(filePath))
-                throw new FileNotFoundException("目标文件或文件夹不存在。", filePath);
+            var fullPath = Path.GetFullPath(filePath);
+            if (!File.Exists(fullPath) && !Directory.Exists(fullPath))
+                throw new FileNotFoundException("目标文件或文件夹不存在。", fullPath);
+            EnsureNoReparsePoint(fullPath);
+            return fullPath;
+        }
+
+        private static void EnsureNoReparsePoint(string fullPath)
+        {
+            var current = fullPath;
+            while (!string.IsNullOrWhiteSpace(current))
+            {
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                    throw new UnauthorizedAccessException(
+                        "ADS 目标路径不能经过重解析点。");
+
+                var parent = Directory.GetParent(current)?.FullName;
+                if (string.IsNullOrWhiteSpace(parent)
+                    || parent.Equals(current, StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                current = parent;
+            }
         }
 
         private static string BuildAdsPath(string filePath, string streamName)
@@ -463,27 +435,37 @@ namespace LongBetterWindows.Host.Services
                 Path.AltDirectorySeparatorChar)}:{name}";
         }
 
-        private static string GetFallbackPath(
-            string filePath,
-            string streamName)
+        internal static string ValidateRollbackTarget(string adsPath)
         {
-            var name = string.IsNullOrEmpty(streamName)
-                ? DefaultStreamName
-                : streamName;
-            if (Directory.Exists(filePath)
-                && name.Equals(DefaultStreamName, StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(adsPath))
+                throw new InvalidDataException("ADS rollback target is empty.");
+
+            var root = Path.GetPathRoot(adsPath);
+            if (string.IsNullOrWhiteSpace(root))
+                throw new InvalidDataException("ADS rollback target is not rooted.");
+
+            var streamSeparator = adsPath.IndexOf(':', root.Length);
+            if (streamSeparator < root.Length
+                || streamSeparator == adsPath.Length - 1)
             {
-                return Path.Combine(filePath, FolderNoteFallbackFileName);
+                throw new InvalidDataException(
+                    "ADS rollback target is not an alternate data stream.");
             }
 
-            var fullPath = Path.GetFullPath(filePath);
-            var identity = Encoding.UTF8.GetBytes($"{fullPath}\0{name}");
-            var suffix = Convert.ToHexString(SHA256.HashData(identity))
-                .ToLowerInvariant()[..12];
-            var directory = Directory.Exists(filePath)
-                ? filePath
-                : Path.GetDirectoryName(fullPath) ?? ".";
-            return Path.Combine(directory, $"long_ads_{suffix}.json");
+            var filePath = adsPath[..streamSeparator];
+            var streamName = adsPath[(streamSeparator + 1)..];
+            var resolvedPath = ResolveTarget(filePath);
+            EnsureNtfsVolume(resolvedPath);
+            var canonicalTarget = BuildAdsPath(resolvedPath, streamName);
+            if (!canonicalTarget.Equals(
+                    adsPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    "ADS rollback target is not canonical.");
+            }
+
+            return canonicalTarget;
         }
 
         private static bool IsNtfsVolume(string filePath)
@@ -496,28 +478,18 @@ namespace LongBetterWindows.Host.Services
                 StringComparison.OrdinalIgnoreCase);
         }
 
-        private static bool IsAdsPath(string path)
+        private static void EnsureNtfsVolume(string filePath)
         {
-            var rootLength = Path.GetPathRoot(path)?.Length ?? 0;
-            return path.IndexOf(':', rootLength) >= 0;
+            if (!IsNtfsVolume(filePath))
+                throw new NotNtfsVolumeException(
+                    "当前文件系统不支持 NTFS 备用数据流。");
         }
 
         private static bool StorageExists(string path)
-        {
-            if (!IsAdsPath(path))
-                return File.Exists(path);
-            return TryReadAds(path).Exists;
-        }
+            => TryReadAds(path).Exists;
 
         private static void DeleteStorage(string path)
         {
-            if (!IsAdsPath(path))
-            {
-                if (File.Exists(path))
-                    File.Delete(path);
-                return;
-            }
-
             if (!DeleteFileW(path))
             {
                 var error = Marshal.GetLastWin32Error();
@@ -526,9 +498,6 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
-        private static bool PathEquals(string left, string right)
-            => left.Equals(right, StringComparison.OrdinalIgnoreCase);
-
         private static IOException CreateIoException(string operation, int error)
             => new($"{operation} (Win32: {error})。");
 
@@ -536,11 +505,17 @@ namespace LongBetterWindows.Host.Services
             => exception switch
             {
                 ArgumentException => ApiErrorCode.InvalidArgument,
+                InvalidDataException or DecoderFallbackException
+                    => ApiErrorCode.InvalidArgument,
+                NotNtfsVolumeException => ApiErrorCode.NotNTFSVolume,
                 FileNotFoundException or DirectoryNotFoundException
                     => ApiErrorCode.NotFound,
                 UnauthorizedAccessException => ApiErrorCode.PermissionDenied,
                 _ => ApiErrorCode.Win32Error,
             };
+
+        private sealed class NotNtfsVolumeException(string message)
+            : IOException(message);
 
         private sealed record StorageSnapshot(
             bool Exists,

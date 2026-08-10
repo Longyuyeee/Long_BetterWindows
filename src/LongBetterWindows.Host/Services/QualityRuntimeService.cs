@@ -44,6 +44,9 @@ namespace LongBetterWindows.Host.Services
                     .FirstOrDefault(window => window.IsVisible),
                 "plugin" => _application.Windows.OfType<PluginWindowHost>()
                     .FirstOrDefault(window => window.IsVisible) ?? _application.MainWindow,
+                "folder-note" => _application.Windows
+                    .OfType<AnchoredTextEditorWindow>()
+                    .FirstOrDefault(window => window.IsVisible),
                 "main" or "market" or "diagnostics" or "plugins" or "system"
                     or "settings" or "developer"
                     => _application.MainWindow,

@@ -1,6 +1,6 @@
 {
   "id": "com.long.folder-note",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "文件夹备注助手",
   "author": "Long",
   "entry_point": "FolderNotePlugin.dll",

@@ -990,6 +990,7 @@
   "superPanel.quality.clipboardLink": "Clipboard link · {0}",
   "action.save": "Save",
   "folderNote.error.folderMissing": "The target folder no longer exists.",
+  "folderNote.error.notNTFS": "Folder notes require an NTFS drive. The current file system cannot store this note.",
   "folderNote.error.loadFailed": "The folder note could not be read. Check access and try again.",
   "folderNote.error.saveFailed": "The folder note could not be saved. Try again.",
   "folderNote.hud.title": "Folder note",

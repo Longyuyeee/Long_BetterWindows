@@ -173,6 +173,15 @@ public class AppStartupOptionsTests
     }
 
     [Fact]
+    public void Parse_FolderNoteCaptureViewIsPreserved()
+    {
+        var options = AppStartupOptions.Parse(
+            ["--quality-capture-view", "folder-note"]);
+
+        Assert.Equal("folder-note", options.QualityCaptureView);
+    }
+
+    [Fact]
     public void Parse_MissingOpenPluginValueDoesNotCreateARequest()
     {
         var options = AppStartupOptions.Parse(["--open-plugin"]);

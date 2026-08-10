@@ -1,5 +1,6 @@
 using System.IO;
 using System.Runtime.ExceptionServices;
+using System.Text;
 using System.Windows.Interop;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Services;
@@ -152,11 +153,21 @@ public class ServiceTests
         var dir = Path.Combine(Path.GetTempPath(), $"test_rb_{Guid.NewGuid():N}");
         try
         {
+            Directory.CreateDirectory(dir);
+            var adsTarget = $"{dir}:test";
+            File.WriteAllText(adsTarget, "new value", new UTF8Encoding(false));
             var rb = new RollbackEngine(Path.Combine(dir, "logs"));
-            rb.RecordChange("plugin-x", new ChangeRecord { Action = ChangeAction.AdsWrite, Target = "test" });
+            rb.RecordChange("plugin-x", new ChangeRecord
+            {
+                Action = ChangeAction.AdsWrite,
+                Target = adsTarget,
+                StorageTarget = adsTarget,
+                OldValueExists = false,
+            });
             var r = await rb.RollbackAsync("plugin-x");
             Assert.True(r.IsSuccess);
             Assert.Empty(rb.GetPluginChanges("plugin-x"));
+            Assert.False(File.Exists(adsTarget));
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }

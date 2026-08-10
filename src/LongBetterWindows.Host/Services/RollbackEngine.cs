@@ -14,6 +14,8 @@ namespace LongBetterWindows.Host.Services
         private readonly object _lock = new();
         private readonly Dictionary<string, PluginChangeLog> _logs = new();
 
+        internal object AdsMutationGate { get; } = new();
+
         public RollbackEngine(string? logDir = null)
         {
             _logDir = logDir ?? Path.Combine(
@@ -211,41 +213,72 @@ namespace LongBetterWindows.Host.Services
 
         private bool RollbackAdsWrite(ChangeRecord record)
         {
-            try
+            lock (AdsMutationGate)
             {
-                var currentTarget = record.StorageTarget ?? record.Target;
-                var oldTarget = record.OldStorageTarget ?? record.Target;
-                DeleteStorageTarget(currentTarget);
-                if (record.OldValueExists ?? record.OldValue is not null)
-                    WriteStorageTarget(oldTarget, record.OldValue ?? string.Empty);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "ADS 回滚写操作失败: {Target}", record.Target);
-                return false;
+                try
+                {
+                    var currentTarget = ResolveAdsRollbackTarget(
+                        record,
+                        record.StorageTarget);
+                    string? oldTarget = null;
+                    if (record.OldValueExists ?? record.OldValue is not null)
+                    {
+                        oldTarget = ResolveAdsRollbackTarget(
+                            record,
+                            record.OldStorageTarget);
+                    }
+
+                    if (oldTarget is null)
+                        DeleteStorageTarget(currentTarget);
+                    else
+                        WriteStorageTarget(oldTarget, record.OldValue ?? string.Empty);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "ADS 回滚写操作失败: {Target}", record.Target);
+                    return false;
+                }
             }
         }
 
         private bool RollbackAdsDelete(ChangeRecord record)
         {
-            try
+            lock (AdsMutationGate)
             {
-                if (record.OldValueExists ?? record.OldValue is not null)
+                try
                 {
-                    WriteStorageTarget(
-                        record.OldStorageTarget
-                            ?? record.StorageTarget
-                            ?? record.Target,
-                        record.OldValue ?? string.Empty);
+                    if (record.OldValueExists ?? record.OldValue is not null)
+                    {
+                        WriteStorageTarget(
+                            ResolveAdsRollbackTarget(
+                                record,
+                                record.OldStorageTarget ?? record.StorageTarget),
+                            record.OldValue ?? string.Empty);
+                    }
+                    return true;
                 }
-                return true;
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "ADS 回滚删操作失败: {Target}", record.Target);
+                    return false;
+                }
             }
-            catch (Exception ex)
+        }
+
+        private static string ResolveAdsRollbackTarget(
+            ChangeRecord record,
+            string? storageTarget)
+        {
+            var target = record.Target;
+            var candidate = storageTarget ?? target;
+            if (!candidate.Equals(target, StringComparison.OrdinalIgnoreCase))
             {
-                Log.Error(ex, "ADS 回滚删操作失败: {Target}", record.Target);
-                return false;
+                throw new InvalidDataException(
+                    "ADS rollback target must be the recorded alternate data stream.");
             }
+
+            return ADSService.ValidateRollbackTarget(target);
         }
 
         private static void DeleteStorageTarget(string path)

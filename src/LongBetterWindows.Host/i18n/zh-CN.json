@@ -990,6 +990,7 @@
   "superPanel.quality.clipboardLink": "剪贴板链接 · {0}",
   "action.save": "保存",
   "folderNote.error.folderMissing": "目标文件夹不存在。",
+  "folderNote.error.notNTFS": "文件夹备注仅支持 NTFS 磁盘，当前文件系统无法保存备注。",
   "folderNote.error.loadFailed": "文件夹备注读取失败，请检查权限后重试。",
   "folderNote.error.saveFailed": "文件夹备注保存失败，请重试。",
   "folderNote.hud.title": "备注",

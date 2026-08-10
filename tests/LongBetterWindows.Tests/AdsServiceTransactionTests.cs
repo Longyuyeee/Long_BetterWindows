@@ -174,6 +174,150 @@ public sealed class AdsServiceTransactionTests
         Assert.Equal(ApiErrorCode.InvalidArgument, result.ErrorCode);
     }
 
+    [Fact]
+    public async Task ReadWriteDelete_UserLongNoteJsonIsIgnoredAndPreserved()
+    {
+        using var scope = new AdsTestScope();
+        var userFile = Path.Combine(scope.TargetDirectory, "long_note.json");
+        const string userContent = "user-owned file";
+        await File.WriteAllTextAsync(userFile, userContent);
+
+        var missing = await scope.Service.ReadAsync(
+            scope.TargetDirectory,
+            "long_note");
+        var write = await scope.Service.WriteAsync(
+            scope.TargetDirectory,
+            "long_note",
+            "stored in ADS");
+        var read = await scope.Service.ReadAsync(
+            scope.TargetDirectory,
+            "long_note");
+        var delete = await scope.Service.DeleteAsync(
+            scope.TargetDirectory,
+            "long_note");
+
+        Assert.False(missing.IsSuccess);
+        Assert.Equal(ApiErrorCode.StreamNotFound, missing.ErrorCode);
+        Assert.True(write.IsSuccess, write.ErrorMessage);
+        Assert.True(read.IsSuccess, read.ErrorMessage);
+        Assert.Equal("stored in ADS", read.Data);
+        Assert.True(delete.IsSuccess, delete.ErrorMessage);
+        Assert.Equal(userContent, await File.ReadAllTextAsync(userFile));
+    }
+
+    [Fact]
+    public async Task WriteRead_PreservesLeadingAndTrailingWhitespace()
+    {
+        using var scope = new AdsTestScope();
+        const string content = "  first line\r\nsecond line\r\n\r\n  ";
+
+        var write = await scope.Service.WriteAsync(
+            scope.TargetDirectory,
+            "long_note",
+            content);
+        var read = await scope.Service.ReadAsync(
+            scope.TargetDirectory,
+            "long_note");
+
+        Assert.True(write.IsSuccess, write.ErrorMessage);
+        Assert.True(read.IsSuccess, read.ErrorMessage);
+        Assert.Equal(content, read.Data);
+    }
+
+    [Fact]
+    public async Task ReadAsync_RejectsOversizedExternalAds()
+    {
+        using var scope = new AdsTestScope();
+        var adsPath = $"{scope.TargetDirectory}:long_note";
+        await File.WriteAllBytesAsync(adsPath, new byte[(1024 * 1024) + 1]);
+
+        var result = await scope.Service.ReadAsync(
+            scope.TargetDirectory,
+            "long_note");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.InvalidArgument, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ReadAsync_RejectsInvalidUtf8()
+    {
+        using var scope = new AdsTestScope();
+        var adsPath = $"{scope.TargetDirectory}:long_note";
+        await File.WriteAllBytesAsync(adsPath, [0xC3, 0x28]);
+
+        var result = await scope.Service.ReadAsync(
+            scope.TargetDirectory,
+            "long_note");
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ApiErrorCode.InvalidArgument, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ConcurrentWrites_AreSerializedWithoutPartialReads()
+    {
+        using var scope = new AdsTestScope();
+        var contents = Enumerable.Range(0, 12)
+            .Select(index => $"note-{index:D2}-{new string((char)('a' + index), 4096)}")
+            .ToArray();
+
+        var writes = await Task.WhenAll(contents.Select(content =>
+            scope.Service.WriteAsync(
+                scope.TargetDirectory,
+                "long_note",
+                content)));
+        var read = await scope.Service.ReadAsync(
+            scope.TargetDirectory,
+            "long_note");
+
+        Assert.All(writes, result => Assert.True(result.IsSuccess, result.ErrorMessage));
+        Assert.True(read.IsSuccess, read.ErrorMessage);
+        Assert.Contains(read.Data, contents);
+    }
+
+    [Fact]
+    public async Task RollbackAsync_RejectsLegacySidecarTargetsWithoutTouchingUserFile()
+    {
+        using var scope = new AdsTestScope();
+        var userFile = Path.Combine(scope.TargetDirectory, "long_note.json");
+        const string userContent = "user-owned file";
+        await File.WriteAllTextAsync(userFile, userContent);
+        var adsTarget = $"{scope.TargetDirectory}:long_note";
+        await File.WriteAllTextAsync(adsTarget, "current ADS note");
+
+        scope.Rollback.RecordChange("builtin", new ChangeRecord
+        {
+            Action = ChangeAction.AdsWrite,
+            Target = adsTarget,
+            StorageTarget = userFile,
+        });
+        scope.Rollback.RecordChange("builtin", new ChangeRecord
+        {
+            Action = ChangeAction.AdsDelete,
+            Target = adsTarget,
+            OldStorageTarget = userFile,
+            OldValueExists = true,
+            OldValue = "legacy note",
+        });
+        scope.Rollback.RecordChange("builtin", new ChangeRecord
+        {
+            Action = ChangeAction.AdsWrite,
+            Target = adsTarget,
+            StorageTarget = adsTarget,
+            OldStorageTarget = userFile,
+            OldValueExists = true,
+            OldValue = "legacy note",
+        });
+
+        var rollback = await scope.Rollback.RollbackAsync("builtin");
+
+        Assert.False(rollback.IsSuccess);
+        Assert.Equal(userContent, await File.ReadAllTextAsync(userFile));
+        Assert.Equal("current ADS note", await File.ReadAllTextAsync(adsTarget));
+        Assert.Equal(3, scope.Rollback.GetPluginChanges("builtin").Count);
+    }
+
     private static string WriteDirectAds(string directory, string content)
     {
         var path = $"{directory}:long_note";

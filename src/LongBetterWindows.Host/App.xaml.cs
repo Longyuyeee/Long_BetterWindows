@@ -561,17 +561,21 @@ namespace LongBetterWindows.Host
                     noteResult.ErrorMessage);
                 FloatingHudWindow.ShowToast(
                     ServicesInitializer.I18n.T(
-                        "folderNote.error.loadFailed"));
+                        noteResult.ErrorCode == ApiErrorCode.NotNTFSVolume
+                            ? "folderNote.error.notNTFS"
+                            : "folderNote.error.loadFailed"));
                 return;
             }
 
+            var closed = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
             Dispatcher.Invoke(() =>
             {
                 var area = SystemParameters.WorkArea;
                 double x = area.Left + (area.Width - 320) / 2;
                 double y = area.Top + (area.Height - 150) / 2;
 
-                FloatingHudWindow.ShowAt(
+                var window = FloatingHudWindow.ShowAt(
                     x,
                     y,
                     existingNote,
@@ -594,7 +598,9 @@ namespace LongBetterWindows.Host
                                 result.ErrorMessage);
                             throw new InvalidOperationException(
                                 ServicesInitializer.I18n.T(
-                                    "folderNote.error.saveFailed"));
+                                    result.ErrorCode == ApiErrorCode.NotNTFSVolume
+                                        ? "folderNote.error.notNTFS"
+                                        : "folderNote.error.saveFailed"));
                         }
 
                         Log.Information("右键备注已保存: {Path}", folderPath);
@@ -606,7 +612,9 @@ namespace LongBetterWindows.Host
                         ServicesInitializer.I18n.T("folderNote.hud.emptyHint"),
                         ServicesInitializer.I18n.T(
                             "folderNote.hud.modifiedHint")));
+                window.Closed += (_, _) => closed.TrySetResult();
             });
+            await closed.Task;
         }
 
         internal bool IsPluginBrokerEnabled => _brokerSettings.Enabled;
