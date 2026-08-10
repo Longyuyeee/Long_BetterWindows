@@ -133,7 +133,12 @@ try {
         },
         [ordered]@{
             id = "com.long.color-picker"
-            checks = @("physical-pixel-sampling", "cancelled-delivery")
+            checks = @(
+                "physical-pixel-sampling",
+                "physical-popup-placement",
+                "captured-click",
+                "single-cancelled-delivery",
+                "bounded-clipboard-retry")
             passed = [bool]$capture.passed -and $servicePassed
         },
         [ordered]@{
@@ -162,7 +167,7 @@ try {
         disposable_process_only = $true
         required_plugin_count = 7
         covered_plugin_count = $plugins.Count
-        expected_case_count = 59
+        expected_case_count = 65
         executed_case_count =
             [int]$transactions.passed_case_count +
             [int]$capture.executed_case_count +

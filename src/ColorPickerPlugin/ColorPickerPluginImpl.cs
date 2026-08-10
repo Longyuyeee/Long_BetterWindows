@@ -28,7 +28,7 @@ public class ColorPickerPluginImpl :
 
     public string Id => "com.long.color-picker";
     public string Name => Text("plugin.name", "颜色拾取器");
-    public string Version => "1.1.1";
+    public string Version => "1.2.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -83,42 +83,51 @@ public class ColorPickerPluginImpl :
         if (_registeredHotkey != null)
             await _host!.HotKey.UnregisterAsync(_registeredHotkey);
         _registeredHotkey = null;
-        Application.Current.Dispatcher.Invoke(() => _window?.Close());
+        var application = Application.Current;
+        if (application is not null)
+            application.Dispatcher.Invoke(() => _window?.Close());
+        _window = null;
         State = PluginState.Stopped;
         return true;
     }
 
     private void OnPickColor()
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        if (_operationLifetime.IsCancellationRequested)
+            return;
+        var application = Application.Current;
+        if (application is null)
+            return;
+
+        application.Dispatcher.Invoke(() =>
         {
-            if (_window?.IsVisible == true)
+            if (_window is not null)
             {
-                _window.Activate();
+                if (_window.IsVisible)
+                    _window.Activate();
                 return;
             }
 
             var operationToken = _operationLifetime.Token;
-            _window = new ColorPickerWindow(
+            var delivery = new ColorPickerDeliveryCoordinator();
+            var clipboardWriter = new ColorPickerClipboardWriter();
+            ColorPickerWindow? window = null;
+            window = new ColorPickerWindow(
                 _screenColorSampler,
                 async hex =>
                 {
                     try
                     {
-                        await AsyncDeliveryBoundary.RunAsync(
-                            () => Task.FromResult(hex),
-                            async value =>
-                            {
-                                var result =
-                                    await _host!.Clipboard.SetTextAsync(value);
-                                if (!result.IsSuccess)
-                                {
-                                    throw new InvalidOperationException(
-                                        result.ErrorMessage
-                                        ?? "Clipboard write failed.");
-                                }
-                            },
+                        var delivered = await delivery.TryDeliverAsync(
+                            hex,
+                            value => clipboardWriter.WriteAsync(
+                                value,
+                                _host!.Clipboard.SetTextAsync,
+                                operationToken),
                             operationToken);
+                        if (!delivered)
+                            return;
+                        operationToken.ThrowIfCancellationRequested();
                         _ = _notification.ShowAsync(Name, string.Format(
                             Text("toast.copied", "已复制颜色 {0}"),
                             hex));
@@ -136,11 +145,37 @@ public class ColorPickerPluginImpl :
                             "toast.copyFailed",
                             "拾取成功，但写入剪贴板失败"));
                     }
+                    finally
+                    {
+                        application.Dispatcher.Invoke(() =>
+                        {
+                            if (ReferenceEquals(_window, window))
+                                _window = null;
+                        });
+                    }
                 },
                 CreateWindowLocalization());
-            _window.Closed += (_, _) => _window = null;
-            _window.Show();
-            _window.Activate();
+            _window = window;
+            window.CaptureFailed += error =>
+            {
+                Log.Warning("[ColorPicker] 取色会话失败: {Error}", error);
+                if (!operationToken.IsCancellationRequested)
+                {
+                    _ = _notification.ShowAsync(Name, Text(
+                        "toast.captureFailed",
+                        "无法读取当前桌面颜色"));
+                }
+            };
+            window.Closed += (_, _) =>
+            {
+                if (!window.HasCommittedSelection)
+                    delivery.Cancel();
+                if (!window.HasCommittedSelection
+                    && ReferenceEquals(_window, window))
+                    _window = null;
+            };
+            window.Show();
+            window.Activate();
         });
     }
 
@@ -175,6 +210,7 @@ public class ColorPickerPluginImpl :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _operationLifetime.Token.ThrowIfCancellationRequested();
         if (invocation.CommandId != "color.pick")
         {
             return Task.FromResult(PluginCommandResult.Failure(string.Format(

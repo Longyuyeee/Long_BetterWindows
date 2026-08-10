@@ -1044,6 +1044,8 @@ public class DesignSystemTests
             root, "src", "ColorPickerPlugin", "ColorPickerPluginImpl.cs"));
         var pickerWindow = File.ReadAllText(Path.Combine(
             root, "src", "ColorPickerPlugin", "ColorPickerWindow.xaml.cs"));
+        var pickerNative = File.ReadAllText(Path.Combine(
+            root, "src", "ColorPickerPlugin", "ColorPickerNativeInteraction.cs"));
 
         Assert.Contains("Ctrl+Alt+F6", macro);
         Assert.Contains("State = PluginState.Running", macro);
@@ -1051,7 +1053,10 @@ public class DesignSystemTests
         Assert.Contains("Ctrl+Alt+P", picker);
         Assert.Contains("Clipboard.SetTextAsync", picker);
         Assert.DoesNotContain("System.Windows.Clipboard", picker);
-        Assert.Contains("GetAsyncKeyState", pickerWindow);
+        Assert.Contains("ColorPickerPointerCapture", pickerWindow);
+        Assert.Contains("SetWindowsHookEx", pickerNative);
+        Assert.Contains("GetCursorPos", pickerNative);
+        Assert.DoesNotContain("GetAsyncKeyState", pickerWindow);
     }
 
     [Fact]

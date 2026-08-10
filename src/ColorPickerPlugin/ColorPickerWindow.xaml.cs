@@ -1,10 +1,9 @@
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Capabilities;
-using LongBetterWindows.PluginSdk.Wpf;
 using Serilog;
 
 namespace ColorPickerPlugin;
@@ -19,14 +18,15 @@ public partial class ColorPickerWindow : Window
     private readonly IScreenColorSampler _screenColorSampler;
     private readonly Func<string, Task> _onPicked;
     private readonly CancellationTokenSource _captureLifetime = new();
+    private readonly ColorPickerPointerCapture _pointerCapture = new();
     private bool _capturing;
-    private bool _leftWasDown;
+    private bool _closing;
+    private int _selectionStarted;
+    private int _failureReported;
 
-    [DllImport("user32.dll")] private static extern bool GetCursorPos(out PointNative point);
-    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int virtualKey);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PointNative { public int X; public int Y; }
+    public event Action<string>? CaptureFailed;
+    internal bool HasCommittedSelection
+        => Volatile.Read(ref _selectionStarted) == 1;
 
     public ColorPickerWindow(
         IScreenColorSampler screenColorSampler,
@@ -51,7 +51,12 @@ public partial class ColorPickerWindow : Window
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
         Focus();
-        _leftWasDown = IsLeftButtonDown();
+        _pointerCapture.LeftButtonPressed += PointerCapture_LeftButtonPressed;
+        if (!_pointerCapture.TryStart(out var error))
+        {
+            FailAndClose(error?.Message ?? "Unable to capture the next screen click.");
+            return;
+        }
         _capturing = true;
         _ = CaptureLoopAsync();
     }
@@ -63,25 +68,17 @@ public partial class ColorPickerWindow : Window
         {
             try
             {
-                if (!GetCursorPos(out var point))
+                if (!ColorPickerNativeWindow.TryGetCursorPosition(out var point))
                 {
-                    Close();
+                    FailAndClose("Unable to read the physical cursor position.");
                     return;
                 }
                 if (!UpdateSample(point))
                 {
-                    Close();
+                    FailAndClose("The desktop pixel could not be sampled.");
                     return;
                 }
-                PositionNearCursor();
-
-                var leftDown = IsLeftButtonDown();
-                if (leftDown && !_leftWasDown)
-                {
-                    await PickAndCloseAsync();
-                    return;
-                }
-                _leftWasDown = leftDown;
+                ColorPickerNativeWindow.PositionNearCursor(this, point);
                 await Task.Delay(35, cancellationToken);
             }
             catch (OperationCanceledException)
@@ -92,12 +89,13 @@ public partial class ColorPickerWindow : Window
             catch (Exception ex)
             {
                 Log.Warning(ex, "[ColorPicker] Capture loop iteration failed");
-                await Task.Delay(80, cancellationToken);
+                FailAndClose(ex.Message);
+                return;
             }
         }
     }
 
-    private bool UpdateSample(PointNative point)
+    private bool UpdateSample(ColorPickerPhysicalPoint point)
     {
         try
         {
@@ -125,46 +123,82 @@ public partial class ColorPickerWindow : Window
         }
     }
 
-    private void PositionNearCursor()
+    private void PointerCapture_LeftButtonPressed(
+        ColorPickerPhysicalPoint point)
     {
-        var placement =
-            MonitorHelper.GetCursorPlacement(this);
-        Left = Math.Clamp(
-            placement.Cursor.X + 18,
-            placement.WorkArea.Left + 8,
-            placement.WorkArea.Right - Width - 8);
-        Top = Math.Clamp(
-            placement.Cursor.Y + 18,
-            placement.WorkArea.Top + 8,
-            placement.WorkArea.Bottom - Height - 8);
+        if (Interlocked.CompareExchange(ref _selectionStarted, 1, 0) != 0)
+            return;
+        _ = Dispatcher.InvokeAsync(
+            () => _ = PickAndCloseAsync(point),
+            DispatcherPriority.Input);
     }
 
-    private async Task PickAndCloseAsync()
+    private async Task PickAndCloseAsync(ColorPickerPhysicalPoint point)
     {
         _capturing = false;
         try
         {
-            await _onPicked(HexText.Text);
+            if (!UpdateSample(point))
+            {
+                FailAndClose("The selected desktop pixel could not be sampled.");
+                return;
+            }
+
+            var selectedHex = HexText.Text;
+            Hide();
+            await _pointerCapture.WaitForLeftButtonReleaseAsync(
+                _captureLifetime.Token);
+            _captureLifetime.Token.ThrowIfCancellationRequested();
+            ClosePicker();
+            await _onPicked(selectedHex);
+        }
+        catch (OperationCanceledException)
+            when (_captureLifetime.IsCancellationRequested)
+        {
+            // Closing or stopping the picker cancels an uncommitted click.
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[ColorPicker] Selected color delivery failed");
+            FailAndClose(ex.Message);
         }
         finally
         {
-            Close();
+            ClosePicker();
         }
     }
-
-    private static bool IsLeftButtonDown() => (GetAsyncKeyState(0x01) & 0x8000) != 0;
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Escape) return;
+        if (Interlocked.CompareExchange(ref _selectionStarted, 2, 0) != 0)
+            return;
         _capturing = false;
-        Close();
+        ClosePicker();
         e.Handled = true;
+    }
+
+    private void FailAndClose(string message)
+    {
+        if (Interlocked.Exchange(ref _failureReported, 1) == 0)
+            CaptureFailed?.Invoke(message);
+        ClosePicker();
+    }
+
+    private void ClosePicker()
+    {
+        if (_closing)
+            return;
+        _closing = true;
+        Close();
     }
 
     private void Window_Closed(object? sender, EventArgs e)
     {
+        _closing = true;
         _capturing = false;
         _captureLifetime.Cancel();
+        _pointerCapture.LeftButtonPressed -= PointerCapture_LeftButtonPressed;
+        _pointerCapture.Dispose();
     }
 }

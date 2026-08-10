@@ -31,13 +31,15 @@
     ],
     "high_risk_boundary_required_plugin_count": 7,
     "high_risk_boundary_required_command_count": 8,
-    "high_risk_boundary_required_case_count": 59,
+    "high_risk_boundary_required_case_count": 65,
     "quick_launch_isolation_script": "verify-quick-launch-isolation.ps1",
     "quick_launch_isolation_test_path": "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
     "quick_launch_isolation_required_case_count": 9,
     "capture_delivery_isolation_script": "verify-capture-delivery-isolation.ps1",
     "capture_delivery_isolation_test_path": "tests/LongBetterWindows.Tests/AsyncDeliveryBoundaryTests.cs",
-    "capture_delivery_isolation_required_case_count": 3,
+    "capture_delivery_isolation_required_case_count": 9,
+    "color_picker_isolation_test_path": "tests/LongBetterWindows.Tests/ColorPickerIsolationTests.cs",
+    "color_picker_isolation_required_case_count": 6,
     "release_rule": "Every required manual check must be passed with an existing evidence file and matching SHA-256 before a new release candidate is eligible."
   },
   "plugins": [
@@ -153,6 +155,21 @@
           "level": "component",
           "path": "tests/LongBetterWindows.Tests/AsyncDeliveryBoundaryTests.cs",
           "symbol": "RunAsync_CancelledDuringProduction_DoesNotDeliver"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ColorPickerIsolationTests.cs",
+          "symbol": "PopupPlacement_StaysInsideNegativeCoordinateMonitorAndAvoidsCursor"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ColorPickerIsolationTests.cs",
+          "symbol": "DeliveryCoordinator_DeliversOnlyFirstSelection"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/ColorPickerIsolationTests.cs",
+          "symbol": "ClipboardWriter_RetriesTransientFailureWithinSingleDelivery"
         }
       ],
       "manual_checks": [

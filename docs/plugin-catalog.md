@@ -5,7 +5,7 @@ Generated from `catalog/plugin-catalog.json` and plugin manifests. Do not edit t
 | Plugin | ID | Version | Listing | Runtime | Category | Capabilities | Manifest |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 剪贴板工具箱 | `com.long.clipboard-tool` | `1.2.0` | `remote` | `webview` | `productivity` | `storage.local`, `system.clipboard`, `system.clipboard.monitor` | [manifest.json](../src/ClipboardTool/manifest.json) |
-| 颜色拾取器 | `com.long.color-picker` | `1.1.1` | `local` | `native` | `design` | `system.clipboard`, `system.hotkey`, `system.notification`, `system.screenshot` | [manifest.json](../src/ColorPickerPlugin/manifest.json) |
+| 颜色拾取器 | `com.long.color-picker` | `1.2.0` | `local` | `native` | `design` | `system.clipboard`, `system.hotkey`, `system.notification`, `system.screenshot` | [manifest.json](../src/ColorPickerPlugin/manifest.json) |
 | 批量重命名 | `com.long.file-renamer` | `1.2.0` | `remote` | `webview` | `file` | `file.ops`, `shell.selection` | [manifest.json](../src/FileRenamerPlugin/manifest.json) |
 | Markdown 预览 | `com.long.markdown-preview` | `1.1.1` | `remote` | `webview` | `text` | `system.clipboard` | [manifest.json](../src/MarkdownPreview/manifest.json) |
 | 快速便签 | `com.long.quick-note` | `1.2.0` | `remote` | `webview` | `productivity` | `storage.local` | [manifest.json](../src/QuickNotePlugin/manifest.json) |

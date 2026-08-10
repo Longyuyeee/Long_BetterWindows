@@ -436,6 +436,43 @@ public sealed class PluginPositiveFunctionMatrixTests
     }
 
     [Fact]
+    public void ColorPickerIsolationEvidence_IsBoundToProductionPlugin()
+    {
+        var root = FindRepositoryRoot();
+        using var matrix = LoadMatrix(root);
+        var policy = matrix.RootElement.GetProperty("policy");
+        var scriptPath = Path.Combine(
+            root,
+            policy.GetProperty("capture_delivery_isolation_script").GetString()!);
+        var testPath = Path.Combine(
+            root,
+            policy.GetProperty("color_picker_isolation_test_path").GetString()!);
+        var plugin = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Single(item =>
+                item.GetProperty("id").GetString()
+                == "com.long.color-picker");
+        var evidence = plugin.GetProperty("automated_evidence")
+            .EnumerateArray()
+            .ToArray();
+
+        Assert.True(File.Exists(scriptPath));
+        Assert.True(File.Exists(testPath));
+        Assert.Equal(
+            9,
+            policy.GetProperty(
+                "capture_delivery_isolation_required_case_count").GetInt32());
+        Assert.Equal(
+            6,
+            policy.GetProperty(
+                "color_picker_isolation_required_case_count").GetInt32());
+        Assert.Contains(evidence, item =>
+            item.GetProperty("path").GetString()
+            == "tests/LongBetterWindows.Tests/ColorPickerIsolationTests.cs");
+    }
+
+    [Fact]
     public void HighRiskBoundaryGate_CoversEveryDeclaredHighRiskPlugin()
     {
         var root = FindRepositoryRoot();
@@ -477,7 +514,7 @@ public sealed class PluginPositiveFunctionMatrixTests
                 .GetInt32(),
             commandCount);
         Assert.Equal(
-            59,
+            65,
             policy.GetProperty("high_risk_boundary_required_case_count")
                 .GetInt32());
         Assert.Contains("verify-high-risk-plugin-transactions.ps1", script);

@@ -9,6 +9,17 @@ public sealed class ScreenColorSampler : IScreenColorSampler
 {
     public HostApiResponse<ScreenColorSample> Sample(int physicalX, int physicalY)
     {
+        var bounds = ScreenCaptureService.GetVirtualScreenBounds();
+        if (physicalX < bounds.X
+            || physicalY < bounds.Y
+            || physicalX >= (long)bounds.X + bounds.Width
+            || physicalY >= (long)bounds.Y + bounds.Height)
+        {
+            return HostApiResponse<ScreenColorSample>.Failure(
+                ApiErrorCode.InvalidArgument,
+                "The sample coordinate is outside the physical virtual screen.");
+        }
+
         var screenDc = GetDC(IntPtr.Zero);
         if (screenDc == IntPtr.Zero)
             return Failure("GetDC");

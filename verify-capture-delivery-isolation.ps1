@@ -2,7 +2,7 @@ param(
     [string]$TestProject = "tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj",
     [string]$OutputPath,
     [string]$DotnetPath = "C:\Program Files\dotnet\dotnet.exe",
-    [int]$ExpectedCaseCount = 3
+    [int]$ExpectedCaseCount = 9
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,7 +35,7 @@ try {
     $testOutput = @(& $DotnetPath test $projectPath `
         -c Release `
         --no-build `
-        --filter "FullyQualifiedName~AsyncDeliveryBoundaryTests" `
+        --filter "FullyQualifiedName~AsyncDeliveryBoundaryTests|FullyQualifiedName~ColorPickerIsolationTests" `
         --logger "trx;LogFileName=capture-delivery.trx" `
         --results-directory $runRoot 2>&1)
     $testExitCode = $LASTEXITCODE

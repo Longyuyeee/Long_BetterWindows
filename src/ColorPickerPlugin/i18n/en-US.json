@@ -9,6 +9,7 @@
   "error.unknownCommand": "Unknown color picker command: {0}",
   "toast.copied": "Copied color {0}",
   "toast.copyFailed": "Color picked, but it could not be copied",
+  "toast.captureFailed": "The current desktop color could not be read",
   "settings.commandCenter": "Command center",
   "settings.currentHotkey": "Current shortcut",
   "settings.apply": "Apply",

@@ -9,6 +9,7 @@
   "error.unknownCommand": "未知取色命令: {0}",
   "toast.copied": "已复制颜色 {0}",
   "toast.copyFailed": "拾取成功，但写入剪贴板失败",
+  "toast.captureFailed": "无法读取当前桌面颜色",
   "settings.commandCenter": "命令中心",
   "settings.currentHotkey": "当前快捷键",
   "settings.apply": "应用",

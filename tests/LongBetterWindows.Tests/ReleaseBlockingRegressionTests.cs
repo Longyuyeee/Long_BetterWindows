@@ -547,6 +547,16 @@ public sealed class ReleaseBlockingRegressionTests
             "src",
             "ColorPickerPlugin",
             "ColorPickerWindow.xaml.cs"));
+        var colorPickerNative = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ColorPickerPlugin",
+            "ColorPickerNativeInteraction.cs"));
+        var colorPickerPlugin = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ColorPickerPlugin",
+            "ColorPickerPluginImpl.cs"));
         var captureService = File.ReadAllText(Path.Combine(
             root,
             "src",
@@ -569,8 +579,12 @@ public sealed class ReleaseBlockingRegressionTests
             selector);
         Assert.Contains("Keyboard.Focus(SelectionCanvas)", selector);
         Assert.DoesNotContain("SystemParameters.VirtualScreen", selector);
-        Assert.Contains("MonitorHelper.GetCursorPlacement(this)", colorPicker);
+        Assert.Contains("ColorPickerNativeWindow.PositionNearCursor(this, point)", colorPicker);
         Assert.Contains("_screenColorSampler.Sample(", colorPicker);
+        Assert.Contains("WaitForLeftButtonReleaseAsync", colorPicker);
+        Assert.Contains("SetWindowsHookEx", colorPickerNative);
+        Assert.Contains("UnhookWindowsHookEx", colorPickerNative);
+        Assert.Contains("ColorPickerDeliveryCoordinator", colorPickerPlugin);
         Assert.Contains("finally", colorPicker);
         Assert.Contains(
             "VirtualScreenHelper.GetPhysicalBounds()",
@@ -701,11 +715,30 @@ public sealed class ReleaseBlockingRegressionTests
             "LongBetterWindows.Host",
             "Services",
             "ScreenColorSampler.cs"));
+        var clipboardWriter = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ColorPickerPlugin",
+            "ColorPickerClipboardWriter.cs"));
+        var plugin = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ColorPickerPlugin",
+            "ColorPickerPluginImpl.cs"));
 
-        Assert.Contains("if (!GetCursorPos(out var point))", picker);
+        Assert.Contains(
+            "if (!ColorPickerNativeWindow.TryGetCursorPosition(out var point))",
+            picker);
         Assert.Contains("if (!UpdateSample(point))", picker);
+        Assert.Contains("outside the physical virtual screen", sampler);
         Assert.Contains("if (pixel == uint.MaxValue)", sampler);
         Assert.Contains("ReleaseDC(IntPtr.Zero, screenDc)", sampler);
+        Assert.Contains("DefaultRetryDelays", clipboardWriter);
+        Assert.Contains("await Task.Delay", clipboardWriter);
+        Assert.Contains("cancellationToken.ThrowIfCancellationRequested()", clipboardWriter);
+        Assert.Contains("HasCommittedSelection", picker);
+        Assert.Contains("delivery.Cancel()", plugin);
+        Assert.Contains("ReferenceEquals(_window, window)", plugin);
     }
 
     private static string FindRepositoryRoot()
