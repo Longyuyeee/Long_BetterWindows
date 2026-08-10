@@ -21,9 +21,12 @@
   "option.compact": "Remove hyphens",
   "output.ariaLabel": "Generated UUIDs",
   "action.generate": "Generate UUIDs",
-  "action.copy": "Copy all",
+  "action.copy": "Copy selection or all",
   "status.generated": "Generated {count} UUIDs",
-  "status.copied": "UUIDs copied",
+  "status.copied": "All UUIDs copied",
+  "status.selectionCopied": "Selected content copied",
+  "error.invalidAmount": "Amount must be an integer from 1 to 100",
+  "error.randomSource": "The secure random source could not produce unique UUIDs",
   "error.copy": "Copy failed",
   "error.unknownCommand": "Unknown UUID command"
 }

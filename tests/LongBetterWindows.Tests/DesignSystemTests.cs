@@ -750,7 +750,8 @@ public class DesignSystemTests
         Assert.Equal("result", output.Key);
         Assert.Equal(PluginCommandOutputType.Text, output.Type);
         Assert.Contains("outputs: { result: { type: 'text', value: output.value } }", page);
-        Assert.Contains("Number.parseInt(args.amount, 10)", page);
+        Assert.Contains("amountInput.value = args.amount === undefined ? '10'", page);
+        Assert.Contains("Number.isInteger(amount)", page);
         Assert.Contains("args.uppercase === 'true'", page);
         Assert.Contains("args.compact === 'true'", page);
         Assert.Contains("applyCommandOptions(command); return generate();", page);

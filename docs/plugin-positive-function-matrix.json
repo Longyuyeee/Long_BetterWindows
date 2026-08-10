@@ -683,6 +683,11 @@
           "level": "contract",
           "path": "tests/LongBetterWindows.Tests/QualityGateTests.cs",
           "symbol": "UuidGenerator"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/BuiltInPluginLocalizationTests.cs",
+          "symbol": "UuidGenerator_ValidatesAmountUniquenessAndResultLifecycle"
         }
       ],
       "manual_checks": [

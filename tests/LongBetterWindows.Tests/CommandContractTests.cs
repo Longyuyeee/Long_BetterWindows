@@ -680,7 +680,9 @@ public class CommandContractTests
 
         var implementation = await File.ReadAllTextAsync(
             Path.Combine(directory, "index.html"));
-        Assert.Contains("Math.min(100", implementation, StringComparison.Ordinal);
+        Assert.Contains("Number.isInteger(amount)", implementation, StringComparison.Ordinal);
+        Assert.Contains("amount >= 1 && amount <= 100", implementation, StringComparison.Ordinal);
+        Assert.Contains("function generateUniqueValues(amount)", implementation, StringComparison.Ordinal);
         Assert.Contains("args.uppercase === 'true'", implementation, StringComparison.Ordinal);
         Assert.Contains("args.compact === 'true'", implementation, StringComparison.Ordinal);
     }

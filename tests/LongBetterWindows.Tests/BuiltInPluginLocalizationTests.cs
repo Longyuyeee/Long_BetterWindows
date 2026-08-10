@@ -321,6 +321,29 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.Contains("input.value = window.LongUI.commandText(command) || ''", source);
     }
 
+    [Fact]
+    public void UuidGenerator_ValidatesAmountUniquenessAndResultLifecycle()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "UuidGenerator",
+            "index.html"));
+
+        Assert.Contains("function clearResult()", source);
+        Assert.Contains("function readAmount()", source);
+        Assert.Contains("Number.isInteger(amount)", source);
+        Assert.Contains("function generateUniqueValues(amount)", source);
+        Assert.Contains("const values = new Set()", source);
+        Assert.Contains("copyButton.disabled = true", source);
+        Assert.Contains("copyButton.disabled = false", source);
+        Assert.Contains("item.addEventListener('input', invalidateResult)", source);
+        Assert.Contains("output.selectionEnd > output.selectionStart", source);
+        Assert.Contains("status.selectionCopied", source);
+        Assert.Contains("error.invalidAmount", source);
+        Assert.Contains("error.randomSource", source);
+    }
+
     [Theory]
     [InlineData("ClipboardTool", "content.value = text", "let currentTab = 'history'")]
     [InlineData("QuickNotePlugin", "if (input.value.trim() === text) input.value = ''", "let notes = []")]

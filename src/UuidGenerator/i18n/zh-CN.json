@@ -21,9 +21,12 @@
   "option.compact": "移除连字符",
   "output.ariaLabel": "生成的 UUID",
   "action.generate": "生成 UUID",
-  "action.copy": "全部复制",
+  "action.copy": "复制所选或全部",
   "status.generated": "已生成 {count} 个 UUID",
-  "status.copied": "UUID 已复制",
+  "status.copied": "全部 UUID 已复制",
+  "status.selectionCopied": "所选内容已复制",
+  "error.invalidAmount": "生成数量必须是 1 到 100 之间的整数",
+  "error.randomSource": "安全随机源暂时无法生成唯一 UUID",
   "error.copy": "复制失败",
   "error.unknownCommand": "未知 UUID 命令"
 }

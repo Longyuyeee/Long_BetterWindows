@@ -5,14 +5,18 @@
   <main class="long-page">
     <header class="long-page-header"><div><div class="long-eyebrow">IDENTIFIER</div><h1 class="long-page-title" data-i18n="page.title">UUID 生成器</h1><p class="long-page-description" data-i18n="page.description">使用浏览器安全随机源生成标准 UUID v4，可批量复制。</p></div><span class="long-badge" data-i18n="page.localBadge">本地安全随机</span></header>
     <section class="long-card long-stack" id="generatorSection" aria-label="UUID 生成器">
-      <div class="long-grid"><label class="long-field"><span class="long-field-label" data-i18n="field.amount">生成数量</span><input class="long-input" id="amount" type="number" min="1" max="100" value="5"></label><div class="long-option-list"><label class="long-option"><input id="uppercase" type="checkbox"><span data-i18n="option.uppercase">使用大写字母</span></label><label class="long-option"><input id="compact" type="checkbox"><span data-i18n="option.compact">移除连字符</span></label></div></div>
+      <div class="long-grid"><label class="long-field"><span class="long-field-label" data-i18n="field.amount">生成数量</span><input class="long-input" id="amount" type="number" min="1" max="100" step="1" value="10"></label><div class="long-option-list"><label class="long-option"><input id="uppercase" type="checkbox"><span data-i18n="option.uppercase">使用大写字母</span></label><label class="long-option"><input id="compact" type="checkbox"><span data-i18n="option.compact">移除连字符</span></label></div></div>
       <textarea class="long-editor" id="output" aria-label="生成的 UUID" readonly></textarea>
-      <div class="long-toolbar"><button class="long-button long-button--primary btn-primary" id="generateButton" type="button" data-i18n="action.generate">生成 UUID</button><button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">全部复制</button><span class="long-toolbar__spacer"></span><span class="long-kbd">Ctrl Enter</span></div>
+      <div class="long-toolbar"><button class="long-button long-button--primary btn-primary" id="generateButton" type="button" data-i18n="action.generate">生成 UUID</button><button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy" disabled>复制所选或全部</button><span class="long-toolbar__spacer"></span><span class="long-kbd">Ctrl Enter</span></div>
       <div id="status" class="long-status" role="status" aria-live="polite"></div>
     </section>
   </main>
   <script>
     const output = document.getElementById('output'); const status = document.getElementById('status');
+    const amountInput = document.getElementById('amount');
+    const uppercaseInput = document.getElementById('uppercase');
+    const compactInput = document.getElementById('compact');
+    const copyButton = document.getElementById('copyButton');
     let strings = {};
     let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
 
@@ -51,13 +55,68 @@
       }
     }
 
+    function clearResult() {
+      output.value = '';
+      copyButton.disabled = true;
+    }
+
+    function invalidateResult() {
+      clearResult();
+      setStatus('', '', '');
+    }
+
+    function readAmount() {
+      const amount = Number(amountInput.value);
+      return Number.isInteger(amount) && amount >= 1 && amount <= 100 ? amount : null;
+    }
+
     function uuid() { if (crypto.randomUUID) return crypto.randomUUID(); const bytes = new Uint8Array(16); crypto.getRandomValues(bytes); bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128; return Array.from(bytes, function (value) { return value.toString(16).padStart(2, '0'); }).join('').replace(/^(........)(....)(....)(....)(............)$/, '$1-$2-$3-$4-$5'); }
-    function generate() { const amount = Math.max(1, Math.min(100, Number(document.getElementById('amount').value) || 1)); const upper = document.getElementById('uppercase').checked; const compact = document.getElementById('compact').checked; output.value = Array.from({ length: amount }, function () { let value = uuid(); if (compact) value = value.replace(/-/g, ''); return upper ? value.toUpperCase() : value; }).join('\n'); const message = setStatus('status.generated', 'success', '已生成 {count} 个 UUID', { count: amount }); window.LongUI?.announce(message); return { success: true, message, outputs: { result: { type: 'text', value: output.value } } }; }
-    function applyCommandOptions(command) { const args = command && command.arguments ? command.arguments : {}; const requested = Number.parseInt(args.amount, 10); document.getElementById('amount').value = Number.isFinite(requested) ? Math.max(1, Math.min(100, requested)) : 1; document.getElementById('uppercase').checked = args.uppercase === 'true'; document.getElementById('compact').checked = args.compact === 'true'; }
-    async function copy() { if (!output.value) return; try { const response = await long.clipboard.setText(output.value); if (!response || !response.success) throw new Error(response && response.error); setStatus('status.copied', 'success', 'UUID 已复制'); } catch (_) { setStatus('error.copy', 'danger', '复制失败'); } }
-    document.getElementById('generateButton').addEventListener('click', generate); document.getElementById('copyButton').addEventListener('click', copy); document.querySelectorAll('input').forEach(function (item) { item.addEventListener('change', generate); });
+
+    function generateUniqueValues(amount) {
+      const values = new Set();
+      const maximumAttempts = amount * 10;
+      for (let attempts = 0; values.size < amount && attempts < maximumAttempts; attempts += 1) {
+        values.add(uuid());
+      }
+      if (values.size !== amount) throw new Error('secure random source returned duplicate UUIDs');
+      return Array.from(values);
+    }
+
+    function formatUuid(value) {
+      const compact = compactInput.checked ? value.replace(/-/g, '') : value;
+      return uppercaseInput.checked ? compact.toUpperCase() : compact;
+    }
+
+    function generate() {
+      clearResult();
+      const amount = readAmount();
+      if (amount === null) {
+        const message = setStatus('error.invalidAmount', 'danger', '生成数量必须是 1 到 100 之间的整数');
+        return { success: false, message, outputs: {} };
+      }
+      try {
+        output.value = generateUniqueValues(amount).map(formatUuid).join('\n');
+      } catch (_) {
+        const message = setStatus('error.randomSource', 'danger', '安全随机源暂时无法生成唯一 UUID');
+        return { success: false, message, outputs: {} };
+      }
+      copyButton.disabled = false;
+      const message = setStatus('status.generated', 'success', '已生成 {count} 个 UUID', { count: amount });
+      window.LongUI?.announce(message);
+      return { success: true, message, outputs: { result: { type: 'text', value: output.value } } };
+    }
+
+    function applyCommandOptions(command) {
+      const args = command && command.arguments ? command.arguments : {};
+      amountInput.value = args.amount === undefined ? '10' : String(args.amount);
+      uppercaseInput.checked = args.uppercase === 'true';
+      compactInput.checked = args.compact === 'true';
+    }
+
+    async function copy() { if (!output.value) return; const selected = output.selectionEnd > output.selectionStart; const value = selected ? output.value.slice(output.selectionStart, output.selectionEnd) : output.value; try { const response = await long.clipboard.setText(value); if (!response || !response.success) throw new Error(response && response.error); setStatus(selected ? 'status.selectionCopied' : 'status.copied', 'success', selected ? '所选内容已复制' : '全部 UUID 已复制'); } catch (_) { setStatus('error.copy', 'danger', '复制失败'); } }
+    document.getElementById('generateButton').addEventListener('click', generate); document.getElementById('copyButton').addEventListener('click', copy); document.querySelectorAll('input').forEach(function (item) { item.addEventListener('input', invalidateResult); item.addEventListener('change', invalidateResult); });
     document.addEventListener('keydown', function (event) { if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); generate(); } });
-    window.LongUI?.onCommand(function (command) { if (command.command_id !== 'uuid.generate') return { success: false, message: t('error.unknownCommand', '未知 UUID 命令'), outputs: {} }; applyCommandOptions(command); return generate(); });
+    window.LongUI?.onCommand(function (command) { if (command.command_id !== 'uuid.generate') { clearResult(); const message = setStatus('error.unknownCommand', 'danger', '未知 UUID 命令'); return { success: false, message, outputs: {} }; } applyCommandOptions(command); return generate(); });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);
     });
