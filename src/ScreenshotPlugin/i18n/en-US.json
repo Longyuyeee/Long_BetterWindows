@@ -14,6 +14,7 @@
   "toast.regionCopied": "Region screenshot copied · {0} × {1}",
   "toast.captureFailed": "Screenshot failed. Try again.",
   "toast.clipboardFailed": "Screenshot captured, but it could not be copied",
+  "toast.busy": "Another screenshot operation is still running",
   "settings.fullTitle": "Full-screen screenshot",
   "settings.regionTitle": "Region screenshot",
   "settings.commandCenter": "Command center",

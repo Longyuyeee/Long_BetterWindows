@@ -27,12 +27,14 @@ public class ScreenshotPluginImpl :
     private string? _registeredRegionHotkey;
     private RegionSelectorWindow? _selector;
     private CancellationTokenSource _operationLifetime = new();
+    private readonly ScreenshotOperationCoordinator _operations = new();
+    private readonly ScreenshotClipboardWriter _clipboardWriter = new();
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.screenshot";
     public string Name => Text("plugin.name", "截图工具");
-    public string Version => "1.1.3";
+    public string Version => "1.2.0";
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public async Task<bool> InitializeAsync(IHostApi host)
@@ -109,7 +111,16 @@ public class ScreenshotPluginImpl :
         _registeredHotkeys.Clear();
         _registeredFullHotkey = null;
         _registeredRegionHotkey = null;
-        Application.Current.Dispatcher.Invoke(() => _selector?.Close());
+        var application = Application.Current;
+        if (application is not null)
+        {
+            application.Dispatcher.Invoke(() =>
+            {
+                if (_selector?.IsVisible == true)
+                    _selector.Close();
+            });
+        }
+        _selector = null;
         State = PluginState.Stopped;
         return true;
     }
@@ -121,14 +132,13 @@ public class ScreenshotPluginImpl :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _operationLifetime.Token.ThrowIfCancellationRequested();
         switch (invocation.CommandId)
         {
             case "screenshot.full":
                 return await CaptureFullScreenAsync(cancellationToken);
             case "screenshot.region":
-                CaptureRegion();
-                return PluginCommandResult.Success(
-                    Text("command.regionStarted", "拖拽选择截图区域"));
+                return StartRegionCapture();
             default:
                 return PluginCommandResult.Failure(string.Format(
                     Text("error.unknownCommand", "未知截图命令: {0}"),
@@ -141,10 +151,15 @@ public class ScreenshotPluginImpl :
     private async Task<PluginCommandResult> CaptureFullScreenAsync(
         CancellationToken cancellationToken = default)
     {
+        var operation = _operations.TryBegin();
+        if (operation is null)
+            return BusyResult();
+        var operationToken = _operationLifetime.Token;
+        using var operationLease = operation;
         using var linkedCancellation =
             CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
-                _operationLifetime.Token);
+                operationToken);
         try
         {
             var bitmap = await CaptureAndCopyAsync(
@@ -159,7 +174,7 @@ public class ScreenshotPluginImpl :
             return PluginCommandResult.Success(message);
         }
         catch (OperationCanceledException)
-            when (_operationLifetime.IsCancellationRequested)
+            when (operationToken.IsCancellationRequested)
         {
             Log.Information(
                 "[Screenshot] Cancelled pending full-screen clipboard delivery");
@@ -170,6 +185,15 @@ public class ScreenshotPluginImpl :
             when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (ScreenshotClipboardDeliveryException ex)
+        {
+            Log.Error(ex, "[Screenshot] 全屏截图写入剪贴板失败");
+            var message = Text(
+                "toast.clipboardFailed",
+                "截图完成，但写入剪贴板失败");
+            ShowToast(message);
+            return PluginCommandResult.Failure(message);
         }
         catch (Exception ex)
         {
@@ -185,22 +209,61 @@ public class ScreenshotPluginImpl :
     private void ShowToast(string message)
         => _ = _notification.ShowAsync(Name, message);
 
-    private void CaptureRegion()
+    private void CaptureRegion() => _ = StartRegionCapture();
+
+    private PluginCommandResult StartRegionCapture()
     {
-        Application.Current.Dispatcher.Invoke(() =>
+        if (_operationLifetime.IsCancellationRequested)
+            return PluginCommandResult.Failure("Screenshot delivery cancelled.");
+        var application = Application.Current;
+        if (application is null)
         {
-            if (_selector?.IsVisible == true)
+            return PluginCommandResult.Failure(Text(
+                "toast.captureFailed",
+                "截图失败，请稍后重试"));
+        }
+
+        return application.Dispatcher.Invoke(() =>
+        {
+            if (_selector is not null)
             {
-                _selector.Activate();
-                return;
+                if (_selector.IsVisible)
+                {
+                    _selector.Activate();
+                    return PluginCommandResult.Success(Text(
+                        "command.regionStarted",
+                        "拖拽选择截图区域"));
+                }
+                return BusyResult();
             }
 
+            var operation = _operations.TryBegin();
+            if (operation is null)
+                return BusyResult();
             var operationToken = _operationLifetime.Token;
-            var selector = new RegionSelectorWindow(CreateSelectorLocalization());
+            RegionSelectorWindow selector;
+            try
+            {
+                selector = new RegionSelectorWindow(
+                    CreateSelectorLocalization());
+            }
+            catch (Exception ex)
+            {
+                operation.Dispose();
+                Log.Error(ex, "[Screenshot] 无法创建区域选择器");
+                var message = Text(
+                    "toast.captureFailed",
+                    "截图失败，请稍后重试");
+                ShowToast(message);
+                return PluginCommandResult.Failure(message);
+            }
             _selector = selector;
             selector.Closed += (_, _) =>
             {
-                if (ReferenceEquals(_selector, selector))
+                if (!selector.HasCommittedSelection)
+                    operation.Dispose();
+                if (!selector.HasCommittedSelection
+                    && ReferenceEquals(_selector, selector))
                     _selector = null;
             };
             selector.RegionSelected += async bounds =>
@@ -227,24 +290,73 @@ public class ScreenshotPluginImpl :
                     Log.Information(
                         "[Screenshot] Cancelled pending region clipboard delivery");
                 }
-                catch (Exception ex)
+                catch (ScreenshotClipboardDeliveryException ex)
                 {
                     Log.Error(ex, "[Screenshot] 区域截图写入剪贴板失败");
                     ShowToast(Text(
                         "toast.clipboardFailed",
                         "截图完成，但写入剪贴板失败"));
                 }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "[Screenshot] 区域截图失败");
+                    ShowToast(Text(
+                        "toast.captureFailed",
+                        "截图失败，请稍后重试"));
+                }
+                finally
+                {
+                    operation.Dispose();
+                    application.Dispatcher.Invoke(() =>
+                    {
+                        if (ReferenceEquals(_selector, selector))
+                            _selector = null;
+                    });
+                }
             };
             selector.CaptureFailed += ex =>
             {
+                operation.Dispose();
+                if (ReferenceEquals(_selector, selector)
+                    && !selector.IsVisible)
+                {
+                    _selector = null;
+                }
                 Log.Error(ex, "[Screenshot] 区域截图失败");
                 ShowToast(Text(
                     "toast.captureFailed",
                     "截图失败，请稍后重试"));
             };
-            selector.Show();
-            selector.Activate();
+            try
+            {
+                selector.Show();
+                selector.Activate();
+                return PluginCommandResult.Success(Text(
+                    "command.regionStarted",
+                    "拖拽选择截图区域"));
+            }
+            catch (Exception ex)
+            {
+                operation.Dispose();
+                if (ReferenceEquals(_selector, selector))
+                    _selector = null;
+                Log.Error(ex, "[Screenshot] 无法打开区域选择器");
+                var message = Text(
+                    "toast.captureFailed",
+                    "截图失败，请稍后重试");
+                ShowToast(message);
+                return PluginCommandResult.Failure(message);
+            }
         });
+    }
+
+    private PluginCommandResult BusyResult()
+    {
+        var message = Text(
+            "toast.busy",
+            "另一项截图操作仍在进行");
+        ShowToast(message);
+        return PluginCommandResult.Failure(message);
     }
 
     private async Task<System.Windows.Media.Imaging.BitmapSource>
@@ -259,24 +371,17 @@ public class ScreenshotPluginImpl :
                 var capture = await captureAsync();
                 if (!capture.IsSuccess || capture.Data is null)
                 {
-                    throw new InvalidOperationException(
+                    throw new ScreenshotCaptureException(
                         capture.ErrorMessage ?? Text(
                             "toast.captureFailed",
                             "截图失败，请稍后重试"));
                 }
                 return capture.Data;
             },
-            async bitmap =>
-            {
-                var result = await _host.Clipboard.SetImageAsync(bitmap);
-                if (!result.IsSuccess)
-                {
-                    throw new InvalidOperationException(
-                        result.ErrorMessage ?? Text(
-                            "toast.clipboardFailed",
-                            "截图完成，但写入剪贴板失败"));
-                }
-            },
+            bitmap => _clipboardWriter.WriteAsync(
+                bitmap,
+                _host.Clipboard.SetImageAsync,
+                cancellationToken),
             cancellationToken);
     }
 

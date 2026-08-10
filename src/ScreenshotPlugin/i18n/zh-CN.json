@@ -14,6 +14,7 @@
   "toast.regionCopied": "区域截图已复制 · {0} × {1}",
   "toast.captureFailed": "截图失败，请稍后重试",
   "toast.clipboardFailed": "截图完成，但写入剪贴板失败",
+  "toast.busy": "另一项截图操作仍在进行",
   "settings.fullTitle": "全屏截图",
   "settings.regionTitle": "区域截图",
   "settings.commandCenter": "命令中心",

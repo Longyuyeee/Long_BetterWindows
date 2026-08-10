@@ -436,6 +436,33 @@ public sealed class PluginPositiveFunctionMatrixTests
     }
 
     [Fact]
+    public void ScreenshotIsolationEvidence_IsBoundToProductionPlugin()
+    {
+        var root = FindRepositoryRoot();
+        using var matrix = LoadMatrix(root);
+        var policy = matrix.RootElement.GetProperty("policy");
+        var testPath = Path.Combine(
+            root,
+            policy.GetProperty("screenshot_isolation_test_path").GetString()!);
+        var plugin = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Single(item =>
+                item.GetProperty("id").GetString()
+                == "com.long.screenshot");
+
+        Assert.True(File.Exists(testPath));
+        Assert.Equal(
+            5,
+            policy.GetProperty(
+                "screenshot_isolation_required_case_count").GetInt32());
+        Assert.Contains(
+            plugin.GetProperty("automated_evidence").EnumerateArray(),
+            item => item.GetProperty("path").GetString()
+                == "tests/LongBetterWindows.Tests/ScreenshotIsolationTests.cs");
+    }
+
+    [Fact]
     public void ColorPickerIsolationEvidence_IsBoundToProductionPlugin()
     {
         var root = FindRepositoryRoot();
@@ -460,7 +487,7 @@ public sealed class PluginPositiveFunctionMatrixTests
         Assert.True(File.Exists(scriptPath));
         Assert.True(File.Exists(testPath));
         Assert.Equal(
-            9,
+            14,
             policy.GetProperty(
                 "capture_delivery_isolation_required_case_count").GetInt32());
         Assert.Equal(
@@ -514,7 +541,7 @@ public sealed class PluginPositiveFunctionMatrixTests
                 .GetInt32(),
             commandCount);
         Assert.Equal(
-            65,
+            70,
             policy.GetProperty("high_risk_boundary_required_case_count")
                 .GetInt32());
         Assert.Contains("verify-high-risk-plugin-transactions.ps1", script);

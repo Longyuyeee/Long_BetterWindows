@@ -542,6 +542,21 @@ public sealed class ReleaseBlockingRegressionTests
             "src",
             "ScreenshotPlugin",
             "RegionSelectorWindow.xaml.cs"));
+        var screenshotOperations = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ScreenshotPlugin",
+            "ScreenshotOperationCoordinator.cs"));
+        var screenshotGeometry = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ScreenshotPlugin",
+            "ScreenshotRegionGeometry.cs"));
+        var screenshotClipboard = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "ScreenshotPlugin",
+            "ScreenshotClipboardWriter.cs"));
         var colorPicker = File.ReadAllText(Path.Combine(
             root,
             "src",
@@ -569,8 +584,10 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains("AsyncDeliveryBoundary.RunAsync(", screenshot);
         Assert.Contains("_operationLifetime.Cancel()", screenshot);
         Assert.DoesNotContain("internal static class ScreenCapture", screenshot);
-        Assert.Contains("GetCursorPos(out _screenStart)", selector);
-        Assert.Contains("Close();", selector);
+        Assert.Contains("TryGetCursorPosition(out _screenStart)", selector);
+        Assert.Contains("PointFromScreen", selector);
+        Assert.Contains("ScreenshotRegionGeometry.TryCreate", selector);
+        Assert.Contains("CloseSelector();", selector);
         Assert.Contains(
             "await Dispatcher.Yield(DispatcherPriority.ApplicationIdle)",
             selector);
@@ -579,6 +596,13 @@ public sealed class ReleaseBlockingRegressionTests
             selector);
         Assert.Contains("Keyboard.Focus(SelectionCanvas)", selector);
         Assert.DoesNotContain("SystemParameters.VirtualScreen", selector);
+        Assert.Contains("ScreenshotOperationCoordinator", screenshot);
+        Assert.Contains("_operations.TryBegin()", screenshot);
+        Assert.Contains("operation.Dispose()", screenshot);
+        Assert.Contains("Interlocked.CompareExchange", screenshotOperations);
+        Assert.Contains("minimumExtent", screenshotGeometry);
+        Assert.Contains("DefaultRetryDelays", screenshotClipboard);
+        Assert.Contains("ScreenshotClipboardDeliveryException", screenshotClipboard);
         Assert.Contains("ColorPickerNativeWindow.PositionNearCursor(this, point)", colorPicker);
         Assert.Contains("_screenColorSampler.Sample(", colorPicker);
         Assert.Contains("WaitForLeftButtonReleaseAsync", colorPicker);

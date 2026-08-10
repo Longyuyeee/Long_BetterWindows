@@ -16,19 +16,23 @@ public sealed record RegionSelectorLocalization(
 public partial class RegionSelectorWindow : Window
 {
     private Point _start;
-    private PointNative _screenStart;
-    private PointNative _screenEnd;
+    private ScreenshotPhysicalPoint _screenStart;
+    private ScreenshotPhysicalPoint _screenEnd;
     private bool _drawing;
+    private bool _closing;
+    private int _selectionCommitted;
 
     public event Func<Int32Rect, Task>? RegionSelected;
     public event Action<Exception>? CaptureFailed;
+    internal bool HasCommittedSelection
+        => Volatile.Read(ref _selectionCommitted) == 1;
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetCursorPos(out PointNative point);
+    private static extern bool GetCursorPos(out NativePoint point);
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct PointNative
+    private struct NativePoint
     {
         public int X;
         public int Y;
@@ -52,7 +56,7 @@ public partial class RegionSelectorWindow : Window
         catch (Exception ex)
         {
             CaptureFailed?.Invoke(ex);
-            Close();
+            CloseSelector();
         }
     }
 
@@ -65,51 +69,54 @@ public partial class RegionSelectorWindow : Window
 
     private void Canvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!GetCursorPos(out _screenStart))
+        if (_drawing || Volatile.Read(ref _selectionCommitted) != 0)
+            return;
+        if (!TryGetCursorPosition(out _screenStart))
             return;
         _screenEnd = _screenStart;
-        _start = e.GetPosition(SelectionCanvas);
+        _start = PointFromScreen(new Point(_screenStart.X, _screenStart.Y));
         _drawing = true;
         SelectionRectangle.Visibility = Visibility.Visible;
         SizeBadge.Visibility = Visibility.Visible;
         InstructionCard.Visibility = Visibility.Collapsed;
-        UpdateSelection(_start);
+        UpdateSelection();
         SelectionCanvas.CaptureMouse();
     }
 
     private void Canvas_MouseMove(object sender, MouseEventArgs e)
     {
         if (_drawing)
-            UpdateSelection(e.GetPosition(SelectionCanvas));
+            UpdateSelection();
     }
 
     private async void Canvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (!_drawing) return;
-        UpdateSelection(e.GetPosition(SelectionCanvas));
+        if (!UpdateSelection())
+        {
+            CloseSelector();
+            return;
+        }
         _drawing = false;
         SelectionCanvas.ReleaseMouseCapture();
 
-        if (SelectionRectangle.Width <= 5 || SelectionRectangle.Height <= 5)
+        if (!ScreenshotRegionGeometry.TryCreate(
+                VirtualScreenHelper.GetPhysicalBounds(),
+                _screenStart,
+                _screenEnd,
+                out var bounds)
+            || Interlocked.CompareExchange(
+                ref _selectionCommitted,
+                1,
+                0) != 0)
         {
-            Close();
-            return;
-        }
-
-        var bounds = new Int32Rect(
-            Math.Min(_screenStart.X, _screenEnd.X),
-            Math.Min(_screenStart.Y, _screenEnd.Y),
-            Math.Abs(_screenEnd.X - _screenStart.X),
-            Math.Abs(_screenEnd.Y - _screenStart.Y));
-        if (bounds.Width <= 0 || bounds.Height <= 0)
-        {
-            Close();
+            CloseSelector();
             return;
         }
 
         try
         {
-            Close();
+            CloseSelector();
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             if (RegionSelected is not null)
                 await RegionSelected(bounds);
@@ -120,10 +127,11 @@ public partial class RegionSelectorWindow : Window
         }
     }
 
-    private void UpdateSelection(Point end)
+    private bool UpdateSelection()
     {
-        if (GetCursorPos(out var screenEnd))
-            _screenEnd = screenEnd;
+        if (!TryGetCursorPosition(out _screenEnd))
+            return false;
+        var end = PointFromScreen(new Point(_screenEnd.X, _screenEnd.Y));
         var x = Math.Min(_start.X, end.X);
         var y = Math.Min(_start.Y, end.Y);
         var width = Math.Abs(end.X - _start.X);
@@ -133,15 +141,52 @@ public partial class RegionSelectorWindow : Window
         SelectionRectangle.Width = width;
         SelectionRectangle.Height = height;
         SizeText.Text =
-            $"{Math.Abs(_screenEnd.X - _screenStart.X)} × " +
-            $"{Math.Abs(_screenEnd.Y - _screenStart.Y)}";
+            $"{Math.Abs((long)_screenEnd.X - _screenStart.X) + 1} × " +
+            $"{Math.Abs((long)_screenEnd.Y - _screenStart.Y) + 1}";
         Canvas.SetLeft(SizeBadge, Math.Min(x + width + 8, Math.Max(0, ActualWidth - 100)));
         Canvas.SetTop(SizeBadge, Math.Min(y + height + 8, Math.Max(0, ActualHeight - 40)));
+        return true;
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape)
-            Close();
+        if (e.Key != Key.Escape)
+            return;
+        if (Interlocked.CompareExchange(ref _selectionCommitted, 2, 0) != 0)
+            return;
+        _drawing = false;
+        if (SelectionCanvas.IsMouseCaptured)
+            SelectionCanvas.ReleaseMouseCapture();
+        CloseSelector();
+        e.Handled = true;
+    }
+
+    private static bool TryGetCursorPosition(
+        out ScreenshotPhysicalPoint point)
+    {
+        if (GetCursorPos(out var nativePoint))
+        {
+            point = new ScreenshotPhysicalPoint(nativePoint.X, nativePoint.Y);
+            return true;
+        }
+
+        point = default;
+        return false;
+    }
+
+    private void CloseSelector()
+    {
+        if (_closing)
+            return;
+        _closing = true;
+        Close();
+    }
+
+    private void Window_Closed(object? sender, EventArgs e)
+    {
+        _closing = true;
+        _drawing = false;
+        if (SelectionCanvas.IsMouseCaptured)
+            SelectionCanvas.ReleaseMouseCapture();
     }
 }

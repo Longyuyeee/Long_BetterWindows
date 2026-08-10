@@ -143,7 +143,12 @@ try {
         },
         [ordered]@{
             id = "com.long.screenshot"
-            checks = @("physical-screen-capture", "cancelled-delivery")
+            checks = @(
+                "physical-screen-capture",
+                "physical-region-geometry",
+                "exclusive-operation-session",
+                "cancelled-delivery",
+                "bounded-image-clipboard-retry")
             passed = [bool]$capture.passed -and $servicePassed
         },
         [ordered]@{
@@ -167,7 +172,7 @@ try {
         disposable_process_only = $true
         required_plugin_count = 7
         covered_plugin_count = $plugins.Count
-        expected_case_count = 65
+        expected_case_count = 70
         executed_case_count =
             [int]$transactions.passed_case_count +
             [int]$capture.executed_case_count +

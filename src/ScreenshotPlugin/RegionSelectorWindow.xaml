@@ -4,6 +4,7 @@
         WindowStyle="None" AllowsTransparency="True" Background="{DynamicResource OverlayDarkBrush}"
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize" Cursor="Cross"
         Focusable="True" Loaded="Window_Loaded"
+        Closed="Window_Closed"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Canvas x:Name="SelectionCanvas"
             Focusable="True"
