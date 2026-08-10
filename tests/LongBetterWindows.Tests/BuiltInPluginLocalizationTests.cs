@@ -230,8 +230,43 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.Contains("function applyLocalization(message)", source);
         Assert.Contains("renderStatus();", source);
         Assert.DoesNotContain("location.reload", source);
-        Assert.DoesNotContain("input.value = ''", source);
-        Assert.DoesNotContain("output.value = ''", source);
+        var localizationStart = source.IndexOf(
+            "function applyLocalization(message)",
+            StringComparison.Ordinal);
+        var localizationEnd = source.IndexOf(
+            "function clearResult()",
+            localizationStart,
+            StringComparison.Ordinal);
+        Assert.True(localizationEnd > localizationStart);
+        var localizationBody = source[localizationStart..localizationEnd];
+        Assert.DoesNotContain("input.value = ''", localizationBody);
+        Assert.DoesNotContain("output.value = ''", localizationBody);
+    }
+
+    [Fact]
+    public void Base64Tool_UsesUtf8BoundariesAndInvalidatesStaleResults()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Base64Tool",
+            "index.html"));
+
+        Assert.Contains("function clearResult()", source);
+        Assert.Contains("input.addEventListener('input', invalidateResult)", source);
+        Assert.Contains("new TextEncoder().encode(value)", source);
+        Assert.Contains("new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })", source);
+        Assert.Contains("function isWellFormedUnicode(value)", source);
+        Assert.Contains("if (!(next >= 0xdc00 && next <= 0xdfff))", source);
+        Assert.Contains("offset += 32768", source);
+        Assert.Contains("value.length > maxCommandOutputLength", source);
+        Assert.Contains("copyButton.disabled = true", source);
+        Assert.Contains("copyButton.disabled = false", source);
+        Assert.Contains("error.emptyInput", source);
+        Assert.Contains("error.clipboardEmpty", source);
+        Assert.Contains("error.unknownCommand", source);
+        Assert.DoesNotContain("unescape(", source);
+        Assert.DoesNotContain("escape(atob", source);
     }
 
     [Fact]

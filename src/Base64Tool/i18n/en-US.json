@@ -21,8 +21,12 @@
   "status.encoded": "Encoding complete",
   "status.decoded": "Decoding complete",
   "status.copied": "Result copied",
+  "error.emptyInput": "Enter content to process",
   "error.encode": "This content could not be encoded",
   "error.invalidBase64": "Enter valid Base64 content",
+  "error.outputTooLong": "The result exceeds 65,536 characters and cannot be returned as command output",
+  "error.clipboardEmpty": "The clipboard does not contain text",
   "error.clipboardRead": "The clipboard could not be read",
-  "error.copy": "The result could not be copied"
+  "error.copy": "The result could not be copied",
+  "error.unknownCommand": "Unknown Base64 command"
 }

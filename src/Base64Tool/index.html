@@ -36,7 +36,7 @@
         <div class="long-toolbar">
           <div id="status" class="long-status" role="status" aria-live="polite"></div>
           <span class="long-toolbar__spacer"></span>
-          <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy">复制结果</button>
+          <button class="long-button long-button--secondary btn-secondary" id="copyButton" type="button" data-i18n="action.copy" disabled>复制结果</button>
         </div>
       </div>
     </section>
@@ -46,6 +46,8 @@
     const input = document.getElementById('input');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
+    const copyButton = document.getElementById('copyButton');
+    const maxCommandOutputLength = 65536;
     let strings = {};
     let currentStatusKey = '';
     let currentStatusFallback = '';
@@ -70,7 +72,7 @@
       currentStatusFallback = fallback;
       currentStatusKind = kind;
       const message = renderStatus();
-      window.LongUI?.announce(message);
+      if (message) window.LongUI?.announce(message);
       return message;
     }
 
@@ -91,15 +93,81 @@
       renderStatus();
     }
 
+    function clearResult() {
+      output.value = '';
+      copyButton.disabled = true;
+    }
+
+    function invalidateResult() {
+      clearResult();
+      setStatus('', '', '');
+    }
+
+    function isWellFormedUnicode(value) {
+      for (let index = 0; index < value.length; index += 1) {
+        const code = value.charCodeAt(index);
+        if (code >= 0xd800 && code <= 0xdbff) {
+          const next = value.charCodeAt(index + 1);
+          if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+          index += 1;
+        } else if (code >= 0xdc00 && code <= 0xdfff) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function bytesToBase64(bytes) {
+      let binary = '';
+      for (let offset = 0; offset < bytes.length; offset += 32768) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+      }
+      return btoa(binary);
+    }
+
+    function encodeText(value) {
+      if (!isWellFormedUnicode(value)) throw new Error('invalid unicode');
+      return bytesToBase64(new TextEncoder().encode(value));
+    }
+
+    function decodeText(value) {
+      const compact = value.replace(/[\t\n\f\r ]/g, '');
+      if (!compact || compact.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(compact)) {
+        throw new Error('invalid base64');
+      }
+      if (compact.includes('=') && compact.length % 4 !== 0) throw new Error('invalid padding');
+      const padded = compact + '='.repeat((4 - compact.length % 4) % 4);
+      const binary = atob(padded);
+      const bytes = Uint8Array.from(binary, function (character) { return character.charCodeAt(0); });
+      return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+    }
+
+    function commitResult(value, statusKey, statusFallback) {
+      if (value.length > maxCommandOutputLength) {
+        const message = setStatus(
+          'error.outputTooLong',
+          'danger',
+          '转换结果超过 65,536 个字符，无法作为命令输出');
+        return { success: false, message, outputs: {} };
+      }
+      output.value = value;
+      copyButton.disabled = false;
+      const message = setStatus(statusKey, 'success', statusFallback);
+      return {
+        success: true,
+        message,
+        outputs: { result: { type: 'text', value: output.value } }
+      };
+    }
+
     function encode() {
+      clearResult();
+      if (!input.value) {
+        const message = setStatus('error.emptyInput', 'danger', '请输入要编码的文本');
+        return { success: false, message, outputs: {} };
+      }
       try {
-        output.value = btoa(unescape(encodeURIComponent(input.value)));
-        const message = setStatus('status.encoded', 'success', '编码完成');
-        return {
-          success: true,
-          message,
-          outputs: { result: { type: 'text', value: output.value } }
-        };
+        return commitResult(encodeText(input.value), 'status.encoded', '编码完成');
       } catch (_) {
         const message = setStatus(
           'error.encode',
@@ -110,14 +178,13 @@
     }
 
     function decode() {
+      clearResult();
+      if (!input.value.trim()) {
+        const message = setStatus('error.emptyInput', 'danger', '请输入要解码的 Base64 内容');
+        return { success: false, message, outputs: {} };
+      }
       try {
-        output.value = decodeURIComponent(escape(atob(input.value.trim())));
-        const message = setStatus('status.decoded', 'success', '解码完成');
-        return {
-          success: true,
-          message,
-          outputs: { result: { type: 'text', value: output.value } }
-        };
+        return commitResult(decodeText(input.value), 'status.decoded', '解码完成');
       } catch (_) {
         const message = setStatus(
           'error.invalidBase64',
@@ -130,8 +197,12 @@
     async function paste() {
       try {
         const result = await long.clipboard.getText();
-        if (result.success && result.data) { input.value = result.data; input.focus(); }
-        else if (!result.success) setStatus('error.clipboardRead', 'danger', '无法读取剪贴板');
+        if (result.success) {
+          input.value = result.data || '';
+          input.focus();
+          invalidateResult();
+          if (!input.value) setStatus('error.clipboardEmpty', 'danger', '剪贴板中没有文本');
+        } else setStatus('error.clipboardRead', 'danger', '无法读取剪贴板');
       } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); }
     }
 
@@ -149,13 +220,17 @@
     document.getElementById('decodeButton').addEventListener('click', decode);
     document.getElementById('pasteButton').addEventListener('click', paste);
     document.getElementById('copyButton').addEventListener('click', copy);
+    input.addEventListener('input', invalidateResult);
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); event.shiftKey ? decode() : encode(); }
     });
     window.LongUI?.onCommand(function (command) {
-      const text = window.LongUI.commandText(command);
-      if (text) input.value = text;
-      return command.command_id === 'base64.decode' ? decode() : encode();
+      input.value = window.LongUI.commandText(command) || '';
+      if (command.command_id === 'base64.decode') return decode();
+      if (command.command_id === 'base64.encode') return encode();
+      clearResult();
+      const message = setStatus('error.unknownCommand', 'danger', '未知 Base64 命令');
+      return { success: false, message, outputs: {} };
     });
     window.chrome?.webview?.addEventListener('message', ({ data }) => {
       if (data?.type === 'long.language-changed') applyLocalization(data);

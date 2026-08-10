@@ -1,6 +1,6 @@
 {
   "id": "com.long.base64",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "name": "Base64 编解码",
   "author": "Long",
   "entry_point": "index.html",

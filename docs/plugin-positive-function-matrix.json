@@ -51,6 +51,11 @@
           "level": "contract",
           "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
           "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/BuiltInPluginLocalizationTests.cs",
+          "symbol": "Base64Tool_UsesUtf8BoundariesAndInvalidatesStaleResults"
         }
       ],
       "manual_checks": [

@@ -670,7 +670,9 @@ public class DesignSystemTests
             Assert.Equal(PluginCommandOutputType.Text, output.Type);
         });
         Assert.Contains("outputs: { result: { type: 'text', value: output.value } }", page);
-        Assert.Contains("return command.command_id === 'base64.decode' ? decode() : encode();", page);
+        Assert.Contains("if (command.command_id === 'base64.decode') return decode();", page);
+        Assert.Contains("if (command.command_id === 'base64.encode') return encode();", page);
+        Assert.Contains("error.unknownCommand", page);
     }
 
     [Fact]

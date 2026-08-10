@@ -21,8 +21,12 @@
   "status.encoded": "编码完成",
   "status.decoded": "解码完成",
   "status.copied": "结果已复制",
+  "error.emptyInput": "请输入要处理的内容",
   "error.encode": "无法编码当前内容",
   "error.invalidBase64": "请输入有效的 Base64 内容",
+  "error.outputTooLong": "转换结果超过 65,536 个字符，无法作为命令输出",
+  "error.clipboardEmpty": "剪贴板中没有文本",
   "error.clipboardRead": "无法读取剪贴板",
-  "error.copy": "复制失败"
+  "error.copy": "复制失败",
+  "error.unknownCommand": "未知 Base64 命令"
 }
