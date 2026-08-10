@@ -1,6 +1,6 @@
 {
   "id": "com.long.text-diff",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": "文本对比",
   "author": "Long",
   "entry_point": "index.html",

@@ -252,6 +252,28 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.Contains("error.emptyInput", source);
     }
 
+    [Fact]
+    public void TextDiff_NormalizesLineEndingsAndInvalidatesStaleResults()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "TextDiffPlugin",
+            "index.html"));
+
+        Assert.Contains("function splitLines(value)", source);
+        Assert.Contains("value.replace(/\\r\\n?/g, '\\n')", source);
+        Assert.Contains("function invalidateComparison()", source);
+        Assert.Contains("textA.addEventListener('input', invalidateComparison)", source);
+        Assert.Contains("textB.addEventListener('input', invalidateComparison)", source);
+        Assert.Contains("setStatus('status.emptyInput'", source);
+        Assert.Contains("line.setAttribute(", source);
+        Assert.Contains("'aria-label'", source);
+        Assert.Contains("diff.addedLine", source);
+        Assert.Contains("diff.deletedLine", source);
+        Assert.Contains("diff.unchangedLine", source);
+    }
+
     [Theory]
     [InlineData("ClipboardTool", "content.value = text", "let currentTab = 'history'")]
     [InlineData("QuickNotePlugin", "if (input.value.trim() === text) input.value = ''", "let notes = []")]

@@ -75,6 +75,10 @@
       return message;
     }
 
+    function format(key, fallback, value) {
+      return t(key, fallback).replace('{0}', value);
+    }
+
     function renderDiff() {
       result.replaceChildren();
       diffText = operationsSnapshot.map(function (operation) {
@@ -84,6 +88,19 @@
           ? '+ '
           : operation.kind === 'delete' ? '- ' : '  ';
         line.textContent = prefix + operation.text;
+        const labelKey = operation.kind === 'add'
+          ? 'diff.addedLine'
+          : operation.kind === 'delete'
+            ? 'diff.deletedLine'
+            : 'diff.unchangedLine';
+        const labelFallback = operation.kind === 'add'
+          ? '新增行：{0}'
+          : operation.kind === 'delete'
+            ? '删除行：{0}'
+            : '未变行：{0}';
+        line.setAttribute(
+          'aria-label',
+          format(labelKey, labelFallback, operation.text));
         result.appendChild(line);
         return prefix + operation.text;
       }).join('\n');
@@ -117,9 +134,31 @@
       }
     }
 
+    function clearComparison() {
+      operationsSnapshot = [];
+      addedCount = 0;
+      removedCount = 0;
+      hasComparison = false;
+      renderDiff();
+    }
+
+    function invalidateComparison() {
+      clearComparison();
+      setStatus('', '', '');
+    }
+
+    function splitLines(value) {
+      return value.replace(/\r\n?/g, '\n').split('\n');
+    }
+
     function compare() {
-      const left = textA.value.split('\n');
-      const right = textB.value.split('\n');
+      clearComparison();
+      if (!textA.value && !textB.value) {
+        setStatus('status.emptyInput', 'warning', '请至少在一侧输入文本');
+        return;
+      }
+      const left = splitLines(textA.value);
+      const right = splitLines(textB.value);
       if (left.length * right.length > 160000) {
         setStatus('status.tooManyLines', 'warning', '文本行数过多，请将两侧控制在约 400 行以内');
         return;
@@ -161,7 +200,7 @@
     async function paste(target) {
       try {
         const response = await long.clipboard.getText();
-        if (response.success && response.data) { target.value = response.data; target.focus(); }
+        if (response.success && response.data) { target.value = response.data; invalidateComparison(); target.focus(); }
         else setStatus('error.clipboardEmpty', 'warning', '剪贴板中没有文本');
       } catch (_) { setStatus('error.clipboardRead', 'danger', '无法读取剪贴板'); }
     }
@@ -177,13 +216,16 @@
     document.getElementById('pasteBButton').addEventListener('click', function () { paste(textB); });
     document.getElementById('copyButton').addEventListener('click', copyDiff);
     document.getElementById('swapButton').addEventListener('click', function () { const value = textA.value; textA.value = textB.value; textB.value = value; compare(); });
-    document.getElementById('clearButton').addEventListener('click', function () { textA.value = ''; textB.value = ''; operationsSnapshot = []; addedCount = 0; removedCount = 0; hasComparison = false; renderDiff(); textA.focus(); setStatus('', '', ''); });
+    document.getElementById('clearButton').addEventListener('click', function () { textA.value = ''; textB.value = ''; invalidateComparison(); textA.focus(); });
+    textA.addEventListener('input', invalidateComparison);
+    textB.addEventListener('input', invalidateComparison);
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); compare(); }
     });
     window.LongUI?.onCommand(function (command) {
       const text = window.LongUI.commandText(command);
       if (text) textA.value = text;
+      invalidateComparison();
       textB.focus();
       return {
         success: true,
