@@ -101,12 +101,13 @@
     const findResult = document.getElementById('findResult');
     const killDialog = document.getElementById('killDialog');
     const confirmKillButton = document.getElementById('confirmKillButton');
+    const cancelKillButton = document.getElementById('cancelKillButton');
     let currentTab = 'tcp';
     let allPorts = { tcp: [], connections: [], udp: [] };
     let refreshTimer = 0;
     let refreshPromise = null;
     let hasLoaded = false;
-    let pendingProcess = null;
+    let pendingPort = null;
     let strings = {};
     let isRefreshing = false;
     let isFinding = false;
@@ -196,11 +197,17 @@
       confirmKillButton.textContent = isKilling
         ? t('dialog.kill.killing', '正在终止…')
         : t('dialog.kill.confirm', '终止进程');
-      document.getElementById('killDialogMessage').textContent = pendingProcess
+      cancelKillButton.disabled = isKilling;
+      document.getElementById('killDialogMessage').textContent = pendingPort
         ? t(
           'dialog.kill.message',
-          '将终止进程 {name}（PID {pid}）。',
-          { name: pendingProcess.name, pid: pendingProcess.id })
+          '将终止仍占用 {protocol} {endpoint} 的进程 {name}（PID {pid}）。',
+          {
+            protocol: pendingPort.Protocol,
+            endpoint: endpoint(pendingPort.LocalAddress, pendingPort.LocalPort),
+            name: pendingPort.ProcessName,
+            pid: pendingPort.ProcessId
+          })
         : '';
     }
 
@@ -506,40 +513,48 @@
           '此端口没有可用的进程标识，无法终止');
         return;
       }
-      if (!port.ProcessName || !port.ProcessIdentity) {
+      if (!port.ProcessName || !port.ProcessIdentity ||
+          !port.Protocol || !port.State || Number(port.LocalPort) <= 0) {
         setStatus(
           'status.processIdentityUnavailable',
           'warning',
           '无法验证此端口对应的进程身份，请刷新后重试');
         return;
       }
-      pendingProcess = {
-        id: Number(port.ProcessId),
-        name: port.ProcessName,
-        identity: port.ProcessIdentity
+      pendingPort = {
+        ProcessId: Number(port.ProcessId),
+        ProcessName: port.ProcessName,
+        ProcessIdentity: port.ProcessIdentity,
+        LocalPort: Number(port.LocalPort),
+        LocalAddress: String(port.LocalAddress || ''),
+        RemotePort: Number(port.RemotePort || 0),
+        RemoteAddress: String(port.RemoteAddress || ''),
+        Protocol: String(port.Protocol),
+        State: String(port.State)
       };
+      stopPolling();
       renderKillDialog();
       killDialog.showModal();
       confirmKillButton.focus();
     }
 
     async function confirmKill() {
-      if (!pendingProcess) return;
-      const target = pendingProcess;
+      if (isKilling || !pendingPort) return;
+      const target = pendingPort;
       isKilling = true;
       window.LongUI?.setBusy(confirmKillButton, true);
       renderKillDialog();
       try {
         unwrap(
-          await long.process.killVerified(target.id, target.name, target.identity),
+          await long.process.killPortOwnerVerified(target),
           t('error.kill', '终止进程失败'));
         killDialog.close();
-        pendingProcess = null;
+        pendingPort = null;
         setStatus(
           'status.processKilled',
           'success',
           '进程 {name} 已终止',
-          { name: target.name });
+          { name: target.ProcessName });
         await refreshPorts(false);
       } catch (error) {
         setStatus(
@@ -689,12 +704,16 @@
     });
     searchInput.addEventListener('input', renderPorts);
     autoRefreshToggle.addEventListener('change', startPolling);
-    document.getElementById('cancelKillButton').addEventListener('click', function () {
+    cancelKillButton.addEventListener('click', function () {
       killDialog.close();
     });
     confirmKillButton.addEventListener('click', function () { void confirmKill(); });
+    killDialog.addEventListener('cancel', function (event) {
+      if (isKilling) event.preventDefault();
+    });
     killDialog.addEventListener('close', function () {
-      pendingProcess = null;
+      pendingPort = null;
+      startPolling();
     });
     document.addEventListener('keydown', function (event) {
       if (event.key === 'F5') {

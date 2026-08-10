@@ -22,6 +22,9 @@ namespace LongBetterWindows.Host.Capabilities
 
         /// <summary>获取所有端口占用情况汇总</summary>
         Task<HostApiResponse<PortSummary>> GetPortSummaryAsync();
+
+        /// <summary>Checks whether the exact endpoint is still owned by the expected process.</summary>
+        Task<HostApiResponse<bool>> IsCurrentOwnerAsync(PortInfo expectedPort);
     }
 
     public class PortInfo

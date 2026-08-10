@@ -1,6 +1,6 @@
 {
   "id": "com.long.portmanager",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "name": "端口管理器",
   "author": "Long",
   "description": "端口扫描、进程识别、占用分析与安全释放，快速找到谁占用了端口，判断能否安全关闭",

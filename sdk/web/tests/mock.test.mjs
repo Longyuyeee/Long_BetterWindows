@@ -16,6 +16,7 @@ test("exposes the complete bridge method ledger without duplicates", () => {
   assert.ok(BRIDGE_METHODS.includes("widget.setInstanceState"));
   assert.ok(BRIDGE_METHODS.includes("fileSystem.executeOrganization"));
   assert.ok(BRIDGE_METHODS.includes("process.killVerified"));
+  assert.ok(BRIDGE_METHODS.includes("process.killPortOwnerVerified"));
   assert.ok(BRIDGE_METHODS.includes("window.getVisible"));
 });
 
@@ -115,6 +116,37 @@ test("records the complete identity for verified process termination", async () 
   assert.deepEqual(mock.getCalls("process.killVerified")[0], {
     method: "process.killVerified",
     args: [42, "demo", "identity-token"]
+  });
+});
+
+test("flattens the complete endpoint snapshot for port-owner termination", async () => {
+  const mock = createLongMock();
+  const port = {
+    ProcessId: 42,
+    ProcessName: "demo",
+    ProcessIdentity: "identity-token",
+    LocalPort: 8080,
+    LocalAddress: "127.0.0.1",
+    RemotePort: 0,
+    RemoteAddress: "0.0.0.0",
+    Protocol: "TCP",
+    State: "LISTENING"
+  };
+  await mock.long.process.killPortOwnerVerified(port);
+
+  assert.deepEqual(mock.getCalls("process.killPortOwnerVerified")[0], {
+    method: "process.killPortOwnerVerified",
+    args: [
+      42,
+      "demo",
+      "identity-token",
+      8080,
+      "127.0.0.1",
+      0,
+      "0.0.0.0",
+      "TCP",
+      "LISTENING"
+    ]
   });
 });
 

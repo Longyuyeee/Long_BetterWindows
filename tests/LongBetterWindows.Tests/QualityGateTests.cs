@@ -2492,7 +2492,7 @@ public class QualityGateTests
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(135, productionMethods.Length);
+        Assert.Equal(136, productionMethods.Length);
         Assert.Equal(productionMethods, mockMethods);
         Assert.Contains("\"name\": \"@long-assistant/plugin-sdk\"", package);
         using var packageDocument = System.Text.Json.JsonDocument.Parse(package);
@@ -2520,6 +2520,8 @@ public class QualityGateTests
         Assert.Contains("host.getInfo", mock);
         Assert.Contains("widget.setInstanceState", mock);
         Assert.Contains("storage.compareExchange", mock);
+        Assert.Contains("killPortOwnerVerified(port: LongPortInfo)", types);
+        Assert.Contains("process.killPortOwnerVerified", mock);
         Assert.Contains("@ts-expect-error", typeTest);
         Assert.Contains("node:test", behaviorTest);
     }

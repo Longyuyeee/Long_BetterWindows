@@ -31,7 +31,7 @@
     ],
     "high_risk_boundary_required_plugin_count": 7,
     "high_risk_boundary_required_command_count": 8,
-    "high_risk_boundary_required_case_count": 54,
+    "high_risk_boundary_required_case_count": 57,
     "quick_launch_isolation_script": "verify-quick-launch-isolation.ps1",
     "quick_launch_isolation_test_path": "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
     "quick_launch_isolation_required_case_count": 7,
@@ -488,6 +488,16 @@
           "level": "integration",
           "path": "tests/LongBetterWindows.Tests/ReleaseBlockingRegressionTests.cs",
           "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/DesignSystemTests.cs",
+          "symbol": "PortManager_UsesRealHostApisAndControlledProcessTermination"
+        },
+        {
+          "level": "integration",
+          "path": "tests/LongBetterWindows.Tests/ProcessServiceTests.cs",
+          "symbol": "KillPortOwnerVerifiedAsync_TerminatesMatchingDisposablePortOwner"
         }
       ],
       "manual_checks": [

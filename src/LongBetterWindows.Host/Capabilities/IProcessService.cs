@@ -18,5 +18,6 @@ namespace LongBetterWindows.Host.Capabilities
             int processId,
             string expectedName,
             string expectedIdentity);
+        Task<HostApiResponse> KillPortOwnerVerifiedAsync(PortInfo expectedPort);
     }
 }

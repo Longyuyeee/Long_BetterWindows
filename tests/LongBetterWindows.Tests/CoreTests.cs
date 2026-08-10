@@ -418,6 +418,7 @@ public class CoreTests
 
     [Theory]
     [InlineData("process.start", "system.process")]
+    [InlineData("process.killPortOwnerVerified", "system.process")]
     [InlineData("performance.getCpuUsage", "system.performance")]
     [InlineData("networkPort.getTcpListeners", "network.ports")]
     [InlineData("audio.setVolume", "system.audio")]
@@ -459,6 +460,7 @@ public class CoreTests
         Assert.Contains("widget:", script);
         Assert.Contains("setInstanceState: function", script);
         Assert.Contains("process:", script);
+        Assert.Contains("killPortOwnerVerified: function", script);
         Assert.Contains("performance:", script);
         Assert.Contains("networkPort:", script);
         Assert.Contains("audio:", script);

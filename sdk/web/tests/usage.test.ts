@@ -51,6 +51,7 @@ async function exercise(api: LongApi): Promise<void> {
   const owner = await api.networkPort.findPortOwner(8080, "tcp");
   owner.data?.ProcessName.toLocaleLowerCase();
   if (owner.data?.ProcessIdentity) {
+    await api.process.killPortOwnerVerified(owner.data);
     await api.process.killVerified(
       owner.data.ProcessId,
       owner.data.ProcessName,

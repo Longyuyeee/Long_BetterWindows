@@ -122,6 +122,18 @@ namespace LongBetterWindows.Host.Engine
                     WebPluginArguments.GetInt(args, 0),
                     WebPluginArguments.GetString(args, 1),
                     WebPluginArguments.GetString(args, 2))),
+                "process.killPortOwnerVerified" => Ok(h.Process.KillPortOwnerVerifiedAsync(new PortInfo
+                {
+                    ProcessId = WebPluginArguments.GetInt(args, 0),
+                    ProcessName = WebPluginArguments.GetString(args, 1),
+                    ProcessIdentity = WebPluginArguments.GetString(args, 2),
+                    LocalPort = WebPluginArguments.GetInt(args, 3),
+                    LocalAddress = WebPluginArguments.GetString(args, 4),
+                    RemotePort = WebPluginArguments.GetInt(args, 5),
+                    RemoteAddress = WebPluginArguments.GetString(args, 6),
+                    Protocol = WebPluginArguments.GetString(args, 7),
+                    State = WebPluginArguments.GetString(args, 8),
+                })),
 
                 // === long.fileOps ===
                 "fileOps.copy" => Ok(h.FileOps.CopyAsync(WebPluginArguments.GetString(args, 0), WebPluginArguments.GetString(args, 1))),

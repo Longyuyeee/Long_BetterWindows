@@ -194,7 +194,10 @@ namespace LongBetterWindows.Host.Services
             Input = new InputService();
             provider.RegisterService<IInputService>(Input);
 
-            Process = new ProcessService();
+            NetworkPort = new NetworkPortService();
+            provider.RegisterService<INetworkPortService>(NetworkPort);
+
+            Process = new ProcessService(NetworkPort);
             provider.RegisterService<IProcessService>(Process);
 
             Http = new HttpService();
@@ -205,9 +208,6 @@ namespace LongBetterWindows.Host.Services
 
             UI = new UIService();
             provider.RegisterService<IUICapability>(UI);
-
-            NetworkPort = new NetworkPortService();
-            provider.RegisterService<INetworkPortService>(NetworkPort);
 
             Performance = new PerformanceService();
             provider.RegisterService<IPerformanceService>(Performance);

@@ -452,6 +452,7 @@ export interface LongProcessApi {
     expectedName: string,
     expectedIdentity: string
   ): Promise<LongResult>;
+  killPortOwnerVerified(port: LongPortInfo): Promise<LongResult>;
 }
 
 export interface LongFileOpsApi {

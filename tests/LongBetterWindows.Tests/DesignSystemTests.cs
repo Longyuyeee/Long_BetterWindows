@@ -653,10 +653,10 @@ public class DesignSystemTests
         Assert.Contains("long.networkPort.getUdpEndpoints()", page);
         Assert.Contains("long.networkPort.findPortOwner(port, protocol)", page);
         Assert.Contains("long.clipboard.setText(text)", page);
-        Assert.Contains(
-            "long.process.killVerified(target.id, target.name, target.identity)",
-            page);
+        Assert.Contains("long.process.killPortOwnerVerified(target)", page);
         Assert.Contains("port.ProcessIdentity", page);
+        Assert.Contains("LocalAddress: String(port.LocalAddress || '')", page);
+        Assert.Contains("if (isKilling || !pendingPort) return", page);
         Assert.Contains("killDialog.showModal()", page);
         Assert.Contains("LongUI?.onCommand", page);
         Assert.Contains("visibilitychange", page);
@@ -668,6 +668,7 @@ public class DesignSystemTests
         Assert.Equal(
             ["network.ports", "system.process", "system.clipboard"],
             capabilities);
+        Assert.Equal("1.1.0", manifest.RootElement.GetProperty("version").GetString());
 
         Assert.Contains(".long-dialog", uiKit);
         Assert.Contains(".long-badge--success", uiKit);

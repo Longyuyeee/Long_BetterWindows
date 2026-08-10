@@ -17,6 +17,7 @@ export const BRIDGE_METHODS = Object.freeze([
   "storage.get", "storage.set", "storage.compareExchange",
   "storage.delete", "storage.containsKey",
   "process.start", "process.getList", "process.kill", "process.killVerified",
+  "process.killPortOwnerVerified",
   "fileOps.copy", "fileOps.move", "fileOps.delete", "fileOps.exists",
   "performance.getCpuUsage", "performance.getMemoryInfo",
   "performance.getDiskInfo", "performance.getSystemInfo",
@@ -101,6 +102,7 @@ const API_TO_BRIDGE = Object.freeze({
   "process.getList": "process.getList",
   "process.kill": "process.kill",
   "process.killVerified": "process.killVerified",
+  "process.killPortOwnerVerified": "process.killPortOwnerVerified",
   "fileOps.copy": "fileOps.copy",
   "fileOps.move": "fileOps.move",
   "fileOps.delete": "fileOps.delete",
@@ -318,6 +320,19 @@ export function createLongMock(options = {}) {
     clipboardCallback = null;
     return invoke("clipboard.stopMonitoring", []);
   };
+  long.process.killPortOwnerVerified = (port) => invoke(
+    "process.killPortOwnerVerified",
+    [
+      port.ProcessId,
+      port.ProcessName,
+      port.ProcessIdentity,
+      port.LocalPort,
+      port.LocalAddress,
+      port.RemotePort,
+      port.RemoteAddress,
+      port.Protocol,
+      port.State
+    ]);
 
   const controller = {
     long,
