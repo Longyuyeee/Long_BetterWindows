@@ -111,6 +111,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
 
     private readonly IMacroNativeApi _native;
     private readonly TimeSpan _pressDuration;
+    private readonly TimeProvider _timeProvider;
     private TimeSpan _loopInterval;
     private readonly MacroHookProc _mouseHookCallback;
     private readonly MacroHookProc _keyboardHookCallback;
@@ -122,7 +123,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     private readonly object _sync = new();
     private IntPtr _mouseHook;
     private IntPtr _keyboardHook;
-    private DateTime _lastEvent;
+    private long _lastEventTimestamp;
     private CancellationTokenSource? _playCancellation;
     private Task<bool>? _playTask;
     private MacroState _state = MacroState.Idle;
@@ -141,11 +142,13 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
     internal MacroEngine(
         IMacroNativeApi native,
         TimeSpan pressDuration,
-        TimeSpan loopInterval)
+        TimeSpan loopInterval,
+        TimeProvider? timeProvider = null)
     {
         _native = native ?? throw new ArgumentNullException(nameof(native));
         _pressDuration = pressDuration;
         _loopInterval = loopInterval;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _mouseHookCallback = MouseHookCallback;
         _keyboardHookCallback = KeyboardHookCallback;
     }
@@ -214,7 +217,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             }
 
             _actions.Clear();
-            _lastEvent = DateTime.UtcNow;
+            _lastEventTimestamp = _timeProvider.GetTimestamp();
             _lastError = null;
             _mouseHook = _native.InstallHook(
                 MouseHookType,
@@ -814,7 +817,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             var hookData = _native.ReadMouseHookData(data);
             if (hookData.IsInjected)
                 return _native.CallNextHook(code, message, data);
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetTimestamp();
             lock (_sync)
             {
                 if (_state == MacroState.Recording
@@ -828,7 +831,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                         messageCode == LeftButtonDownMessage
                             || messageCode == RightButtonDownMessage,
                         ElapsedMilliseconds(now)));
-                    _lastEvent = now;
+                    _lastEventTimestamp = now;
                 }
             }
         }
@@ -851,7 +854,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
             var hookData = _native.ReadKeyboardHookData(data);
             if (hookData.IsInjected)
                 return _native.CallNextHook(code, message, data);
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetTimestamp();
             lock (_sync)
             {
                 if (_state == MacroState.Recording
@@ -863,7 +866,7 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
                             || messageCode == SystemKeyDownMessage,
                         ElapsedMilliseconds(now),
                         hookData.IsExtended));
-                    _lastEvent = now;
+                    _lastEventTimestamp = now;
                 }
             }
         }
@@ -880,9 +883,11 @@ public sealed class MacroEngine : IDisposable, IAsyncDisposable
         }
     }
 
-    private int ElapsedMilliseconds(DateTime now)
+    private int ElapsedMilliseconds(long now)
         => (int)Math.Clamp(
-            (now - _lastEvent).TotalMilliseconds,
+            _timeProvider.GetElapsedTime(
+                _lastEventTimestamp,
+                now).TotalMilliseconds,
             0,
             int.MaxValue);
 

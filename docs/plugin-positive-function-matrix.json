@@ -33,7 +33,7 @@
     ],
     "high_risk_boundary_required_plugin_count": 9,
     "high_risk_boundary_required_command_count": 23,
-    "high_risk_boundary_required_case_count": 120,
+    "high_risk_boundary_required_case_count": 121,
     "quick_launch_isolation_script": "verify-quick-launch-isolation.ps1",
     "quick_launch_isolation_test_path": "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
     "quick_launch_isolation_required_case_count": 9,
@@ -455,6 +455,11 @@
             "level": "component",
             "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
             "symbol": "LoopPlayback_AppliesUpdatedIntervalToNextCycle"
+          },
+          {
+            "level": "component",
+            "path": "tests/LongBetterWindows.Tests/MacroEngineTests.cs",
+            "symbol": "Recording_UsesMonotonicClockForActionDelays"
           },
           {
             "level": "integration",

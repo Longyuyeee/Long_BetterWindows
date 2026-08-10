@@ -228,6 +228,32 @@ public sealed class MacroEngineTests
     }
 
     [Fact]
+    public async Task Recording_UsesMonotonicClockForActionDelays()
+    {
+        var native = new FakeMacroNativeApi();
+        var timeProvider = new FakeTimeProvider();
+        await using var engine = new MacroEngine(
+            native,
+            TimeSpan.Zero,
+            TimeSpan.FromMilliseconds(10),
+            timeProvider);
+        Assert.True(engine.StartRecording());
+
+        timeProvider.Advance(TimeSpan.FromMilliseconds(125));
+        native.RaiseKeyboard(0x0100, 0x41);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(35));
+        native.RaiseKeyboard(0x0101, 0x41);
+        Assert.True(engine.StopRecording());
+
+        var actions = JsonSerializer.Deserialize<List<MacroAction>>(
+            engine.SaveToJson());
+        Assert.Collection(
+            actions!,
+            action => Assert.Equal(125, action.DelayMs),
+            action => Assert.Equal(35, action.DelayMs));
+    }
+
+    [Fact]
     public async Task Recording_PreservesModifierChordTransitions()
     {
         var native = new FakeMacroNativeApi();
@@ -565,6 +591,18 @@ public sealed class MacroEngineTests
         Assert.Equal(expectedX, action.X);
         Assert.Equal(expectedY, action.Y);
         Assert.Equal(right, action.IsRightButton);
+    }
+
+    private sealed class FakeTimeProvider : TimeProvider
+    {
+        private long _timestamp;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => _timestamp;
+
+        public void Advance(TimeSpan elapsed)
+            => _timestamp = checked(_timestamp + elapsed.Ticks);
     }
 
     private sealed class FakeMacroNativeApi : IMacroNativeApi

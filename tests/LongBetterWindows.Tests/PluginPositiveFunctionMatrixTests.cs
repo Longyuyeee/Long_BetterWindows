@@ -590,7 +590,7 @@ public sealed class PluginPositiveFunctionMatrixTests
                 .GetInt32(),
             commandCount);
         Assert.Equal(
-            120,
+            121,
             policy.GetProperty("high_risk_boundary_required_case_count")
                 .GetInt32());
         Assert.Contains("expected_case_count = $expectedCaseCount", script);
