@@ -92,19 +92,42 @@
     }
 
     function secureIndex(max) {
+      if (!Number.isSafeInteger(max) || max <= 0 || max > 0x100000000) {
+        throw new RangeError('Invalid random range');
+      }
       const value = new Uint32Array(1);
-      crypto.getRandomValues(value);
+      const limit = Math.floor(0x100000000 / max) * max;
+      do {
+        crypto.getRandomValues(value);
+      } while (value[0] >= limit);
       return value[0] % max;
     }
 
+    function selectedCharacterSets() {
+      const sets = [lower];
+      if (document.getElementById('uppercase').checked) sets.push('ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+      if (document.getElementById('numbers').checked) sets.push('0123456789');
+      if (document.getElementById('symbols').checked) sets.push('!@#$%^&*()_+-=[]{}|;:,.<>?');
+      return sets;
+    }
+
+    function secureShuffle(characters) {
+      for (let index = characters.length - 1; index > 0; index -= 1) {
+        const target = secureIndex(index + 1);
+        [characters[index], characters[target]] = [characters[target], characters[index]];
+      }
+    }
+
     function generate() {
-      let pool = lower;
-      if (document.getElementById('uppercase').checked) pool += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      if (document.getElementById('numbers').checked) pool += '0123456789';
-      if (document.getElementById('symbols').checked) pool += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      const characterSets = selectedCharacterSets();
+      const pool = characterSets.join('');
       const size = Number(lengthInput.value);
-      let value = '';
-      for (let index = 0; index < size; index++) value += pool[secureIndex(pool.length)];
+      const characters = characterSets.map(function (set) {
+        return set[secureIndex(set.length)];
+      });
+      while (characters.length < size) characters.push(pool[secureIndex(pool.length)]);
+      secureShuffle(characters);
+      const value = characters.join('');
       password.textContent = value;
       lengthValue.textContent = size;
       renderStrength();
@@ -121,12 +144,16 @@
     async function copy() {
       if (!password.textContent) return;
       try {
-        await long.clipboard.setText(password.textContent);
-        const message = setStatus(
-          'status.copied',
-          'success',
-          '密码已复制到剪贴板');
-        window.LongUI?.announce(message);
+        const response = await long.clipboard.setText(password.textContent);
+        if (response.success) {
+          const message = setStatus(
+            'status.copied',
+            'success',
+            '密码已复制到剪贴板');
+          window.LongUI?.announce(message);
+        } else {
+          setStatus('error.copy', 'danger', response.error || '复制失败');
+        }
       } catch (_) {
         setStatus('error.copy', 'danger', '复制失败');
       }

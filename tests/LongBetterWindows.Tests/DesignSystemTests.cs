@@ -804,6 +804,22 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void PasswordGenerator_GuaranteesSelectedSetsAndUsesUnbiasedRandomIndexes()
+    {
+        var root = FindRepositoryRoot();
+        var html = File.ReadAllText(Path.Combine(
+            root, "src", "PasswordGenerator", "index.html"));
+
+        Assert.Contains("const limit = Math.floor(0x100000000 / max) * max", html);
+        Assert.Contains("while (value[0] >= limit)", html);
+        Assert.Contains("const characters = characterSets.map", html);
+        Assert.Contains("secureShuffle(characters)", html);
+        Assert.Contains("const response = await long.clipboard.setText", html);
+        Assert.Contains("if (response.success)", html);
+        Assert.DoesNotContain("crypto.getRandomValues(value);\n      return value[0] % max", html);
+    }
+
+    [Fact]
     public void FileRenamer_UsesDeclaredFileOperationsCapability()
     {
         var root = FindRepositoryRoot();

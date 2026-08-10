@@ -1,6 +1,6 @@
 {
   "id": "com.long.password-gen",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "name": "密码生成器",
   "author": "Long",
   "entry_point": "index.html",
