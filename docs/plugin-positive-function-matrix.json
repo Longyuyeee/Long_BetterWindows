@@ -514,6 +514,11 @@
           "level": "component",
           "path": "tests/LongBetterWindows.Tests/BuiltInPluginLocalizationTests.cs",
           "symbol": "SamplePlugin_IsLocalizedReferenceImplementation"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/SamplePluginTests.cs",
+          "symbol": "HelloCommand_PreservesPluginSettingAcrossLanguageChanges"
         }
       ],
       "manual_checks": [

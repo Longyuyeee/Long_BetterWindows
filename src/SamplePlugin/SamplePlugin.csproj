@@ -4,6 +4,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
     <AssemblyName>SamplePlugin</AssemblyName>
     <!-- 禁止复制宿主依赖，运行时由 ALC 从宿主进程解析 -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>

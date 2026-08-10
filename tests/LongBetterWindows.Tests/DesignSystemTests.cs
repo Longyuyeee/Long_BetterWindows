@@ -991,12 +991,19 @@ public class DesignSystemTests
     {
         var root = FindRepositoryRoot();
         var sample = File.ReadAllText(Path.Combine(root, "src", "SamplePlugin", "HelloPlugin.cs"));
+        var settings = File.ReadAllText(Path.Combine(
+            root, "src", "SamplePlugin", "SampleSettingsControl.cs"));
         var manifest = File.ReadAllText(Path.Combine(root, "src", "SamplePlugin", "manifest.json"));
 
+        Assert.Contains("IHasSettingsUI", sample);
         Assert.Contains("IPluginCommandHandler", sample);
         Assert.Contains("PluginCommandInvocation", sample);
         Assert.Contains("PluginCommandResult.Success", sample);
+        Assert.Contains("PluginCommandOutputType.Text", sample);
         Assert.Contains("sample.hello", manifest);
+        Assert.Contains("\"outputs\"", manifest);
+        Assert.Contains("Long.SampleSettings.Audience", settings);
+        Assert.Contains("Long.SampleSettings.Save", settings);
     }
 
     [Fact]

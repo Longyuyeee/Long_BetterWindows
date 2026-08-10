@@ -2,8 +2,15 @@
   "plugin.name": "Sample Plugin",
   "commands.sample.hello.title": "Run sample command",
   "commands.sample.hello.description": "Verify the plugin lifecycle, unified command protocol, and status feedback",
-  "toast.ready": "The sample plugin is working",
+  "commands.sample.hello.outputs.result.description": "Greeting result containing the current plugin setting",
+  "toast.ready": "The sample plugin is ready for {0}",
   "result.success": "Sample command completed successfully",
+  "settings.audience": "Greeting audience",
+  "settings.save": "Save",
+  "settings.hint": "This value stays in the plugin scope and is used by command notifications and output.",
+  "settings.saved": "Saved",
+  "settings.failed": "Save failed: {0}",
+  "settings.invalid": "The greeting audience must contain 1 to 64 characters",
   "error.unknownCommand": "Unknown sample command: {0}",
   "error.notification": "Unable to show the sample notification"
 }

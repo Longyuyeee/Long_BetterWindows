@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\src\MacroPlugin\MacroPlugin.csproj" />
     <ProjectReference Include="..\..\src\ScreenshotPlugin\ScreenshotPlugin.csproj" />
     <ProjectReference Include="..\..\src\QuickLaunchPlugin\QuickLaunchPlugin.csproj" />
+    <ProjectReference Include="..\..\src\SamplePlugin\SamplePlugin.csproj" />
     <ProjectReference Include="..\..\src\WindowManagerPlugin\WindowManagerPlugin.csproj" />
     <ProjectReference Include="..\..\tools\LongBetterWindows.MarketplacePublisher\LongBetterWindows.MarketplacePublisher.csproj" />
     <ProjectReference Include="..\..\tools\LongBetterWindows.PluginCatalogGenerator\LongBetterWindows.PluginCatalogGenerator.csproj" />

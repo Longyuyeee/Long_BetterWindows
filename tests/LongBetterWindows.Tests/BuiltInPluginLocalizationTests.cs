@@ -484,9 +484,14 @@ public sealed class BuiltInPluginLocalizationTests
         Assert.True(start >= 0);
         Assert.True(end > start);
         var languageBody = source[start..end];
+        Assert.Contains("IHasSettingsUI", source);
+        Assert.Contains("host.Settings", source);
         Assert.Contains("IPluginLanguageLifecycle", source);
+        Assert.Contains("ApplyLocalization", languageBody);
         Assert.DoesNotContain("ShowMainUI", languageBody);
         Assert.DoesNotContain("StartAsync", languageBody);
+        Assert.DoesNotContain("_audience =", languageBody);
+        Assert.Contains("<UseWPF>true</UseWPF>", project);
         Assert.Contains("PluginLocalization Include=\"i18n\\*.json\"", project);
         Assert.Contains("SamplePlugin\\i18n", hostProject);
     }

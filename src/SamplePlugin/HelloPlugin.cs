@@ -1,3 +1,4 @@
+using System.Windows;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Contracts;
@@ -25,11 +26,16 @@ namespace SamplePlugin;
 /// </summary>
 public class HelloPlugin :
     ILongPlugin,
+    IHasSettingsUI,
     IHasMainUI,
     IPluginCommandHandler,
     IPluginLanguageLifecycle
 {
+    private const string AudienceSettingKey = "audience";
+    private IPluginSettingsService _pluginSettings = null!;
     private INotificationService _notification = null!;
+    private string _audience = "Long";
+    private readonly List<WeakReference<SampleSettingsControl>> _settings = [];
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -38,7 +44,7 @@ public class HelloPlugin :
     // ═══════════════════════════════════════════════
     public string Id => "com.long.sample";
     public string Name => Text("plugin.name", "示例插件");
-    public string Version => "1.1.0";
+    public string Version => "1.2.0";
 
     // 当前状态：Loaded → Running → Disabled
     public PluginState State { get; private set; } = PluginState.Loaded;
@@ -48,8 +54,9 @@ public class HelloPlugin :
     // 此时可访问 IHostApi 检查能力是否已授权。
     // 在此完成：配置加载、资源分配、能力验证。
     // ═══════════════════════════════════════════════
-    public Task<bool> InitializeAsync(IHostApi host)
+    public async Task<bool> InitializeAsync(IHostApi host)
     {
+        _pluginSettings = host.Settings;
         _notification = host.Notification;
         // host.HotKey  — 热键服务（需要 system.hotkey 能力）
         // host.ShellSelection — Explorer 感知（需要 shell.selection 能力）
@@ -63,8 +70,16 @@ public class HelloPlugin :
         //     return Task.FromResult(false);  // 返回 false → Error 状态
         // }
 
+        var audience = await _pluginSettings.GetAsync(AudienceSettingKey);
+        if (audience.IsSuccess
+            && !string.IsNullOrWhiteSpace(audience.Data)
+            && audience.Data.Length <= 64)
+        {
+            _audience = audience.Data.Trim();
+        }
+
         Log.Information("[SamplePlugin] 初始化完成");
-        return Task.FromResult(true);
+        return true;
     }
 
     // ═══════════════════════════════════════════════
@@ -99,6 +114,18 @@ public class HelloPlugin :
     public void ShowMainUI()
         => _ = ShowReadyAsync();
 
+    public FrameworkElement CreateSettingsUI()
+    {
+        var control = new SampleSettingsControl(
+            Name,
+            _audience,
+            SaveAudienceAsync,
+            CreateSettingsLocalization());
+        _settings.RemoveAll(reference => !reference.TryGetTarget(out _));
+        _settings.Add(new WeakReference<SampleSettingsControl>(control));
+        return control;
+    }
+
     // 声明式命令处理器：command_id 来自 manifest.json。
     public async Task<PluginCommandResult> ExecuteCommandAsync(
         PluginCommandInvocation invocation,
@@ -113,19 +140,47 @@ public class HelloPlugin :
                     invocation.CommandId));
         }
 
-        var notification = await ShowReadyAsync();
+        var readyMessage = ReadyMessage();
+        var notification = await ShowReadyAsync(readyMessage);
         return notification.IsSuccess
             ? PluginCommandResult.Success(
-                Text("result.success", "示例命令执行成功"))
+                Text("result.success", "示例命令执行成功"),
+                outputs: new Dictionary<string, PluginCommandOutput>
+                {
+                    ["result"] = new(
+                        PluginCommandOutputType.Text,
+                        readyMessage),
+                })
             : PluginCommandResult.Failure(
                 notification.ErrorMessage
                 ?? Text("error.notification", "无法显示示例通知"));
     }
 
-    private Task<HostApiResponse> ShowReadyAsync() =>
+    private Task<HostApiResponse> ShowReadyAsync(string? message = null) =>
         _notification.ShowAsync(
             Name,
-            Text("toast.ready", "示例插件运行正常"));
+            message ?? ReadyMessage());
+
+    private string ReadyMessage() => string.Format(
+        Text("toast.ready", "示例插件已为 {0} 准备就绪"),
+        _audience);
+
+    private async Task<HostApiResponse> SaveAudienceAsync(string audience)
+    {
+        var normalized = audience.Trim();
+        if (normalized.Length is 0 or > 64)
+        {
+            return HostApiResponse.Failure(
+                ApiErrorCode.InvalidArgument,
+                Text("settings.invalid", "问候对象必须为 1 至 64 个字符"));
+        }
+
+        var result = await _pluginSettings.SetAsync(
+            AudienceSettingKey,
+            normalized);
+        if (result.IsSuccess) _audience = normalized;
+        return result;
+    }
 
     // 语言切换只更新展示资源，不重复启动插件或执行示例命令。
     public Task OnLanguageChangedAsync(
@@ -134,8 +189,32 @@ public class HelloPlugin :
     {
         cancellationToken.ThrowIfCancellationRequested();
         _strings = context.Resources;
+        var application = Application.Current;
+        if (application is not null)
+        {
+            application.Dispatcher.Invoke(() =>
+            {
+                _settings.RemoveAll(reference => !reference.TryGetTarget(out _));
+                foreach (var reference in _settings)
+                {
+                    if (reference.TryGetTarget(out var control))
+                    {
+                        control.ApplyLocalization(
+                            Name,
+                            CreateSettingsLocalization());
+                    }
+                }
+            });
+        }
         return Task.CompletedTask;
     }
+
+    private SampleSettingsLocalization CreateSettingsLocalization() => new(
+        Text("settings.audience", "问候对象"),
+        Text("settings.save", "保存"),
+        Text("settings.hint", "该值会保存在插件作用域内，并用于命令通知与输出。"),
+        Text("settings.saved", "已保存"),
+        Text("settings.failed", "保存失败：{0}"));
 
     private string Text(string key, string fallback)
         => _strings.TryGetValue(key, out var value)
@@ -146,12 +225,8 @@ public class HelloPlugin :
     // ═══════════════════════════════════════════════
     // 扩展提示：
     //
-    // 1. 自定义设置 UI: 让类实现 IHasSettingsUI 接口
-    //    public class HelloPlugin : ILongPlugin, IHasSettingsUI { ... }
-    //
-    // 2. 配置持久化: 通过 host.Storage 存取配置
-    //    await host.Storage.SetAsync("key", "value");
-    //    var v = await host.Storage.GetAsync("key");
+    // 1. 插件设置: 通过 host.Settings 读写插件作用域配置。
+    // 2. 设置 UI: 实现 IHasSettingsUI，并将控件与持久化回调分离。
     //
     // 3. 使用 Explorer 能力:
     //    var path = await host.ShellSelection.GetActiveExplorerFolderPathAsync();

@@ -2,8 +2,15 @@
   "plugin.name": "示例插件",
   "commands.sample.hello.title": "运行示例命令",
   "commands.sample.hello.description": "验证插件生命周期、统一命令协议与状态反馈",
-  "toast.ready": "示例插件运行正常",
+  "commands.sample.hello.outputs.result.description": "包含当前插件设置的问候结果",
+  "toast.ready": "示例插件已为 {0} 准备就绪",
   "result.success": "示例命令执行成功",
+  "settings.audience": "问候对象",
+  "settings.save": "保存",
+  "settings.hint": "该值会保存在插件作用域内，并用于命令通知与输出。",
+  "settings.saved": "已保存",
+  "settings.failed": "保存失败：{0}",
+  "settings.invalid": "问候对象必须为 1 至 64 个字符",
   "error.unknownCommand": "未知示例命令: {0}",
   "error.notification": "无法显示示例通知"
 }
