@@ -114,8 +114,12 @@ $validated = @($receiptFiles | Sort-Object BaseName | ForEach-Object {
         }
     }
     if ($id -eq 'native-performance' `
-        -and [string]$receipt.verified_contract.native_performance_manifest_sha256 -notmatch '^[0-9a-f]{64}$') {
-        throw 'Native performance approval contract is missing.'
+        -and ([string]$receipt.verified_contract.native_performance_manifest_sha256 -notmatch '^[0-9a-f]{64}$' `
+            -or [string]$receipt.verified_contract.native_performance_analysis_sha256 -notmatch '^[0-9a-f]{64}$' `
+            -or [string]$receipt.verified_contract.native_performance_export_sha256 -notmatch '^[0-9a-f]{64}$' `
+            -or [string]::IsNullOrWhiteSpace(
+                [string]$receipt.verified_contract.native_performance_analyst))) {
+        throw 'Native performance approval contract is missing structured WPA analysis.'
     }
     if ($id -eq 'lpwp-long-grid-e2e' `
         -and ([string]$receipt.verified_contract.protocol -ne 'long.plugin.ipc/1.0' `

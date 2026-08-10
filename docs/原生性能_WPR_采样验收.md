@@ -48,7 +48,24 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 验证器检查提交、管理员状态、两个配置、25 插件、ETL/JSON 哈希，以及“原始采集不得直接通过发布门禁”的约束。
 
-## 4. WPA 人工分析
+## 4. WPA 导出与人工分析
+
+先在 WPA 中打开 ETL，至少把 `CPU Usage (Sampled)` 与 `Desktop Composition` 的分析表加入视图并保存为 `.wpaProfile`。然后在普通 PowerShell 会话导出表格；该步骤不要求管理员权限：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\export-native-performance-tables.ps1 `
+  -EvidenceDirectory .\artifacts\quality\native-performance-<commit> `
+  -WpaProfilePath <保存的-wpaProfile-路径> `
+  -ExpectedCommit <40位采集提交>
+
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\verify-native-performance-export.ps1 `
+  -EvidenceDirectory .\artifacts\quality\native-performance-<commit> `
+  -ExpectedCommit <40位采集提交>
+```
+
+导出器把 WPA Profile、CSV/XML 表格和 SHA-256 Manifest 原子写入 `wpa-export/`，且固定为 `pending_review`。已存在的目录不会被覆盖；失败目录不会被误认为完整证据。
 
 在 Windows Performance Analyzer 中至少检查：
 
@@ -63,7 +80,30 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 - Windows/WPF/DWM/驱动外部活动；
 - 当前证据无法稳定复现。
 
-只有形成可复核的 WPA 表格/截图、分析说明和审阅人签核后，才可以另行批准原生性能项。原始 ETL 捕获本身永远不等于发布通过。
+完成检查后，为 CPU 与 Desktop Composition 各选择至少一份不同的导出表格或截图，生成不可覆盖的结构化分析回执：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\new-native-performance-analysis-evidence.ps1 `
+  -EvidenceDirectory .\artifacts\quality\native-performance-<commit> `
+  -ExpectedCommit <40位采集提交> `
+  -Reviewer <分析人> `
+  -Notes <归因结论> `
+  -CpuEvidenceFiles <CPU表格或截图> `
+  -CompositionEvidenceFiles <合成表格或截图> `
+  -ConfirmCpuSampledReviewed `
+  -ConfirmDesktopCompositionReviewed `
+  -ConfirmTimelineCorrelated `
+  -ConfirmNoUnresolvedProductHotspot `
+  -ConfirmPassed
+
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\verify-native-performance-analysis.ps1 `
+  -EvidenceDirectory .\artifacts\quality\native-performance-<commit> `
+  -ExpectedCommit <40位采集提交>
+```
+
+最终 `native-performance` 批准必须同时提交原始 Manifest、导出 Manifest、分析回执及回执引用的全部表格/截图，并由不同于 WPA 分析人的审阅者执行。原始 ETL、导出成功或分析回执本身都不能直接通过发布门禁。
 
 ## 5. 严格工作集门禁
 

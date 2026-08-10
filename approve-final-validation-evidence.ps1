@@ -95,19 +95,53 @@ if ($resolvedEvidence.Count -eq 0) { throw 'At least one evidence file is requir
 $contract = [ordered]@{}
 if ($ValidationId -eq 'native-performance') {
     $manifestPath = @($EvidenceFiles | ForEach-Object { Resolve-RepositoryPath $_ } |
-        Where-Object { [IO.Path]::GetFileName($_) -eq 'native-performance-evidence.json' } |
-        Select-Object -First 1)
+        Where-Object { [IO.Path]::GetFileName($_) -eq 'native-performance-evidence.json' })
     if ($manifestPath.Count -ne 1) {
         throw 'Native performance approval requires native-performance-evidence.json.'
     }
-    $verifyArguments = @{
-        EvidenceDirectory = Split-Path -Parent $manifestPath[0]
-        ExpectedCommit = $sourceCommit
+    $analysisPath = @($EvidenceFiles | ForEach-Object { Resolve-RepositoryPath $_ } |
+        Where-Object { [IO.Path]::GetFileName($_) -eq 'native-performance-analysis.json' })
+    if ($analysisPath.Count -ne 1) {
+        throw 'Native performance approval requires native-performance-analysis.json.'
     }
-    & (Join-Path $PSScriptRoot 'verify-native-performance-evidence.ps1') @verifyArguments
-    if ($LASTEXITCODE -ne 0) { throw 'Native performance evidence verification failed.' }
+    $evidenceRoot = Split-Path -Parent $manifestPath[0]
+    if ((Split-Path -Parent $analysisPath[0]) -ne $evidenceRoot) {
+        throw 'Native performance capture and analysis reports must share one evidence directory.'
+    }
+    $analysis = Get-Content -LiteralPath $analysisPath[0] -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+    $exportManifestPath = [IO.Path]::GetFullPath((
+        Join-Path $evidenceRoot ([string]$analysis.export_manifest_file)))
+    & (Join-Path $PSScriptRoot 'verify-native-performance-analysis.ps1') `
+        -EvidenceDirectory $evidenceRoot `
+        -ExportDirectory (Split-Path -Parent $exportManifestPath) `
+        -ExpectedCommit $sourceCommit
+    if ([string]$analysis.reviewer -eq $Reviewer.Trim()) {
+        throw 'Native performance final approver must differ from the WPA analyst.'
+    }
+    $requiredAnalysisPaths = @(
+        @($analysis.evidence_files | ForEach-Object {
+            Join-Path $evidenceRoot ([string]$_.relative_path)
+        })
+        $exportManifestPath
+    )
+    foreach ($path in $requiredAnalysisPaths) {
+        $fullPath = [IO.Path]::GetFullPath($path)
+        $relativePath = Get-RepositoryRelativePath $fullPath
+        $match = @($resolvedEvidence | Where-Object {
+            $_.relative_path -eq $relativePath
+        })
+        if ($match.Count -ne 1) {
+            throw 'Native performance approval must include every hash-locked WPA analysis file.'
+        }
+    }
     $contract.native_performance_manifest_sha256 =
         (Get-FileHash -LiteralPath $manifestPath[0] -Algorithm SHA256).Hash.ToLowerInvariant()
+    $contract.native_performance_analysis_sha256 =
+        (Get-FileHash -LiteralPath $analysisPath[0] -Algorithm SHA256).Hash.ToLowerInvariant()
+    $contract.native_performance_export_sha256 =
+        ([string]$analysis.export_manifest_sha256).ToLowerInvariant()
+    $contract.native_performance_analyst = ([string]$analysis.reviewer).Trim()
 }
 elseif ($ValidationId -eq 'lpwp-long-grid-e2e') {
     $documents = @($EvidenceFiles | ForEach-Object {

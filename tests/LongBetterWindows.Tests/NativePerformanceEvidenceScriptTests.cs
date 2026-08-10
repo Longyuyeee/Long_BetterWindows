@@ -36,6 +36,60 @@ public sealed class NativePerformanceEvidenceScriptTests
         Assert.Contains("Unapproved evidence must remain pending_analysis", source);
         Assert.Contains("Raw WPR capture cannot mark", source);
         Assert.Contains("Evidence hash mismatch", source);
+        Assert.Contains("$profiles.Count -ne 2 `", source);
+        Assert.Contains("@($performance.samples).Count `", source);
+        Assert.DoesNotContain("exit 1", source);
+    }
+
+    [Fact]
+    public void WpaExport_IsImmutableAndCannotApproveRawTrace()
+    {
+        var source = ReadRepositoryFile(
+            "export-native-performance-tables.ps1");
+
+        Assert.Contains("wpaexporter.exe", source);
+        Assert.Contains("-outputformat CSV", source);
+        Assert.Contains("native-performance-export.json", source);
+        Assert.Contains("analysis_status = 'pending_review'", source);
+        Assert.Contains("release_gate_passed = $false", source);
+        Assert.Contains("Write-NewJsonFileAtomically", source);
+        Assert.Contains("Directory]::Move", source);
+
+        var verifier = ReadRepositoryFile(
+            "verify-native-performance-export.ps1");
+        Assert.Contains("raw manifest binding does not match", verifier);
+        Assert.Contains("trace binding does not match", verifier);
+        Assert.Contains("export table changed", verifier);
+        Assert.Contains("cannot pass the release gate", verifier);
+    }
+
+    [Fact]
+    public void Analysis_RequiresBothWpaViewsAndIndependentFinalApproval()
+    {
+        var source = ReadRepositoryFile(
+            "new-native-performance-analysis-evidence.ps1");
+
+        Assert.Contains("ConfirmCpuSampledReviewed", source);
+        Assert.Contains("ConfirmDesktopCompositionReviewed", source);
+        Assert.Contains("ConfirmTimelineCorrelated", source);
+        Assert.Contains("ConfirmNoUnresolvedProductHotspot", source);
+        Assert.Contains("CPU and Desktop Composition require separate", source);
+        Assert.Contains("classification = 'native_performance_analysis'", source);
+        Assert.Contains("release_gate_passed = $false", source);
+        Assert.Contains("Write-NewJsonFileAtomically", source);
+
+        var verifier = ReadRepositoryFile(
+            "verify-native-performance-analysis.ps1");
+        Assert.Contains("Separate CPU and Desktop Composition evidence", verifier);
+        Assert.Contains("analysis WPA export binding does not match", verifier);
+        Assert.Contains("Independent final approval is still required", verifier);
+
+        var approval = ReadRepositoryFile(
+            "approve-final-validation-evidence.ps1");
+        Assert.Contains("verify-native-performance-analysis.ps1", approval);
+        Assert.Contains("final approver must differ from the WPA analyst", approval);
+        Assert.Contains("every hash-locked WPA analysis file", approval);
+        Assert.Contains("native_performance_analysis_sha256", approval);
     }
 
     [Fact]

@@ -12,7 +12,9 @@ public sealed class FinalProductAcceptanceScriptTests
         Assert.Contains("-ConfirmPassed", source);
         Assert.Contains("clean tracked worktree", source);
         Assert.Contains("artifacts/quality", source);
-        Assert.Contains("verify-native-performance-evidence.ps1", source);
+        Assert.Contains("verify-native-performance-analysis.ps1", source);
+        Assert.Contains("native_performance_analysis_sha256", source);
+        Assert.Contains("final approver must differ from the WPA analyst", source);
         Assert.Contains("lpwp_long_grid_e2e", source);
         Assert.Contains("long.plugin.ipc/1.0", source);
         Assert.Contains("Long Grid E2E raw evidence is missing or does not match", source);

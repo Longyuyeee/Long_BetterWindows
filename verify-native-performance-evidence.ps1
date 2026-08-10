@@ -36,8 +36,8 @@ if ($manifest.administrator -ne $true) {
     $errors.Add("Capture was not produced by an elevated Administrator session.")
 }
 $profiles = @($manifest.profiles)
-if ($profiles.Count -ne 2
-    -or $profiles -notcontains "CPU.Light"
+if ($profiles.Count -ne 2 `
+    -or $profiles -notcontains "CPU.Light" `
     -or $profiles -notcontains "DesktopComposition.Verbose") {
     $errors.Add("Required CPU and DesktopComposition profiles are missing.")
 }
@@ -88,15 +88,14 @@ if (Test-Path -LiteralPath $performancePath -PathType Leaf) {
     if (@($performance.samples).stage -notcontains "plugin_page_idle") {
         $errors.Add("Performance report has no final plugin_page_idle sample.")
     }
-    if (@($performance.samples).Count
+    if (@($performance.samples).Count `
         -ne [int]$manifest.performance_sample_count) {
         $errors.Add("Performance sample count does not match the manifest.")
     }
 }
 
 if ($errors.Count -gt 0) {
-    $errors | ForEach-Object { Write-Error $_ }
-    exit 1
+    throw ($errors -join [Environment]::NewLine)
 }
 Write-Host "Native performance capture is internally consistent."
 Write-Host "Analysis status: pending_analysis; release gate remains blocked."
