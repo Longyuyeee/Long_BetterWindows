@@ -5,7 +5,9 @@ param(
         "src/LongBetterWindows.Host/bin/Release/net8.0-windows",
     [string]$OutputPath,
     [string]$DotnetPath = "C:\Program Files\dotnet\dotnet.exe",
-    [int]$ExpectedServiceCaseCount = 40
+    [int]$ExpectedServiceCaseCount = 40,
+    [int]$ExpectedDesktopLifecycleCaseCount = 35,
+    [int]$ExpectedWindowManagerCaseCount = 10
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,6 +46,8 @@ New-Item -ItemType Directory -Path $runRoot | Out-Null
 $transactionPath = Join-Path $runRoot "transactions.json"
 $capturePath = Join-Path $runRoot "capture-delivery.json"
 $quickLaunchPath = Join-Path $runRoot "quick-launch.json"
+$desktopLifecyclePath = Join-Path $runRoot "desktop-lifecycle.json"
+$windowManagerPath = Join-Path $runRoot "window-manager.json"
 $serviceTrxPath = Join-Path $runRoot "service-boundaries.trx"
 
 try {
@@ -69,6 +73,24 @@ try {
         -ExpectedCaseCount 9
     if ($LASTEXITCODE -ne 0) {
         throw "QuickLaunch isolation matrix failed."
+    }
+
+    & (Join-Path $PSScriptRoot "verify-desktop-side-effect-lifecycle.ps1") `
+        -TestProject $TestProject `
+        -DotnetPath $DotnetPath `
+        -OutputPath $desktopLifecyclePath `
+        -ExpectedCaseCount $ExpectedDesktopLifecycleCaseCount
+    if ($LASTEXITCODE -ne 0) {
+        throw "Critical desktop lifecycle matrix failed."
+    }
+
+    & (Join-Path $PSScriptRoot "verify-window-manager-desktop-isolation.ps1") `
+        -TestProject $TestProject `
+        -DotnetPath $DotnetPath `
+        -OutputPath $windowManagerPath `
+        -ExpectedCaseCount $ExpectedWindowManagerCaseCount
+    if ($LASTEXITCODE -ne 0) {
+        throw "WindowManager desktop isolation matrix failed."
     }
 
     $serviceFilter = @(
@@ -105,9 +127,13 @@ try {
     $transactions = Read-JsonReport $transactionPath
     $capture = Read-JsonReport $capturePath
     $quickLaunch = Read-JsonReport $quickLaunchPath
+    $desktopLifecycle = Read-JsonReport $desktopLifecyclePath
+    $windowManager = Read-JsonReport $windowManagerPath
     $allPassed = [bool]$transactions.passed -and
         [bool]$capture.passed -and
         [bool]$quickLaunch.passed -and
+        [bool]$desktopLifecycle.passed -and
+        [bool]$windowManager.passed -and
         $servicePassed
 
     $plugins = @(
@@ -155,6 +181,26 @@ try {
             id = "com.long.quicklaunch"
             checks = @("search-isolation", "stop-lifetime-cancellation")
             passed = [bool]$quickLaunch.passed
+        },
+        [ordered]@{
+            id = "com.long.macro"
+            checks = @(
+                "recording-session-isolation",
+                "playback-cancellation",
+                "pressed-input-release",
+                "hook-cleanup")
+            passed = [bool]$desktopLifecycle.passed
+        },
+        [ordered]@{
+            id = "com.long.window-manager"
+            checks = @(
+                "transaction-recovery",
+                "display-state-normalization",
+                "physical-work-area-layouts",
+                "topmost-round-trip",
+                "hotkey-cleanup")
+            passed = [bool]$desktopLifecycle.passed -and
+                [bool]$windowManager.passed
         }
     )
 
@@ -170,19 +216,23 @@ try {
         system_clipboard_touched = $false
         pointer_input_generated = $false
         disposable_process_only = $true
-        required_plugin_count = 7
+        required_plugin_count = 9
         covered_plugin_count = $plugins.Count
-        expected_case_count = 70
+        expected_case_count = 115
         executed_case_count =
             [int]$transactions.passed_case_count +
             [int]$capture.executed_case_count +
             [int]$quickLaunch.executed_case_count +
+            [int]$desktopLifecycle.executed_case_count +
+            [int]$windowManager.executed_case_count +
             $serviceCases.Count
         passed = $allPassed
         plugins = $plugins
         transaction_commands = $transactions
         capture_delivery = $capture
         quick_launch = $quickLaunch
+        desktop_lifecycle = $desktopLifecycle
+        window_manager = $windowManager
         service_boundaries = [ordered]@{
             expected_case_count = $ExpectedServiceCaseCount
             executed_case_count = $serviceCases.Count

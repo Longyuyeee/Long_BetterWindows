@@ -187,7 +187,7 @@ public sealed class WindowInfoService : IWindowInfoService
             }
         }
 
-        var target = CalculateTarget(workArea, layout);
+        var target = WindowLayoutGeometry.Calculate(workArea, layout);
         if (!_native.TrySetWindowPosition(
                 window,
                 IntPtr.Zero,
@@ -563,72 +563,6 @@ public sealed class WindowInfoService : IWindowInfoService
                 Before = before,
             },
         };
-
-    private static NativeWindowRect CalculateTarget(
-        NativeWindowRect work,
-        WindowLayout layout)
-    {
-        var halfWidth = work.Width / 2;
-        var halfHeight = work.Height / 2;
-        var thirdWidth = work.Width / 3;
-        return layout switch
-        {
-            WindowLayout.Left => FromSize(
-                work.Left,
-                work.Top,
-                halfWidth,
-                work.Height),
-            WindowLayout.Right => FromSize(
-                work.Left + halfWidth,
-                work.Top,
-                work.Width - halfWidth,
-                work.Height),
-            WindowLayout.Maximize => work,
-            WindowLayout.Bottom => FromSize(
-                work.Left,
-                work.Top + halfHeight,
-                work.Width,
-                work.Height - halfHeight),
-            WindowLayout.TopLeft => FromSize(
-                work.Left,
-                work.Top,
-                halfWidth,
-                halfHeight),
-            WindowLayout.TopRight => FromSize(
-                work.Left + halfWidth,
-                work.Top,
-                work.Width - halfWidth,
-                halfHeight),
-            WindowLayout.BottomLeft => FromSize(
-                work.Left,
-                work.Top + halfHeight,
-                halfWidth,
-                work.Height - halfHeight),
-            WindowLayout.BottomRight => FromSize(
-                work.Left + halfWidth,
-                work.Top + halfHeight,
-                work.Width - halfWidth,
-                work.Height - halfHeight),
-            WindowLayout.ThirdLeft => FromSize(
-                work.Left,
-                work.Top,
-                thirdWidth,
-                work.Height),
-            WindowLayout.ThirdRight => FromSize(
-                work.Left + thirdWidth,
-                work.Top,
-                work.Width - thirdWidth,
-                work.Height),
-            _ => throw new ArgumentOutOfRangeException(nameof(layout)),
-        };
-    }
-
-    private static NativeWindowRect FromSize(
-        int x,
-        int y,
-        int width,
-        int height)
-        => new(x, y, x + width, y + height);
 
     private static bool SnapshotEquals(
         WindowSnapshot expected,

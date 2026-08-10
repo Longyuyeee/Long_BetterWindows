@@ -500,6 +500,51 @@ public sealed class PluginPositiveFunctionMatrixTests
     }
 
     [Fact]
+    public void WindowManagerDesktopIsolationEvidence_IsBoundToProductionPlugin()
+    {
+        var root = FindRepositoryRoot();
+        using var matrix = LoadMatrix(root);
+        var policy = matrix.RootElement.GetProperty("policy");
+        var scriptPath = Path.Combine(
+            root,
+            policy.GetProperty("window_manager_isolation_script").GetString()!);
+        var script = File.ReadAllText(scriptPath);
+        var testPath = Path.Combine(
+            root,
+            policy.GetProperty("window_manager_isolation_test_path").GetString()!);
+        var plugin = matrix.RootElement
+            .GetProperty("plugins")
+            .EnumerateArray()
+            .Single(item =>
+                item.GetProperty("id").GetString()
+                == "com.long.window-manager");
+        var evidence = plugin.GetProperty("automated_evidence")
+            .EnumerateArray()
+            .ToArray();
+
+        Assert.True(File.Exists(scriptPath));
+        Assert.True(File.Exists(testPath));
+        Assert.Contains("disposable_native_window_only = $true", script);
+        Assert.Contains("visible_window_created = $false", script);
+        Assert.Contains("foreground_activation_attempted = $false", script);
+        Assert.Contains("pointer_or_keyboard_input_generated = $false", script);
+        Assert.Equal(
+            10,
+            policy.GetProperty(
+                "window_manager_isolation_required_case_count").GetInt32());
+        Assert.Contains(evidence, item =>
+            item.GetProperty("path").GetString()
+            == "tests/LongBetterWindows.Tests/WindowManagerDesktopIsolationTests.cs"
+            && item.GetProperty("symbol").GetString()
+            == "Layout_UsesExactMonitorWorkAreaOnDisposableWindow");
+        Assert.Contains(evidence, item =>
+            item.GetProperty("path").GetString()
+            == "tests/LongBetterWindows.Tests/WindowManagerDesktopIsolationTests.cs"
+            && item.GetProperty("symbol").GetString()
+            == "Topmost_RoundTripPreservesDisposableWindowGeometry");
+    }
+
+    [Fact]
     public void HighRiskBoundaryGate_CoversEveryDeclaredHighRiskPlugin()
     {
         var root = FindRepositoryRoot();
@@ -518,7 +563,8 @@ public sealed class PluginPositiveFunctionMatrixTests
         var highRisk = matrix.RootElement
             .GetProperty("plugins")
             .EnumerateArray()
-            .Where(plugin => plugin.GetProperty("risk").GetString() == "high")
+            .Where(plugin => plugin.GetProperty("risk").GetString()
+                is "high" or "critical")
             .Select(plugin => plugin.GetProperty("id").GetString()!)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -541,12 +587,14 @@ public sealed class PluginPositiveFunctionMatrixTests
                 .GetInt32(),
             commandCount);
         Assert.Equal(
-            70,
+            115,
             policy.GetProperty("high_risk_boundary_required_case_count")
                 .GetInt32());
         Assert.Contains("verify-high-risk-plugin-transactions.ps1", script);
         Assert.Contains("verify-capture-delivery-isolation.ps1", script);
         Assert.Contains("verify-quick-launch-isolation.ps1", script);
+        Assert.Contains("verify-desktop-side-effect-lifecycle.ps1", script);
+        Assert.Contains("verify-window-manager-desktop-isolation.ps1", script);
         Assert.Contains("FileSystemOrganizationTests", script);
         Assert.Contains("AdsServiceTransactionTests", script);
         Assert.Contains("ProcessServiceTests", script);
