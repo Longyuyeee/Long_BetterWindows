@@ -254,6 +254,60 @@ public sealed class FileSystemOrganizationTests : IDisposable
         Assert.Equal("second", File.ReadAllText(Path.Combine(_root, "two.txt")));
     }
 
+    [Fact]
+    public async Task BatchRename_RejectsEmptyBatch()
+    {
+        var service = new FileSystemService();
+
+        var result = await service.BatchRenameAsync([]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("At least one rename operation", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task BatchRename_RejectsReservedWindowsName()
+    {
+        var source = Path.Combine(_root, "source.txt");
+        File.WriteAllText(source, "source");
+        var service = new FileSystemService();
+
+        var result = await service.BatchRenameAsync(
+        [
+            new RenameOperation { OldPath = source, NewName = "CON.txt" },
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.True(File.Exists(source));
+        Assert.False(File.Exists(Path.Combine(_root, "CON.txt")));
+    }
+
+    [Fact]
+    public async Task BatchRename_RollsBackEarlierMovesWhenLaterMoveFails()
+    {
+        var first = Path.Combine(_root, "first.txt");
+        var second = Path.Combine(_root, "second.txt");
+        File.WriteAllText(first, "first");
+        File.WriteAllText(second, "second");
+        var service = new FileSystemService();
+
+        using (File.Open(second, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var result = await service.BatchRenameAsync(
+            [
+                new RenameOperation { OldPath = first, NewName = "one.txt" },
+                new RenameOperation { OldPath = second, NewName = "two.txt" },
+            ]);
+
+            Assert.False(result.IsSuccess);
+        }
+
+        Assert.Equal("first", File.ReadAllText(first));
+        Assert.Equal("second", File.ReadAllText(second));
+        Assert.False(File.Exists(Path.Combine(_root, "one.txt")));
+        Assert.False(File.Exists(Path.Combine(_root, "two.txt")));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

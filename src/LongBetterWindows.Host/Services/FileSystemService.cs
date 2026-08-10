@@ -137,6 +137,9 @@ namespace LongBetterWindows.Host.Services
                 {
                     if (operations is null)
                         throw new ArgumentNullException(nameof(operations));
+                    if (operations.Count == 0)
+                        throw new InvalidDataException(
+                            "At least one rename operation is required.");
 
                     var planned = new List<(string Source, string Destination)>();
                     var sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -146,10 +149,6 @@ namespace LongBetterWindows.Host.Services
                         if (operation is null)
                             throw new InvalidDataException("Rename operation is required.");
                         var source = Path.GetFullPath(operation.OldPath);
-                        if (!File.Exists(source))
-                            throw new FileNotFoundException(
-                                "Rename source does not exist.",
-                                source);
                         if (!sources.Add(source))
                             throw new IOException("Duplicate rename source.");
                         ValidateFileName(operation.NewName);
@@ -166,12 +165,7 @@ namespace LongBetterWindows.Host.Services
                                 "Rename destination must remain in the source directory.");
                         if (!destinations.Add(destination))
                             throw new IOException("Duplicate rename destination.");
-                        if (!source.Equals(
-                                destination,
-                                StringComparison.OrdinalIgnoreCase)
-                            && File.Exists(destination))
-                            throw new IOException(
-                                "Rename destination already exists.");
+                        ValidateRenameMove(source, destination);
                         planned.Add((source, destination));
                     }
 
@@ -180,6 +174,7 @@ namespace LongBetterWindows.Host.Services
                                      item.Destination,
                                      StringComparison.Ordinal)))
                     {
+                        ValidateRenameMove(item.Source, item.Destination);
                         File.Move(item.Source, item.Destination);
                         completed.Add(item);
                     }
@@ -612,13 +607,58 @@ namespace LongBetterWindows.Host.Services
 
         private static void ValidateFileName(string name)
         {
-            if (string.IsNullOrWhiteSpace(name)
+            if (string.IsNullOrWhiteSpace(name))
+                throw new InvalidDataException(
+                    "Rename destination name is invalid.");
+            var stem = name.Split('.')[0];
+            if (name.Length > 255
                 || !string.Equals(name, Path.GetFileName(name), StringComparison.Ordinal)
                 || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
                 || name.EndsWith(' ')
-                || name.EndsWith('.'))
+                || name.EndsWith('.')
+                || IsReservedWindowsFileName(stem))
                 throw new InvalidDataException(
                     "Rename destination name is invalid.");
+        }
+
+        private static bool IsReservedWindowsFileName(string name)
+        {
+            var normalized = name.TrimEnd(' ', '.').ToUpperInvariant();
+            return normalized is "CON" or "PRN" or "AUX" or "NUL"
+                || (normalized.Length == 4
+                    && (normalized.StartsWith("COM", StringComparison.Ordinal)
+                        || normalized.StartsWith("LPT", StringComparison.Ordinal))
+                    && normalized[3] is >= '1' and <= '9');
+        }
+
+        private static void ValidateRenameMove(string sourcePath, string destinationPath)
+        {
+            var source = Path.GetFullPath(sourcePath);
+            var destination = Path.GetFullPath(destinationPath);
+            if (!File.Exists(source))
+                throw new FileNotFoundException(
+                    "Rename source does not exist.",
+                    source);
+            if ((File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
+                throw new UnauthorizedAccessException(
+                    "Rename source cannot be a reparse point.");
+
+            var sourceDirectory = Path.GetDirectoryName(source)
+                ?? throw new InvalidDataException(
+                    "Rename source has no parent directory.");
+            var destinationDirectory = Path.GetDirectoryName(destination);
+            if (!string.Equals(
+                    sourceDirectory,
+                    destinationDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException(
+                    "Rename destination must remain in the source directory.");
+            if ((File.GetAttributes(sourceDirectory) & FileAttributes.ReparsePoint) != 0)
+                throw new UnauthorizedAccessException(
+                    "Rename source directory cannot be a reparse point.");
+            if (!source.Equals(destination, StringComparison.OrdinalIgnoreCase)
+                && File.Exists(destination))
+                throw new IOException("Rename destination already exists.");
         }
 
         private static void EnsureDirectoryIsNotReparsePoint(string path)

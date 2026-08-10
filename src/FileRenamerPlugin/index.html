@@ -36,6 +36,16 @@
         <input id="parameterB" placeholder="替换为" aria-label="替换后的文本" hidden>
       </div>
 
+      <div class="long-toolbar">
+        <span class="long-field-label" data-i18n="preview.title">重命名预览</span>
+        <span class="long-toolbar__spacer"></span>
+        <div class="long-toolbar" id="pagination" hidden>
+          <button class="long-button long-button--secondary btn-secondary" id="previousPage" type="button" aria-label="上一页">&larr;</button>
+          <span class="long-secondary" id="pageLabel">1 / 1</span>
+          <button class="long-button long-button--secondary btn-secondary" id="nextPage" type="button" aria-label="下一页">&rarr;</button>
+        </div>
+      </div>
+
       <div class="long-file-list" id="fileList"></div>
 
       <div class="long-toolbar">
@@ -52,12 +62,15 @@
     const list = document.getElementById('fileList');
     const status = document.getElementById('status');
     const renameButton = document.getElementById('renameButton');
+    const pageSize = 100;
     let files = [];
     let previewNames = [];
+    let currentPage = 0;
     let strings = {};
     let listState = 'empty';
     let loadErrorDetail = '';
     let isRenaming = false;
+    let selectionRequestId = 0;
     let currentStatus = { key: '', fallback: '', values: {}, kind: '' };
 
     function t(key, fallback, values) {
@@ -116,6 +129,12 @@
       parameterB.setAttribute(
         'aria-label',
         t('field.replacementAriaLabel', '替换后的文本'));
+      document.getElementById('previousPage').setAttribute(
+        'aria-label',
+        t('preview.previousPage', '上一页'));
+      document.getElementById('nextPage').setAttribute(
+        'aria-label',
+        t('preview.nextPage', '下一页'));
       renderListState(false);
       if (currentStatus.key || currentStatus.fallback) {
         setStatus(
@@ -127,12 +146,25 @@
     }
 
     async function loadSelection() {
+      if (isRenaming) {
+        return {
+          success: false,
+          error: t('status.busy', '正在执行批量重命名，请稍候')
+        };
+      }
+      const requestId = ++selectionRequestId;
       if (!files.length) {
         listState = 'loading';
         renderListState(false);
       }
       try {
         const response = await long.shell.getSelectedItems();
+        if (requestId !== selectionRequestId || isRenaming) {
+          return {
+            success: false,
+            error: t('status.busy', '正在执行批量重命名，请稍候')
+          };
+        }
         if (!response.success) throw new Error(response.error || t('error.selectionRead', 'Explorer 选区读取失败'));
         if (!response.data || !response.data.length) {
           setFiles([]);
@@ -147,6 +179,12 @@
           { count: files.length });
         return { success: true, count: files.length };
       } catch (error) {
+        if (requestId !== selectionRequestId || isRenaming) {
+          return {
+            success: false,
+            error: t('status.busy', '正在执行批量重命名，请稍候')
+          };
+        }
         loadErrorDetail = error && error.message ? error.message : String(error);
         if (!files.length) {
           listState = 'error';
@@ -162,8 +200,16 @@
     }
 
     function setFiles(paths) {
-      files = paths.filter(function (path) { return typeof path === 'string' && path.length > 0; });
+      const seen = new Set();
+      files = paths.filter(function (path) {
+        if (typeof path !== 'string' || !path.length) return false;
+        const key = path.replace(/\\/g, '/').toLocaleLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       previewNames = files.map(fileName);
+      currentPage = 0;
       listState = files.length ? 'ready' : 'empty';
       applyRule();
     }
@@ -194,6 +240,7 @@
         '{count} 个文件',
         { count: files.length });
       if (!files.length) {
+        renderPagination(1);
         window.LongUI?.renderState(list, {
           kind: 'empty',
           title: t('state.empty', '等待文件选区'),
@@ -202,24 +249,43 @@
         updateValidation(updateStatus);
         return;
       }
-      files.forEach(function (path, index) {
+      const totalPages = Math.max(1, Math.ceil(files.length / pageSize));
+      currentPage = Math.min(currentPage, totalPages - 1);
+      const start = currentPage * pageSize;
+      const end = Math.min(start + pageSize, files.length);
+      files.slice(start, end).forEach(function (path, pageIndex) {
+        const index = start + pageIndex;
         const row = document.createElement('div'); row.className = 'long-file-row';
         const oldName = document.createElement('span'); oldName.className = 'long-file-row__old'; oldName.textContent = fileName(path); oldName.title = path;
         const arrow = document.createElement('span'); arrow.className = 'long-file-row__arrow'; arrow.textContent = '→';
-        const nextName = document.createElement('input'); nextName.className = 'long-file-row__new'; nextName.value = previewNames[index]; nextName.setAttribute('aria-label', t('file.newNameAriaLabel', '新文件名'));
+        const nextName = document.createElement('input'); nextName.className = 'long-file-row__new'; nextName.value = previewNames[index]; nextName.disabled = isRenaming; nextName.setAttribute('aria-label', t('file.newNameAriaLabel', '新文件名'));
         nextName.addEventListener('input', function () { previewNames[index] = nextName.value; updateValidation(); });
         const badge = document.createElement('span'); badge.className = 'long-badge'; badge.textContent = previewNames[index] === fileName(path) ? t('file.unchanged', '未修改') : t('file.pending', '待修改');
         row.append(oldName, arrow, nextName, badge); list.appendChild(row);
       });
+      renderPagination(totalPages);
       updateValidation(updateStatus);
+    }
+
+    function renderPagination(totalPages) {
+      const pagination = document.getElementById('pagination');
+      pagination.hidden = files.length <= pageSize;
+      document.getElementById('pageLabel').textContent = t(
+        'preview.page',
+        '{current} / {total}',
+        { current: currentPage + 1, total: totalPages });
+      document.getElementById('previousPage').disabled = isRenaming || currentPage === 0;
+      document.getElementById('nextPage').disabled = isRenaming || currentPage >= totalPages - 1;
     }
 
     function updateValidation(updateStatus) {
       if (updateStatus === undefined) updateStatus = true;
       const changed = previewNames.filter(function (name, index) { return name !== fileName(files[index]); }).length;
       const invalid = previewNames.some(function (name) { return !isValidFileName(name); });
-      const normalized = previewNames.map(function (name) { return name.toLocaleLowerCase(); });
-      const duplicates = new Set(normalized).size !== normalized.length;
+      const destinations = previewNames.map(function (name, index) {
+        return parentPath(files[index]).toLocaleLowerCase() + '\u0000' + name.toLocaleLowerCase();
+      });
+      const duplicates = new Set(destinations).size !== destinations.length;
       document.getElementById('changeCount').textContent = t(
         'change.count',
         '{count} 项待修改',
@@ -233,8 +299,11 @@
 
     async function executeRename() {
       if (isRenaming) return;
+      selectionRequestId++;
       isRenaming = true;
       window.LongUI?.setBusy(renameButton, true);
+      setInteractionDisabled(true);
+      renderFiles(false);
       const failures = [];
       let completed = 0;
       try {
@@ -254,12 +323,14 @@
       } finally {
         isRenaming = false;
         window.LongUI?.setBusy(renameButton, false);
+        setInteractionDisabled(false);
+        renderFiles(false);
       }
       if (failures.length) {
         setStatus(
           'status.transactionFailed',
           'danger',
-          '未执行批量重命名，文件已保持原状 · {detail}',
+          '批量重命名失败，请核对文件状态后再重试 · {detail}',
           { detail: failures[0] });
       } else {
         setFiles([]);
@@ -272,11 +343,31 @@
     }
 
     function fileName(path) { return path.replace(/\\/g, '/').split('/').pop() || path; }
+    function parentPath(path) {
+      const normalized = path.replace(/\\/g, '/');
+      const index = normalized.lastIndexOf('/');
+      return index >= 0 ? normalized.slice(0, index) : '';
+    }
     function splitName(name) {
       const index = name.lastIndexOf('.');
       return index > 0 ? { base: name.slice(0, index), extension: name.slice(index) } : { base: name, extension: '' };
     }
-    function isValidFileName(name) { return !!name.trim() && !/[<>:"/\\|?*\u0000-\u001F]/.test(name) && !/[. ]$/.test(name); }
+    function isValidFileName(name) {
+      const base = name.split('.')[0].toLocaleUpperCase();
+      return !!name.trim()
+        && name.length <= 255
+        && !/[<>:"/\\|?*\u0000-\u001F]/.test(name)
+        && !/[. ]$/.test(name)
+        && !/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/.test(base);
+    }
+
+    function setInteractionDisabled(disabled) {
+      document.getElementById('loadButton').disabled = disabled;
+      document.getElementById('resetButton').disabled = disabled;
+      document.getElementById('ruleType').disabled = disabled;
+      document.getElementById('parameterA').disabled = disabled;
+      document.getElementById('parameterB').disabled = disabled;
+    }
 
     document.getElementById('loadButton').addEventListener('click', loadSelection);
     document.getElementById('renameButton').addEventListener('click', executeRename);
@@ -284,12 +375,30 @@
     document.getElementById('ruleType').addEventListener('change', applyRule);
     document.getElementById('parameterA').addEventListener('input', applyRule);
     document.getElementById('parameterB').addEventListener('input', applyRule);
+    document.getElementById('previousPage').addEventListener('click', function () {
+      if (isRenaming || currentPage === 0) return;
+      currentPage--;
+      renderFiles(false);
+    });
+    document.getElementById('nextPage').addEventListener('click', function () {
+      if (isRenaming || (currentPage + 1) * pageSize >= files.length) return;
+      currentPage++;
+      renderFiles(false);
+    });
     document.addEventListener('keydown', function (event) {
       if (event.ctrlKey && event.key === 'Enter' && !renameButton.disabled) { event.preventDefault(); executeRename(); }
     });
     window.LongUI?.onCommand(async function (command) {
+      if (isRenaming) {
+        return {
+          success: false,
+          message: t('status.busy', '正在执行批量重命名，请稍候'),
+          outputs: {}
+        };
+      }
       const paths = window.LongUI.commandPaths(command);
       if (paths.length) {
+        selectionRequestId++;
         setFiles(paths);
         setStatus('status.contextLoaded', 'success', '已从命令上下文读取 {count} 个文件', { count: paths.length });
       } else {

@@ -235,6 +235,21 @@
           "level": "contract",
           "path": "tests/LongBetterWindows.Tests/CommandContractTests.cs",
           "symbol": "BuiltInManifest_CommandContract_IsValid"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/FileSystemOrganizationTests.cs",
+          "symbol": "BatchRename_RejectsEmptyBatch"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/FileSystemOrganizationTests.cs",
+          "symbol": "BatchRename_RejectsReservedWindowsName"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/FileSystemOrganizationTests.cs",
+          "symbol": "BatchRename_RollsBackEarlierMovesWhenLaterMoveFails"
         }
       ],
       "manual_checks": [

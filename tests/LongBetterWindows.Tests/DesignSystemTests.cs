@@ -904,6 +904,15 @@ public class DesignSystemTests
 
         Assert.Contains("\"file.ops\"", manifest);
         Assert.Contains("long.shell.renameBatch(operations)", html);
+        Assert.Contains("const pageSize = 100", html);
+        Assert.Contains("parentPath(files[index]).toLocaleLowerCase()", html);
+        Assert.Contains("let selectionRequestId = 0", html);
+        Assert.Contains("requestId !== selectionRequestId || isRenaming", html);
+        Assert.Contains("setInteractionDisabled(true)", html);
+        Assert.Contains("IsReservedWindowsFileName", File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Services", "FileSystemService.cs")));
+        Assert.Contains("\"version\": \"1.2.0\"", manifest);
+        Assert.Contains("\"auto_start\": false", manifest);
         Assert.Contains("\"shell.renameBatch\"", dispatcher);
         Assert.Contains("FileSystem.BatchRenameAsync", dispatcher);
         Assert.Contains("FileOps.MoveAsync", dispatcher);
