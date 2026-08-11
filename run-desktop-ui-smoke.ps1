@@ -163,6 +163,25 @@ public static class LongDesktopInput {
     [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+    [StructLayout(LayoutKind.Sequential)]
+    struct INPUT {
+        public uint type;
+        public INPUTUNION value;
+    }
+    [StructLayout(LayoutKind.Explicit, Size = 32)]
+    struct INPUTUNION {
+        [FieldOffset(0)] public KEYBDINPUT keyboard;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    struct KEYBDINPUT {
+        public ushort virtualKey;
+        public ushort scanCode;
+        public uint flags;
+        public uint time;
+        public UIntPtr extra;
+    }
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern uint SendInput(uint count, INPUT[] inputs, int size);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern uint RegisterWindowMessage(string name);
     [DllImport("user32.dll", SetLastError = true)]
     static extern IntPtr SendMessageTimeout(
@@ -214,6 +233,26 @@ public static class LongDesktopInput {
         }
     }
     public static IntPtr ForegroundWindow() { return GetForegroundWindow(); }
+    public static bool KeyPress(ushort virtualKey) {
+        var inputs = new[] {
+            new INPUT {
+                type = 1,
+                value = new INPUTUNION {
+                    keyboard = new KEYBDINPUT { virtualKey = virtualKey }
+                }
+            },
+            new INPUT {
+                type = 1,
+                value = new INPUTUNION {
+                    keyboard = new KEYBDINPUT {
+                        virtualKey = virtualKey,
+                        flags = 0x0002
+                    }
+                }
+            }
+        };
+        return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>()) == inputs.Length;
+    }
     public static void Click(IntPtr window, int x, int y) {
         Activate(window);
         System.Threading.Thread.Sleep(100);
@@ -339,6 +378,67 @@ function Find-DescendantByControlType(
     return $root.FindFirst(
         [Windows.Automation.TreeScope]::Descendants,
         $condition)
+}
+
+function Get-SelectedAutomationItem(
+    [Windows.Automation.AutomationElement] $list) {
+    $pattern = $null
+    if (-not $list.TryGetCurrentPattern(
+        [Windows.Automation.SelectionPattern]::Pattern,
+        [ref]$pattern)) {
+        return $null
+    }
+    $selection = ([Windows.Automation.SelectionPattern]$pattern).Current.GetSelection()
+    if ($selection.Count -eq 0) { return $null }
+    return $selection[0]
+}
+
+function Get-AutomationIdentity(
+    [Windows.Automation.AutomationElement] $element) {
+    if ($null -eq $element) { return '' }
+    return '{0}|{1}|{2}' -f `
+        $element.Current.AutomationId,
+        $element.Current.Name,
+        (($element.GetRuntimeId() | ForEach-Object { $_.ToString() }) -join '.')
+}
+
+function Wait-LauncherLatency(
+    [Windows.Automation.AutomationElement] $window,
+    [bool] $requireQueryResult,
+    [string] $failureMessage) {
+    return Wait-Until {
+        $status = [string]$window.Current.ItemStatus
+        if ($status -notmatch 'first_frame_ms=([0-9.]+)') { return $null }
+        if ($status -notmatch 'first_results_ms=([0-9.]+)') { return $null }
+        if ($requireQueryResult -and
+            $status -notmatch 'query_first_results_ms=([0-9.]+)') {
+            return $null
+        }
+        return $status
+    } $failureMessage
+}
+
+function Assert-LauncherLatencyBudget(
+    [string] $status,
+    [bool] $checkQuery,
+    [string] $surface) {
+    $frame = [regex]::Match($status, 'first_frame_ms=([0-9.]+)')
+    $results = [regex]::Match($status, 'first_results_ms=([0-9.]+)')
+    $query = [regex]::Match($status, 'query_first_results_ms=([0-9.]+)')
+    $frameMs = [double]::Parse(
+        $frame.Groups[1].Value,
+        [Globalization.CultureInfo]::InvariantCulture)
+    if ($frameMs -gt 250) {
+        throw "$surface exceeded the 250ms first-frame budget: $status"
+    }
+    if ($checkQuery) {
+        $queryMs = [double]::Parse(
+            $query.Groups[1].Value,
+            [Globalization.CultureInfo]::InvariantCulture)
+        if ($queryMs -gt 100) {
+            throw "$surface exceeded the 100ms query-result budget: $status"
+        }
+    }
 }
 
 function Find-VisibleDescendantByAutomationId(
@@ -744,6 +844,9 @@ try {
     $results = Wait-Until {
         Find-DescendantByAutomationId $palette 'Long.CommandPalette.Results'
     } 'Command Palette result list was not discoverable.'
+    $paletteLatency = Wait-LauncherLatency $palette $false `
+        'Command Palette did not publish first-frame and first-result latency.'
+    Assert-LauncherLatencyBudget $paletteLatency $false 'Command Palette'
     $report.automation_semantics['palette'] = [ordered]@{
         window = Get-AutomationSemantics $palette 'ControlType.Window' 'Command Palette window semantics failed.'
         search = Get-AutomationSemantics $search 'ControlType.Edit' 'Command Palette search semantics failed.'
@@ -751,16 +854,55 @@ try {
     }
 
     Write-Stage 'Setting wifi through the standard UI Automation value pattern.'
-    [LongDesktopInput]::Activate([IntPtr]$palette.Current.NativeWindowHandle) | Out-Null
+    $paletteHandle = [IntPtr]$palette.Current.NativeWindowHandle
+    Wait-Until {
+        [LongDesktopInput]::Activate($paletteHandle) -and
+            [LongDesktopInput]::ForegroundWindow() -eq $paletteHandle
+    } 'Command Palette could not become the foreground window.' | Out-Null
     $search.SetFocus()
+    Wait-Until {
+        if ($search.Current.HasKeyboardFocus) { $true }
+    } 'Command Palette search did not receive focus before keyboard navigation.' | Out-Null
     $valuePattern = [Windows.Automation.ValuePattern]$search.GetCurrentPattern(
         [Windows.Automation.ValuePattern]::Pattern)
+    $paletteSelectionBefore = Wait-Until {
+        Get-SelectedAutomationItem $results
+    } 'Command Palette did not expose its initial selected result.'
+    $paletteSelectionBeforeId = Get-AutomationIdentity $paletteSelectionBefore
+    if (-not [LongDesktopInput]::KeyPress(0x28)) {
+        throw 'SendInput could not deliver Down Arrow to Command Palette.'
+    }
+    $paletteSelectionAfter = Wait-Until {
+        $selected = Get-SelectedAutomationItem $results
+        if ($null -ne $selected -and
+            (Get-AutomationIdentity $selected) -ne $paletteSelectionBeforeId) {
+            $selected
+        }
+    } 'Down Arrow did not move the Command Palette selection.'
+    $paletteAnnouncement = Wait-Until {
+        $announcement = Find-DescendantByAutomationId `
+            $palette 'Long.CommandPalette.SelectionAnnouncement'
+        if ($null -eq $announcement) {
+            $announcement = Find-RawDescendantByAutomationId `
+                $palette 'Long.CommandPalette.SelectionAnnouncement'
+        }
+        if ($null -ne $announcement -and
+            -not [string]::IsNullOrWhiteSpace($announcement.Current.Name)) {
+            $announcement.Current.Name
+        }
+    } 'Command Palette did not publish its keyboard selection announcement.'
+    if (-not $search.Current.HasKeyboardFocus) {
+        throw 'Down Arrow moved focus away from Command Palette search.'
+    }
     $valuePattern.SetValue('wifi')
     Start-Sleep -Milliseconds 500
     Write-Stage "Search value after UI Automation input: '$($valuePattern.Current.Value)'."
     $wifi = Wait-Until {
         Find-DescendantByName $results 'Wi-Fi'
     } 'The Wi-Fi Windows setting result did not appear.'
+    $paletteQueryLatency = Wait-LauncherLatency $palette $true `
+        'Command Palette did not publish query-to-first-result latency.'
+    Assert-LauncherLatencyBudget $paletteQueryLatency $true 'Command Palette'
     $focusConfirmed = Wait-Until { $search.Current.HasKeyboardFocus } `
         'The Command Palette search box did not receive keyboard focus.'
 
@@ -854,7 +996,12 @@ try {
         secondary_menu_kept_palette_open = $menuKeptPaletteOpen
         escape_closed_palette = $true
         automation_transport = 'quality_window_message'
-        physical_keyboard_validated = $false
+        physical_keyboard_validated = $true
+        keyboard_selection_changed = $true
+        keyboard_focus_preserved = $true
+        selection_announcement = [string]$paletteAnnouncement
+        invocation_latency = [string]$paletteLatency
+        query_latency = [string]$paletteQueryLatency
     }
     Stop-QualityHost $paletteMenuProcess
     $paletteMenuProcess = $null
@@ -867,11 +1014,49 @@ try {
     $panelResults = Wait-Until {
         Find-DescendantByAutomationId $superPanel 'Long.SuperPanel.Results'
     } 'Super Panel result list was not discoverable.'
+    $superPanelLatency = Wait-LauncherLatency $superPanel $false `
+        'Super Panel did not publish first-frame and first-result latency.'
+    Assert-LauncherLatencyBudget $superPanelLatency $false 'Super Panel'
     $contextListMode = Wait-Until {
         if ($panelResults.Current.ItemStatus -like 'mode:context-list;page:1/*') {
             $panelResults.Current.ItemStatus
         }
     } 'Super Panel did not expose the contextual list presentation.'
+    $superPanelHandle = [IntPtr]$superPanel.Current.NativeWindowHandle
+    Wait-Until {
+        [LongDesktopInput]::Activate($superPanelHandle) -and
+            [LongDesktopInput]::ForegroundWindow() -eq $superPanelHandle
+    } 'Super Panel could not become the foreground window.' | Out-Null
+    $panelResults.SetFocus()
+    Wait-Until {
+        if ($panelResults.Current.HasKeyboardFocus) { $true }
+    } 'Super Panel results did not receive focus before keyboard navigation.' | Out-Null
+    $panelSelectionBefore = Wait-Until {
+        Get-SelectedAutomationItem $panelResults
+    } 'Super Panel did not expose its initial selected result.'
+    $panelSelectionBeforeId = Get-AutomationIdentity $panelSelectionBefore
+    if (-not [LongDesktopInput]::KeyPress(0x28)) {
+        throw 'SendInput could not deliver Down Arrow to Super Panel.'
+    }
+    $panelSelectionAfter = Wait-Until {
+        $selected = Get-SelectedAutomationItem $panelResults
+        if ($null -ne $selected -and
+            (Get-AutomationIdentity $selected) -ne $panelSelectionBeforeId) {
+            $selected
+        }
+    } 'Down Arrow did not move the Super Panel selection.'
+    $panelAnnouncement = Wait-Until {
+        $announcement = Find-DescendantByAutomationId `
+            $superPanel 'Long.SuperPanel.SelectionAnnouncement'
+        if ($null -eq $announcement) {
+            $announcement = Find-RawDescendantByAutomationId `
+                $superPanel 'Long.SuperPanel.SelectionAnnouncement'
+        }
+        if ($null -ne $announcement -and
+            -not [string]::IsNullOrWhiteSpace($announcement.Current.Name)) {
+            $announcement.Current.Name
+        }
+    } 'Super Panel did not publish its keyboard selection announcement.'
     $nextPanelPage = Wait-Until {
         Find-DescendantByAutomationId $superPanel 'Long.SuperPanel.NextPage'
     } 'Super Panel next-page action was not discoverable.'
@@ -900,6 +1085,10 @@ try {
         context_list_mode = [string]$contextListMode
         context_second_page = [string]$contextSecondPage
         escape_closed_panel = $true
+        keyboard_selection_changed = $true
+        selection_announcement = [string]$panelAnnouncement
+        invocation_latency = [string]$superPanelLatency
+        physical_keyboard_validated = $true
         context_matrix = @(
             [ordered]@{
                 profile = 'url'
@@ -1100,15 +1289,23 @@ try {
     $preservedContext = Wait-Until {
         Find-DescendantByAutomationId $transitionPalette 'quality.url'
     } 'The transitioned Command Palette did not preserve the Super Panel context.'
-    $preservedSelection = Wait-Until {
-        $candidate = Find-DescendantByAutomationId `
+    $preservedCandidate = Wait-Until {
+        Find-DescendantByAutomationId `
             $transitionPaletteResults $transitionSelectedId
-        if ($null -eq $candidate) { return $null }
-        $pattern = [Windows.Automation.SelectionItemPattern]`
-            $candidate.GetCurrentPattern(
-                [Windows.Automation.SelectionItemPattern]::Pattern)
-        if ($pattern.Current.IsSelected) { $candidate }
-    } 'The transitioned Command Palette did not preserve the selected result.'
+    } "The transitioned Command Palette did not contain selected result '$transitionSelectedId'."
+    try {
+        $preservedSelection = Wait-Until {
+            $pattern = [Windows.Automation.SelectionItemPattern]`
+                $preservedCandidate.GetCurrentPattern(
+                    [Windows.Automation.SelectionItemPattern]::Pattern)
+            if ($pattern.Current.IsSelected) { $preservedCandidate }
+        } "The transitioned Command Palette did not select '$transitionSelectedId'."
+    }
+    catch {
+        $actualSelection = Get-SelectedAutomationItem $transitionPaletteResults
+        $actualIdentity = Get-AutomationIdentity $actualSelection
+        throw "The transitioned Command Palette expected '$transitionSelectedId' but selected '$actualIdentity'."
+    }
     [LongDesktopInput]::WindowAction(
         [IntPtr]$transitionPalette.Current.NativeWindowHandle, 3) | Out-Null
     Wait-Until {

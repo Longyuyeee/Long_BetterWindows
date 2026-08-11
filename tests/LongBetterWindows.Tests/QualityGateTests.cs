@@ -1415,7 +1415,7 @@ public class QualityGateTests
         Assert.Contains("Long.Brush.Surface.Overlay", xaml);
         Assert.Contains("CancellationTokenSource? _searchCts", source);
         Assert.Contains("_searchCts?.Cancel()", source);
-        Assert.Contains("Task.Delay(45, token)", source);
+        Assert.Contains("Task.Delay(25, token)", source);
         Assert.Contains("OperationCanceledException", source);
         Assert.Contains("Command Palette 可输入", source);
         Assert.Contains("Shell32.GetForegroundWindow()", source);
@@ -1846,6 +1846,12 @@ public class QualityGateTests
             "WorkspaceShellControl.xaml");
 
         Assert.Contains("Long.CommandPalette.Search", palette);
+        Assert.Contains("PreviewKeyDown=\"SearchBox_KeyDown\"", palette);
+        Assert.Contains("AdditionalPreferredResultIds: _preferredSelectionId", Read(
+            "src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml.cs"));
+        Assert.Contains("IsSynchronizedWithCurrentItem=\"True\"", palette);
+        Assert.Contains("view.MoveCurrentTo(selectedItem)", Read(
+            "src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml.cs"));
         Assert.Contains("Long.CommandPalette.Results", palette);
         Assert.Contains("Long.Result.MoreActions", palette);
         Assert.Contains("Long.SuperPanel.Results", superPanel);

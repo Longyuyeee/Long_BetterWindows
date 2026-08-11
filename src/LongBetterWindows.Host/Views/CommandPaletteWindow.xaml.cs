@@ -6,6 +6,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
@@ -27,6 +28,9 @@ namespace LongBetterWindows.Host.Views
         private CancellationTokenSource? _searchCts;
         private string? _preferredSelectionId;
         private readonly QualityWindowAutomation? _qualityAutomation;
+        private readonly LauncherLatencySession _latency = new();
+        private EventHandler? _firstFrameHandler;
+        private bool _suppressSearch;
 
         private CommandPaletteWindow()
         {
@@ -50,6 +54,7 @@ namespace LongBetterWindows.Host.Views
                 _contextCts?.Cancel();
                 _contextCts?.Dispose();
                 _qualityAutomation?.Dispose();
+                DetachFirstFrameHandler();
                 _instance = null;
             };
         }
@@ -63,26 +68,42 @@ namespace LongBetterWindows.Host.Views
             var dispatcher = Application.Current.Dispatcher;
             if (!dispatcher.CheckAccess())
             {
-                dispatcher.Invoke(() => ShowPalette(initialQuery));
+                dispatcher.Invoke(() => ShowPaletteCore(initialQuery, started));
                 return;
             }
+
+            ShowPaletteCore(initialQuery, started);
+        }
+
+        private static void ShowPaletteCore(string? initialQuery, long started)
+        {
 
             var captureRequest = new ContextCaptureRequest(
                 Shell32.GetForegroundWindow(),
                 DateTimeOffset.UtcNow);
             _instance ??= new CommandPaletteWindow();
+            _instance.BeginPresentationLatency(started);
             ServicesInitializer.LauncherContinuity.Discard();
             _instance._originWindowHandle = captureRequest.ForegroundWindowHandle;
             _instance._preferredSelectionId = null;
-            _instance.SearchBox.Text = initialQuery ?? string.Empty;
+            _instance._suppressSearch = true;
+            try
+            {
+                _instance.SearchBox.Text = initialQuery ?? string.Empty;
+            }
+            finally
+            {
+                _instance._suppressSearch = false;
+            }
             _instance.SearchBox.CaretIndex = _instance.SearchBox.Text.Length;
-            _instance.BeginSearch();
             _instance.StatusText.Text = string.Empty;
-            _instance.BeginLoadContext(captureRequest);
 
             if (!_instance.IsVisible)
                 _instance.Show();
 
+            _instance.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                () => _instance.BeginLoadContext(captureRequest));
             _instance.Activate();
             _instance.SearchBox.Focus();
             _instance.AnimateIn();
@@ -93,23 +114,39 @@ namespace LongBetterWindows.Host.Views
         internal static void ShowPalette(PanelExpansionIntent intent)
         {
             ArgumentNullException.ThrowIfNull(intent);
+            var started = Stopwatch.GetTimestamp();
             var dispatcher = Application.Current.Dispatcher;
             if (!dispatcher.CheckAccess())
             {
-                dispatcher.Invoke(() => ShowPalette(intent));
+                dispatcher.Invoke(() => ShowPaletteCore(intent, started));
                 return;
             }
 
+            ShowPaletteCore(intent, started);
+        }
+
+        private static void ShowPaletteCore(PanelExpansionIntent intent, long started)
+        {
+
             var state = intent.Consume();
             _instance ??= new CommandPaletteWindow();
+            _instance.BeginPresentationLatency(started);
             ServicesInitializer.LauncherContinuity.Discard();
             _instance._contextCts?.Cancel();
             _instance._originWindowHandle = state.OriginWindowHandle;
             _instance._contextSnapshot = state.Context;
             _instance._preferredSelectionId = state.SelectedResultId;
-            _instance.SearchBox.Text = state.Query;
+            _instance._suppressSearch = true;
+            try
+            {
+                _instance.SearchBox.Text = state.Query;
+            }
+            finally
+            {
+                _instance._suppressSearch = false;
+            }
             _instance.SearchBox.CaretIndex = state.Query.Length;
-            _instance.RenderContextBadges();
+            _instance.RenderContextBadges(beginSearch: false);
             _instance.StatusText.Text = string.Empty;
 
             if (!_instance.IsVisible)
@@ -117,6 +154,9 @@ namespace LongBetterWindows.Host.Views
             _instance.Activate();
             _instance.SearchBox.Focus();
             _instance.AnimateIn();
+            _instance.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                () => _instance.BeginSearch());
         }
 
         internal static void RestoreFromWorkspace(LauncherReturnState state)
@@ -182,11 +222,14 @@ namespace LongBetterWindows.Host.Views
             SearchHint.Visibility = string.IsNullOrEmpty(SearchBox.Text)
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            if (_suppressSearch) return;
             BeginSearch(debounce: true);
         }
 
         private void BeginSearch(bool debounce = false)
         {
+            _latency.BeginQuery();
+            UpdateLatencyAutomationStatus();
             _searchCts?.Cancel();
             _searchCts?.Dispose();
             _searchCts = new CancellationTokenSource();
@@ -198,14 +241,17 @@ namespace LongBetterWindows.Host.Views
             try
             {
                 if (debounce)
-                    await Task.Delay(45, token);
+                    await Task.Delay(25, token);
 
                 StatusText.Foreground = (Brush)FindResource("Long.Brush.Text.Secondary");
                 StatusText.Text = I18n("palette.status.searching");
                 var request = new SearchRequest(
                     SearchBox.Text,
                     _contextSnapshot,
-                    MaxResults: 12);
+                    MaxResults: 12,
+                    AdditionalPreferredResultIds: _preferredSelectionId is null
+                        ? null
+                        : new[] { _preferredSelectionId });
                 var finalResults = await ServicesInitializer.Search.SearchIncrementalAsync(
                     request,
                     results =>
@@ -259,13 +305,14 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
-        private void RenderContextBadges()
+        private void RenderContextBadges(bool beginSearch = true)
         {
             ContextBadges.ItemsSource = _contextSnapshot.Items;
             ContextBadges.Visibility = _contextSnapshot.Items.Count > 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-            BeginSearch();
+            if (beginSearch)
+                BeginSearch();
         }
 
         private void ContextRemove_Click(object sender, RoutedEventArgs e)
@@ -291,20 +338,25 @@ namespace LongBetterWindows.Host.Views
                 key => ServicesInitializer.I18n.T(key));
             var view = CollectionViewSource.GetDefaultView(projected);
             if (view is ListCollectionView listView)
+            {
                 listView.GroupDescriptions.Add(
                     new PropertyGroupDescription(
                         nameof(LauncherResultViewItem.SectionTitle)));
+                listView.Refresh();
+            }
             ResultsList.ItemsSource = view;
             var selection = StableSelectionResolver.Resolve(
                 projected,
                 selectedId,
                 item => item.Id);
-            ResultsList.SelectedIndex = selection.Index;
-            if (_preferredSelectionId is not null
-                && (selection.Preserved || completed))
-            {
+            var selectedItem = selection.Index >= 0
+                ? projected[selection.Index]
+                : null;
+            if (selectedItem is not null)
+                view.MoveCurrentTo(selectedItem);
+            ResultsList.SelectedItem = selectedItem;
+            if (_preferredSelectionId is not null && completed)
                 _preferredSelectionId = null;
-            }
             EmptyState.Visibility = completed && projected.Count == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -318,6 +370,16 @@ namespace LongBetterWindows.Host.Views
                 : string.Format(
                     I18n("palette.status.resultCount"),
                     projected.Count);
+            var resultLatency = _latency.MarkFirstActionableResults(projected.Count);
+            if (resultLatency is not null)
+            {
+                UpdateLatencyAutomationStatus();
+                Log.Debug(
+                    "Command Palette actionable results: InvocationMs={InvocationMs:F1}, QueryMs={QueryMs:F1}, Results={ResultCount}",
+                    resultLatency.InvocationElapsed?.TotalMilliseconds,
+                    resultLatency.QueryElapsed.TotalMilliseconds,
+                    projected.Count);
+            }
         }
 
         private async Task ExecuteSelectedAsync()
@@ -400,12 +462,51 @@ namespace LongBetterWindows.Host.Views
         private void MoveSelection(int offset)
         {
             if (ResultsList.Items.Count == 0) return;
+            _preferredSelectionId = null;
             var next = Math.Clamp(
                 ResultsList.SelectedIndex + offset,
                 0,
                 ResultsList.Items.Count - 1);
             ResultsList.SelectedIndex = next;
             ResultsList.ScrollIntoView(ResultsList.SelectedItem);
+            AnnounceSelection();
+        }
+
+        private void AnnounceSelection()
+        {
+            if (ResultsList.SelectedItem is not LauncherResultViewItem selected)
+                return;
+            AccessibilityLiveRegion.Announce(
+                SelectionAnnouncement,
+                $"{selected.Title}, {ResultsList.SelectedIndex + 1}/{ResultsList.Items.Count}");
+        }
+
+        private void BeginPresentationLatency(long started)
+        {
+            _latency.BeginInvocation(started);
+            UpdateLatencyAutomationStatus();
+            DetachFirstFrameHandler();
+            _firstFrameHandler = (_, _) =>
+            {
+                DetachFirstFrameHandler();
+                var elapsed = _latency.MarkFirstFrame();
+                if (elapsed is null) return;
+                UpdateLatencyAutomationStatus();
+                Log.Debug(
+                    "Command Palette first rendered frame: {ElapsedMs:F1}ms",
+                    elapsed.Value.TotalMilliseconds);
+            };
+            CompositionTarget.Rendering += _firstFrameHandler;
+        }
+
+        private void UpdateLatencyAutomationStatus()
+            => AutomationProperties.SetItemStatus(this, _latency.ToAutomationStatus());
+
+        private void DetachFirstFrameHandler()
+        {
+            if (_firstFrameHandler is null) return;
+            CompositionTarget.Rendering -= _firstFrameHandler;
+            _firstFrameHandler = null;
         }
 
         private async void ResultsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)

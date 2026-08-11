@@ -348,6 +348,7 @@
                 <ListBox x:Name="ResultsList" BorderThickness="0" Background="Transparent"
                          AutomationProperties.AutomationId="Long.SuperPanel.Results"
                          AutomationProperties.Name="{DynamicResource i18n.superPanel.resultsAutomation}"
+                         AutomationProperties.LiveSetting="Polite"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          AllowDrop="True"
@@ -396,6 +397,11 @@
                 <TextBlock x:Name="StatusText" Grid.Column="2" HorizontalAlignment="Right" FontSize="10"
                            AutomationProperties.LiveSetting="Polite"
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                <TextBlock x:Name="SelectionAnnouncement"
+                           Width="1" Height="1" Opacity="0"
+                           IsHitTestVisible="False" Focusable="False"
+                           AutomationProperties.AutomationId="Long.SuperPanel.SelectionAnnouncement"
+                           AutomationProperties.LiveSetting="Polite" />
             </Grid>
         </Grid>
     </Border>

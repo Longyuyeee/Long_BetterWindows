@@ -144,6 +144,25 @@ public class SearchCoordinatorTests
     }
 
     [Fact]
+    public async Task SearchCoordinator_KeepsAdditionalPreferredResultInsideLimit()
+    {
+        var coordinator = new SearchCoordinator(new ISearchProvider[]
+        {
+            new FakeSearchProvider("high", 20, 0, Result("high", 500)),
+            new FakeSearchProvider("restore", 10, 0, Result("restore", 10)),
+        });
+        var request = new SearchRequest(
+            string.Empty,
+            ContextSnapshot.Empty,
+            MaxResults: 1,
+            AdditionalPreferredResultIds: new[] { "restore" });
+
+        var result = Assert.Single(await coordinator.SearchIncrementalAsync(request));
+
+        Assert.Equal("restore", result.Id);
+    }
+
+    [Fact]
     public async Task StaticCommandProvider_MapsCommandToUnifiedExecutableResult()
     {
         var registry = new CommandRegistry();

@@ -4,6 +4,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using LongBetterWindows.Host.Automation;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
@@ -23,6 +24,8 @@ namespace LongBetterWindows.Host.Views
         private readonly SuperPanelDragSession _dragSession = new();
         private readonly SuperPanelWindowLifecycle _windowLifecycle;
         private readonly QualityWindowAutomation? _qualityAutomation;
+        private readonly LauncherLatencySession _latency = new();
+        private EventHandler? _firstFrameHandler;
         private string _contextMetadata = ContextMetadataProjection.Project(ContextSnapshot.Empty);
 
         private SuperPanelWindow()
@@ -61,6 +64,7 @@ namespace LongBetterWindows.Host.Views
                 _searchSession.Dispose();
                 _windowLifecycle.Dispose();
                 _qualityAutomation?.Dispose();
+                DetachFirstFrameHandler();
                 _instance = null;
             };
         }
@@ -92,13 +96,18 @@ namespace LongBetterWindows.Host.Views
             var foreground = originWindowHandle ?? Shell32.GetForegroundWindow();
             var request = new ContextCaptureRequest(foreground, DateTimeOffset.UtcNow);
             _instance ??= new SuperPanelWindow();
+            _instance.BeginPresentationLatency(started);
             _instance._windowLifecycle.CaptureForegroundWindow(foreground);
-            if (presetContext is null)
-                _instance.BeginLoad(request);
-            else
-                _instance.ApplyContext(presetContext);
-
             _instance._windowLifecycle.Present(animate: true);
+            _instance.Dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                () =>
+                {
+                    if (presetContext is null)
+                        _instance.BeginLoad(request);
+                    else
+                        _instance.ApplyContext(presetContext);
+                });
             Log.Debug("Super Panel visible: {ElapsedMs:F1}ms",
                 Stopwatch.GetElapsedTime(started).TotalMilliseconds);
         }
@@ -136,6 +145,19 @@ namespace LongBetterWindows.Host.Views
         {
             _groupCoordinator.SetResults(update.Results, update.Completed);
             RenderActiveGroup(preserveSelection: true);
+            var resultLatency = _latency.MarkFirstActionableResults(
+                ResultsList.Items.Count);
+            if (resultLatency is not null)
+            {
+                UpdateLatencyAutomationStatus();
+                if (IsActive)
+                    ResultsList.Focus();
+                Log.Debug(
+                    "Super Panel actionable results: InvocationMs={InvocationMs:F1}, QueryMs={QueryMs:F1}, Results={ResultCount}",
+                    resultLatency.InvocationElapsed?.TotalMilliseconds,
+                    resultLatency.QueryElapsed.TotalMilliseconds,
+                    ResultsList.Items.Count);
+            }
         }
 
         private void RenderActiveGroup(bool preserveSelection = false)
@@ -328,6 +350,28 @@ namespace LongBetterWindows.Host.Views
             _dragSession.Reset();
             RenderActiveGroup();
             ResultsList.Focus();
+            AnnounceSelection();
+        }
+
+        private void MoveSelection(int offset)
+        {
+            if (ResultsList.Items.Count == 0) return;
+            ResultsList.SelectedIndex = Math.Clamp(
+                ResultsList.SelectedIndex + offset,
+                0,
+                ResultsList.Items.Count - 1);
+            ResultsList.ScrollIntoView(ResultsList.SelectedItem);
+            ResultsList.Focus();
+            AnnounceSelection();
+        }
+
+        private void AnnounceSelection()
+        {
+            if (ResultsList.SelectedItem is not SearchResultItem selected)
+                return;
+            AccessibilityLiveRegion.Announce(
+                SelectionAnnouncement,
+                $"{selected.Title}, {ResultsList.SelectedIndex + 1}/{ResultsList.Items.Count}");
         }
 
         private void ResultsList_PreviewMouseLeftButtonDown(
@@ -517,6 +561,13 @@ namespace LongBetterWindows.Host.Views
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key is Key.Down or Key.Up)
+            {
+                MoveSelection(e.Key == Key.Down ? 1 : -1);
+                e.Handled = true;
+                return;
+            }
+
             var selected = ResultsList.SelectedItem as SearchResultItem;
             var command = SuperPanelKeyboardRouter.Resolve(
                 e.Key,
@@ -603,6 +654,34 @@ namespace LongBetterWindows.Host.Views
         private void Window_Deactivated(object? sender, EventArgs e)
         {
             _windowLifecycle.HandleDeactivated(App.KeepSuperPanelVisibleForQuality);
+        }
+
+        private void BeginPresentationLatency(long started)
+        {
+            _latency.BeginInvocation(started);
+            UpdateLatencyAutomationStatus();
+            DetachFirstFrameHandler();
+            _firstFrameHandler = (_, _) =>
+            {
+                DetachFirstFrameHandler();
+                var elapsed = _latency.MarkFirstFrame();
+                if (elapsed is null) return;
+                UpdateLatencyAutomationStatus();
+                Log.Debug(
+                    "Super Panel first rendered frame: {ElapsedMs:F1}ms",
+                    elapsed.Value.TotalMilliseconds);
+            };
+            CompositionTarget.Rendering += _firstFrameHandler;
+        }
+
+        private void UpdateLatencyAutomationStatus()
+            => AutomationProperties.SetItemStatus(this, _latency.ToAutomationStatus());
+
+        private void DetachFirstFrameHandler()
+        {
+            if (_firstFrameHandler is null) return;
+            CompositionTarget.Rendering -= _firstFrameHandler;
+            _firstFrameHandler = null;
         }
 
         private static T? FindAncestor<T>(DependencyObject? source) where T : DependencyObject

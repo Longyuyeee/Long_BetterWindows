@@ -96,7 +96,8 @@ namespace LongBetterWindows.Host.Interaction
                 var snapshot = Order(
                     merged.Values,
                     request.MaxResults,
-                    !string.IsNullOrWhiteSpace(request.Query));
+                    !string.IsNullOrWhiteSpace(request.Query),
+                    request.AdditionalPreferredResultIds);
                 batchCount++;
                 if (firstBatchElapsed is null && snapshot.Count > 0)
                     firstBatchElapsed = Stopwatch.GetElapsedTime(started);
@@ -107,7 +108,8 @@ namespace LongBetterWindows.Host.Interaction
             var final = Order(
                 merged.Values,
                 request.MaxResults,
-                !string.IsNullOrWhiteSpace(request.Query));
+                !string.IsNullOrWhiteSpace(request.Query),
+                request.AdditionalPreferredResultIds);
             metricsCompleted?.Invoke(new SearchRunMetrics(
                 firstBatchElapsed,
                 Stopwatch.GetElapsedTime(started),
@@ -163,9 +165,12 @@ namespace LongBetterWindows.Host.Interaction
         private IReadOnlyList<SearchResultItem> Order(
             IEnumerable<SearchResultItem> results,
             int maxResults,
-            bool hasActiveQuery)
+            bool hasActiveQuery,
+            IReadOnlyCollection<string>? additionalPreferredResultIds)
         {
             var now = DateTimeOffset.UtcNow;
+            var preferred = additionalPreferredResultIds?.ToHashSet(
+                StringComparer.OrdinalIgnoreCase);
             return results
                 .Select(item =>
                 {
@@ -180,7 +185,8 @@ namespace LongBetterWindows.Host.Interaction
                         PreferenceScore = preference.Score,
                     };
                 })
-                .OrderByDescending(item => item.Score + item.PreferenceScore)
+                .OrderByDescending(item => preferred?.Contains(item.Id) == true)
+                .ThenByDescending(item => item.Score + item.PreferenceScore)
                 .ThenByDescending(item => item.ProviderPriority)
                 .ThenBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
                 .Take(maxResults)

@@ -56,7 +56,7 @@
                          AutomationProperties.AutomationId="Long.CommandPalette.Search"
                          AutomationProperties.Name="{DynamicResource i18n.palette.searchAutomation}"
                          TextChanged="SearchBox_TextChanged"
-                         KeyDown="SearchBox_KeyDown" />
+                         PreviewKeyDown="SearchBox_KeyDown" />
                 <TextBlock x:Name="SearchHint" Grid.Column="1" Text="{DynamicResource i18n.palette.searchHint}"
                            IsHitTestVisible="False" VerticalAlignment="Center"
                            FontSize="20" FontWeight="SemiBold"
@@ -74,8 +74,10 @@
 
             <Grid Grid.Row="2">
             <ListBox x:Name="ResultsList"
+                     IsSynchronizedWithCurrentItem="True"
                      AutomationProperties.AutomationId="Long.CommandPalette.Results"
                      AutomationProperties.Name="{DynamicResource i18n.palette.resultsAutomation}"
+                     AutomationProperties.LiveSetting="Polite"
                      BorderThickness="0" Background="Transparent"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      MouseDoubleClick="ResultsList_MouseDoubleClick">
@@ -267,6 +269,11 @@
                            FontSize="10"
                            AutomationProperties.LiveSetting="Polite"
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                <TextBlock x:Name="SelectionAnnouncement"
+                           Width="1" Height="1" Opacity="0"
+                           IsHitTestVisible="False" Focusable="False"
+                           AutomationProperties.AutomationId="Long.CommandPalette.SelectionAnnouncement"
+                           AutomationProperties.LiveSetting="Polite" />
             </Grid>
         </Grid>
     </Border>
