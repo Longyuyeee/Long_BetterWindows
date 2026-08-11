@@ -6,7 +6,7 @@
 ## 验收边界
 
 - 正式矩阵必须来自真实设置为 100%、125%、150%、200% 的显示环境。
-- 采集程序读取目标窗口所在显示器的 `actual_monitor_dpi`；与声明档位不一致时立即失败。
+- 采集程序读取目标窗口所在显示器的 `actual_monitor_dpi` 与 `actual_monitor_device_name`；与声明档位或指定设备不一致时立即失败。
 - 工程 `render_dpi` 图片、远程缩放、图片放大或修改元数据均不能代替物理设备证据。
 - 自动校验通过不等于人工签核。人工检查和署名分为独立步骤。
 - 250% 可作为补充设备基线，但不属于规范要求的四档发布矩阵。
@@ -19,8 +19,11 @@
 powershell.exe -ExecutionPolicy Bypass -File .\capture-physical-dpi-evidence.ps1 `
   -OutputDirectory .\artifacts\physical-dpi-100-YYYYMMDD `
   -ExpectedSourceCommit "完整的 40 位候选源码提交" `
-  -ExpectedScalePercent 100
+  -ExpectedScalePercent 100 `
+  -MonitorDeviceName '\\.\DISPLAY1'
 ```
+
+多显示器设备应显式传入 Windows 设备名，避免依赖上次窗口位置。每张伴随元数据同时记录设备边界、工作区、主屏状态与实际 DPI；未指定设备名时仍记录实际落点，但不计作定向多屏证据。
 
 脚本生成亮/暗主题下的主界面、插件市场、命令面板和 URL Web 插件，共 8 张图片及伴随元数据。测试人员逐张检查：
 

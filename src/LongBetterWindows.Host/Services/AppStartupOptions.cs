@@ -65,6 +65,7 @@ namespace LongBetterWindows.Host.Services
         public int QualityCaptureDelayMilliseconds { get; private init; } = 700;
         public int QualityCaptureWidth { get; private init; }
         public int QualityCaptureHeight { get; private init; }
+        public string? QualityMonitorDeviceName { get; private init; }
 
         public static AppStartupOptions Parse(IReadOnlyList<string> arguments)
         {
@@ -197,6 +198,9 @@ namespace LongBetterWindows.Host.Services
                     arguments, "--quality-capture-delay-ms", 700, 10_000, 100),
                 QualityCaptureWidth = ReadIntegerArgument(arguments, "--quality-width", 0, 3840),
                 QualityCaptureHeight = ReadIntegerArgument(arguments, "--quality-height", 0, 2160),
+                QualityMonitorDeviceName = ReadArgument(
+                    arguments,
+                    "--quality-monitor-device"),
             };
         }
 

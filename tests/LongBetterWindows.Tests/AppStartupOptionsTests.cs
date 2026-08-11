@@ -25,6 +25,7 @@ public class AppStartupOptionsTests
             "--quality-render-dpi", "144",
             "--quality-width", "1280",
             "--quality-height", "800",
+            "--quality-monitor-device", @"\\.\DISPLAY2",
             "--quality-high-contrast",
             "--quality-reduce-motion",
             "--quality-window-automation",
@@ -76,6 +77,7 @@ public class AppStartupOptionsTests
         Assert.Equal(144, options.QualityRenderDpi);
         Assert.Equal(1280, options.QualityCaptureWidth);
         Assert.Equal(800, options.QualityCaptureHeight);
+        Assert.Equal(@"\\.\DISPLAY2", options.QualityMonitorDeviceName);
         Assert.True(options.ForceHighContrast);
         Assert.True(options.ForceReduceMotion);
         Assert.True(options.EnableWindowAutomationForQuality);

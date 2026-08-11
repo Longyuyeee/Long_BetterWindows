@@ -58,6 +58,15 @@ namespace LongBetterWindows.Host.Services
             if (options.QualityCaptureWidth > 0) target.Width = options.QualityCaptureWidth;
             if (options.QualityCaptureHeight > 0) target.Height = options.QualityCaptureHeight;
             target.WindowState = WindowState.Normal;
+            if (!string.IsNullOrWhiteSpace(options.QualityMonitorDeviceName)
+                && !QualityMonitorPlacement.TryApply(
+                    target,
+                    options.QualityMonitorDeviceName,
+                    out _,
+                    out var placementError))
+            {
+                throw new InvalidOperationException(placementError);
+            }
             target.UpdateLayout();
             await _application.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
             if (options.ShowMarketListForQuality &&
@@ -98,6 +107,13 @@ namespace LongBetterWindows.Host.Services
 
             var logicalWidth = Math.Max(1, target.ActualWidth);
             var logicalHeight = Math.Max(1, target.ActualHeight);
+            if (!QualityMonitorPlacement.TryDescribe(
+                    target,
+                    out var actualMonitor,
+                    out var monitorError))
+            {
+                throw new InvalidOperationException(monitorError);
+            }
             var path = Path.GetFullPath(options.QualityCapturePath!);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
@@ -105,7 +121,7 @@ namespace LongBetterWindows.Host.Services
             {
                 await CaptureWebViewAsync(
                     target, path, options, logicalWidth, logicalHeight,
-                    isLight, highContrast, reducedMotion);
+                    isLight, highContrast, reducedMotion, actualMonitor!);
                 _application.Shutdown(0);
                 return;
             }
@@ -133,7 +149,7 @@ namespace LongBetterWindows.Host.Services
             await WriteCaptureMetadataAsync(
                 path, options, logicalWidth, logicalHeight, pixelWidth, pixelHeight,
                 actualDpi.PixelsPerInchX, "wpf_render_target",
-                isLight, highContrast, reducedMotion);
+                isLight, highContrast, reducedMotion, actualMonitor!);
             Log.Information(
                 "Quality capture complete: View={View}, RenderDpi={RenderDpi}, ActualDpi={ActualDpi}, Path={Path}",
                 options.QualityCaptureView, options.QualityRenderDpi,
@@ -1542,7 +1558,8 @@ namespace LongBetterWindows.Host.Services
             double logicalHeight,
             bool isLight,
             bool highContrast,
-            bool reducedMotion)
+            bool reducedMotion,
+            QualityMonitorDescriptor actualMonitor)
         {
             var webView = await WaitForWebViewReadyAsync(target, TimeSpan.FromSeconds(10));
             await Task.Delay(Math.Max(250, options.QualityCaptureDelayMilliseconds));
@@ -1562,7 +1579,7 @@ namespace LongBetterWindows.Host.Services
                 Math.Max(1, (int)Math.Ceiling(webView.ActualWidth * webDpi.DpiScaleX)),
                 Math.Max(1, (int)Math.Ceiling(webView.ActualHeight * webDpi.DpiScaleY)),
                 webDpi.PixelsPerInchX, "webview_preview",
-                isLight, highContrast, reducedMotion);
+                isLight, highContrast, reducedMotion, actualMonitor);
         }
 
         private static async Task<WebView2> WaitForWebViewReadyAsync(
@@ -2001,7 +2018,8 @@ namespace LongBetterWindows.Host.Services
             string captureKind,
             bool isLight,
             bool highContrast,
-            bool reducedMotion)
+            bool reducedMotion,
+            QualityMonitorDescriptor actualMonitor)
         {
             var metadata = new
             {
@@ -2011,6 +2029,11 @@ namespace LongBetterWindows.Host.Services
                 theme = isLight ? "light" : "dark",
                 render_dpi = options.QualityRenderDpi,
                 actual_monitor_dpi = actualDpi,
+                requested_monitor_device_name = options.QualityMonitorDeviceName,
+                actual_monitor_device_name = actualMonitor.DeviceName,
+                actual_monitor_bounds = actualMonitor.Bounds,
+                actual_monitor_work_area = actualMonitor.WorkArea,
+                actual_monitor_primary = actualMonitor.IsPrimary,
                 capture_kind = captureKind,
                 logical_width = logicalWidth,
                 logical_height = logicalHeight,

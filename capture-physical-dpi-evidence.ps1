@@ -16,6 +16,7 @@ param(
     [string[]] $Views = @('main','market','palette','plugin'),
     [string] $PluginCommandKey = 'com.long.url-toolkit:url.encode',
     [string] $PluginCommandText = 'LongAssistantDpiReview',
+    [string] $MonitorDeviceName,
     [ValidateRange(100,10000)] [int] $CaptureDelayMilliseconds = 1500,
     [ValidateRange(30,180)] [int] $ProcessTimeoutSeconds = 90,
     [switch] $ApproveAfterVisualReview,
@@ -88,6 +89,9 @@ foreach ($theme in $Themes) {
                 '--command-text', $PluginCommandText
             )
         }
+        if (-not [string]::IsNullOrWhiteSpace($MonitorDeviceName)) {
+            $arguments += @('--quality-monitor-device', $MonitorDeviceName.Trim())
+        }
 
         $process = Start-Process -FilePath $executable -ArgumentList $arguments `
             -WorkingDirectory $outputRoot -PassThru
@@ -105,6 +109,17 @@ foreach ($theme in $Themes) {
         if ([Math]::Abs($actualDpi - $expectedDpi) -gt 0.6) {
             throw "Physical monitor DPI mismatch. Expected $expectedDpi DPI ($ExpectedScalePercent%), captured $actualDpi DPI. Move Long to the correct display and retry."
         }
+        $actualMonitorDeviceName = [string]$metadata.actual_monitor_device_name
+        if ([string]::IsNullOrWhiteSpace($actualMonitorDeviceName)) {
+            throw "Capture did not report its physical monitor device: $fileName"
+        }
+        if (-not [string]::IsNullOrWhiteSpace($MonitorDeviceName) `
+            -and -not [string]::Equals(
+                $actualMonitorDeviceName,
+                $MonitorDeviceName.Trim(),
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Physical monitor mismatch. Expected $MonitorDeviceName, captured $actualMonitorDeviceName."
+        }
         $expectedKind = if ($view -eq 'plugin') { 'webview_preview' } else { 'wpf_render_target' }
         if ($metadata.capture_kind -ne $expectedKind) {
             throw "Unexpected capture kind for $view. Expected $expectedKind, got $($metadata.capture_kind)."
@@ -116,6 +131,10 @@ foreach ($theme in $Themes) {
             view = $view
             actual_monitor_dpi = $actualDpi
             actual_scale_percent = [Math]::Round($actualDpi / 96.0 * 100.0, 1)
+            actual_monitor_device_name = $actualMonitorDeviceName
+            actual_monitor_bounds = $metadata.actual_monitor_bounds
+            actual_monitor_work_area = $metadata.actual_monitor_work_area
+            actual_monitor_primary = [bool]$metadata.actual_monitor_primary
             capture_kind = $metadata.capture_kind
             logical_width = $metadata.logical_width
             logical_height = $metadata.logical_height
@@ -156,6 +175,7 @@ $manifest = [ordered]@{
     environment = [ordered]@{
         os_version = [Environment]::OSVersion.VersionString
         process_architecture = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
+        requested_monitor_device_name = if ([string]::IsNullOrWhiteSpace($MonitorDeviceName)) { $null } else { $MonitorDeviceName.Trim() }
     }
     captures = $captures
 }

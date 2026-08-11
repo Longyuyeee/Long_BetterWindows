@@ -410,6 +410,9 @@ public class QualityGateTests
         var verify = Read("verify-physical-dpi-matrix.ps1");
 
         Assert.Contains("actual_monitor_dpi", capture);
+        Assert.Contains("actual_monitor_device_name", capture);
+        Assert.Contains("--quality-monitor-device", capture);
+        Assert.Contains("Physical monitor mismatch", capture);
         Assert.Contains("Physical monitor DPI mismatch", capture);
         Assert.Contains("physical_device_dpi_evidence", capture);
         Assert.Contains("ExpectedSourceCommit", capture);
