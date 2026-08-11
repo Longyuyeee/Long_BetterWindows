@@ -11,6 +11,9 @@ internal enum QualityWindowAction
     Dismiss = 3,
     SelectDeterministicResult = 4,
     SelectFocusProbeCommand = 5,
+    SelectManagementWorkspace = 6,
+    SelectMarketplaceWorkspace = 7,
+    SelectSettingsWorkspace = 8,
 }
 
 internal sealed class QualityWindowAutomation : IDisposable

@@ -61,4 +61,15 @@ namespace LongBetterWindows.Host.Interaction
             Route = new MarketplaceModuleRoute(MarketplaceModuleRouteKind.Catalog);
         }
     }
+
+    internal static class MarketplaceModuleNavigationPolicy
+    {
+        public static bool CanNavigateBack(
+            bool isCompactLayout,
+            MarketplaceModuleRouteKind routeKind,
+            bool hasConfirmation)
+            => isCompactLayout
+                && routeKind == MarketplaceModuleRouteKind.Detail
+                && !hasConfirmation;
+    }
 }

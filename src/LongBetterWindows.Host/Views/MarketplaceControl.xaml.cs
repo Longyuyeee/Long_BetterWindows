@@ -782,8 +782,10 @@ namespace LongBetterWindows.Host.Views
                 && InstallProgress.Visibility != Visibility.Visible;
 
         internal bool CanNavigateBackInModule
-            => _moduleRouter.Route.Kind == MarketplaceModuleRouteKind.Detail
-                && ConfirmOverlay.Visibility != Visibility.Visible;
+            => MarketplaceModuleNavigationPolicy.CanNavigateBack(
+                _isCompactLayout,
+                _moduleRouter.Route.Kind,
+                ConfirmOverlay.Visibility == Visibility.Visible);
 
         internal bool DismissTransientLayer()
             => DismissConfirmation();

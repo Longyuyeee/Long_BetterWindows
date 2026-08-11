@@ -33,4 +33,23 @@ public class MarketplaceModuleRouterTests
         Assert.Null(router.LastSelectedPluginId);
         Assert.False(router.BackToCatalog());
     }
+
+    [Theory]
+    [InlineData(true, (int)MarketplaceModuleRouteKind.Detail, false, true)]
+    [InlineData(false, (int)MarketplaceModuleRouteKind.Detail, false, false)]
+    [InlineData(true, (int)MarketplaceModuleRouteKind.Catalog, false, false)]
+    [InlineData(true, (int)MarketplaceModuleRouteKind.Detail, true, false)]
+    public void NavigationPolicy_OnlyTreatsCompactDetailAsBackStack(
+        bool compact,
+        int route,
+        bool confirmation,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            MarketplaceModuleNavigationPolicy.CanNavigateBack(
+                compact,
+                (MarketplaceModuleRouteKind)route,
+                confirmation));
+    }
 }

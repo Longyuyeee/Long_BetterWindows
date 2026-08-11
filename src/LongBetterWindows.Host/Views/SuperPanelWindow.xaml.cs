@@ -690,8 +690,45 @@ namespace LongBetterWindows.Host.Views
                     ResultsList.SelectedItem = focusProbeCommand;
                     ResultsList.ScrollIntoView(focusProbeCommand);
                     return true;
+                case QualityWindowAction.SelectManagementWorkspace:
+                    return SelectWorkspaceTargetForQuality("management:root");
+                case QualityWindowAction.SelectMarketplaceWorkspace:
+                    return SelectWorkspaceTargetForQuality("marketplace:catalog");
+                case QualityWindowAction.SelectSettingsWorkspace:
+                    return SelectWorkspaceTargetForQuality("settings:root");
                 default:
                     return false;
+            }
+        }
+
+        private bool SelectWorkspaceTargetForQuality(string target)
+        {
+            while (_groupCoordinator.MovePage(-1))
+            {
+                // Quality selection always scans from the first visible page.
+            }
+
+            while (true)
+            {
+                var view = _groupCoordinator.BuildView();
+                var result = view.VisibleResults.FirstOrDefault(item =>
+                    item.PrimaryAction.Kind == SearchActionKind.OpenWorkspaceModule
+                    && string.Equals(
+                        item.PrimaryAction.Target,
+                        target,
+                        StringComparison.OrdinalIgnoreCase));
+                if (result is not null)
+                {
+                    RenderActiveGroup();
+                    ResultsList.SelectedItem = result;
+                    ResultsList.ScrollIntoView(result);
+                    return true;
+                }
+                if (!_groupCoordinator.MovePage(1))
+                {
+                    RenderActiveGroup();
+                    return false;
+                }
             }
         }
 

@@ -916,10 +916,13 @@ namespace LongBetterWindows.Host
             if (key != Key.Escape)
                 return;
 
+            e.Handled = await HandleWorkspaceEscapeAsync();
+        }
+
+        private async Task<bool> HandleWorkspaceEscapeAsync()
+        {
             if (WorkspaceShell.HasOpenPluginUiModal)
-            {
-                return;
-            }
+                return false;
 
             var state = ServicesInitializer.Workspace.State;
             var action = WorkspaceEscapeRouter.Route(
@@ -939,29 +942,33 @@ namespace LongBetterWindows.Host
             switch (action)
             {
                 case WorkspaceEscapeAction.DismissTransientLayer:
-                    e.Handled = ToolCenter.CancelWorkflowReview()
+                    return ToolCenter.CancelWorkflowReview()
                         || ToolCenter.DismissTransientLayer();
-                    break;
                 case WorkspaceEscapeAction.ClearScopedSearch:
-                    e.Handled = WorkspaceShell.ClearScopedSearch();
-                    break;
+                    return WorkspaceShell.ClearScopedSearch();
                 case WorkspaceEscapeAction.NavigateBackInModule:
-                    e.Handled = ToolCenter.NavigateBackInModule();
-                    break;
+                    return ToolCenter.NavigateBackInModule();
                 case WorkspaceEscapeAction.CloseActiveModule:
                     await CloseWorkspaceModuleAsync(state.ActiveModuleKey);
-                    e.Handled = true;
-                    break;
+                    return true;
                 case WorkspaceEscapeAction.ReturnToLauncher:
                     RestoreLauncherIfPending(state.ActiveModuleKey.ToString());
-                    e.Handled = true;
-                    break;
+                    return true;
+                default:
+                    return false;
             }
         }
 
         private bool ExecuteQualityWindowAction(QualityWindowAction action)
-            => action == QualityWindowAction.ExecutePrimary
+        {
+            if (action == QualityWindowAction.Dismiss)
+            {
+                _ = HandleWorkspaceEscapeAsync();
+                return true;
+            }
+            return action == QualityWindowAction.ExecutePrimary
                 && ToolCenter.ExecuteQualityPrimaryAction();
+        }
 
         private static void RestoreLauncherIfPending(string workspaceTarget)
         {

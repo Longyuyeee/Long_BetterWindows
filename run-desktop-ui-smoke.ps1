@@ -879,6 +879,7 @@ $report = [ordered]@{
     release_executable = $executable
     palette = [ordered]@{}
     super_panel = [ordered]@{}
+    launcher_workspace_continuity = [ordered]@{}
     focus_restore = [ordered]@{}
     management_navigation = [ordered]@{}
     workflow_review = [ordered]@{}
@@ -902,6 +903,7 @@ $focusEscapeProcess = $null
 $focusExpandProcess = $null
 $focusExecuteProcess = $null
 $superPanelTransitionProcess = $null
+$launcherWorkspaceProcess = $null
 $managementProcess = $null
 $pluginSettingsProcess = $null
 $workflowPaletteProcess = $null
@@ -1465,6 +1467,93 @@ try {
     $report.super_panel['preserved_selection_id'] = $transitionSelectedId
     Stop-QualityHost $superPanelTransitionProcess
     $superPanelTransitionProcess = $null
+
+    Write-Stage 'Starting Super Panel to Workspace continuity workflow.'
+    $launcherWorkspaceProcess = Start-QualityHost @(
+        '--quality-open-super-panel',
+        '--quality-context-profile', 'url',
+        '--language', 'en-US')
+    $continuityTargets = @(
+        [pscustomobject]@{
+            name = 'management'
+            select_action = 6
+            module_tab = 'Long.Workspace.ModuleTab.management:root'
+        },
+        [pscustomobject]@{
+            name = 'marketplace'
+            select_action = 7
+            module_tab = 'Long.Workspace.ModuleTab.marketplace:catalog'
+        },
+        [pscustomobject]@{
+            name = 'settings'
+            select_action = 8
+            module_tab = 'Long.Workspace.ModuleTab.settings:root'
+        })
+    foreach ($continuityTarget in $continuityTargets) {
+        $continuityPanel = Wait-Until {
+            Find-WindowByAutomationId `
+                $launcherWorkspaceProcess.Id 'Long.SuperPanel'
+        } "Super Panel did not appear before opening $($continuityTarget.name)."
+        $continuityResults = Wait-Until {
+            $candidate = Find-DescendantByAutomationId `
+                $continuityPanel 'Long.SuperPanel.Results'
+            if ($null -ne $candidate -and
+                $candidate.Current.ItemStatus -like `
+                    'mode:context-list;*context-items:1;inputs:url,clipboard,text') {
+                $candidate
+            }
+        } "Super Panel lost context before opening $($continuityTarget.name)."
+        $continuityPanelHandle = [IntPtr]$continuityPanel.Current.NativeWindowHandle
+        if ([LongDesktopInput]::WindowAction(
+            $continuityPanelHandle,
+            $continuityTarget.select_action) -ne 1) {
+            throw "Super Panel could not select $($continuityTarget.name)."
+        }
+        if ([LongDesktopInput]::WindowAction($continuityPanelHandle, 1) -ne 1) {
+            throw "Super Panel rejected opening $($continuityTarget.name)."
+        }
+        Wait-Until {
+            $null -eq (Find-WindowByAutomationId `
+                $launcherWorkspaceProcess.Id 'Long.SuperPanel')
+        } "Super Panel did not hide before opening $($continuityTarget.name)." | Out-Null
+        $continuityMain = Wait-Until {
+            Find-WindowByAutomationId `
+                $launcherWorkspaceProcess.Id 'Long.MainWindow'
+        } "Workspace did not appear for $($continuityTarget.name)."
+        Wait-Until {
+            $candidate = Find-ProcessElementByAutomationId `
+                $launcherWorkspaceProcess.Id $continuityTarget.module_tab
+            if ($null -ne $candidate -and
+                $candidate.Current.ItemStatus -like 'active:true;*') {
+                $candidate
+            }
+        } "Workspace did not activate $($continuityTarget.name)." | Out-Null
+        if ([LongDesktopInput]::WindowAction(
+            [IntPtr]$continuityMain.Current.NativeWindowHandle, 3) -ne 1) {
+            throw "Workspace rejected Escape for $($continuityTarget.name)."
+        }
+        $restoredPanel = Wait-Until {
+            Find-WindowByAutomationId `
+                $launcherWorkspaceProcess.Id 'Long.SuperPanel'
+        } "Workspace Escape did not restore Super Panel from $($continuityTarget.name)."
+        Wait-Until {
+            $candidate = Find-DescendantByAutomationId `
+                $restoredPanel 'Long.SuperPanel.Results'
+            if ($null -ne $candidate -and
+                $candidate.Current.ItemStatus -like `
+                    'mode:context-list;*context-items:1;inputs:url,clipboard,text') {
+                $candidate
+            }
+        } "Returning from $($continuityTarget.name) did not preserve Super Panel context." | Out-Null
+        $report.launcher_workspace_continuity[$continuityTarget.name] = [ordered]@{
+            module_activated = $true
+            panel_restored = $true
+            context_preserved = $true
+        }
+    }
+    $report.launcher_workspace_continuity['coordinate_clicks_used'] = $false
+    Stop-QualityHost $launcherWorkspaceProcess
+    $launcherWorkspaceProcess = $null
     }
 
     Write-Stage 'Starting Workspace management navigation workflow.'
@@ -2226,10 +2315,10 @@ try {
         [ref]$panelSelectionPattern)) {
         throw 'The managed workflow Super Panel item did not expose SelectionItemPattern.'
     }
-    if ([LongDesktopInput]::WindowAction(
-        [IntPtr]$workflowPanel.Current.NativeWindowHandle, 4) -ne 1) {
-        throw 'Super Panel rejected the deterministic first-result action.'
-    }
+    $panelSelectionPattern.Select()
+    Wait-Until {
+        $panelSelectionPattern.Current.IsSelected
+    } 'The managed workflow Super Panel item could not be selected.' | Out-Null
     $workflowPanelResults.SetFocus()
     Write-Stage 'Opening the managed workflow review from Super Panel with Enter.'
     if ([LongDesktopInput]::WindowAction(
@@ -2742,6 +2831,7 @@ finally {
     Stop-QualityHost $focusExecuteProcess
     Stop-QualityHost $focusProbeProcess
     Stop-QualityHost $superPanelTransitionProcess
+    Stop-QualityHost $launcherWorkspaceProcess
     Stop-QualityHost $managementProcess
     Stop-QualityHost $pluginSettingsProcess
     Stop-QualityHost $workflowPaletteProcess
