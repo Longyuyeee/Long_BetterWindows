@@ -9,6 +9,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "release-evidence-io.ps1")
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$script:candidateBindingCache = @{}
 
 function Resolve-RepositoryPath([string]$PathValue) {
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
@@ -23,6 +25,119 @@ function Add-MatrixError(
     $Errors.Add($Message)
 }
 
+function Get-RepositoryRelativePath([string]$FullPath) {
+    $root = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd(
+        [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+    if (-not $FullPath.StartsWith(
+            $root,
+            [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Path is outside the repository: $FullPath"
+    }
+    return $FullPath.Substring($root.Length).Replace("\", "/")
+}
+
+function Get-StreamSha256([System.IO.Stream]$Stream) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString(
+            $algorithm.ComputeHash($Stream))).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        $algorithm.Dispose()
+    }
+}
+
+function Get-CandidateBinding([string]$CandidateDirectory) {
+    if ($script:candidateBindingCache.ContainsKey($CandidateDirectory)) {
+        return $script:candidateBindingCache[$CandidateDirectory]
+    }
+    $binding = $null
+    try {
+        $candidateRoot = Resolve-RepositoryPath $CandidateDirectory
+        $releaseRoot = Resolve-RepositoryPath "artifacts/releases"
+        $releasePrefix = $releaseRoot.TrimEnd(
+            [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+        if (-not $candidateRoot.StartsWith(
+                $releasePrefix,
+                [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Candidate directory is outside artifacts/releases."
+        }
+        $candidatePrefix = $candidateRoot.TrimEnd(
+            [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+        $manifestPath = Join-Path $candidateRoot "release-manifest.json"
+        $subjectPath = Join-Path $candidateRoot `
+            "self-contained\LongBetterWindows.Host.exe"
+        if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) `
+            -or -not (Test-Path -LiteralPath $subjectPath -PathType Leaf)) {
+            throw "Candidate manifest or subject executable is missing."
+        }
+        $manifest = Get-Content -LiteralPath $manifestPath `
+            -Raw -Encoding UTF8 | ConvertFrom-Json
+        $packages = @($manifest.packages | Where-Object {
+            [string]$_.kind -eq "self-contained"
+        })
+        if ([int]$manifest.schema_version -ne 1 `
+            -or [bool]$manifest.source_dirty `
+            -or -not [bool]$manifest.release_eligible `
+            -or $packages.Count -ne 1) {
+            throw "Candidate release contract is invalid."
+        }
+        $packagePath = [IO.Path]::GetFullPath((Join-Path `
+            $candidateRoot ([string]$packages[0].file)))
+        if (-not $packagePath.StartsWith(
+                $candidatePrefix,
+                [StringComparison]::OrdinalIgnoreCase) `
+            -or -not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+            throw "Candidate package is missing or outside its directory."
+        }
+        $packageHash = (Get-FileHash -LiteralPath $packagePath `
+            -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($packageHash -ne [string]$packages[0].sha256) {
+            throw "Candidate package does not match its manifest."
+        }
+        $subjectHash = (Get-FileHash -LiteralPath $subjectPath `
+            -Algorithm SHA256).Hash.ToLowerInvariant()
+        $archive = [IO.Compression.ZipFile]::OpenRead($packagePath)
+        try {
+            $entries = @($archive.Entries | Where-Object {
+                $_.FullName.Replace("\", "/") -match `
+                    '(^|/)LongBetterWindows\.Host\.exe$'
+            })
+            if ($entries.Count -ne 1) {
+                throw "Candidate ZIP subject identity is ambiguous."
+            }
+            $stream = $entries[0].Open()
+            try {
+                $archiveSubjectHash = Get-StreamSha256 $stream
+            }
+            finally {
+                $stream.Dispose()
+            }
+        }
+        finally {
+            $archive.Dispose()
+        }
+        if ($archiveSubjectHash -ne $subjectHash) {
+            throw "Candidate extracted subject differs from its ZIP."
+        }
+        $binding = [PSCustomObject]@{
+            CandidateCommit = ([string]$manifest.commit).ToLowerInvariant()
+            CandidateVersion = [string]$manifest.version
+            CandidateDirectory = Get-RepositoryRelativePath $candidateRoot
+            ReleaseManifestSha256 = (Get-FileHash -LiteralPath `
+                $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            SelfContainedPackage = $packagePath
+            SelfContainedPackageSha256 = $packageHash
+            SubjectExecutableSha256 = $subjectHash
+        }
+    }
+    catch {
+        $binding = $null
+    }
+    $script:candidateBindingCache[$CandidateDirectory] = $binding
+    return $binding
+}
+
 function Test-ApprovalReceipt(
     [System.IO.FileInfo]$ReceiptFile,
     [string]$PluginId,
@@ -34,8 +149,11 @@ function Test-ApprovalReceipt(
         $receipt = Get-Content -LiteralPath $ReceiptFile.FullName `
             -Raw -Encoding UTF8 | ConvertFrom-Json
         $label = "$PluginId/$ManualCheckId"
-        if ([int]$receipt.schema_version -ne 1 `
-            -or [string]$receipt.plugin_id -ne $PluginId `
+        if ([int]$receipt.schema_version -ne 2) {
+            $script:staleApprovalReceiptCount++
+            return $false
+        }
+        if ([string]$receipt.plugin_id -ne $PluginId `
             -or [string]$receipt.manual_check_id -ne $ManualCheckId `
             -or [string]$receipt.status -ne "passed") {
             Add-MatrixError $Errors "Manual approval receipt identity/status is invalid: $label"
@@ -60,6 +178,47 @@ function Test-ApprovalReceipt(
         $sourceChanges = @(& git -C $PSScriptRoot diff `
             --name-only $sourceCommit HEAD -- src 2>$null)
         if ($LASTEXITCODE -ne 0 -or $sourceChanges.Count -gt 0) {
+            $script:staleApprovalReceiptCount++
+            return $false
+        }
+        $candidateDirectory = [string]$receipt.candidate_directory
+        $candidateCommit = [string]$receipt.candidate_commit
+        $candidateBinding = Get-CandidateBinding $candidateDirectory
+        $receiptPackagePath = $null
+        try {
+            $receiptPackagePath = Resolve-RepositoryPath `
+                ([string]$receipt.self_contained_package)
+        }
+        catch {}
+        if ($null -eq $candidateBinding `
+            -or $null -eq $receiptPackagePath `
+            -or $candidateCommit -notmatch "^[a-fA-F0-9]{40}$" `
+            -or $candidateBinding.CandidateCommit -ne $candidateCommit `
+            -or $candidateBinding.CandidateDirectory -ne `
+                $candidateDirectory.Replace("\", "/") `
+            -or $candidateBinding.CandidateVersion -ne `
+                [string]$receipt.candidate_version `
+            -or $candidateBinding.ReleaseManifestSha256 -ne `
+                [string]$receipt.release_manifest_sha256 `
+            -or $candidateBinding.SelfContainedPackageSha256 -ne `
+                [string]$receipt.self_contained_package_sha256 `
+            -or $candidateBinding.SelfContainedPackage -ne $receiptPackagePath `
+            -or $candidateBinding.SubjectExecutableSha256 -ne `
+                [string]$receipt.subject_executable_sha256) {
+            $script:staleApprovalReceiptCount++
+            return $false
+        }
+        & git -C $PSScriptRoot merge-base --is-ancestor `
+            $candidateCommit HEAD 2>$null
+        $candidateChanges = if ($LASTEXITCODE -eq 0) {
+            @(& git -C $PSScriptRoot diff --name-only `
+                $candidateCommit HEAD 2>$null | Where-Object {
+                    $_ -notmatch '^docs/plugin-manual-approvals/[^/]+\.json$'
+                })
+        } else {
+            @("candidate-not-ancestor")
+        }
+        if ($LASTEXITCODE -ne 0 -or $candidateChanges.Count -gt 0) {
             $script:staleApprovalReceiptCount++
             return $false
         }

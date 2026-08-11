@@ -22,6 +22,14 @@ public sealed class PluginManualValidationPlannerScriptTests
         Assert.Contains("Sort-Object RiskRank, PluginIndex, ManualIndex", source);
         Assert.Contains("approval_command", source);
         Assert.Contains("-SubjectExecutable", source);
+        Assert.Contains("-CandidateDirectory", source);
+        Assert.Contains("candidate_commit", source);
+        Assert.Contains("release_manifest_sha256", source);
+        Assert.Contains("self_contained_package_sha256", source);
+        Assert.Contains("candidateRelativePath", source);
+        Assert.Contains("packageRelativePath", source);
+        Assert.Contains("artifacts/releases", source);
+        Assert.Contains("schema_version -ne 2", source);
         Assert.Contains(
             "$staleApprovalReceipts.Add(",
             source);

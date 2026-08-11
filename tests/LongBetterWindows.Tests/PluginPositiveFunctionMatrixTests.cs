@@ -215,6 +215,12 @@ public sealed class PluginPositiveFunctionMatrixTests
                 Path.Combine(root, "docs", "plugin-manual-approvals"),
                 "*.json").Length,
             approvalCount + staleApprovalCount);
+        var legacyReceiptCount = Directory.GetFiles(
+                Path.Combine(root, "docs", "plugin-manual-approvals"),
+                "*.json")
+            .Count(path => JsonDocument.Parse(File.ReadAllText(path))
+                .RootElement.GetProperty("schema_version").GetInt32() != 2);
+        Assert.True(staleApprovalCount >= legacyReceiptCount);
         Assert.Equal(
             approvalCount == 25 && pendingCount == 0 && failedCount == 0,
             releaseEligible);

@@ -9,8 +9,10 @@
 - `-ConfirmPassed`；
 - 审阅人和结论说明；
 - 至少一个位于 `artifacts/quality/` 的本地原始证据文件；
-- 当前 Release 宿主、插件 Manifest 和 Git 提交。
+- 当前冻结候选目录、候选 Git 提交、Release Manifest、自包含 ZIP、Release 宿主和插件 Manifest。
 
-回执记录原始证据的仓库相对位置、大小和 SHA-256，但原始文件继续保持本地、不提交 GitHub。`verify-plugin-positive-matrix.ps1` 会验证回执、Manifest、命令集合和产品源码是否自审批提交后发生变化；任何不一致都会让该人工项保持未通过。
+v2 回执会同时记录候选提交、Release Manifest SHA-256、自包含 ZIP SHA-256 和解压宿主 EXE SHA-256，四层身份必须一致。v1 回执只作为历史记录保留，会被矩阵标记为过期，不能参与发布放行。
+
+回执记录原始证据的仓库相对位置、大小和 SHA-256，但原始文件继续保持本地、不提交 GitHub。`verify-plugin-positive-matrix.ps1` 会独立复算候选包身份，并验证回执、Manifest、命令集合和产品源码是否自候选提交后发生变化；任何不一致都会让该人工项保持未通过。
 
 不要手工伪造或复制其他提交的回执。首次批准不使用 `-Replace`；重新验收时必须在旧回执存在的情况下使用 `-Replace`，并重新检查全部原始证据。首次创建采用不可覆盖原子提交；重审会锁定旧回执 SHA-256 并原子替换，并发审核不能静默覆盖另一位审阅人的结论。

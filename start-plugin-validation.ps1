@@ -79,11 +79,19 @@ if (Test-Path -LiteralPath $evidencePath) {
     }
     $existingSession = Get-Content -LiteralPath $sessionPath `
         -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ([int]$existingSession.schema_version -ne 1 `
+    if ([int]$existingSession.schema_version -ne 2 `
         -or [string]$existingSession.classification -ne `
             "plugin_manual_validation_session" `
         -or [string]$existingSession.candidate_commit -ne `
             [string]$plan.candidate_commit `
+        -or [string]$existingSession.candidate_directory -ne `
+            [string]$plan.candidate_directory `
+        -or [string]$existingSession.release_manifest_sha256 -ne `
+            [string]$plan.release_manifest_sha256 `
+        -or [string]$existingSession.self_contained_package -ne `
+            [string]$plan.self_contained_package `
+        -or [string]$existingSession.self_contained_package_sha256 -ne `
+            [string]$plan.self_contained_package_sha256 `
         -or [string]$existingSession.plugin_id -ne `
             [string]$plan.next.plugin_id `
         -or [string]$existingSession.manual_check_id -ne `
@@ -116,11 +124,15 @@ if (-not $PrepareOnly) {
 }
 
 $session = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     classification = "plugin_manual_validation_session"
     prepared_at = $preparedAt
     candidate_version = [string]$plan.version
     candidate_commit = [string]$plan.candidate_commit
+    candidate_directory = [string]$plan.candidate_directory
+    release_manifest_sha256 = [string]$plan.release_manifest_sha256
+    self_contained_package = [string]$plan.self_contained_package
+    self_contained_package_sha256 = [string]$plan.self_contained_package_sha256
     plugin_id = [string]$plan.next.plugin_id
     manual_check_id = [string]$plan.next.manual_check_id
     risk = [string]$plan.next.risk

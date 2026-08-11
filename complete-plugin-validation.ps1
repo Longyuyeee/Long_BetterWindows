@@ -46,12 +46,20 @@ if (-not (Test-Path -LiteralPath $sessionFile -PathType Leaf)) {
 }
 $session = Get-Content -LiteralPath $sessionFile -Raw -Encoding UTF8 |
     ConvertFrom-Json
-if ([int]$session.schema_version -ne 1 `
+if ([int]$session.schema_version -ne 2 `
     -or [string]$session.classification -ne `
         "plugin_manual_validation_session" `
     -or [string]$session.candidate_version -ne [string]$plan.version `
     -or [string]$session.candidate_commit -ne `
         [string]$plan.candidate_commit `
+    -or [string]$session.candidate_directory -ne `
+        [string]$plan.candidate_directory `
+    -or [string]$session.release_manifest_sha256 -ne `
+        [string]$plan.release_manifest_sha256 `
+    -or [string]$session.self_contained_package -ne `
+        [string]$plan.self_contained_package `
+    -or [string]$session.self_contained_package_sha256 -ne `
+        [string]$plan.self_contained_package_sha256 `
     -or [string]$session.plugin_id -ne [string]$plan.next.plugin_id `
     -or [string]$session.manual_check_id -ne `
         [string]$plan.next.manual_check_id `
@@ -98,6 +106,7 @@ $approvalParameters = @{
     Reviewer = $Reviewer.Trim()
     Notes = $Notes.Trim()
     EvidenceFiles = @($reviewEvidence) + @($sessionFile)
+    CandidateDirectory = [string]$session.candidate_directory
     SubjectExecutable = [string]$session.subject_executable
     ConfirmPassed = $true
 }
@@ -117,13 +126,16 @@ if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
 $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 |
     ConvertFrom-Json
 [ordered]@{
-    schema_version = 1
+    schema_version = 2
     classification = "plugin_manual_validation_completion"
     status = "receipt_created_pending_commit"
     plugin_id = [string]$receipt.plugin_id
     manual_check_id = [string]$receipt.manual_check_id
     reviewer = [string]$receipt.reviewer
     candidate_commit = [string]$session.candidate_commit
+    release_manifest_sha256 = [string]$receipt.release_manifest_sha256
+    self_contained_package_sha256 = `
+        [string]$receipt.self_contained_package_sha256
     subject_executable_sha256 = [string]$receipt.subject_executable_sha256
     evidence_file_count = @($receipt.evidence_files).Count
     receipt_path = $receiptPath

@@ -13,6 +13,11 @@ public sealed class PluginManualValidationSessionScriptTests
         Assert.Contains("artifacts/quality", source);
         Assert.Contains("Get-FileHash", source);
         Assert.Contains("subject_executable_sha256", source);
+        Assert.Contains("schema_version = 2", source);
+        Assert.Contains("candidate_directory", source);
+        Assert.Contains("release_manifest_sha256", source);
+        Assert.Contains("self_contained_package_sha256", source);
+        Assert.Contains("existingSession.self_contained_package -ne", source);
         Assert.Contains("Get-Process -Name \"LongBetterWindows.Host\"", source);
         Assert.Contains("Start-Process", source);
         Assert.Contains("-FilePath $subjectPath", source);
@@ -46,6 +51,7 @@ public sealed class PluginManualValidationSessionScriptTests
 
         Assert.Contains("$resumePreparedSession", source);
         Assert.Contains("launch_status -ne \"prepared_only\"", source);
+        Assert.Contains("existingSession.schema_version -ne 2", source);
         Assert.Contains("Existing validation session cannot be resumed safely", source);
         Assert.Contains("launch_status = if ($PrepareOnly)", source);
         Assert.Contains("\"launching\"", source);

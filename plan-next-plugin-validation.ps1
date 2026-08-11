@@ -63,12 +63,25 @@ if ([string]::IsNullOrWhiteSpace($CandidateDirectory)) {
 }
 
 $candidateRoot = Resolve-RepositoryPath $CandidateDirectory
+$releaseRoot = Resolve-RepositoryPath "artifacts/releases"
+$releasePrefix = $releaseRoot.TrimEnd(
+    [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+if (-not $candidateRoot.StartsWith(
+        $releasePrefix,
+        [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Plugin validation candidate must be stored under artifacts/releases."
+}
+$candidatePrefix = $candidateRoot.TrimEnd(
+    [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+$candidateRelativePath = Get-RepositoryRelativePath $candidateRoot
 $releaseManifestPath = Join-Path $candidateRoot "release-manifest.json"
 if (-not (Test-Path -LiteralPath $releaseManifestPath -PathType Leaf)) {
     throw "Candidate release manifest was not found: $releaseManifestPath"
 }
 $releaseManifest = Get-Content -LiteralPath $releaseManifestPath `
     -Raw -Encoding UTF8 | ConvertFrom-Json
+$releaseManifestHash = (Get-FileHash -LiteralPath $releaseManifestPath `
+    -Algorithm SHA256).Hash.ToLowerInvariant()
 $candidateCommit = [string]$releaseManifest.commit
 if ([int]$releaseManifest.schema_version -ne 1 `
     -or [string]$releaseManifest.version -ne $version `
@@ -107,10 +120,15 @@ if ($selfContainedPackages.Count -ne 1) {
     throw "Candidate manifest must contain exactly one self-contained package."
 }
 $packageEntry = $selfContainedPackages[0]
-$packagePath = Join-Path $candidateRoot ([string]$packageEntry.file)
-if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+$packagePath = [IO.Path]::GetFullPath((Join-Path `
+    $candidateRoot ([string]$packageEntry.file)))
+if (-not $packagePath.StartsWith(
+        $candidatePrefix,
+        [StringComparison]::OrdinalIgnoreCase) `
+    -or -not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
     throw "Candidate self-contained package was not found: $packagePath"
 }
+$packageRelativePath = Get-RepositoryRelativePath $packagePath
 $packageHash = (Get-FileHash -LiteralPath $packagePath `
     -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($packageHash -ne [string]$packageEntry.sha256) {
@@ -176,7 +194,14 @@ if (Test-Path -LiteralPath $approvalRoot -PathType Container) {
             -Filter "*.json" -File) {
         $receipt = Get-Content -LiteralPath $receiptFile.FullName `
             -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ([string]$receipt.subject_executable_sha256 -ne $subjectHash) {
+        if ([int]$receipt.schema_version -ne 2 `
+            -or [string]$receipt.candidate_version -ne $version `
+            -or [string]$receipt.candidate_commit -ne $candidateCommit `
+            -or [string]$receipt.candidate_directory -ne $candidateRelativePath `
+            -or [string]$receipt.release_manifest_sha256 -ne $releaseManifestHash `
+            -or [string]$receipt.self_contained_package -ne $packageRelativePath `
+            -or [string]$receipt.self_contained_package_sha256 -ne $packageHash `
+            -or [string]$receipt.subject_executable_sha256 -ne $subjectHash) {
             $staleApprovalReceipts.Add(
                 (Get-RepositoryRelativePath $receiptFile.FullName))
             continue
@@ -247,6 +272,7 @@ if ($orderedPending.Count -gt 0) {
             "-ManualCheckId '$([string]$item.Check.id)' " +
             "-Reviewer '<reviewer>' -Notes '<observed result>' " +
             "-EvidenceFiles @('<evidence-file-1>','<evidence-file-2>') " +
+            "-CandidateDirectory '$candidateRelativePath' " +
             "-SubjectExecutable '$subjectRelativePath' -ConfirmPassed")
     }
 }
@@ -258,10 +284,9 @@ $plan = [ordered]@{
     version = $version
     candidate_commit = $candidateCommit
     head_commit = $headCommit
-    candidate_directory = Get-RepositoryRelativePath $candidateRoot
-    release_manifest_sha256 = (Get-FileHash -LiteralPath `
-        $releaseManifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    self_contained_package = Get-RepositoryRelativePath $packagePath
+    candidate_directory = $candidateRelativePath
+    release_manifest_sha256 = $releaseManifestHash
+    self_contained_package = $packageRelativePath
     self_contained_package_sha256 = $packageHash
     subject_executable_sha256 = $subjectHash
     required_manual_check_count = [int]$matrixVerification.required_manual_check_count

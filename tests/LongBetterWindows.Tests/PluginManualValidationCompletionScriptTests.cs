@@ -16,9 +16,16 @@ public sealed class PluginManualValidationCompletionScriptTests
         Assert.Contains("pending_human_observation", source);
         Assert.Contains("candidate_commit", source);
         Assert.Contains("subject_executable_sha256", source);
+        Assert.Contains("session.schema_version -ne 2", source);
+        Assert.Contains("candidate_directory", source);
+        Assert.Contains("release_manifest_sha256", source);
+        Assert.Contains("self_contained_package_sha256", source);
+        Assert.Contains("session.self_contained_package -ne", source);
+        Assert.Contains("CandidateDirectory =", source);
         Assert.Contains("approve-plugin-manual-evidence.ps1", source);
         Assert.Contains("ConfirmPassed = $true", source);
         Assert.Contains("receipt_created_pending_commit", source);
+        Assert.Contains("schema_version = 2", source);
     }
 
     [Fact]
