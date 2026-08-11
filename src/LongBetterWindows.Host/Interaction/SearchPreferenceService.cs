@@ -48,7 +48,10 @@ namespace LongBetterWindows.Host.Interaction
             }
         }
 
-        public SearchPreferenceScore GetScore(string resultId, DateTimeOffset now)
+        public SearchPreferenceScore GetScore(
+            string resultId,
+            DateTimeOffset now,
+            bool hasActiveQuery = false)
         {
             lock (_lock)
             {
@@ -65,9 +68,11 @@ namespace LongBetterWindows.Host.Interaction
                     : age <= TimeSpan.FromDays(7) ? 90
                     : age <= TimeSpan.FromDays(30) ? 40
                     : 0;
-                return new SearchPreferenceScore(
-                    entry.IsPinned,
-                    (entry.IsPinned ? 1500 : 0) + frequency + recency);
+                var score = hasActiveQuery
+                    ? (entry.IsPinned ? 80 : 0)
+                        + Math.Min(40, (frequency + recency) / 8)
+                    : (entry.IsPinned ? 1500 : 0) + frequency + recency;
+                return new SearchPreferenceScore(entry.IsPinned, score);
             }
         }
 

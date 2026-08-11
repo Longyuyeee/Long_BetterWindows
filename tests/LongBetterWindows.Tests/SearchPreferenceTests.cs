@@ -28,7 +28,7 @@ public class SearchPreferenceTests
     }
 
     [Fact]
-    public async Task PinnedResult_OutranksHigherBaseScore()
+    public async Task PinnedResult_OutranksHigherBaseScoreForEmptyQuery()
     {
         var preferences = new SearchPreferenceService(new MemoryStorage());
         await preferences.TogglePinnedAsync("low");
@@ -37,11 +37,30 @@ public class SearchPreferenceTests
             preferences: preferences);
 
         var results = await coordinator.SearchIncrementalAsync(
-            new SearchRequest("demo", ContextSnapshot.Empty));
+            new SearchRequest(string.Empty, ContextSnapshot.Empty));
 
         Assert.Equal("low", results[0].Id);
         Assert.True(results[0].IsPinned);
         Assert.True(results[0].PreferenceScore > 1000);
+    }
+
+    [Fact]
+    public async Task ExactIntent_OutranksWeakPinnedResultForActiveQuery()
+    {
+        var preferences = new SearchPreferenceService(new MemoryStorage());
+        await preferences.TogglePinnedAsync("low");
+        for (var use = 0; use < 32; use++)
+            await preferences.RecordUseAsync("low");
+        var coordinator = new SearchCoordinator(
+            new[] { new FixedProvider() },
+            preferences: preferences);
+
+        var results = await coordinator.SearchIncrementalAsync(
+            new SearchRequest("high", ContextSnapshot.Empty));
+
+        Assert.Equal("high", results[0].Id);
+        Assert.True(results[1].IsPinned);
+        Assert.Equal(120, results[1].PreferenceScore);
     }
 
     [Fact]

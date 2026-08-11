@@ -93,7 +93,10 @@ namespace LongBetterWindows.Host.Interaction
                     }
                 }
 
-                var snapshot = Order(merged.Values, request.MaxResults);
+                var snapshot = Order(
+                    merged.Values,
+                    request.MaxResults,
+                    !string.IsNullOrWhiteSpace(request.Query));
                 batchCount++;
                 if (firstBatchElapsed is null && snapshot.Count > 0)
                     firstBatchElapsed = Stopwatch.GetElapsedTime(started);
@@ -101,7 +104,10 @@ namespace LongBetterWindows.Host.Interaction
                     await resultsUpdated(snapshot);
             }
 
-            var final = Order(merged.Values, request.MaxResults);
+            var final = Order(
+                merged.Values,
+                request.MaxResults,
+                !string.IsNullOrWhiteSpace(request.Query));
             metricsCompleted?.Invoke(new SearchRunMetrics(
                 firstBatchElapsed,
                 Stopwatch.GetElapsedTime(started),
@@ -156,13 +162,17 @@ namespace LongBetterWindows.Host.Interaction
 
         private IReadOnlyList<SearchResultItem> Order(
             IEnumerable<SearchResultItem> results,
-            int maxResults)
+            int maxResults,
+            bool hasActiveQuery)
         {
             var now = DateTimeOffset.UtcNow;
             return results
                 .Select(item =>
                 {
-                    var preference = _preferences?.GetScore(item.Id, now)
+                    var preference = _preferences?.GetScore(
+                            item.Id,
+                            now,
+                            hasActiveQuery)
                         ?? new SearchPreferenceScore(false, 0);
                     return item with
                     {
