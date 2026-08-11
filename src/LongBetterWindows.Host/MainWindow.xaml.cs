@@ -978,7 +978,10 @@ namespace LongBetterWindows.Host
             {
                 pending = pending with { OriginWindowHandle = nint.Zero };
             }
-            CommandPaletteWindow.RestoreFromWorkspace(pending);
+            if (pending.Surface == LauncherSurface.SuperPanel)
+                SuperPanelWindow.RestoreFromWorkspace(pending);
+            else
+                CommandPaletteWindow.RestoreFromWorkspace(pending);
         }
 
         private void CancelWorkflowReview_Click(object sender, RoutedEventArgs e)

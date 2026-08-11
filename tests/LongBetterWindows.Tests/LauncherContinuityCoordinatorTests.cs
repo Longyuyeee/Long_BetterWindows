@@ -1,3 +1,4 @@
+using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Interaction;
 
 namespace LongBetterWindows.Tests;
@@ -39,6 +40,38 @@ public class LauncherContinuityCoordinatorTests
         coordinator.Cancel("settings:root");
         Assert.True(second.IsConsumed);
         Assert.False(coordinator.HasPendingFor("settings:root"));
+    }
+
+    [Fact]
+    public void SuperPanelTransition_PreservesOriginSurfaceAndContext()
+    {
+        var context = new ContextSnapshot(
+            DateTimeOffset.UtcNow,
+            [new ContextItem
+            {
+                Id = "selection",
+                Source = ContextSource.ExplorerSelection,
+                Label = "Selected text",
+                Text = "value",
+                CompatibleInputTypes = [AcceptedInputType.Text],
+            }]);
+        var coordinator = new LauncherContinuityCoordinator();
+        coordinator.Begin(
+            "management:root",
+            new LauncherReturnIntent(
+                (nint)84,
+                string.Empty,
+                context,
+                LauncherReturnMode.RestoreLauncher,
+                DateTimeOffset.UtcNow,
+                LauncherSurface.SuperPanel));
+
+        var state = coordinator.TryConsume("management:root", true);
+
+        Assert.NotNull(state);
+        Assert.Equal(LauncherSurface.SuperPanel, state.Surface);
+        Assert.Equal((nint)84, state.OriginWindowHandle);
+        Assert.Same(context, state.Context);
     }
 
     private static LauncherReturnIntent Intent(string query, nint origin)

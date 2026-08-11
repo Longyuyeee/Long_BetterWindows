@@ -208,11 +208,14 @@ namespace LongBetterWindows.Host.Views
         }
         private async Task ExecuteAsync(SearchResultItem selected)
         {
+            var workspaceTarget = GetWorkspaceTarget(selected.PrimaryAction);
+            BeginWorkspaceTransition(workspaceTarget);
             var outcome = await _actionCoordinator.ExecuteAsync(
                 selected,
                 selected.PrimaryAction,
                 _searchSession.CurrentContext,
                 beforeCommandExecution: _windowLifecycle.ReleaseForegroundAsync);
+            CancelFailedWorkspaceTransition(workspaceTarget, outcome);
             ApplyActionOutcome(outcome);
         }
 
@@ -244,12 +247,63 @@ namespace LongBetterWindows.Host.Views
             SearchResultItem selected,
             SearchResultAction action)
         {
+            var workspaceTarget = GetWorkspaceTarget(action);
+            BeginWorkspaceTransition(workspaceTarget);
             var outcome = await _actionCoordinator.ExecuteAsync(
                 selected,
                 action,
                 _searchSession.CurrentContext,
                 beforeCommandExecution: _windowLifecycle.ReleaseForegroundAsync);
+            CancelFailedWorkspaceTransition(workspaceTarget, outcome);
             ApplyActionOutcome(outcome);
+        }
+
+        private static string? GetWorkspaceTarget(SearchResultAction action)
+            => action.Kind switch
+            {
+                SearchActionKind.OpenWorkspaceModule => action.Target,
+                SearchActionKind.OpenWorkflowReview => $"workflow:{action.Target}",
+                _ => null,
+            };
+
+        private void BeginWorkspaceTransition(string? workspaceTarget)
+        {
+            if (workspaceTarget is null)
+                return;
+
+            ServicesInitializer.LauncherContinuity.Begin(
+                workspaceTarget,
+                new LauncherReturnIntent(
+                    _windowLifecycle.ForegroundWindowHandle,
+                    query: string.Empty,
+                    _searchSession.CurrentContext,
+                    LauncherReturnMode.RestoreLauncher,
+                    DateTimeOffset.UtcNow,
+                    LauncherSurface.SuperPanel));
+        }
+
+        private static void CancelFailedWorkspaceTransition(
+            string? workspaceTarget,
+            SuperPanelActionOutcome outcome)
+        {
+            if (workspaceTarget is not null && !outcome.IsSuccess)
+                ServicesInitializer.LauncherContinuity.Cancel(workspaceTarget);
+        }
+
+        internal static void RestoreFromWorkspace(LauncherReturnState state)
+        {
+            var dispatcher = Application.Current.Dispatcher;
+            if (!dispatcher.CheckAccess())
+            {
+                dispatcher.Invoke(() => RestoreFromWorkspace(state));
+                return;
+            }
+
+            _instance ??= new SuperPanelWindow();
+            _instance._windowLifecycle.CaptureForegroundWindow(
+                state.OriginWindowHandle);
+            _instance._windowLifecycle.Present(animate: true);
+            _instance.ApplyContext(state.Context);
         }
 
         private void ApplyActionOutcome(SuperPanelActionOutcome outcome)

@@ -15,6 +15,12 @@ namespace LongBetterWindows.Host.Interaction
         OriginWindow,
     }
 
+    internal enum LauncherSurface
+    {
+        CommandPalette,
+        SuperPanel,
+    }
+
     internal sealed class LauncherReturnIntent
     {
         private readonly object _stateLock = new();
@@ -28,19 +34,22 @@ namespace LongBetterWindows.Host.Interaction
             string? query,
             ContextSnapshot context,
             LauncherReturnMode mode,
-            DateTimeOffset capturedAt)
+            DateTimeOffset capturedAt,
+            LauncherSurface surface = LauncherSurface.CommandPalette)
         {
             ArgumentNullException.ThrowIfNull(context);
             _originWindowHandle = originWindowHandle;
             _query = query ?? string.Empty;
             _context = context;
             Mode = mode;
+            Surface = surface;
             CapturedAt = capturedAt;
             ContextItemCount = context.Items.Count;
             HasQuery = _query.Length > 0;
         }
 
         public LauncherReturnMode Mode { get; }
+        public LauncherSurface Surface { get; }
         public DateTimeOffset CapturedAt { get; }
         public int ContextItemCount { get; }
         public bool HasQuery { get; }
@@ -105,7 +114,8 @@ namespace LongBetterWindows.Host.Interaction
                     restoreLauncherState ? _context : ContextSnapshot.Empty,
                     restoreOrigin
                         ? LauncherFocusTarget.OriginWindow
-                        : LauncherFocusTarget.LauncherInput);
+                        : LauncherFocusTarget.LauncherInput,
+                    Surface);
 
                 ClearSensitiveState();
                 _consumed = true;
@@ -125,7 +135,7 @@ namespace LongBetterWindows.Host.Interaction
         }
 
         public override string ToString()
-            => $"LauncherReturnIntent(Mode={Mode}, ContextItems={ContextItemCount}, HasQuery={HasQuery}, Consumed={IsConsumed})";
+            => $"LauncherReturnIntent(Mode={Mode}, Surface={Surface}, ContextItems={ContextItemCount}, HasQuery={HasQuery}, Consumed={IsConsumed})";
 
         private void ClearSensitiveState()
         {
@@ -139,5 +149,6 @@ namespace LongBetterWindows.Host.Interaction
         [property: JsonIgnore] nint OriginWindowHandle,
         [property: JsonIgnore] string Query,
         [property: JsonIgnore] ContextSnapshot Context,
-        LauncherFocusTarget FocusTarget);
+        LauncherFocusTarget FocusTarget,
+        LauncherSurface Surface);
 }
