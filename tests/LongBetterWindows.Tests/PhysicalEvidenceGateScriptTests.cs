@@ -16,7 +16,7 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
     public PhysicalEvidenceGateScriptTests() => Directory.CreateDirectory(_root);
 
     [Fact]
-    public async Task AccessibilityVerifier_AcceptsCompleteV2Evidence()
+    public async Task AccessibilityVerifier_AcceptsCompleteV3Evidence()
     {
         var directories = WriteAccessibilityMatrix("accessibility-valid");
         var output = Path.Combine(_root, "accessibility-valid.json");
@@ -31,7 +31,7 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             $"Exit={result.ExitCode}{Environment.NewLine}{result.StandardError}");
         using var summary = JsonDocument.Parse(File.ReadAllText(output));
         Assert.True(summary.RootElement.GetProperty("passed").GetBoolean());
-        Assert.Equal(3, summary.RootElement.GetProperty("schema_version").GetInt32());
+        Assert.Equal(4, summary.RootElement.GetProperty("schema_version").GetInt32());
         Assert.Equal(
             1,
             summary.RootElement
@@ -42,20 +42,20 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
     }
 
     [Fact]
-    public async Task AccessibilityVerifier_RejectsV1Evidence()
+    public async Task AccessibilityVerifier_RejectsV2Evidence()
     {
         var directories = WriteAccessibilityMatrix(
-            "accessibility-v1",
-            schemaVersion: 1);
+            "accessibility-v2",
+            schemaVersion: 2);
 
         var result = await RunMatrixVerifierAsync(
             "verify-accessibility-matrix.ps1",
             directories,
-            Path.Combine(_root, "accessibility-v1.json"));
+            Path.Combine(_root, "accessibility-v2.json"));
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains(
-            "schema version 2 is required",
+            "schema version 3 is required",
             result.StandardError,
             StringComparison.OrdinalIgnoreCase);
     }
@@ -162,7 +162,7 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
 
     private string[] WriteAccessibilityMatrix(
         string fixtureName,
-        int schemaVersion = 2,
+        int schemaVersion = 3,
         bool managementTabOrderApproved = true)
     {
         var profiles = new[]
@@ -178,7 +178,9 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             Directory.CreateDirectory(smokeDirectory);
             var reportPath = Path.Combine(smokeDirectory, "desktop-ui-smoke.json");
             var logPath = Path.Combine(smokeDirectory, "desktop-ui-smoke.log");
-            File.WriteAllText(reportPath, """{"passed":true}""");
+            File.WriteAllText(
+                reportPath,
+                """{"passed":true,"assistive_technology_events":{"passed":true,"focus_event_count":1,"live_region_event_count":1,"expected_announcement":"fixture announcement"}}""");
             File.WriteAllText(logPath, "fixture log");
             var usesScreenReader = index == 0;
             var manifest = new
@@ -207,6 +209,15 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
                 {
                     file = "desktop-ui-smoke/desktop-ui-smoke.log",
                     sha256 = Hash(logPath),
+                },
+                assistive_technology_events = new
+                {
+                    transport = "windows_ui_automation_events",
+                    physical_keyboard_validated = true,
+                    focus_event_count = 1,
+                    live_region_event_count = 1,
+                    expected_announcement = "fixture announcement",
+                    screen_reader_active_during_capture = usesScreenReader,
                 },
                 human_review = new
                 {

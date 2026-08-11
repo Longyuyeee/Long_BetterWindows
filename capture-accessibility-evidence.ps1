@@ -70,13 +70,17 @@ $reportPath = Join-Path $smokeRoot 'desktop-ui-smoke.json'
 if (-not (Test-Path -LiteralPath $reportPath)) { throw 'Desktop UI smoke report was not generated.' }
 $report = Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if (-not [bool]$report.passed -or @($report.accessibility_modes).Count -ne 3 `
-    -or @($report.automation_semantics.psobject.Properties).Count -lt 4) {
+    -or @($report.automation_semantics.psobject.Properties).Count -lt 4 `
+    -or -not [bool]$report.assistive_technology_events.passed `
+    -or -not [bool]$report.assistive_technology_events.physical_keyboard_validated `
+    -or [int]$report.assistive_technology_events.focus_event_count -lt 1 `
+    -or [int]$report.assistive_technology_events.live_region_event_count -lt 1) {
     throw 'Desktop UI smoke did not satisfy the accessibility evidence gate.'
 }
 
 $logPath = Join-Path $smokeRoot 'desktop-ui-smoke.log'
 $manifest = [ordered]@{
-    schema_version = 2
+    schema_version = 3
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'physical_accessibility_evidence'
     source_commit = $expectedCommit
@@ -102,6 +106,14 @@ $manifest = [ordered]@{
     desktop_ui_log = [ordered]@{
         file = 'desktop-ui-smoke/desktop-ui-smoke.log'
         sha256 = (Get-FileHash -LiteralPath $logPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    assistive_technology_events = [ordered]@{
+        transport = [string]$report.assistive_technology_events.transport
+        physical_keyboard_validated = [bool]$report.assistive_technology_events.physical_keyboard_validated
+        focus_event_count = [int]$report.assistive_technology_events.focus_event_count
+        live_region_event_count = [int]$report.assistive_technology_events.live_region_event_count
+        expected_announcement = [string]$report.assistive_technology_events.expected_announcement
+        screen_reader_active_during_capture = $readerDetected
     }
     human_review = [ordered]@{
         status = 'pending'

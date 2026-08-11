@@ -47,8 +47,8 @@ $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | Convert
 if ($manifest.classification -ne 'physical_accessibility_evidence') {
     throw "Unexpected evidence classification: $($manifest.classification)"
 }
-if ([int]$manifest.schema_version -ne 2) {
-    throw 'Accessibility evidence schema version 2 is required. Recapture this candidate.'
+if ([int]$manifest.schema_version -ne 3) {
+    throw 'Accessibility evidence schema version 3 is required. Recapture this candidate.'
 }
 if ([string]$manifest.human_review.status -ne 'pending') {
     throw 'Accessibility evidence is not pending review.'
@@ -72,11 +72,26 @@ if ((Get-FileHash $reportPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $ma
 }
 $report = Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if (-not [bool]$report.passed) { throw 'Desktop UI report is not passing.' }
+$eventEvidence = $manifest.assistive_technology_events
+$reportedEvents = $report.assistive_technology_events
+if ([string]$eventEvidence.transport -ne 'windows_ui_automation_events' `
+    -or -not [bool]$eventEvidence.physical_keyboard_validated `
+    -or [int]$eventEvidence.focus_event_count -lt 1 `
+    -or [int]$eventEvidence.live_region_event_count -lt 1 `
+    -or -not [bool]$reportedEvents.passed `
+    -or [int]$reportedEvents.focus_event_count -ne [int]$eventEvidence.focus_event_count `
+    -or [int]$reportedEvents.live_region_event_count -ne [int]$eventEvidence.live_region_event_count `
+    -or [string]$reportedEvents.expected_announcement -ne [string]$eventEvidence.expected_announcement) {
+    throw 'Accessibility UIA event evidence is incomplete or inconsistent.'
+}
 
 $readerName = [string]$manifest.screen_reader.name
 if ($readerName -ne 'None') {
     if (-not [bool]$manifest.screen_reader.process_detected) {
         throw 'The selected screen reader was not detected during capture.'
+    }
+    if (-not [bool]$eventEvidence.screen_reader_active_during_capture) {
+        throw 'UIA event evidence was not captured while the screen reader was active.'
     }
     if (-not $ConfirmScreenReaderAnnouncements) {
         throw 'ConfirmScreenReaderAnnouncements is required for screen-reader evidence.'

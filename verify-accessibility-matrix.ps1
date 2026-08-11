@@ -39,8 +39,8 @@ foreach ($directory in $EvidenceDirectories) {
     if ($manifest.classification -ne 'physical_accessibility_evidence') {
         throw "Unexpected evidence classification: $manifestPath"
     }
-    if ([int]$manifest.schema_version -ne 2) {
-        throw "Accessibility evidence schema version 2 is required: $manifestPath"
+    if ([int]$manifest.schema_version -ne 3) {
+        throw "Accessibility evidence schema version 3 is required: $manifestPath"
     }
     if ([string]$manifest.source_commit -ne $expectedCommit) {
         throw "Accessibility evidence source commit does not match ExpectedSourceCommit: $manifestPath"
@@ -78,8 +78,21 @@ foreach ($directory in $EvidenceDirectories) {
         -or (Get-FileHash $logPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.desktop_ui_log.sha256) {
         throw "Accessibility evidence hash mismatch: $profile"
     }
+    $report = Get-Content -LiteralPath $reportPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $eventEvidence = $manifest.assistive_technology_events
+    $reportedEvents = $report.assistive_technology_events
+    if ([string]$eventEvidence.transport -ne 'windows_ui_automation_events' `
+        -or -not [bool]$eventEvidence.physical_keyboard_validated `
+        -or [int]$eventEvidence.focus_event_count -lt 1 `
+        -or [int]$eventEvidence.live_region_event_count -lt 1 `
+        -or -not [bool]$reportedEvents.passed `
+        -or [int]$reportedEvents.focus_event_count -ne [int]$eventEvidence.focus_event_count `
+        -or [int]$reportedEvents.live_region_event_count -ne [int]$eventEvidence.live_region_event_count) {
+        throw "Accessibility UIA event evidence is incomplete: $profile"
+    }
     $readerName = [string]$manifest.screen_reader.name
     if ($readerName -ne 'None' -and [bool]$manifest.screen_reader.process_detected `
+        -and [bool]$eventEvidence.screen_reader_active_during_capture `
         -and [bool]$checks.screen_reader_announcements `
         -and [bool]$checks.management_close_announcements) {
         $screenReaderApprovalCount++
@@ -97,6 +110,8 @@ foreach ($directory in $EvidenceDirectories) {
         reviewer = $manifest.human_review.reviewer
         reviewed_at = $manifest.human_review.reviewed_at
         screen_reader = $readerName
+        focus_event_count = [int]$eventEvidence.focus_event_count
+        live_region_event_count = [int]$eventEvidence.live_region_event_count
         source_manifest = [ordered]@{
             file = "$sourceDirectoryName/$sourceFile"
             sha256 = $manifestHash
@@ -114,7 +129,7 @@ if ($screenReaderApprovalCount -lt 1) {
 }
 
 $summary = [ordered]@{
-    schema_version = 3
+    schema_version = 4
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_physical_accessibility_matrix'
     source_commit = $expectedCommit

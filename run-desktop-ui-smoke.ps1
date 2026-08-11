@@ -147,11 +147,30 @@ if (-not (Test-Path -LiteralPath $pluginsDirectory -PathType Container)) {
 
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
-Add-Type -TypeDefinition @'
+$uiAutomationAssemblies = @(
+    [Windows.Automation.AutomationElement].Assembly.Location,
+    [Windows.Automation.AutomationPattern].Assembly.Location
+) | Sort-Object -Unique
+Add-Type -ReferencedAssemblies $uiAutomationAssemblies -TypeDefinition @'
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Windows.Automation;
+public sealed class LongAutomationEventSnapshot {
+    public string Kind { get; set; }
+    public string AutomationId { get; set; }
+    public string Name { get; set; }
+    public string ControlType { get; set; }
+    public int ProcessId { get; set; }
+    public string CapturedAt { get; set; }
+}
 public static class LongDesktopInput {
+    static readonly object AutomationEventGate = new object();
+    static readonly List<LongAutomationEventSnapshot> AutomationEvents =
+        new List<LongAutomationEventSnapshot>();
+    static AutomationEventHandler liveRegionHandler;
+    static AutomationFocusChangedEventHandler focusChangedHandler;
+    static int automationEventProcessId;
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
@@ -292,6 +311,74 @@ public static class LongDesktopInput {
         IntPtr sent = SendMessageTimeout(
             window, message, new IntPtr(action), IntPtr.Zero, 0x0002, 5000, out result);
         return sent == IntPtr.Zero ? -1 : unchecked((int)result.ToUInt64());
+    }
+    public static void StartAutomationEventCapture(int processId) {
+        StopAutomationEventCapture();
+        lock (AutomationEventGate) {
+            AutomationEvents.Clear();
+            automationEventProcessId = processId;
+        }
+        liveRegionHandler = CaptureAutomationEvent;
+        focusChangedHandler = CaptureFocusChanged;
+        Automation.AddAutomationEventHandler(
+            AutomationElementIdentifiers.LiveRegionChangedEvent,
+            AutomationElement.RootElement,
+            TreeScope.Descendants,
+            liveRegionHandler);
+        Automation.AddAutomationFocusChangedEventHandler(focusChangedHandler);
+    }
+    public static LongAutomationEventSnapshot[] GetAutomationEventCapture() {
+        lock (AutomationEventGate) {
+            return AutomationEvents.ToArray();
+        }
+    }
+    public static LongAutomationEventSnapshot[] StopAutomationEventCapture() {
+        if (liveRegionHandler != null) {
+            Automation.RemoveAutomationEventHandler(
+                AutomationElementIdentifiers.LiveRegionChangedEvent,
+                AutomationElement.RootElement,
+                liveRegionHandler);
+            liveRegionHandler = null;
+        }
+        if (focusChangedHandler != null) {
+            Automation.RemoveAutomationFocusChangedEventHandler(
+                focusChangedHandler);
+            focusChangedHandler = null;
+        }
+        lock (AutomationEventGate) {
+            automationEventProcessId = 0;
+            return AutomationEvents.ToArray();
+        }
+    }
+    static void CaptureAutomationEvent(object sender, AutomationEventArgs args) {
+        CaptureEvent("live_region_changed", sender as AutomationElement);
+    }
+    static void CaptureFocusChanged(
+        object sender,
+        AutomationFocusChangedEventArgs args) {
+        CaptureEvent("focus_changed", sender as AutomationElement);
+    }
+    static void CaptureEvent(string kind, AutomationElement element) {
+        if (element == null) return;
+        try {
+            var current = element.Current;
+            lock (AutomationEventGate) {
+                if (automationEventProcessId == 0 ||
+                    current.ProcessId != automationEventProcessId ||
+                    AutomationEvents.Count >= 1024) return;
+                AutomationEvents.Add(new LongAutomationEventSnapshot {
+                    Kind = kind,
+                    AutomationId = current.AutomationId ?? string.Empty,
+                    Name = current.Name ?? string.Empty,
+                    ControlType = current.ControlType == null
+                        ? string.Empty
+                        : current.ControlType.ProgrammaticName,
+                    ProcessId = current.ProcessId,
+                    CapturedAt = DateTimeOffset.UtcNow.ToString("O")
+                });
+            }
+        }
+        catch (ElementNotAvailableException) { }
     }
 }
 '@
@@ -801,6 +888,7 @@ $report = [ordered]@{
     plugin_lifecycle = [ordered]@{}
     marketplace = [ordered]@{}
     automation_semantics = [ordered]@{}
+    assistive_technology_events = [ordered]@{}
     accessibility_modes = @()
     passed = $false
     error = $null
@@ -824,6 +912,7 @@ $workflowOutputProcess = $null
 $pluginProcess = $null
 $marketProcess = $null
 $accessibilityProcess = $null
+$automationEventCaptureActive = $false
 
 try {
     if ($SettingsNavigationOnly -or
@@ -835,6 +924,8 @@ try {
     Write-Stage 'Starting Command Palette host.'
     Set-Clipboard -Value 'long-ui-smoke-pending'
     $paletteProcess = Start-QualityHost '--quality-open-palette'
+    [LongDesktopInput]::StartAutomationEventCapture($paletteProcess.Id)
+    $automationEventCaptureActive = $true
     $palette = Wait-Until {
         Find-WindowByAutomationId $paletteProcess.Id 'Long.CommandPalette'
     } 'Command Palette did not appear through Windows UI Automation.'
@@ -869,6 +960,14 @@ try {
         Get-SelectedAutomationItem $results
     } 'Command Palette did not expose its initial selected result.'
     $paletteSelectionBeforeId = Get-AutomationIdentity $paletteSelectionBefore
+    $paletteSelectionBefore.SetFocus()
+    Wait-Until {
+        $paletteSelectionBefore.Current.HasKeyboardFocus
+    } 'Command Palette result did not receive focus for the accessibility focus-return probe.' | Out-Null
+    $search.SetFocus()
+    Wait-Until {
+        $search.Current.HasKeyboardFocus
+    } 'Command Palette search did not regain focus for keyboard navigation.' | Out-Null
     if (-not [LongDesktopInput]::KeyPress(0x28)) {
         throw 'SendInput could not deliver Down Arrow to Command Palette.'
     }
@@ -905,6 +1004,51 @@ try {
     Assert-LauncherLatencyBudget $paletteQueryLatency $true 'Command Palette'
     $focusConfirmed = Wait-Until { $search.Current.HasKeyboardFocus } `
         'The Command Palette search box did not receive keyboard focus.'
+    Wait-Until {
+        $events = @([LongDesktopInput]::GetAutomationEventCapture())
+        $report.assistive_technology_events = [ordered]@{
+            passed = $false
+            transport = 'windows_ui_automation_events'
+            source_process_id = $paletteProcess.Id
+            observed_events = $events
+        }
+        $focusEvent = @($events | Where-Object {
+            $_.ProcessId -eq $paletteProcess.Id -and
+            $_.Kind -eq 'focus_changed' -and
+            $_.AutomationId -eq 'Long.CommandPalette.Search'
+        })
+        $liveEvent = @($events | Where-Object {
+            $_.ProcessId -eq $paletteProcess.Id -and
+            $_.Kind -eq 'live_region_changed' -and
+            $_.AutomationId -eq 'Long.CommandPalette.SelectionAnnouncement' -and
+            $_.Name -eq [string]$paletteAnnouncement
+        })
+        $focusEvent.Count -gt 0 -and $liveEvent.Count -gt 0
+    } 'Command Palette did not emit the expected UIA focus and live-region events.' | Out-Null
+    $paletteAutomationEvents = @(
+        [LongDesktopInput]::StopAutomationEventCapture())
+    $automationEventCaptureActive = $false
+    $paletteFocusEvents = @($paletteAutomationEvents | Where-Object {
+        $_.ProcessId -eq $paletteProcess.Id -and
+        $_.Kind -eq 'focus_changed' -and
+        $_.AutomationId -eq 'Long.CommandPalette.Search'
+    })
+    $paletteLiveRegionEvents = @($paletteAutomationEvents | Where-Object {
+        $_.ProcessId -eq $paletteProcess.Id -and
+        $_.Kind -eq 'live_region_changed' -and
+        $_.AutomationId -eq 'Long.CommandPalette.SelectionAnnouncement'
+    })
+    $report.assistive_technology_events = [ordered]@{
+        passed = $true
+        transport = 'windows_ui_automation_events'
+        source_process_id = $paletteProcess.Id
+        physical_keyboard_validated = $true
+        focus_event_count = $paletteFocusEvents.Count
+        live_region_event_count = $paletteLiveRegionEvents.Count
+        expected_announcement = [string]$paletteAnnouncement
+        focus_events = $paletteFocusEvents
+        live_region_events = $paletteLiveRegionEvents
+    }
 
     Write-Stage 'Executing the selected secondary command through the quality window channel.'
     if ([LongDesktopInput]::WindowAction(
@@ -2608,6 +2752,10 @@ finally {
     Stop-QualityHost $pluginProcess
     Stop-QualityHost $marketProcess
     Stop-QualityHost $accessibilityProcess
+    if ($automationEventCaptureActive) {
+        [LongDesktopInput]::StopAutomationEventCapture() | Out-Null
+        $automationEventCaptureActive = $false
+    }
     if ($WorkflowExportMatrix -and $null -ne $exportAclIdentity) {
         & icacls.exe $exportDeniedRoot /remove:d $exportAclIdentity /Q | Out-Null
     }
