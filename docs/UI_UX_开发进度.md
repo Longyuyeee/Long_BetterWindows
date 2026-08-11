@@ -38,7 +38,7 @@
 - [x] 为 QuickLaunch、Translate、Screenshot、ColorPicker、FolderNote、FileRenamer 声明命令。
 - [x] 实现统一命令执行上下文与执行结果。
 - [x] 让 5 个代表插件通过统一命令真正执行。
-- [x] 实现命令与工作区核心入口的自动全拼、首字母和有限错字匹配；文件、设置、工作流及插件自有搜索待统一。
+- [x] 统一命令、工作区、文件、Windows 设置、工作流及 QuickLaunch 插件自有搜索的自动全拼、首字母和有限错字匹配。
 - [x] 实现全键盘 Command Palette 交互骨架。
 - [x] 完成阶段 1 代码验收。
 

@@ -37,6 +37,9 @@ namespace LongBetterWindows.Host.Interaction
             if (normalized.Length == 0)
                 return new SearchTextForms(string.Empty, string.Empty, string.Empty);
 
+            if (!normalized.Any(IsCjk))
+                return new SearchTextForms(normalized, normalized, normalized);
+
             return new SearchTextForms(
                 normalized,
                 Normalize(WordsHelper.GetPinyin(value!)),
@@ -74,8 +77,8 @@ namespace LongBetterWindows.Host.Interaction
 
             if (allowFuzzy
                 && normalizedQuery.Length >= 4
-                && (IsWithinSingleEdit(normalizedQuery, candidate.Normalized)
-                    || IsWithinSingleEdit(normalizedQuery, candidate.Pinyin)))
+                && (IsWithinSingleEditOfCandidate(normalizedQuery, candidate.Normalized)
+                    || IsWithinSingleEditOfCandidate(normalizedQuery, candidate.Pinyin)))
             {
                 return new(SearchTextMatchKind.Fuzzy, 480);
             }
@@ -102,6 +105,24 @@ namespace LongBetterWindows.Host.Interaction
         public static string Normalize(string? value)
             => (value ?? string.Empty).Trim().ToLowerInvariant();
 
+        private static bool IsCjk(char value)
+            => value is >= '\u3400' and <= '\u4dbf'
+                or >= '\u4e00' and <= '\u9fff'
+                or >= '\uf900' and <= '\ufaff';
+
+        private static bool IsWithinSingleEditOfCandidate(
+            string query,
+            string candidate)
+        {
+            if (candidate.Length <= query.Length + 1)
+                return IsWithinSingleEdit(query, candidate);
+
+            return IsWithinSingleEdit(query, candidate[..query.Length])
+                || IsWithinSingleEdit(
+                    query,
+                    candidate[..Math.Min(candidate.Length, query.Length + 1)]);
+        }
+
         private static bool IsWithinSingleEdit(string query, string candidate)
         {
             if (Math.Abs(query.Length - candidate.Length) > 1)
@@ -121,6 +142,17 @@ namespace LongBetterWindows.Host.Interaction
 
                 if (++edits > 1)
                     return false;
+
+                if (query.Length == candidate.Length
+                    && queryIndex + 1 < query.Length
+                    && candidateIndex + 1 < candidate.Length
+                    && query[queryIndex] == candidate[candidateIndex + 1]
+                    && query[queryIndex + 1] == candidate[candidateIndex])
+                {
+                    queryIndex += 2;
+                    candidateIndex += 2;
+                    continue;
+                }
 
                 if (query.Length > candidate.Length)
                     queryIndex++;

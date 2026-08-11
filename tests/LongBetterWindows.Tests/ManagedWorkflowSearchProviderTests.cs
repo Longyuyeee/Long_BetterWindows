@@ -107,6 +107,21 @@ public sealed class ManagedWorkflowSearchProviderTests : IDisposable
         Assert.Contains("Approval required", result.Subtitle);
     }
 
+    [Theory]
+    [InlineData("zhenglixiazaimulu")]
+    [InlineData("zlxzml")]
+    [InlineData("zhenglixiazaimulv")]
+    public async Task SearchAsync_MatchesWorkflowNameByUnifiedTextForms(string query)
+    {
+        var repository = new CommandWorkflowRepository(_root, "local-managed");
+        Assert.True((await repository.SaveAsync(Workflow())).IsSuccess);
+        var provider = new ManagedWorkflowSearchProvider(Registry(), repository);
+
+        var result = Assert.Single(await provider.SearchAsync(Request(query)));
+
+        Assert.Equal("workflow:workflow.organize", result.Id);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);

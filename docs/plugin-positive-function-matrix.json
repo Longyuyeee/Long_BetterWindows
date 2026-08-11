@@ -586,6 +586,11 @@
           "level": "component",
           "path": "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
           "symbol": "LargeDirectorySearch_FindsNestedTargetWithoutMutation"
+        },
+        {
+          "level": "component",
+          "path": "tests/LongBetterWindows.Tests/PinyinSearchTests.cs",
+          "symbol": "QuickLaunchMatcher_UsesHostPinyinScores"
         }
       ],
       "manual_checks": [

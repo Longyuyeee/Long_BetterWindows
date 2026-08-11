@@ -3,6 +3,7 @@ using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
+using QuickLaunchPlugin;
 using System.Diagnostics;
 
 namespace LongBetterWindows.Tests;
@@ -153,6 +154,69 @@ public class PinyinSearchTests
         Array.Sort(samples);
         var p95 = samples[(int)Math.Ceiling(samples.Length * 0.95) - 1];
         Assert.True(p95 < 100, $"Pinyin command search P95 took {p95:F2}ms.");
+    }
+
+    [Theory]
+    [InlineData("weixin", 760)]
+    [InlineData("wx", 740)]
+    [InlineData("weixni", 480)]
+    public async Task QuickLaunchMatcher_UsesHostPinyinScores(
+        string query,
+        int expectedScore)
+    {
+        var matcher = new QuickLaunchApplicationMatcher(new PinyinService());
+
+        var scores = await matcher.ScoreAsync(
+            ["\u5fae\u4fe1", "Notepad"],
+            query);
+
+        Assert.Equal(expectedScore, scores["\u5fae\u4fe1"]);
+        Assert.DoesNotContain("Notepad", scores.Keys);
+    }
+
+    [Fact]
+    public async Task QuickLaunchMatcher_FallsBackToDirectSearchWithoutCapability()
+    {
+        var matcher = new QuickLaunchApplicationMatcher(null);
+
+        var scores = await matcher.ScoreAsync(["Notepad", "Calculator"], "note");
+
+        Assert.Equal(820, scores["Notepad"]);
+        Assert.DoesNotContain("Calculator", scores.Keys);
+    }
+
+    [Fact]
+    public async Task QuickLaunchMatcher_PropagatesCancellation()
+    {
+        var matcher = new QuickLaunchApplicationMatcher(new PinyinService());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            matcher.ScoreAsync(["\u5fae\u4fe1"], "weixin", cancellation.Token));
+    }
+
+    [Fact]
+    public async Task QuickLaunchMatcher_ThousandApplicationHotQueryMeetsP95Budget()
+    {
+        var matcher = new QuickLaunchApplicationMatcher(new PinyinService());
+        var names = Enumerable.Range(0, 1000)
+            .Select(index => $"\u5e94\u7528\u7a0b\u5e8f {index}")
+            .ToArray();
+        _ = await matcher.ScoreAsync(names, "yingyongchengxu");
+
+        var samples = new double[20];
+        for (var index = 0; index < samples.Length; index++)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            _ = await matcher.ScoreAsync(names, "yingyongchengxu");
+            stopwatch.Stop();
+            samples[index] = stopwatch.Elapsed.TotalMilliseconds;
+        }
+
+        Array.Sort(samples);
+        var p95 = samples[(int)Math.Ceiling(samples.Length * 0.95) - 1];
+        Assert.True(p95 < 100, $"QuickLaunch pinyin search P95 took {p95:F2}ms.");
     }
 
     private sealed class MemoryStorage : IStorageService

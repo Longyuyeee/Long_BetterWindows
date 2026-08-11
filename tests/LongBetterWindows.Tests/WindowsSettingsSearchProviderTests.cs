@@ -36,4 +36,20 @@ public sealed class WindowsSettingsSearchProviderTests
 
         Assert.Empty(results);
     }
+
+    [Theory]
+    [InlineData("jiantieban")]
+    [InlineData("jtb")]
+    [InlineData("jiantiebam")]
+    public async Task SearchAsync_MatchesSettingsByPinyinAndLimitedTypo(string query)
+    {
+        var provider = new WindowsSettingsSearchProvider();
+
+        var results = await provider.SearchAsync(new SearchRequest(
+            query, ContextSnapshot.Empty, MaxResults: 6));
+
+        Assert.Contains(
+            results,
+            item => item.PrimaryAction.Target == "ms-settings:clipboard");
+    }
 }

@@ -103,12 +103,12 @@
       "headless_component": false,
       "has_host_ui": true,
       "direct_ihostapi_object": true,
-      "capabilities": ["shell.execute", "system.clipboard"],
+      "capabilities": ["shell.execute", "system.clipboard", "text.pinyin"],
       "side_effect_tier": "high",
-      "required_proxy_methods": ["shell.execute", "clipboard.write"],
+      "required_proxy_methods": ["shell.execute", "clipboard.write", "pinyin.filter"],
       "required_resource_leases": [],
       "decision": "defer_missing_proxy",
-      "blockers": ["Application discovery and launch UI are host presentation work; commands launch external targets."],
+      "blockers": ["Application discovery, host-backed pinyin matching and launch UI cross the current boundary; commands launch external targets."],
       "evidence": [{ "path": "src/QuickLaunchPlugin/QuickLaunchPluginImpl.cs", "contains": "_host.ShellExecute.OpenWithDefaultAsync" }]
     },
     {

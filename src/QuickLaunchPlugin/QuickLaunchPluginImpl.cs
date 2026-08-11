@@ -19,18 +19,21 @@ public class QuickLaunchPluginImpl :
     private LaunchWindow? _window;
     private readonly QuickLaunchTargetPolicy _targetPolicy = new();
     private CancellationTokenSource _operationLifetime = new();
+    private QuickLaunchApplicationMatcher _applicationMatcher = new(null);
     private IReadOnlyDictionary<string, string> _strings =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
     public string Id => "com.long.quicklaunch";
     public string Name => Text("plugin.name", "快捷启动器");
-    public string Version => "1.2.0";
+    public string Version => "1.2.1";
     public int Priority => 180;
     public PluginState State { get; private set; } = PluginState.Loaded;
 
     public Task<bool> InitializeAsync(IHostApi host)
     {
         _host = host;
+        _applicationMatcher = new QuickLaunchApplicationMatcher(
+            host.HasCapability("text.pinyin") ? host.Pinyin : null);
         Log.Information("[QuickLaunch] 已接入统一命令入口");
         return Task.FromResult(true);
     }
@@ -125,6 +128,8 @@ public class QuickLaunchPluginImpl :
         operationToken.ThrowIfCancellationRequested();
         var limit = Math.Min(scoped ? 10 : 5, request.MaxResults);
         List<SmartEntry> matches;
+        IReadOnlyDictionary<string, int> matchScores =
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         if (recallingPreferences)
         {
             var order = preferredIds
@@ -138,10 +143,14 @@ public class QuickLaunchPluginImpl :
         }
         else
         {
+            matchScores = await _applicationMatcher.ScoreAsync(
+                applications.Select(entry => entry.Name),
+                query,
+                operationToken);
             matches = applications
-                .Where(entry => entry.Name.Contains(
-                    query,
-                    StringComparison.OrdinalIgnoreCase))
+                .Where(entry => matchScores.ContainsKey(entry.Name))
+                .OrderByDescending(entry => matchScores[entry.Name])
+                .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
                 .Take(limit)
                 .ToList();
         }
@@ -162,7 +171,11 @@ public class QuickLaunchPluginImpl :
             Source = Text(
                 "search.applicationSource",
                 "快捷启动器 · 应用"),
-            Score = (recallingPreferences ? 100 : scoped ? 900 : 720) - index,
+            Score = recallingPreferences
+                ? 100 - index
+                : (scoped ? 900 : 720)
+                    + Math.Clamp(matchScores[entry.Name] / 20, 0, 49)
+                    - index,
             Kind = PluginSearchResultKind.Data,
             PrimaryAction = new PluginSearchAction(
                 PluginSearchActionKind.ExecuteCommand,
@@ -237,6 +250,7 @@ public class QuickLaunchPluginImpl :
                 var window = LaunchWindow.Show(
                     OnEntrySelected,
                     CreateWindowLocalization(),
+                    _applicationMatcher,
                     initialQuery);
                 _window = window;
                 window.Closed += (_, _) =>

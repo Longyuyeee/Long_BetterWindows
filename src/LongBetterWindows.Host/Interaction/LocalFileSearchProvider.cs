@@ -87,10 +87,12 @@ namespace LongBetterWindows.Host.Interaction
                 {
                     foreach (var path in Directory.EnumerateFileSystemEntries(root, "*", options))
                     {
+                        var name = Path.GetFileName(path);
                         results.Add(new IndexedPath(
                             path,
-                            Path.GetFileName(path),
-                            Directory.Exists(path)));
+                            name,
+                            Directory.Exists(path),
+                            SearchTextMatcher.CreateForms(name)));
                         if (results.Count % SnapshotBatchSize == 0)
                             PublishSnapshot(results);
                         if (results.Count >= MaximumIndexedEntries)
@@ -161,7 +163,11 @@ namespace LongBetterWindows.Host.Interaction
             if (item.Name.Equals(query, StringComparison.OrdinalIgnoreCase)) return 980;
             if (item.Name.StartsWith(query, StringComparison.OrdinalIgnoreCase)) return 900;
             if (item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)) return 760;
-            return item.Path.Contains(query, StringComparison.OrdinalIgnoreCase) ? 520 : 0;
+            var automatic = SearchTextMatcher.Match(query, item.NameForms);
+            var pathScore = item.Path.Contains(
+                query,
+                StringComparison.OrdinalIgnoreCase) ? 520 : 0;
+            return Math.Max(automatic.Score, pathScore);
         }
 
         private SearchResultItem CreateResult(IndexedPath item, int score)
@@ -226,6 +232,10 @@ namespace LongBetterWindows.Host.Interaction
             if (!string.IsNullOrWhiteSpace(oneDrive)) yield return oneDrive;
         }
 
-        private sealed record IndexedPath(string Path, string Name, bool IsDirectory);
+        private sealed record IndexedPath(
+            string Path,
+            string Name,
+            bool IsDirectory,
+            SearchTextForms NameForms);
     }
 }

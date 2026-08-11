@@ -418,8 +418,13 @@ public sealed class PluginPositiveFunctionMatrixTests
             .Single(item =>
                 item.GetProperty("id").GetString()
                 == "com.long.quicklaunch");
-        var evidence = Assert.Single(
-            plugin.GetProperty("automated_evidence").EnumerateArray());
+        var evidence = plugin
+            .GetProperty("automated_evidence")
+            .EnumerateArray()
+            .Select(item => (
+                Path: item.GetProperty("path").GetString(),
+                Symbol: item.GetProperty("symbol").GetString()))
+            .ToArray();
 
         Assert.True(File.Exists(scriptPath));
         Assert.True(File.Exists(testPath));
@@ -427,12 +432,14 @@ public sealed class PluginPositiveFunctionMatrixTests
             9,
             policy.GetProperty(
                 "quick_launch_isolation_required_case_count").GetInt32());
-        Assert.Equal(
-            "tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
-            evidence.GetProperty("path").GetString());
-        Assert.Equal(
-            "LargeDirectorySearch_FindsNestedTargetWithoutMutation",
-            evidence.GetProperty("symbol").GetString());
+        Assert.Contains(
+            ("tests/LongBetterWindows.Tests/QuickLaunchIsolationTests.cs",
+                "LargeDirectorySearch_FindsNestedTargetWithoutMutation"),
+            evidence);
+        Assert.Contains(
+            ("tests/LongBetterWindows.Tests/PinyinSearchTests.cs",
+                "QuickLaunchMatcher_UsesHostPinyinScores"),
+            evidence);
     }
 
     [Fact]

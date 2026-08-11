@@ -73,7 +73,12 @@ namespace LongBetterWindows.Host.Interaction
                     query, StringComparison.OrdinalIgnoreCase))) return 780;
             if (entry.Keywords.Any(keyword => keyword.Contains(
                     query, StringComparison.OrdinalIgnoreCase))) return 700;
-            return entry.Description.Contains(query, StringComparison.OrdinalIgnoreCase) ? 620 : 0;
+            if (entry.Description.Contains(query, StringComparison.OrdinalIgnoreCase)) return 620;
+
+            var automatic = SearchTextMatcher.BestMatch(
+                query,
+                entry.SearchForms);
+            return automatic.Score;
         }
 
         private SearchResultItem CreateResult(SettingEntry entry, int score)
@@ -102,12 +107,22 @@ namespace LongBetterWindows.Host.Interaction
             string description,
             string uri,
             params string[] keywords)
-            => new(title, description, uri, keywords);
+            => new(
+                title,
+                description,
+                uri,
+                keywords,
+                keywords
+                    .Prepend(description)
+                    .Prepend(title)
+                    .Select(SearchTextMatcher.CreateForms)
+                    .ToArray());
 
         private sealed record SettingEntry(
             string Title,
             string Description,
             string Uri,
-            IReadOnlyList<string> Keywords);
+            IReadOnlyList<string> Keywords,
+            IReadOnlyList<SearchTextForms> SearchForms);
     }
 }

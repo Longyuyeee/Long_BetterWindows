@@ -37,14 +37,27 @@ public partial class LaunchWindow : Window
     private CancellationTokenSource? _searchCancellation;
     private readonly QuickLaunchDiskSearchEngine _diskSearch;
     private readonly QuickLaunchQueryGeneration _queryGeneration = new();
+    private readonly QuickLaunchApplicationMatcher _applicationMatcher;
     private bool _candidateLimitReached;
 
     public LaunchWindow(
         LaunchWindowLocalization localization,
         QuickLaunchDiskSearchEngine? diskSearch = null)
+        : this(
+            localization,
+            diskSearch,
+            new QuickLaunchApplicationMatcher(null))
+    {
+    }
+
+    internal LaunchWindow(
+        LaunchWindowLocalization localization,
+        QuickLaunchDiskSearchEngine? diskSearch,
+        QuickLaunchApplicationMatcher applicationMatcher)
     {
         _localization = localization;
         _diskSearch = diskSearch ?? new QuickLaunchDiskSearchEngine();
+        _applicationMatcher = applicationMatcher;
         InitializeComponent();
         Loaded += LaunchWindow_Loaded;
         Closed += (_, _) =>
@@ -57,13 +70,14 @@ public partial class LaunchWindow : Window
         ApplyLocalization(localization);
     }
 
-    public static LaunchWindow Show(
+    internal static LaunchWindow Show(
         Action<SmartEntry?> onSelect,
         LaunchWindowLocalization localization,
+        QuickLaunchApplicationMatcher applicationMatcher,
         string? initialQuery = null)
     {
         var area = MonitorHelper.GetCursorWorkArea();
-        var window = new LaunchWindow(localization)
+        var window = new LaunchWindow(localization, null, applicationMatcher)
         {
             _onSelect = onSelect,
             Left = area.Left + (area.Width - 640) / 2,
@@ -201,8 +215,15 @@ public partial class LaunchWindow : Window
         }
 
         // 3. 应用搜索
+        var appScores = await _applicationMatcher.ScoreAsync(
+            _apps.Select(app => app.Name),
+            query,
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var appResults = _apps
-            .Where(a => a.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+            .Where(app => appScores.ContainsKey(app.Name))
+            .OrderByDescending(app => appScores[app.Name])
+            .ThenBy(app => app.Name, StringComparer.OrdinalIgnoreCase)
             .Take(5)
             .ToList();
         immediateResults.AddRange(appResults);

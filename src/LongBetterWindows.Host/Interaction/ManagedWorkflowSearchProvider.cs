@@ -11,6 +11,10 @@ namespace LongBetterWindows.Host.Interaction
         private readonly CommandWorkflowRepository _repository;
         private readonly CommandWorkflowPlanner _planner;
         private readonly Func<string, string>? _localize;
+        private static readonly IReadOnlyList<SearchTextForms> CategorySearchForms =
+            new[] { "组合动作", "工作流", "workflow" }
+                .Select(SearchTextMatcher.CreateForms)
+                .ToArray();
 
         public ManagedWorkflowSearchProvider(
             PluginRegistry plugins,
@@ -104,7 +108,15 @@ namespace LongBetterWindows.Host.Interaction
             if ("组合动作".Contains(query, StringComparison.Ordinal)
                 || "工作流".Contains(query, StringComparison.Ordinal)
                 || "workflow".Contains(query, StringComparison.Ordinal)) return 430;
-            return 0;
+
+            var nameMatch = SearchTextMatcher.Match(
+                query,
+                SearchTextMatcher.CreateForms(workflow.Name));
+            if (nameMatch.IsMatch) return nameMatch.Score;
+
+            return SearchTextMatcher.BestMatch(query, CategorySearchForms).IsMatch
+                ? 430
+                : 0;
         }
 
         private string BuildSubtitle(

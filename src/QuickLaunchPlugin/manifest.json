@@ -1,10 +1,10 @@
 {
   "id": "com.long.quicklaunch",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "name": "快捷启动器",
   "author": "Long",
   "entry_point": "QuickLaunchPlugin.dll",
-  "capabilities": ["shell.execute", "system.clipboard"],
+  "capabilities": ["shell.execute", "system.clipboard", "text.pinyin"],
   "commands": [
     {
       "id": "launcher.open",

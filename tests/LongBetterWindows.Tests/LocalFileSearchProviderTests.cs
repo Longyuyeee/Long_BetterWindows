@@ -97,6 +97,23 @@ public sealed class LocalFileSearchProviderTests : IDisposable
         Assert.Equal(3, results.Count);
     }
 
+    [Theory]
+    [InlineData("zhongwenbaogao")]
+    [InlineData("zwbg")]
+    [InlineData("zhongwenbaogso")]
+    public async Task SearchAsync_MatchesChineseFileNameByUnifiedTextForms(string query)
+    {
+        var path = Path.Combine(_root, "\u4e2d\u6587\u62a5\u544a.txt");
+        File.WriteAllText(path, "content");
+        var provider = new LocalFileSearchProvider(new[] { _root });
+
+        var result = await SearchUntilSingleAsync(
+            provider,
+            new SearchRequest(query, ContextSnapshot.Empty, MaxResults: 10));
+
+        Assert.Equal("\u4e2d\u6587\u62a5\u544a.txt", result.Title);
+    }
+
     [Fact]
     public void WebPluginTemplate_UsesLongUiKitAndEscapesPluginName()
     {
