@@ -299,15 +299,17 @@ public sealed class ExperimentalPluginWorkerTests
     [Fact]
     public async Task WorkerHostRequest_UsesItsOwnDeadline()
     {
+        var bridge = new DeadlineObservingHostBridge();
         await using var session = await StartRunningWorkerAsync(
             "synthetic.capability.reader",
-            new DelayedHostBridge(TimeSpan.FromSeconds(1)));
+            bridge);
         var timeout = await Assert.ThrowsAsync<IpcRemoteException>(() =>
             session.InvokeCommandAsync(
                 new PluginWorkerCommandRequest(
                     "query-capability", "system.theme", 100),
                 deadlineMilliseconds: 2_000));
         Assert.Equal(IpcErrorCodes.Timeout, timeout.Code);
+        Assert.True(bridge.CancellationObserved.Task.IsCompletedSuccessfully);
         Assert.Equal("alive", (await session.InvokeCommandAsync(
             new PluginWorkerCommandRequest("echo", "alive"))).Text);
     }
@@ -540,18 +542,26 @@ public sealed class ExperimentalPluginWorkerTests
         }
     }
 
-    private sealed class DelayedHostBridge(TimeSpan delay)
+    private sealed class DeadlineObservingHostBridge
         : IExperimentalPluginWorkerHostBridge
     {
+        public TaskCompletionSource CancellationObserved { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
         public async Task<IpcEnvelope> HandleRequestAsync(
             IpcEnvelope request,
             CancellationToken cancellationToken)
         {
-            await Task.Delay(delay, cancellationToken);
-            return IpcEnvelope.Response(
-                PluginWorkerProtocol.Name,
-                request.Id,
-                new PluginWorkerCapabilityQueryResponse(true));
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("Deadline cancellation was not observed.");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                CancellationObserved.TrySetResult();
+                throw;
+            }
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
