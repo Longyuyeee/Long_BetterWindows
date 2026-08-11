@@ -1108,7 +1108,7 @@ public class QualityGateTests
         Assert.Contains("<RemoveDir Directories=\"$(OutputPath)Plugins", project);
         Assert.Contains("CopyPluginsToPublish", project);
         Assert.Contains("$(PublishDir)Plugins", project);
-        Assert.Contains("<Version>1.11.0-rc.6</Version>", project);
+        Assert.Contains("<Version>1.11.0-rc.7</Version>", project);
         Assert.Contains("<AssemblyVersion>1.11.0.0</AssemblyVersion>", project);
     }
 
@@ -1129,7 +1129,7 @@ public class QualityGateTests
     [Fact]
     public void ReleaseCandidateVersion_IsConsistentAcrossPackagingAndIpcFixture()
     {
-        const string version = "1.11.0-rc.6";
+        const string version = "1.11.0-rc.7";
         var project = Read("src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj");
         var release = Read("release.ps1");
         var installerBuild = Read("build-installer.ps1");
