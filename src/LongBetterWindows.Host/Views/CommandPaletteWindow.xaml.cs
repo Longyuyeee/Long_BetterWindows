@@ -68,18 +68,53 @@ namespace LongBetterWindows.Host.Views
             var dispatcher = Application.Current.Dispatcher;
             if (!dispatcher.CheckAccess())
             {
-                dispatcher.Invoke(() => ShowPaletteCore(initialQuery, started));
+                dispatcher.Invoke(() => ShowPaletteCore(
+                    initialQuery,
+                    started,
+                    presetContext: null,
+                    originWindowHandle: null));
                 return;
             }
 
-            ShowPaletteCore(initialQuery, started);
+            ShowPaletteCore(
+                initialQuery,
+                started,
+                presetContext: null,
+                originWindowHandle: null);
         }
 
-        private static void ShowPaletteCore(string? initialQuery, long started)
+        internal static void ShowPaletteForQuality(
+            string? contextProfile = null,
+            nint originWindowHandle = default)
         {
+            var started = Stopwatch.GetTimestamp();
+            var presetContext = QualityContextFixtures.Create(contextProfile);
+            var dispatcher = Application.Current.Dispatcher;
+            if (!dispatcher.CheckAccess())
+            {
+                dispatcher.Invoke(() => ShowPaletteCore(
+                    initialQuery: null,
+                    started,
+                    presetContext,
+                    originWindowHandle == nint.Zero ? null : originWindowHandle));
+                return;
+            }
 
+            ShowPaletteCore(
+                initialQuery: null,
+                started,
+                presetContext,
+                originWindowHandle == nint.Zero ? null : originWindowHandle);
+        }
+
+        private static void ShowPaletteCore(
+            string? initialQuery,
+            long started,
+            ContextSnapshot? presetContext,
+            nint? originWindowHandle)
+        {
             var captureRequest = new ContextCaptureRequest(
-                Shell32.GetForegroundWindow(),
+                originWindowHandle ?? Shell32.GetForegroundWindow(),
                 DateTimeOffset.UtcNow);
             _instance ??= new CommandPaletteWindow();
             _instance.BeginPresentationLatency(started);
@@ -103,7 +138,18 @@ namespace LongBetterWindows.Host.Views
 
             _instance.Dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
-                () => _instance.BeginLoadContext(captureRequest));
+                () =>
+                {
+                    if (presetContext is null)
+                    {
+                        _instance.BeginLoadContext(captureRequest);
+                        return;
+                    }
+
+                    _instance._contextCts?.Cancel();
+                    _instance._contextSnapshot = presetContext;
+                    _instance.RenderContextBadges();
+                });
             _instance.Activate();
             _instance.SearchBox.Focus();
             _instance.AnimateIn();

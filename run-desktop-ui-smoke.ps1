@@ -880,6 +880,7 @@ $report = [ordered]@{
     palette = [ordered]@{}
     super_panel = [ordered]@{}
     launcher_workspace_continuity = [ordered]@{}
+    command_palette_workspace_continuity = [ordered]@{}
     focus_restore = [ordered]@{}
     management_navigation = [ordered]@{}
     workflow_review = [ordered]@{}
@@ -904,6 +905,7 @@ $focusExpandProcess = $null
 $focusExecuteProcess = $null
 $superPanelTransitionProcess = $null
 $launcherWorkspaceProcess = $null
+$paletteWorkspaceProcess = $null
 $managementProcess = $null
 $pluginSettingsProcess = $null
 $workflowPaletteProcess = $null
@@ -1471,7 +1473,7 @@ try {
     Write-Stage 'Starting Super Panel to Workspace continuity workflow.'
     $launcherWorkspaceProcess = Start-QualityHost @(
         '--quality-open-super-panel',
-        '--quality-context-profile', 'url',
+        '--quality-context', 'url',
         '--language', 'en-US')
     $continuityTargets = @(
         [pscustomobject]@{
@@ -1554,6 +1556,111 @@ try {
     $report.launcher_workspace_continuity['coordinate_clicks_used'] = $false
     Stop-QualityHost $launcherWorkspaceProcess
     $launcherWorkspaceProcess = $null
+
+    Write-Stage 'Starting Command Palette to Workspace continuity workflow.'
+    $paletteWorkspaceProcess = Start-QualityHost @(
+        '--quality-open-palette',
+        '--quality-context', 'url',
+        '--language', 'en-US')
+    $paletteContinuityTargets = @(
+        [pscustomobject]@{
+            name = 'management'
+            query = 'Overview'
+            module_tab = 'Long.Workspace.ModuleTab.management:root'
+        },
+        [pscustomobject]@{
+            name = 'marketplace'
+            query = 'Plugin Market'
+            module_tab = 'Long.Workspace.ModuleTab.marketplace:catalog'
+        },
+        [pscustomobject]@{
+            name = 'settings'
+            query = 'Settings'
+            module_tab = 'Long.Workspace.ModuleTab.settings:root'
+        })
+    foreach ($continuityTarget in $paletteContinuityTargets) {
+        $continuityPalette = Wait-Until {
+            Find-WindowByAutomationId `
+                $paletteWorkspaceProcess.Id 'Long.CommandPalette'
+        } "Command Palette did not appear before opening $($continuityTarget.name)."
+        $continuitySearch = Wait-Until {
+            Find-DescendantByAutomationId `
+                $continuityPalette 'Long.CommandPalette.Search'
+        } "Command Palette search was unavailable before opening $($continuityTarget.name)."
+        $continuityResults = Wait-Until {
+            Find-DescendantByAutomationId `
+                $continuityPalette 'Long.CommandPalette.Results'
+        } "Command Palette results were unavailable before opening $($continuityTarget.name)."
+        Wait-Until {
+            Find-DescendantByAutomationId $continuityPalette 'quality.url'
+        } "Command Palette lost URL context before opening $($continuityTarget.name)." | Out-Null
+        $continuitySearchPattern =
+            [Windows.Automation.ValuePattern]$continuitySearch.GetCurrentPattern(
+                [Windows.Automation.ValuePattern]::Pattern)
+        $continuitySearchPattern.SetValue($continuityTarget.query)
+        Wait-Until {
+            Find-DescendantByName $continuityResults $continuityTarget.query
+        } "Command Palette did not find $($continuityTarget.name)." | Out-Null
+        $continuityPaletteHandle =
+            [IntPtr]$continuityPalette.Current.NativeWindowHandle
+        if ([LongDesktopInput]::WindowAction($continuityPaletteHandle, 4) -ne 1) {
+            throw "Command Palette could not select $($continuityTarget.name)."
+        }
+        if ([LongDesktopInput]::WindowAction($continuityPaletteHandle, 1) -ne 1) {
+            throw "Command Palette rejected opening $($continuityTarget.name)."
+        }
+        Wait-Until {
+            $null -eq (Find-WindowByAutomationId `
+                $paletteWorkspaceProcess.Id 'Long.CommandPalette')
+        } "Command Palette did not hide before opening $($continuityTarget.name)." | Out-Null
+        $continuityMain = Wait-Until {
+            Find-WindowByAutomationId `
+                $paletteWorkspaceProcess.Id 'Long.MainWindow'
+        } "Workspace did not appear for Command Palette $($continuityTarget.name)."
+        Wait-Until {
+            $candidate = Find-ProcessElementByAutomationId `
+                $paletteWorkspaceProcess.Id $continuityTarget.module_tab
+            if ($null -ne $candidate -and
+                $candidate.Current.ItemStatus -like 'active:true;*') {
+                $candidate
+            }
+        } "Workspace did not activate Command Palette $($continuityTarget.name)." | Out-Null
+        if ([LongDesktopInput]::WindowAction(
+            [IntPtr]$continuityMain.Current.NativeWindowHandle, 3) -ne 1) {
+            throw "Workspace rejected Escape for Command Palette $($continuityTarget.name)."
+        }
+        $restoredPalette = Wait-Until {
+            Find-WindowByAutomationId `
+                $paletteWorkspaceProcess.Id 'Long.CommandPalette'
+        } "Workspace Escape did not restore Command Palette from $($continuityTarget.name)."
+        $restoredSearch = Wait-Until {
+            $candidate = Find-DescendantByAutomationId `
+                $restoredPalette 'Long.CommandPalette.Search'
+            if ($null -eq $candidate) { return $null }
+            $pattern = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
+                [Windows.Automation.ValuePattern]::Pattern)
+            if ($pattern.Current.Value -eq $continuityTarget.query) {
+                $candidate
+            }
+        } "Returning from $($continuityTarget.name) did not preserve the query."
+        Wait-Until {
+            Find-DescendantByAutomationId $restoredPalette 'quality.url'
+        } "Returning from $($continuityTarget.name) did not preserve URL context." | Out-Null
+        Wait-Until {
+            $restoredSearch.Current.HasKeyboardFocus
+        } "Returning from $($continuityTarget.name) did not restore search focus." | Out-Null
+        $report.command_palette_workspace_continuity[$continuityTarget.name] =
+            [ordered]@{
+                module_activated = $true
+                palette_restored = $true
+                query_preserved = $true
+                context_preserved = $true
+                focus_restored = $true
+            }
+    }
+    $report.command_palette_workspace_continuity['coordinate_clicks_used'] = $false
+    Stop-QualityHost $paletteWorkspaceProcess
+    $paletteWorkspaceProcess = $null
     }
 
     Write-Stage 'Starting Workspace management navigation workflow.'
@@ -2832,6 +2939,7 @@ finally {
     Stop-QualityHost $focusProbeProcess
     Stop-QualityHost $superPanelTransitionProcess
     Stop-QualityHost $launcherWorkspaceProcess
+    Stop-QualityHost $paletteWorkspaceProcess
     Stop-QualityHost $managementProcess
     Stop-QualityHost $pluginSettingsProcess
     Stop-QualityHost $workflowPaletteProcess

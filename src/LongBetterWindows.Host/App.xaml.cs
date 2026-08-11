@@ -270,7 +270,16 @@ namespace LongBetterWindows.Host
                 }
 
                 if (_startupOptions.OpenPaletteForQuality)
-                    CommandPaletteWindow.ShowPalette();
+                {
+                    if (_startupOptions.UseLiveContextForQuality)
+                        CommandPaletteWindow.ShowPalette();
+                    else
+                        CommandPaletteWindow.ShowPaletteForQuality(
+                            _startupOptions.UseEmptyContextForQuality
+                                ? "empty"
+                                : _startupOptions.QualityContextProfile,
+                            _startupOptions.QualityOriginWindowHandle);
+                }
                 if (_startupOptions.OpenSuperPanelForQuality)
                 {
                     if (_startupOptions.UseLiveContextForQuality)
