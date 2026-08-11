@@ -160,22 +160,14 @@ namespace LongBetterWindows.Host.Interaction
         }
 
         private static bool Matches(string query, params string[] candidates)
-            => candidates.Any(candidate =>
-                Normalize(candidate).Contains(query, StringComparison.Ordinal));
+            => SearchTextMatcher.BestMatch(
+                query,
+                candidates.Select(SearchTextMatcher.CreateForms)).IsMatch;
 
         private static int Score(string query, params string[] candidates)
-        {
-            var normalized = candidates.Select(Normalize).ToArray();
-            if (normalized.Any(candidate => candidate == query))
-                return 1000;
-            if (normalized.Any(candidate => candidate.StartsWith(
-                    query, StringComparison.Ordinal)))
-                return 820;
-            return normalized.Any(candidate => candidate.Contains(
-                query, StringComparison.Ordinal))
-                    ? 640
-                    : 0;
-        }
+            => SearchTextMatcher.BestMatch(
+                query,
+                candidates.Select(SearchTextMatcher.CreateForms)).Score;
 
         private static string Normalize(string? value)
             => (value ?? string.Empty).Trim().ToLowerInvariant();

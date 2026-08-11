@@ -31,6 +31,8 @@ namespace LongBetterWindows.Host.Interaction
     {
         private readonly Dictionary<string, CommandDescriptor> _commands =
             new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, CommandSearchIndex> _searchIndexes =
+            new(StringComparer.OrdinalIgnoreCase);
         private readonly object _lock = new();
         private CommandPreferenceService? _preferences;
 
@@ -49,8 +51,10 @@ namespace LongBetterWindows.Host.Interaction
                 foreach (var command in manifest.Commands)
                 {
                     var key = BuildKey(manifest.Id, command.Id);
-                    _commands[key] = new CommandDescriptor(
+                    var descriptor = new CommandDescriptor(
                         key, manifest.Id, manifest.Name, command);
+                    _commands[key] = descriptor;
+                    _searchIndexes[key] = CommandSearchIndex.Create(descriptor);
                 }
             }
         }
@@ -83,7 +87,7 @@ namespace LongBetterWindows.Host.Interaction
                              .ToArray())
                 {
                     var descriptor = _commands[key];
-                    _commands[key] = descriptor with
+                    var localized = descriptor with
                     {
                         PluginName = GetResource(
                             context,
@@ -116,6 +120,8 @@ namespace LongBetterWindows.Host.Interaction
                                 context))
                             .ToArray(),
                     };
+                    _commands[key] = localized;
+                    _searchIndexes[key] = CommandSearchIndex.Create(localized);
                 }
             }
         }
@@ -164,19 +170,32 @@ namespace LongBetterWindows.Host.Interaction
             if (maxResults <= 0) return Array.Empty<CommandSearchResult>();
             var normalized = Normalize(query);
 
-            List<CommandDescriptor> snapshot;
-            lock (_lock) snapshot = _commands.Values.ToList();
+            List<(CommandDescriptor Descriptor, CommandSearchIndex Index)> snapshot;
+            lock (_lock)
+            {
+                snapshot = _commands.Values
+                    .Select(descriptor => (
+                        descriptor,
+                        _searchIndexes[descriptor.Key]))
+                    .ToList();
+            }
 
             return snapshot
                 .Select(x => new
                 {
-                    Descriptor = x,
-                    Preference = GetPreference(x.Key),
+                    Descriptor = x.Descriptor,
+                    SearchIndex = x.Index,
+                    Preference = GetPreference(x.Descriptor.Key),
                 })
                 .Where(x => x.Preference.IsEnabled)
                 .Select(x => new CommandSearchResult(
                     x.Descriptor,
-                    Score(x.Descriptor, normalized, inputTypes, x.Preference.Aliases)))
+                    Score(
+                        x.Descriptor,
+                        x.SearchIndex,
+                        normalized,
+                        inputTypes,
+                        x.Preference.Aliases)))
                 .Where(x => x.Score > 0)
                 .OrderByDescending(x => x.Score)
                 .ThenBy(x => x.Descriptor.Title, StringComparer.OrdinalIgnoreCase)
@@ -186,6 +205,7 @@ namespace LongBetterWindows.Host.Interaction
 
         private static int Score(
             CommandDescriptor descriptor,
+            CommandSearchIndex index,
             string query,
             IReadOnlyCollection<AcceptedInputType> inputTypes,
             IReadOnlyCollection<string>? userAliases = null)
@@ -214,6 +234,21 @@ namespace LongBetterWindows.Host.Interaction
             else if (title.Contains(query, StringComparison.Ordinal)) score = 620;
             else if (aliases.Any(x => x.Contains(query, StringComparison.Ordinal))) score = 580;
             else if (Normalize(descriptor.PluginName).Contains(query, StringComparison.Ordinal)) score = 440;
+            else
+            {
+                var automatic = SearchTextMatcher.BestMatch(
+                    query,
+                    index.AutomaticForms);
+                score = automatic.Score;
+
+                if (userAliases is not null)
+                {
+                    var userAliasScore = SearchTextMatcher.BestMatch(
+                        query,
+                        userAliases.Select(SearchTextMatcher.CreateForms)).Score;
+                    score = Math.Max(score, userAliasScore);
+                }
+            }
 
             if (score == 0) return 0;
 
@@ -234,6 +269,7 @@ namespace LongBetterWindows.Host.Interaction
                          .ToList())
             {
                 _commands.Remove(key);
+                _searchIndexes.Remove(key);
             }
         }
 
@@ -242,6 +278,20 @@ namespace LongBetterWindows.Host.Interaction
 
         private static string Normalize(string value)
             => value.Trim().ToLowerInvariant();
+
+        private sealed record CommandSearchIndex(
+            IReadOnlyList<SearchTextForms> AutomaticForms)
+        {
+            public static CommandSearchIndex Create(CommandDescriptor descriptor)
+                => new(
+                    descriptor.Command.Aliases
+                        .Prepend(descriptor.PluginName)
+                        .Prepend(descriptor.Title)
+                        .Select(SearchTextMatcher.CreateForms)
+                        .Where(forms => forms.Normalized.Length > 0)
+                        .Distinct()
+                        .ToArray());
+        }
 
         private static string GetResource(
             PluginLanguageContext context,
