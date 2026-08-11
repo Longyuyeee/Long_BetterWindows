@@ -135,14 +135,21 @@ namespace LongBetterWindows.Host.Views
             SuperPanelResultsUpdate update)
         {
             _groupCoordinator.SetResults(update.Results, update.Completed);
-            RenderActiveGroup();
+            RenderActiveGroup(preserveSelection: true);
         }
-        private void RenderActiveGroup()
+
+        private void RenderActiveGroup(bool preserveSelection = false)
         {
+            var selectedId = preserveSelection
+                ? (ResultsList.SelectedItem as SearchResultItem)?.Id
+                : null;
             var view = _groupCoordinator.BuildView();
             ApplyPresentation(view);
             ResultsList.ItemsSource = view.VisibleResults;
-            ResultsList.SelectedIndex = view.VisibleResults.Count > 0 ? 0 : -1;
+            ResultsList.SelectedIndex = StableSelectionResolver.Resolve(
+                view.VisibleResults,
+                selectedId,
+                item => item.Id).Index;
             EmptyState.Visibility = view.ShowEmptyState
                 ? Visibility.Visible
                 : Visibility.Collapsed;

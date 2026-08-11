@@ -295,15 +295,13 @@ namespace LongBetterWindows.Host.Views
                     new PropertyGroupDescription(
                         nameof(LauncherResultViewItem.SectionTitle)));
             ResultsList.ItemsSource = view;
-            var selectedIndex = selectedId is null
-                ? -1
-                : projected.ToList().FindIndex(item =>
-                    string.Equals(item.Id, selectedId, StringComparison.OrdinalIgnoreCase));
-            ResultsList.SelectedIndex = selectedIndex >= 0
-                ? selectedIndex
-                : projected.Count > 0 ? 0 : -1;
+            var selection = StableSelectionResolver.Resolve(
+                projected,
+                selectedId,
+                item => item.Id);
+            ResultsList.SelectedIndex = selection.Index;
             if (_preferredSelectionId is not null
-                && (selectedIndex >= 0 || completed))
+                && (selection.Preserved || completed))
             {
                 _preferredSelectionId = null;
             }
