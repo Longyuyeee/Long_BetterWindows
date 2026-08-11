@@ -881,6 +881,7 @@ $report = [ordered]@{
     super_panel = [ordered]@{}
     launcher_workspace_continuity = [ordered]@{}
     command_palette_workspace_continuity = [ordered]@{}
+    launcher_module_close_continuity = [ordered]@{}
     focus_restore = [ordered]@{}
     management_navigation = [ordered]@{}
     workflow_review = [ordered]@{}
@@ -906,6 +907,8 @@ $focusExecuteProcess = $null
 $superPanelTransitionProcess = $null
 $launcherWorkspaceProcess = $null
 $paletteWorkspaceProcess = $null
+$panelModuleCloseProcess = $null
+$paletteModuleCloseProcess = $null
 $managementProcess = $null
 $pluginSettingsProcess = $null
 $workflowPaletteProcess = $null
@@ -1661,6 +1664,161 @@ try {
     $report.command_palette_workspace_continuity['coordinate_clicks_used'] = $false
     Stop-QualityHost $paletteWorkspaceProcess
     $paletteWorkspaceProcess = $null
+
+    Write-Stage 'Starting Super Panel module-tab close continuity workflow.'
+    $panelModuleCloseProcess = Start-QualityHost @(
+        '--quality-open-super-panel',
+        '--quality-context', 'url',
+        '--language', 'en-US')
+    for ($cycle = 1; $cycle -le 2; $cycle++) {
+        $closePanel = Wait-Until {
+            Find-WindowByAutomationId `
+                $panelModuleCloseProcess.Id 'Long.SuperPanel'
+        } "Super Panel did not appear for module-close cycle $cycle."
+        $closePanelResults = Wait-Until {
+            $candidate = Find-DescendantByAutomationId `
+                $closePanel 'Long.SuperPanel.Results'
+            if ($null -ne $candidate -and
+                $candidate.Current.ItemStatus -like `
+                    'mode:context-list;*context-items:1;inputs:url,clipboard,text') {
+                $candidate
+            }
+        } "Super Panel context was not preserved before module-close cycle $cycle."
+        $closePanelHandle = [IntPtr]$closePanel.Current.NativeWindowHandle
+        if ([LongDesktopInput]::WindowAction($closePanelHandle, 7) -ne 1) {
+            throw "Super Panel could not select Plugin Market in close cycle $cycle."
+        }
+        if ([LongDesktopInput]::WindowAction($closePanelHandle, 1) -ne 1) {
+            throw "Super Panel could not open Plugin Market in close cycle $cycle."
+        }
+        $closeMain = Wait-Until {
+            Find-WindowByAutomationId `
+                $panelModuleCloseProcess.Id 'Long.MainWindow'
+        } "Workspace did not appear for Super Panel close cycle $cycle."
+        $marketClose = Wait-Until {
+            Find-ProcessElementByAutomationId `
+                $panelModuleCloseProcess.Id `
+                'Long.Workspace.ModuleClose.marketplace:catalog'
+        } "Plugin Market close action was unavailable in Super Panel cycle $cycle."
+        Invoke-AutomationElement $marketClose `
+            "Plugin Market close action failed in Super Panel cycle $cycle."
+        Wait-Until {
+            $null -eq (Find-ProcessElementByAutomationId `
+                $panelModuleCloseProcess.Id `
+                'Long.Workspace.ModuleTab.marketplace:catalog')
+        } "Plugin Market tab remained after Super Panel close cycle $cycle." | Out-Null
+        $restoredClosePanel = Wait-Until {
+            Find-WindowByAutomationId `
+                $panelModuleCloseProcess.Id 'Long.SuperPanel'
+        } "Closing Plugin Market did not restore Super Panel in cycle $cycle."
+        Wait-Until {
+            $candidate = Find-DescendantByAutomationId `
+                $restoredClosePanel 'Long.SuperPanel.Results'
+            if ($null -ne $candidate -and
+                $candidate.Current.ItemStatus -like `
+                    'mode:context-list;*context-items:1;inputs:url,clipboard,text') {
+                $candidate
+            }
+        } "Closing Plugin Market lost Super Panel context in cycle $cycle." | Out-Null
+        $restoredPanelHandle =
+            [IntPtr]$restoredClosePanel.Current.NativeWindowHandle
+        Wait-Until {
+            [LongDesktopInput]::ForegroundWindow() -eq $restoredPanelHandle
+        } "Closing Plugin Market did not restore Super Panel focus in cycle $cycle." | Out-Null
+    }
+    $report.launcher_module_close_continuity['super_panel'] = [ordered]@{
+        cycles = 2
+        panel_restored = $true
+        context_preserved = $true
+        focus_restored = $true
+        repeated_entry = $true
+    }
+    Stop-QualityHost $panelModuleCloseProcess
+    $panelModuleCloseProcess = $null
+
+    Write-Stage 'Starting Command Palette module-tab close continuity workflow.'
+    $paletteModuleCloseProcess = Start-QualityHost @(
+        '--quality-open-palette',
+        '--quality-context', 'url',
+        '--language', 'en-US')
+    for ($cycle = 1; $cycle -le 2; $cycle++) {
+        $closePalette = Wait-Until {
+            Find-WindowByAutomationId `
+                $paletteModuleCloseProcess.Id 'Long.CommandPalette'
+        } "Command Palette did not appear for module-close cycle $cycle."
+        $closeSearch = Wait-Until {
+            Find-DescendantByAutomationId `
+                $closePalette 'Long.CommandPalette.Search'
+        } "Command Palette search was unavailable in close cycle $cycle."
+        $closeResults = Wait-Until {
+            Find-DescendantByAutomationId `
+                $closePalette 'Long.CommandPalette.Results'
+        } "Command Palette results were unavailable in close cycle $cycle."
+        Wait-Until {
+            Find-DescendantByAutomationId $closePalette 'quality.url'
+        } "Command Palette lost URL context before close cycle $cycle." | Out-Null
+        $closeSearchPattern =
+            [Windows.Automation.ValuePattern]$closeSearch.GetCurrentPattern(
+                [Windows.Automation.ValuePattern]::Pattern)
+        $closeSearchPattern.SetValue('Plugin Market')
+        Wait-Until {
+            Find-DescendantByName $closeResults 'Plugin Market'
+        } "Command Palette did not find Plugin Market in close cycle $cycle." | Out-Null
+        $closePaletteHandle = [IntPtr]$closePalette.Current.NativeWindowHandle
+        if ([LongDesktopInput]::WindowAction($closePaletteHandle, 4) -ne 1) {
+            throw "Command Palette could not select Plugin Market in close cycle $cycle."
+        }
+        if ([LongDesktopInput]::WindowAction($closePaletteHandle, 1) -ne 1) {
+            throw "Command Palette could not open Plugin Market in close cycle $cycle."
+        }
+        Wait-Until {
+            Find-WindowByAutomationId `
+                $paletteModuleCloseProcess.Id 'Long.MainWindow'
+        } "Workspace did not appear for Command Palette close cycle $cycle." | Out-Null
+        $marketClose = Wait-Until {
+            Find-ProcessElementByAutomationId `
+                $paletteModuleCloseProcess.Id `
+                'Long.Workspace.ModuleClose.marketplace:catalog'
+        } "Plugin Market close action was unavailable in Command Palette cycle $cycle."
+        Invoke-AutomationElement $marketClose `
+            "Plugin Market close action failed in Command Palette cycle $cycle."
+        Wait-Until {
+            $null -eq (Find-ProcessElementByAutomationId `
+                $paletteModuleCloseProcess.Id `
+                'Long.Workspace.ModuleTab.marketplace:catalog')
+        } "Plugin Market tab remained after Command Palette close cycle $cycle." | Out-Null
+        $restoredClosePalette = Wait-Until {
+            Find-WindowByAutomationId `
+                $paletteModuleCloseProcess.Id 'Long.CommandPalette'
+        } "Closing Plugin Market did not restore Command Palette in cycle $cycle."
+        $restoredCloseSearch = Wait-Until {
+            $candidate = Find-DescendantByAutomationId `
+                $restoredClosePalette 'Long.CommandPalette.Search'
+            if ($null -eq $candidate) { return $null }
+            $pattern = [Windows.Automation.ValuePattern]$candidate.GetCurrentPattern(
+                [Windows.Automation.ValuePattern]::Pattern)
+            if ($pattern.Current.Value -eq 'Plugin Market') {
+                $candidate
+            }
+        } "Closing Plugin Market did not preserve Command Palette query in cycle $cycle."
+        Wait-Until {
+            Find-DescendantByAutomationId $restoredClosePalette 'quality.url'
+        } "Closing Plugin Market lost Command Palette context in cycle $cycle." | Out-Null
+        Wait-Until {
+            $restoredCloseSearch.Current.HasKeyboardFocus
+        } "Closing Plugin Market did not restore Command Palette focus in cycle $cycle." | Out-Null
+    }
+    $report.launcher_module_close_continuity['command_palette'] = [ordered]@{
+        cycles = 2
+        palette_restored = $true
+        query_preserved = $true
+        context_preserved = $true
+        focus_restored = $true
+        repeated_entry = $true
+    }
+    $report.launcher_module_close_continuity['coordinate_clicks_used'] = $false
+    Stop-QualityHost $paletteModuleCloseProcess
+    $paletteModuleCloseProcess = $null
     }
 
     Write-Stage 'Starting Workspace management navigation workflow.'
@@ -2940,6 +3098,8 @@ finally {
     Stop-QualityHost $superPanelTransitionProcess
     Stop-QualityHost $launcherWorkspaceProcess
     Stop-QualityHost $paletteWorkspaceProcess
+    Stop-QualityHost $panelModuleCloseProcess
+    Stop-QualityHost $paletteModuleCloseProcess
     Stop-QualityHost $managementProcess
     Stop-QualityHost $pluginSettingsProcess
     Stop-QualityHost $workflowPaletteProcess
