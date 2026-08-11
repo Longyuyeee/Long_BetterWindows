@@ -279,7 +279,9 @@ public class QualityGateTests
         Assert.Contains("rollback_verified", gate);
         Assert.Contains("Physical DPI gate schema version 3 is required", gate);
         Assert.Contains("Physical DPI gate must contain exactly 32 captures", gate);
-        Assert.Contains("Accessibility gate schema version 3 is required", gate);
+        Assert.Contains("Accessibility gate schema version 4 is required", gate);
+        Assert.Contains("Accessibility UIA event evidence is incomplete or inconsistent", gate);
+        Assert.Contains("Accessibility screen-reader approvals do not match portable sources", gate);
         Assert.Contains("requires at least one screen-reader approval", gate);
         Assert.Contains("Read-PortableMatrixSource", gate);
         Assert.Contains("portable source hash mismatch", gate);

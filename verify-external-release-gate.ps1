@@ -131,8 +131,8 @@ function Assert-PhysicalDpiContract($gate, [string] $sourceCommit) {
 function Assert-AccessibilityContract($gate, [string] $sourceCommit) {
     $document = $gate.document
     $requiredProfiles = @('high_contrast','reduced_motion','combined')
-    if ([int]$document.schema_version -ne 3) {
-        throw 'Accessibility gate schema version 3 is required.'
+    if ([int]$document.schema_version -ne 4) {
+        throw 'Accessibility gate schema version 4 is required.'
     }
     if ([int]$document.screen_reader_approval_count -lt 1) {
         throw 'Accessibility gate requires at least one screen-reader approval.'
@@ -147,8 +147,11 @@ function Assert-AccessibilityContract($gate, [string] $sourceCommit) {
         $requiredProfiles 'Accessibility evidence profiles'
     $sourceFiles = [Collections.Generic.HashSet[string]]::new(
         [StringComparer]::OrdinalIgnoreCase)
+    $verifiedScreenReaderApprovalCount = 0
     foreach ($entry in $evidence) {
-        if ([string]$entry.source_commit -ne $sourceCommit) {
+        if ([string]$entry.source_commit -ne $sourceCommit `
+            -or [int]$entry.focus_event_count -lt 1 `
+            -or [int]$entry.live_region_event_count -lt 1) {
             throw 'Accessibility evidence entry does not match the candidate.'
         }
         if (-not $sourceFiles.Add([string]$entry.source_manifest.file)) {
@@ -156,13 +159,37 @@ function Assert-AccessibilityContract($gate, [string] $sourceCommit) {
         }
         $source = Read-PortableMatrixSource `
             $gate $entry.source_manifest 'Accessibility evidence'
-        if ([int]$source.schema_version -ne 2 `
+        if ([int]$source.schema_version -ne 3 `
             -or [string]$source.classification -ne 'physical_accessibility_evidence' `
             -or [string]$source.source_commit -ne $sourceCommit `
             -or [string]$source.expected_profile -ne [string]$entry.profile `
             -or [string]$source.human_review.status -ne 'approved') {
             throw 'Accessibility portable source content does not match its summary.'
         }
+        $events = $source.assistive_technology_events
+        if ([string]$events.transport -ne 'windows_ui_automation_events' `
+            -or -not [bool]$events.physical_keyboard_validated `
+            -or [int]$events.focus_event_count -lt 1 `
+            -or [int]$events.live_region_event_count -lt 1 `
+            -or [int]$events.focus_event_count -ne [int]$entry.focus_event_count `
+            -or [int]$events.live_region_event_count -ne [int]$entry.live_region_event_count `
+            -or [string]::IsNullOrWhiteSpace([string]$events.expected_announcement)) {
+            throw 'Accessibility UIA event evidence is incomplete or inconsistent.'
+        }
+        $readerName = [string]$source.screen_reader.name
+        $checks = $source.human_review.checklist
+        if ($readerName -ne 'None' `
+            -and [bool]$source.screen_reader.process_detected `
+            -and [bool]$events.screen_reader_active_during_capture `
+            -and [bool]$checks.screen_reader_announcements `
+            -and [bool]$checks.management_close_announcements) {
+            $verifiedScreenReaderApprovalCount++
+        }
+    }
+    if ($verifiedScreenReaderApprovalCount -lt 1 `
+        -or $verifiedScreenReaderApprovalCount -ne `
+            [int]$document.screen_reader_approval_count) {
+        throw 'Accessibility screen-reader approvals do not match portable sources.'
     }
 }
 

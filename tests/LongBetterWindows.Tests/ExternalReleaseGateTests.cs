@@ -69,7 +69,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
                 .GetProperty("physical_dpi_schema_version")
                 .GetInt32());
         Assert.Equal(
-            3,
+            4,
             root.GetProperty("evidence_contract")
                 .GetProperty("accessibility_schema_version")
                 .GetInt32());
@@ -234,13 +234,52 @@ public sealed class ExternalReleaseGateTests : IDisposable
     [Fact]
     public async Task VerifyExternalReleaseGate_RejectsLegacyAccessibilitySummary()
     {
-        var paths = WriteFixture(PackageHash, accessibilitySchemaVersion: 2);
+        var paths = WriteFixture(PackageHash, accessibilitySchemaVersion: 3);
         var output = Path.Combine(_root, "legacy-accessibility-rejected.json");
 
         var result = await RunVerifierAsync(paths, output);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Accessibility gate schema version 3 is required", result.Error);
+        Assert.Contains("Accessibility gate schema version 4 is required", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsLegacyAccessibilityPortableSource()
+    {
+        var paths = WriteFixture(PackageHash, accessibilitySourceSchemaVersion: 2);
+        var output = Path.Combine(_root, "legacy-accessibility-source-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("portable source content does not match its summary", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsMissingAccessibilityUiaEvents()
+    {
+        var paths = WriteFixture(PackageHash, accessibilitySourceFocusEventCount: 0);
+        var output = Path.Combine(_root, "accessibility-events-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Accessibility UIA event evidence is incomplete or inconsistent", result.Error);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsInactiveScreenReaderSourceApproval()
+    {
+        var paths = WriteFixture(PackageHash, accessibilityScreenReaderActive: false);
+        var output = Path.Combine(_root, "accessibility-reader-source-rejected.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("screen-reader approvals do not match portable sources", result.Error);
         Assert.False(File.Exists(output));
     }
 
@@ -529,7 +568,12 @@ public sealed class ExternalReleaseGateTests : IDisposable
         bool marketplacePreflightOnly = false,
         int physicalDpiSchemaVersion = 3,
         int physicalDpiCaptureCount = 32,
-        int accessibilitySchemaVersion = 3,
+        int accessibilitySchemaVersion = 4,
+        int accessibilitySourceSchemaVersion = 3,
+        int accessibilityFocusEventCount = 1,
+        int accessibilityLiveRegionEventCount = 1,
+        int? accessibilitySourceFocusEventCount = null,
+        bool accessibilityScreenReaderActive = true,
         int screenReaderApprovalCount = 1,
         int downloadSchemaVersion = 2,
         int cleanSchemaVersion = 2,
@@ -726,21 +770,48 @@ public sealed class ExternalReleaseGateTests : IDisposable
             "reduced_motion",
             "combined",
         };
-        var accessibilityEvidence = accessibilityProfiles.Select(profile =>
+        var accessibilityEvidence = accessibilityProfiles.Select((profile, index) =>
         {
+            var usesScreenReader = index == 0;
             var relativePath = $"accessibility.sources/accessibility-{profile}.json";
             WritePortableSource(relativePath, new
             {
-                schema_version = 2,
+                schema_version = accessibilitySourceSchemaVersion,
                 classification = "physical_accessibility_evidence",
                 source_commit = Commit,
                 expected_profile = profile,
-                human_review = new { status = "approved" },
+                assistive_technology_events = new
+                {
+                    transport = "windows_ui_automation_events",
+                    physical_keyboard_validated = true,
+                    focus_event_count = accessibilitySourceFocusEventCount
+                        ?? accessibilityFocusEventCount,
+                    live_region_event_count = accessibilityLiveRegionEventCount,
+                    expected_announcement = "fixture announcement",
+                    screen_reader_active_during_capture = usesScreenReader
+                        && accessibilityScreenReaderActive,
+                },
+                screen_reader = new
+                {
+                    name = usesScreenReader ? "Narrator" : "None",
+                    process_detected = usesScreenReader,
+                },
+                human_review = new
+                {
+                    status = "approved",
+                    checklist = new
+                    {
+                        screen_reader_announcements = usesScreenReader,
+                        management_close_announcements = usesScreenReader,
+                    },
+                },
             });
             return new
             {
                 profile,
                 source_commit = Commit,
+                focus_event_count = accessibilityFocusEventCount,
+                live_region_event_count = accessibilityLiveRegionEventCount,
                 source_manifest = EvidenceEntry(relativePath),
             };
         }).ToArray();
