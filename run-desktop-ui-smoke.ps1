@@ -215,6 +215,11 @@ public static class LongDesktopInput {
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr state);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr window, uint command);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    static extern IntPtr GetWindowLongPtr64(IntPtr window, int index);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    static extern IntPtr GetWindowLongPtr32(IntPtr window, int index);
     public static IntPtr[] TopLevelWindows(int processId) {
         var windows = new List<IntPtr>();
         EnumWindows((window, state) => {
@@ -224,6 +229,13 @@ public static class LongDesktopInput {
             return true;
         }, IntPtr.Zero);
         return windows.ToArray();
+    }
+    public static IntPtr OwnerWindow(IntPtr window) { return GetWindow(window, 4); }
+    public static bool HasTaskbarAppStyle(IntPtr window) {
+        IntPtr value = IntPtr.Size == 8
+            ? GetWindowLongPtr64(window, -20)
+            : GetWindowLongPtr32(window, -20);
+        return (value.ToInt64() & 0x00040000L) != 0;
     }
     public static bool Activate(IntPtr window) {
         uint ignored;
@@ -2116,6 +2128,72 @@ try {
     $developerDocumentSemantics = Get-AutomationSemantics `
         $developerDocument 'ControlType.Button' `
         'The Developer document button semantics failed.'
+
+    Write-Stage 'Validating owned Developer secondary windows and keyboard close.'
+    $managementHandle = [IntPtr]$managementMain.Current.NativeWindowHandle
+    Invoke-AutomationElement $developerDocument `
+        'The Developer document did not support InvokePattern.'
+    $docViewer = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $managementProcess.Id 'Long.Developer.DocViewer.Window'
+    } 'The Developer document viewer window was not discoverable.'
+    $docViewerHandle = [IntPtr]$docViewer.Current.NativeWindowHandle
+    if ([LongDesktopInput]::OwnerWindow($docViewerHandle) -ne $managementHandle -or
+        [LongDesktopInput]::HasTaskbarAppStyle($docViewerHandle)) {
+        throw 'The Developer document viewer did not preserve owned tool-window taskbar semantics.'
+    }
+    [LongDesktopInput]::Activate($docViewerHandle) | Out-Null
+    Start-Sleep -Milliseconds 700
+    [LongDesktopInput]::KeyPress(0x1B) | Out-Null
+    Wait-Until {
+        $null -eq (Find-ProcessElementByAutomationId `
+            $managementProcess.Id 'Long.Developer.DocViewer.Window')
+    } 'Escape did not close the Developer document viewer.' | Out-Null
+
+    $designOpen = Wait-Until {
+        Find-DescendantByAutomationId `
+            $managementMain 'Long.Developer.DesignPreview.Open'
+    } 'The Design System preview action was not discoverable.'
+    Invoke-AutomationElement $designOpen `
+        'The Design System preview action did not support InvokePattern.'
+    $designWindow = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $managementProcess.Id 'Long.Developer.DesignPreview.Window'
+    } 'The Design System preview window was not discoverable.'
+    $designHandle = [IntPtr]$designWindow.Current.NativeWindowHandle
+    if ([LongDesktopInput]::OwnerWindow($designHandle) -ne $managementHandle -or
+        [LongDesktopInput]::HasTaskbarAppStyle($designHandle)) {
+        throw 'The Design System preview did not preserve owned tool-window taskbar semantics.'
+    }
+    [LongDesktopInput]::Activate($designHandle) | Out-Null
+    [LongDesktopInput]::KeyPress(0x1B) | Out-Null
+    Wait-Until {
+        $null -eq (Find-ProcessElementByAutomationId `
+            $managementProcess.Id 'Long.Developer.DesignPreview.Window')
+    } 'Escape did not close the Design System preview.' | Out-Null
+
+    $workbenchOpen = Wait-Until {
+        Find-DescendantByAutomationId `
+            $managementMain 'Long.Developer.Workbench.Open'
+    } 'The plugin workbench action was not discoverable.'
+    Invoke-AutomationElement $workbenchOpen `
+        'The plugin workbench action did not support InvokePattern.'
+    $workbenchWindow = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $managementProcess.Id 'Long.Developer.Workbench.Window'
+    } 'The plugin workbench window was not discoverable.'
+    $workbenchHandle = [IntPtr]$workbenchWindow.Current.NativeWindowHandle
+    if ([LongDesktopInput]::OwnerWindow($workbenchHandle) -ne $managementHandle -or
+        [LongDesktopInput]::HasTaskbarAppStyle($workbenchHandle)) {
+        throw 'The plugin workbench did not preserve owned tool-window taskbar semantics.'
+    }
+    [LongDesktopInput]::Activate($workbenchHandle) | Out-Null
+    Start-Sleep -Milliseconds 900
+    [LongDesktopInput]::KeyPress(0x1B) | Out-Null
+    Wait-Until {
+        $null -eq (Find-ProcessElementByAutomationId `
+            $managementProcess.Id 'Long.Developer.Workbench.Window')
+    } 'Escape did not close the plugin workbench.' | Out-Null
     $developerClose = Wait-Until {
         Find-ProcessElementByAutomationId `
             $managementProcess.Id `
@@ -2174,6 +2252,8 @@ try {
         market_opened_as_module = $true
         settings_close_restored_root = $true
         developer_document_keyboard_access = $true
+        developer_secondary_windows_owned = $true
+        developer_secondary_windows_escape_close = $true
         developer_close_restored_root = $true
         market_tab_reactivated = $true
         market_close_restored_root = $true

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Input;
 using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Services;
 using Microsoft.Web.WebView2.Wpf;
@@ -117,16 +118,13 @@ namespace LongBetterWindows.Host.Views
 
         public PluginDevTools()
         {
+            InitializeComponent();
             _pluginsRoot = Path.Combine(AppContext.BaseDirectory, "Plugins");
             Directory.CreateDirectory(_pluginsRoot);
 
-            Width = 900; Height = 650;
-            MinWidth = 600; MinHeight = 400;
             Title = ServicesInitializer.I18n.T("developer.workbench.windowTitle");
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            WindowStyle = WindowStyle.ToolWindow;
             _webView = new WebView2();
-            Content = _webView;
+            WebViewHost.Children.Add(_webView);
 
             Loaded += async (_, _) =>
             {
@@ -137,11 +135,13 @@ namespace LongBetterWindows.Host.Views
                     _webView.CoreWebView2.NavigationStarting += OnNavigationStarting;
                     _webView.CoreWebView2.NavigationCompleted += OnNavigationCompleted;
                     ServicesInitializer.I18n.LanguageChanged += OnLanguageChanged;
+                    App.ThemeChanged += OnThemeChanged;
                     _languageSubscribed = true;
 
                     var htmlPath = FindHtmlPath();
                     if (htmlPath != null && File.Exists(htmlPath))
                         _webView.CoreWebView2.Navigate(new Uri(htmlPath).AbsoluteUri);
+                    _webView.Focus();
                 }
                 catch (Exception ex)
                 {
@@ -152,7 +152,10 @@ namespace LongBetterWindows.Host.Views
             Closed += (_, _) =>
             {
                 if (_languageSubscribed)
+                {
                     ServicesInitializer.I18n.LanguageChanged -= OnLanguageChanged;
+                    App.ThemeChanged -= OnThemeChanged;
+                }
                 if (_webView.CoreWebView2 != null)
                 {
                     _webView.CoreWebView2.WebMessageReceived -= OnJsMessage;
@@ -176,7 +179,10 @@ namespace LongBetterWindows.Host.Views
         {
             _pageReady = e.IsSuccess;
             if (_pageReady)
+            {
                 SendLocalization();
+                SendAppearance();
+            }
         }
 
         private void OnLanguageChanged(string language)
@@ -216,6 +222,33 @@ namespace LongBetterWindows.Host.Views
                 });
         }
 
+        private void OnThemeChanged(bool isLight)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => OnThemeChanged(isLight));
+                return;
+            }
+
+            SendAppearance();
+        }
+
+        private void SendAppearance()
+        {
+            if (!_pageReady)
+                return;
+
+            SendJs("appearance", new { theme = App.IsLightTheme ? "light" : "dark" });
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+                DragMove();
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
         public static void Open(Window owner)
         {
             var tools = new PluginDevTools { Owner = owner, Opacity = 0 };
@@ -252,6 +285,7 @@ namespace LongBetterWindows.Host.Views
                 case "newPlugin": NewPlugin(msg.Template ?? "web", msg.Name ?? "my-plugin", msg.Id ?? "com.example.plugin", msg.Capabilities); break;
                 case "listCapabilities": ListCapabilities(); break;
                 case "getLogs": GetPluginLogs(msg.Id ?? ""); break;
+                case "closeWindow": Close(); break;
             }
         }
 
@@ -367,22 +401,13 @@ namespace LongBetterWindows.Host.Views
 
             if (safePath.EndsWith(".html") || safePath.EndsWith(".htm"))
             {
-                var w = new Window
-                {
-                    Title = string.Format(
+                var preview = new PluginHtmlPreview(
+                    this,
+                    string.Format(
                         ServicesInitializer.I18n.T("developer.workbench.previewTitle"),
                         Path.GetFileName(safePath)),
-                    Width = 500, Height = 500,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                };
-                var wv = new WebView2();
-                w.Content = wv;
-                w.Loaded += async (_, _) =>
-                {
-                    await wv.EnsureCoreWebView2Async();
-                    wv.CoreWebView2.Navigate(new Uri(safePath).AbsoluteUri);
-                };
-                w.Show();
+                    safePath);
+                preview.Show();
             }
             else
             {

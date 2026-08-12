@@ -1,36 +1,41 @@
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Input;
 using LongBetterWindows.Host.Helpers;
 using Microsoft.Web.WebView2.Wpf;
-using Wpf.Ui.Appearance;
 
 namespace LongBetterWindows.Host.Views
 {
     public partial class DocViewer : Window
     {
         private readonly WebView2 _webView;
+        private string _markdown = string.Empty;
+        private bool _themeSubscribed;
 
         public DocViewer()
         {
-            Width = 800;
-            Height = 600;
-            MinWidth = 500;
-            MinHeight = 400;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            WindowStyle = WindowStyle.ToolWindow;
-            ShowInTaskbar = false;
-
+            InitializeComponent();
             _webView = new WebView2();
-            Content = _webView;
+            WebViewHost.Children.Add(_webView);
 
             Loaded += async (_, _) =>
             {
                 await _webView.EnsureCoreWebView2Async();
+                _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+                _webView.PreviewKeyDown += OnWebViewPreviewKeyDown;
+                App.ThemeChanged += OnThemeChanged;
+                _themeSubscribed = true;
+                _webView.Focus();
             };
 
             Closed += (_, _) =>
             {
+                if (_themeSubscribed)
+                    App.ThemeChanged -= OnThemeChanged;
+                if (_webView.CoreWebView2 != null)
+                    _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+                _webView.PreviewKeyDown -= OnWebViewPreviewKeyDown;
                 _webView.Dispose();
             };
         }
@@ -51,15 +56,14 @@ namespace LongBetterWindows.Host.Views
 
         private async void RenderMarkdown(string markdown)
         {
+            _markdown = markdown;
             try
             {
                 await _webView.EnsureCoreWebView2Async();
-                var isDark = Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme()
-                    == Wpf.Ui.Appearance.ApplicationTheme.Dark;
                 var html = BuildHtml(
                     title: Title,
                     markdown: markdown,
-                    isDark: isDark,
+                    isDark: !App.IsLightTheme,
                     language: Services.ServicesInitializer.I18n.CurrentLanguage);
                 _webView.CoreWebView2.NavigateToString(html);
             }
@@ -68,6 +72,42 @@ namespace LongBetterWindows.Host.Views
                 System.Diagnostics.Debug.WriteLine($"DocViewer render error: {ex.Message}");
             }
         }
+
+        private void OnThemeChanged(bool isLight)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => OnThemeChanged(isLight));
+                return;
+            }
+
+            RenderMarkdown(_markdown);
+        }
+
+        private void OnWebMessageReceived(
+            object? sender,
+            Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+        {
+            if (e.TryGetWebMessageAsString() == "closeWindow")
+                Close();
+        }
+
+        private void OnWebViewPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape)
+                return;
+
+            e.Handled = true;
+            Close();
+        }
+
+        private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+                DragMove();
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
         private static string BuildHtml(
             string title,
@@ -104,6 +144,8 @@ namespace LongBetterWindows.Host.Views
             sb.AppendLine($"blockquote{{border-left:3px solid {accent};padding-left:16px;color:{blockquote};margin:12px 0;}}");
             sb.AppendLine($"hr{{border:none;border-top:1px solid {border};margin:24px 0;}}");
             sb.AppendLine($"strong{{color:{text};}}");
+            sb.AppendLine("*{scrollbar-width:thin;scrollbar-color:#7C879E transparent;}");
+            sb.AppendLine("::-webkit-scrollbar{width:10px;height:10px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:#7C879E;border:3px solid transparent;border-radius:8px;background-clip:padding-box;}::-webkit-scrollbar-thumb:hover{background:#626D82;background-clip:padding-box;}");
             sb.AppendLine("</style></head><body>");
 
             // Markdown content (must be before renderer script so it exists in DOM when JS runs)
@@ -129,7 +171,7 @@ namespace LongBetterWindows.Host.Views
             // Horizontal rule
             sb.AppendLine("  .replace(/^---+$/gm, '<hr>')");
             // Blockquotes
-            sb.AppendLine("  .replace(/^>(.+)$/gm, '<blockquote>$1</blockquote>')");
+            sb.AppendLine("  .replace(/^&gt;\\s*(.*)$/gm, function(_,text){text=text.replace(/^&gt;\\s*/, '');return text ? '<blockquote>'+text+'</blockquote>' : '';})");
             // Links
             sb.AppendLine("  .replace(/\\[(.+?)\\]\\((.+?)\\)/g, '<a href=\"$2\">$1</a>')");
             // Tables
@@ -152,6 +194,7 @@ namespace LongBetterWindows.Host.Views
             sb.AppendLine("  html = html.trim();");
             sb.AppendLine("document.body.innerHTML = html;");
             sb.AppendLine("})();");
+            sb.AppendLine("document.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();window.chrome.webview.postMessage('closeWindow');}},true);");
             sb.AppendLine("</script>");
 
             sb.AppendLine("</body></html>");

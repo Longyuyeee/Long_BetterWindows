@@ -1491,6 +1491,9 @@ public class QualityGateTests
         Assert.Contains("duration == TimeSpan.Zero", animation);
         Assert.Contains("prefers-reduced-motion: reduce", devTools);
         Assert.Contains(":focus-visible", devTools);
+        Assert.Contains(":root[data-long-theme=\"light\"]", devTools);
+        Assert.Contains("case 'appearance':", devTools);
+        Assert.Contains("::-webkit-scrollbar-thumb", devTools);
         Assert.Contains("ReadArgument(arguments, \"--theme\")", options);
         Assert.Contains("--run-command", options);
         Assert.Contains("--plugins-dir", options);
@@ -2123,6 +2126,48 @@ public class QualityGateTests
         Assert.Contains("PluginRunRequested?.Invoke", code);
         Assert.Contains("current[targetIndex] != target", projection);
         Assert.Contains("<local:InstalledPluginRailControl", shell);
+    }
+
+    [Fact]
+    public void DeveloperSecondaryWindows_FollowOwnedToolWindowContract()
+    {
+        var developer = Read("src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml");
+        var docXaml = Read("src", "LongBetterWindows.Host", "Views", "DocViewer.xaml");
+        var docCode = Read("src", "LongBetterWindows.Host", "Views", "DocViewer.xaml.cs");
+        var designXaml = Read("src", "LongBetterWindows.Host", "Views", "DesignSystemPreview.xaml");
+        var designCode = Read("src", "LongBetterWindows.Host", "Views", "DesignSystemPreview.xaml.cs");
+        var workbenchXaml = Read("src", "LongBetterWindows.Host", "Views", "PluginDevTools.xaml");
+        var workbenchCode = Read("src", "LongBetterWindows.Host", "Views", "PluginDevTools.xaml.cs");
+        var htmlPreviewXaml = Read("src", "LongBetterWindows.Host", "Views", "PluginHtmlPreview.xaml");
+        var htmlPreviewCode = Read("src", "LongBetterWindows.Host", "Views", "PluginHtmlPreview.xaml.cs");
+
+        Assert.Contains("Long.Developer.Workbench.Open", developer);
+        Assert.Contains("Long.Developer.DesignPreview.Open", developer);
+        Assert.All(
+            new[] { docXaml, designXaml, workbenchXaml, htmlPreviewXaml },
+            xaml =>
+            {
+                Assert.Contains("Style=\"{StaticResource LongWindowChrome}\"", xaml);
+                Assert.Contains("ShowInTaskbar=\"False\"", xaml);
+                Assert.Contains("WindowStartupLocation=\"CenterOwner\"", xaml);
+            });
+        Assert.Contains("Long.Developer.DocViewer.Window", docXaml);
+        Assert.Contains("Long.Developer.DesignPreview.Window", designXaml);
+        Assert.Contains("Long.Developer.Workbench.Window", workbenchXaml);
+        Assert.Contains("Long.Developer.HtmlPreview.Window", htmlPreviewXaml);
+        Assert.Contains("App.ThemeChanged += OnThemeChanged", docCode);
+        Assert.Contains("App.ThemeChanged -= OnThemeChanged", docCode);
+        Assert.Contains("postMessage('closeWindow')", docCode);
+        Assert.Contains("::-webkit-scrollbar-thumb", docCode);
+        Assert.Contains("/^&gt;\\\\s*(.*)$/gm", docCode);
+        Assert.Contains("_webView.PreviewKeyDown += OnWebViewPreviewKeyDown", docCode);
+        Assert.Contains("Window_PreviewKeyDown", designCode);
+        Assert.Contains("App.ThemeChanged += OnThemeChanged", workbenchCode);
+        Assert.Contains("App.ThemeChanged -= OnThemeChanged", workbenchCode);
+        Assert.Contains("case \"closeWindow\": Close()", workbenchCode);
+        Assert.Contains("new PluginHtmlPreview(", workbenchCode);
+        Assert.Contains("Owner = owner", htmlPreviewCode);
+        Assert.Contains("WebView_PreviewKeyDown", htmlPreviewCode);
     }
 
     [Fact]

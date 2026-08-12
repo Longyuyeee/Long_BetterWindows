@@ -40,8 +40,9 @@
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
                 </StackPanel>
                 <Button Grid.Column="1" Content="{DynamicResource i18n.action.open}"
-                        Style="{StaticResource LongButton.Primary}" Click="DevTools_Click"
-                        AutomationProperties.Name="{DynamicResource i18n.developer.workbench.openA11y}"/>
+                         Style="{StaticResource LongButton.Primary}" Click="DevTools_Click"
+                         AutomationProperties.AutomationId="Long.Developer.Workbench.Open"
+                         AutomationProperties.Name="{DynamicResource i18n.developer.workbench.openA11y}"/>
             </Grid>
         </Border>
         <Border x:Name="DesignCard" Grid.Column="2"
@@ -55,8 +56,9 @@
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
                 </StackPanel>
                 <Button Grid.Column="1" Content="{DynamicResource i18n.developer.design.preview}"
-                        Style="{StaticResource LongButton}" Click="DesignSystemPreview_Click"
-                        AutomationProperties.Name="{DynamicResource i18n.developer.design.previewA11y}"/>
+                         Style="{StaticResource LongButton}" Click="DesignSystemPreview_Click"
+                         AutomationProperties.AutomationId="Long.Developer.DesignPreview.Open"
+                         AutomationProperties.Name="{DynamicResource i18n.developer.design.previewA11y}"/>
             </Grid>
         </Border>
         <Border x:Name="DocsCard" Grid.Row="1"
