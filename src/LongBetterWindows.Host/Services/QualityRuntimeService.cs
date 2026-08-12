@@ -1038,6 +1038,12 @@ namespace LongBetterWindows.Host.Services
             _application.Shutdown(passed ? 0 : 6);
         }
 
+        public Task RunWorkspaceSwitchProbeAsync(
+            MainWindow mainWindow,
+            string reportPath)
+            => new WorkspaceSwitchQualityProbe(_application)
+                .RunAsync(mainWindow, reportPath);
+
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
         {
             var originalTheme = App.IsLightTheme;

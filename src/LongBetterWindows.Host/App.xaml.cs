@@ -390,6 +390,20 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityWorkspaceSwitchReportPath))
+                {
+                    if (MainWindow is not MainWindow workspaceSwitchWindow)
+                    {
+                        throw new InvalidOperationException(
+                            "Workspace switch probe requires the main window.");
+                    }
+                    await _qualityRuntime!.RunWorkspaceSwitchProbeAsync(
+                        workspaceSwitchWindow,
+                        _startupOptions.QualityWorkspaceSwitchReportPath);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId))
                 {
                     if (MainWindow is not MainWindow runtimeWindow)
@@ -479,6 +493,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityPluginRuntimeSessionReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityWebViewLifecycleReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityWorkspaceSwitchReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId)
                     || !string.IsNullOrWhiteSpace(

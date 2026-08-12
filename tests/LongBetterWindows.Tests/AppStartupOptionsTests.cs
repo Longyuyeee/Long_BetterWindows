@@ -42,6 +42,7 @@ public class AppStartupOptionsTests
             "--quality-plugin-page-performance-report", "plugin-performance.json",
             "--quality-plugin-runtime-session-report", "plugin-runtime-session.json",
             "--quality-webview-lifecycle-report", "webview-lifecycle.json",
+            "--quality-workspace-switch-report", "workspace-switch.json",
             "--quality-taskbar-identity-report", "taskbar-identity.json",
             "--quality-ui-service-theme-report", "ui-service-theme.json",
             "--quality-themed-message-dialog-report", "message-dialog.json",
@@ -104,6 +105,9 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "webview-lifecycle.json",
             options.QualityWebViewLifecycleReportPath);
+        Assert.Equal(
+            "workspace-switch.json",
+            options.QualityWorkspaceSwitchReportPath);
         Assert.Equal(
             "taskbar-identity.json",
             options.QualityTaskbarIdentityReportPath);

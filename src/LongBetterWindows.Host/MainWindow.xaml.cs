@@ -482,6 +482,18 @@ namespace LongBetterWindows.Host
         internal WorkspaceModuleKey GetActiveWorkspaceModuleKeyForQuality()
             => ServicesInitializer.Workspace.State.ActiveModuleKey;
 
+        internal (int Total, int PluginRuntime) GetWorkspaceModuleCountsForQuality()
+        {
+            var modules = ServicesInitializer.Workspace.State.Modules;
+            return (
+                modules.Count,
+                modules.Count(module => module.Key.Kind == "plugin-runtime"));
+        }
+
+        internal Task OpenManagementPageForQualityAsync(
+            WorkspaceManagementPage page)
+            => OpenManagementPageAsync(page);
+
         internal bool HasPluginRuntimeModuleForQuality(string sessionId)
             => ServicesInitializer.Workspace.State.Modules.Any(module =>
                 module.Key.Kind == "plugin-runtime"
