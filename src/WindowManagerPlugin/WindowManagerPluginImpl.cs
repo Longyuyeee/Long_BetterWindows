@@ -130,6 +130,16 @@ public class WindowManagerPluginImpl :
             }
 
             _guide = new WindowManagerGuide(CreateGuideLocalization());
+            var owner = Application.Current.Windows
+                .OfType<Window>()
+                .FirstOrDefault(window =>
+                    window.IsActive
+                    && window.IsVisible
+                    && !ReferenceEquals(window, _guide));
+            if (owner is not null)
+                _guide.Owner = owner;
+            else
+                _guide.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             _guide.Closed += (_, _) => _guide = null;
             _guide.Show();
         });

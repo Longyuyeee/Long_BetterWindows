@@ -2,18 +2,22 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="窗口管理" Width="560" Height="590" SizeToContent="Manual"
+        Title="窗口管理" Width="560" Height="500" SizeToContent="Manual"
         Background="Transparent"
         Foreground="{DynamicResource Long.Brush.Text.Primary}"
         FontFamily="{DynamicResource Long.Font.Ui}"
         WindowStyle="None" ResizeMode="NoResize"
-        WindowStartupLocation="CenterScreen">
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        AutomationProperties.AutomationId="Long.WindowManager.Guide.Window"
+        PreviewKeyDown="Window_PreviewKeyDown">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="42" CornerRadius="14"
                             GlassFrameThickness="0" ResizeBorderThickness="6"
                             UseAeroCaptionButtons="True" />
     </shell:WindowChrome.WindowChrome>
-    <Border Style="{StaticResource LongCard}" Padding="24">
+    <Border Background="{DynamicResource Long.Brush.Surface.Card}"
+            BorderBrush="{DynamicResource Long.Brush.Border.Default}"
+            BorderThickness="1" CornerRadius="14" Padding="24">
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <Grid>
@@ -22,11 +26,17 @@
                     <TextBlock x:Name="DescriptionText" Text="用统一指令或快捷键整理当前窗口" Margin="0,6,0,0"
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                 </StackPanel>
-                <Button x:Name="CloseButton" HorizontalAlignment="Right" VerticalAlignment="Top" Content="×"
+                <Button x:Name="CloseButton" HorizontalAlignment="Right" VerticalAlignment="Top"
                         Style="{StaticResource LongIconButton}" Click="Close_Click"
-                        AutomationProperties.Name="关闭窗口管理指南" />
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                        AutomationProperties.AutomationId="Long.WindowManager.Guide.Close"
+                        AutomationProperties.Name="关闭窗口管理指南">
+                    <Path Data="{StaticResource Long.Icon.Close}" Style="{StaticResource LongIcon}"
+                          Width="13" Height="13" />
+                </Button>
             </Grid>
-            <ScrollViewer Grid.Row="1" Margin="0,22,0,18" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Grid.Row="1" Margin="0,22,0,18"
+                          VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <TextBlock x:Name="CommonTitleText" Text="常用操作" FontWeight="SemiBold" Foreground="{DynamicResource Long.Brush.Accent.Primary}" />
                     <UniformGrid Columns="2" Margin="0,8,0,18">

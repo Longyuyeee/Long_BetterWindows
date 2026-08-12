@@ -1808,6 +1808,8 @@ public class QualityGateTests
             Read("src", "ScreenshotPlugin", "RegionSelectorWindow.xaml"));
         Assert.Contains("AutomationProperties.Name=\"关闭窗口管理指南\"",
             Read("src", "WindowManagerPlugin", "WindowManagerGuide.xaml"));
+        Assert.Contains("Long.WindowManager.Guide.Window",
+            Read("src", "WindowManagerPlugin", "WindowManagerGuide.xaml"));
 
         var toolCenter = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
         Assert.Contains("Keyboard.Modifiers.HasFlag(ModifierKeys.Control)", toolCenter);

@@ -118,7 +118,7 @@ public partial class AnchoredTextEditorWindow : Window
     private void Window_Activated(object sender, EventArgs e)
         => _closeDelay?.Cancel();
 
-    private async void Window_KeyDown(object sender, KeyEventArgs e)
+    private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Escape)
         {

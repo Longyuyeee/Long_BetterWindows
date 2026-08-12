@@ -1179,6 +1179,8 @@ public class DesignSystemTests
         Assert.Contains("window.topmost", manager);
         Assert.Contains("State = PluginState.Running", manager);
         Assert.Contains("Long.Brush.", guide);
+        Assert.Contains("Long.Icon.Close", guide);
+        Assert.DoesNotContain("Content=\"×\"", guide);
     }
 
     [Fact]

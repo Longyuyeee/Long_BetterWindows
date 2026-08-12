@@ -429,10 +429,27 @@ public sealed class ReleaseBlockingRegressionTests
                 "src",
                 "WindowManagerPlugin",
                 "WindowManagerGuide.xaml"));
+        var guideCode = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src",
+                "WindowManagerPlugin",
+                "WindowManagerGuide.xaml.cs"));
+        var implementation = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src",
+                "WindowManagerPlugin",
+                "WindowManagerPluginImpl.cs"));
 
         Assert.DoesNotContain("StaticResource LongDialog", guide);
         Assert.Contains("WindowChrome.WindowChrome", guide);
         Assert.Contains("DynamicResource Long.Brush.Text.Primary", guide);
+        Assert.Contains("ShowInTaskbar=\"False\"", guide);
+        Assert.Contains("WindowStartupLocation=\"CenterOwner\"", guide);
+        Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", guide);
+        Assert.Contains("e.Key != Key.Escape", guideCode);
+        Assert.Contains("_guide.Owner = owner", implementation);
     }
 
     [Fact]
@@ -693,6 +710,11 @@ public sealed class ReleaseBlockingRegressionTests
             "src",
             "LongBetterWindows.PluginSdk.Wpf",
             "AnchoredTextEditorWindow.xaml.cs"));
+        var editorXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.PluginSdk.Wpf",
+            "AnchoredTextEditorWindow.xaml"));
         var folderNote = File.ReadAllText(Path.Combine(
             root,
             "src",
@@ -730,6 +752,10 @@ public sealed class ReleaseBlockingRegressionTests
 
         Assert.Contains("Func<string, Task> _onSave", hud);
         Assert.Contains("await _onSave(Editor.Text)", hud);
+        Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", editorXaml);
+        Assert.DoesNotContain(" KeyDown=\"Window_KeyDown\"", editorXaml);
+        Assert.Contains("Long.Sdk.AnchoredTextEditor.Window", editorXaml);
+        Assert.Contains("Long.Sdk.AnchoredTextEditor.Input", editorXaml);
         Assert.DoesNotContain("Editor.Text.Trim()", hud);
         Assert.Contains("await _onSave(NoteTextBox.Text)", floatingHud);
         Assert.DoesNotContain("NoteTextBox.Text.Trim()", floatingHud);

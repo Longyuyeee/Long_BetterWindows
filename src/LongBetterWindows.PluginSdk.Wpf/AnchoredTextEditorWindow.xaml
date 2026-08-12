@@ -8,9 +8,10 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
+        AutomationProperties.AutomationId="Long.Sdk.AnchoredTextEditor.Window"
         Deactivated="Window_Deactivated"
         Activated="Window_Activated"
-        KeyDown="Window_KeyDown"
+        PreviewKeyDown="Window_PreviewKeyDown"
         Loaded="Window_Loaded">
     <Border Style="{DynamicResource LongToast}">
         <StackPanel Width="320">
@@ -26,6 +27,7 @@
                        Margin="0,0,0,10"
                        TextTrimming="CharacterEllipsis" />
             <TextBox x:Name="Editor"
+                     AutomationProperties.AutomationId="Long.Sdk.AnchoredTextEditor.Input"
                      FontSize="14"
                      CaretBrush="{DynamicResource Long.Brush.Accent.Primary}"
                      BorderThickness="0"

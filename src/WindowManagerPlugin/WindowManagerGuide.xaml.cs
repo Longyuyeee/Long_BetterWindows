@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Input;
 
 namespace WindowManagerPlugin;
 
@@ -55,4 +56,13 @@ public partial class WindowManagerGuide : Window
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape)
+            return;
+
+        e.Handled = true;
+        Close();
+    }
 }
