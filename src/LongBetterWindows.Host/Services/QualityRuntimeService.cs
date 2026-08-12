@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -921,6 +922,120 @@ namespace LongBetterWindows.Host.Services
             if (result != PluginMainUiOpenStatus.Opened)
                 throw new InvalidOperationException(
                     $"Quality runtime plugin could not open: {pluginId} ({result})");
+        }
+
+        public async Task RunWebViewLifecycleProbeAsync(
+            MainWindow mainWindow,
+            string reportPath)
+        {
+            const string pluginId = "com.long.base64";
+            const int cycleCount = 16;
+            var entry = HostProvider.Instance.PluginStore.Get(pluginId)
+                ?? throw new InvalidOperationException(
+                    $"Quality WebView plugin was not found: {pluginId}");
+            var samples = new List<WebViewLifecycleResourceSample>();
+            var cycleResults = new List<WebViewLifecycleCycleResult>();
+
+            mainWindow.Hide();
+            for (var cycle = 1; cycle <= cycleCount; cycle++)
+            {
+                await OpenPluginRuntimeAsync(mainWindow, pluginId);
+                var opened = await WaitUntilAsync(
+                    () =>
+                    {
+                        var state = mainWindow.GetPluginRuntimeQualityState();
+                        return state.IsVisible
+                            && state.SessionId is not null
+                            && mainWindow.GetPluginRuntimeContentForQuality()
+                                is WebView2 { CoreWebView2: not null };
+                    },
+                    15_000);
+                var openedState = mainWindow.GetPluginRuntimeQualityState();
+                samples.Add(CaptureProcessResources(cycle, "opened"));
+
+                var endRequested = opened
+                    && await mainWindow.EndPluginRuntimeForQualityAsync();
+                var released = endRequested && await WaitUntilAsync(
+                    () =>
+                    {
+                        var state = mainWindow.GetPluginRuntimeQualityState();
+                        return entry.State == PluginState.Stopped
+                            && state.ContentIdentity == 0
+                            && (openedState.SessionId is null
+                                || ServicesInitializer.PluginSessions
+                                    .GetBySessionId(openedState.SessionId) is null);
+                    },
+                    15_000);
+
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.ContextIdle);
+                await Task.Delay(400);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                samples.Add(CaptureProcessResources(cycle, "released"));
+                cycleResults.Add(new WebViewLifecycleCycleResult(
+                    cycle,
+                    opened,
+                    endRequested,
+                    released,
+                    openedState.SessionId));
+            }
+
+            var releasedSamples = samples
+                .Where(sample => sample.Stage == "released")
+                .ToArray();
+            var warm = releasedSamples.First();
+            var final = releasedSamples.Last();
+            var growth = WebViewLifecycleGrowthPolicy.Evaluate(
+                warm.HandleCount,
+                final.HandleCount,
+                warm.ThreadCount,
+                final.ThreadCount,
+                warm.PrivateMemoryBytes,
+                final.PrivateMemoryBytes);
+            var lifecyclePassed = cycleResults.All(result =>
+                result.Opened && result.EndRequested && result.Released);
+            var growthPassed = growth.Passed;
+            var passed = lifecyclePassed && growthPassed;
+            var fullPath = Path.GetFullPath(reportPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await File.WriteAllTextAsync(
+                fullPath,
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        schema_version = 1,
+                        captured_at = DateTimeOffset.UtcNow,
+                        classification = "development_webview_lifecycle",
+                        plugin_id = pluginId,
+                        cycle_count = cycleCount,
+                        passed,
+                        lifecycle_passed = lifecyclePassed,
+                        growth_passed = growthPassed,
+                        warm_baseline_cycle = warm.Cycle,
+                        growth = new
+                        {
+                            handle_count = growth.HandleCount,
+                            thread_count = growth.ThreadCount,
+                            private_memory_bytes = growth.PrivateMemoryBytes,
+                        },
+                        limits = new
+                        {
+                            handle_count =
+                                WebViewLifecycleGrowthPolicy.MaximumHandleGrowth,
+                            thread_count =
+                                WebViewLifecycleGrowthPolicy.MaximumThreadGrowth,
+                            private_memory_bytes =
+                                WebViewLifecycleGrowthPolicy
+                                    .MaximumPrivateMemoryGrowthBytes,
+                        },
+                        cycles = cycleResults,
+                        samples,
+                    },
+                    new JsonSerializerOptions { WriteIndented = true }));
+            _application.Shutdown(passed ? 0 : 6);
         }
 
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
@@ -2074,6 +2189,23 @@ namespace LongBetterWindows.Host.Services
             return condition();
         }
 
+        private static WebViewLifecycleResourceSample CaptureProcessResources(
+            int cycle,
+            string stage)
+        {
+            using var process = Process.GetCurrentProcess();
+            process.Refresh();
+            return new WebViewLifecycleResourceSample(
+                cycle,
+                stage,
+                DateTimeOffset.UtcNow,
+                process.HandleCount,
+                process.Threads.Count,
+                process.PrivateMemorySize64,
+                process.WorkingSet64,
+                GC.GetTotalMemory(forceFullCollection: false));
+        }
+
         private static bool ConfigSettingEquals(
             string configPath,
             string key,
@@ -2210,6 +2342,23 @@ namespace LongBetterWindows.Host.Services
             double PrimaryButtonContrast,
             double SecondaryButtonContrast,
             bool Passed);
+
+        private sealed record WebViewLifecycleResourceSample(
+            int Cycle,
+            string Stage,
+            DateTimeOffset CapturedAt,
+            int HandleCount,
+            int ThreadCount,
+            long PrivateMemoryBytes,
+            long WorkingSetBytes,
+            long ManagedMemoryBytes);
+
+        private sealed record WebViewLifecycleCycleResult(
+            int Cycle,
+            bool Opened,
+            bool EndRequested,
+            bool Released,
+            string? SessionId);
 
         private sealed record ThemedMessageDialogSnapshot(
             string Theme,

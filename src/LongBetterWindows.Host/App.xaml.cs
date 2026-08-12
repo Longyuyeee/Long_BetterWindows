@@ -376,6 +376,20 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityWebViewLifecycleReportPath))
+                {
+                    if (MainWindow is not MainWindow webViewLifecycleWindow)
+                    {
+                        throw new InvalidOperationException(
+                            "WebView lifecycle probe requires the main window.");
+                    }
+                    await _qualityRuntime!.RunWebViewLifecycleProbeAsync(
+                        webViewLifecycleWindow,
+                        _startupOptions.QualityWebViewLifecycleReportPath);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId))
                 {
                     if (MainWindow is not MainWindow runtimeWindow)
@@ -463,6 +477,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityPluginPagePerformanceReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeSessionReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityWebViewLifecycleReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId)
                     || !string.IsNullOrWhiteSpace(
