@@ -72,6 +72,10 @@
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          AutomationProperties.Name="{DynamicResource i18n.diagnostics.health.listA11y}">
+                    <ListBox.Resources>
+                        <Style TargetType="ScrollBar"
+                               BasedOn="{StaticResource DarkScrollBarStyle}" />
+                    </ListBox.Resources>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
                             <Setter Property="Padding" Value="0" />

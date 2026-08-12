@@ -195,6 +195,10 @@
                      PreviewKeyDown="PluginList_PreviewKeyDown"
                      AutomationProperties.Name="{DynamicResource plugins.list}"
                      AutomationProperties.AutomationId="Long.Workspace.PluginRail.List">
+                <ListBox.Resources>
+                    <Style TargetType="ScrollBar"
+                           BasedOn="{StaticResource DarkScrollBarStyle}" />
+                </ListBox.Resources>
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <VirtualizingStackPanel />

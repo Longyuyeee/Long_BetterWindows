@@ -56,6 +56,7 @@
         <ComboBox x:Name="CompactCategorySelector"
                   Grid.ColumnSpan="3"
                   Margin="0,0,0,16"
+                  Style="{StaticResource LongComboBox}"
                   Visibility="Collapsed"
                   SelectionChanged="CategorySelector_SelectionChanged"
                   automation:AutomationProperties.Name="{DynamicResource i18n.settings.category.selector}"
@@ -99,6 +100,7 @@
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
                 </StackPanel>
                 <ComboBox x:Name="LanguageSelector" Grid.Column="1" Width="156"
+                          Style="{StaticResource LongComboBox}"
                           VerticalAlignment="Center"
                           SelectionChanged="LanguageSelector_SelectionChanged">
                     <ComboBoxItem Tag="zh-CN"

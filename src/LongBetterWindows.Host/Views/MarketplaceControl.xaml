@@ -127,6 +127,10 @@
                              SelectionChanged="MarketList_SelectionChanged"
                              PreviewMouseLeftButtonUp="MarketList_PreviewMouseLeftButtonUp"
                              ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.Resources>
+                            <Style TargetType="ScrollBar"
+                                   BasedOn="{StaticResource DarkScrollBarStyle}" />
+                        </ListBox.Resources>
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
                                 <Setter Property="Padding" Value="10" />
@@ -349,6 +353,7 @@
                         </Button>
                     </Grid>
                     <ScrollViewer Grid.Row="1" Margin="0,8,0,0"
+                                  Style="{StaticResource DarkScrollViewerStyle}"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,8,0">

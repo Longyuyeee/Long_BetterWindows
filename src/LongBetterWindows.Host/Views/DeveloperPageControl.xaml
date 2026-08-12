@@ -52,7 +52,9 @@
                 <TextBlock Text="{DynamicResource i18n.developer.docs.title}" FontSize="14" FontWeight="SemiBold"/>
                 <TextBlock Text="{DynamicResource i18n.developer.docs.desc}" Margin="0,5,0,8"
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
-                <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer MaxHeight="240"
+                              Style="{StaticResource DarkScrollViewerStyle}"
+                              VerticalScrollBarVisibility="Auto">
                     <StackPanel x:Name="DocLinksPanel"/>
                 </ScrollViewer>
             </StackPanel>

@@ -810,6 +810,38 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void CoreInteractiveControls_DoNotFallBackToNativeWpfChrome()
+    {
+        var root = FindRepositoryRoot();
+        var settings = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml"));
+        var pluginSettings = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "PluginSettingsModuleControl.xaml"));
+        var workflowEditor = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "WorkflowEditorControl.xaml"));
+        var pluginRail = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "InstalledPluginRailControl.xaml"));
+        var marketplace = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml"));
+        var performance = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "PerformancePanel.xaml"));
+        var developer = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "DeveloperPageControl.xaml"));
+
+        Assert.Equal(2, Count(settings, "Style=\"{StaticResource LongComboBox}\""));
+        Assert.Contains("Style=\"{StaticResource LongCheckBox}\"", pluginSettings);
+        Assert.Equal(2, Count(workflowEditor, "Style=\"{StaticResource LongCheckBox}\""));
+        Assert.Equal(2, Count(
+            workflowEditor,
+            "BasedOn=\"{StaticResource DarkScrollBarStyle}\""));
+        Assert.Contains("BasedOn=\"{StaticResource DarkScrollBarStyle}\"", pluginRail);
+        Assert.Contains("BasedOn=\"{StaticResource DarkScrollBarStyle}\"", marketplace);
+        Assert.Contains("Style=\"{StaticResource DarkScrollViewerStyle}\"", marketplace);
+        Assert.Contains("BasedOn=\"{StaticResource DarkScrollBarStyle}\"", performance);
+        Assert.Contains("Style=\"{StaticResource DarkScrollViewerStyle}\"", developer);
+    }
+
+    [Fact]
     public void TranslatePlugin_BoundsInputAndRejectsStaleNetworkResults()
     {
         var root = FindRepositoryRoot();
@@ -1155,6 +1187,19 @@ public class DesignSystemTests
 
     private static XDocument LoadXaml(params string[] pathParts)
         => XDocument.Load(Path.Combine(new[] { FindRepositoryRoot() }.Concat(pathParts).ToArray()));
+
+    private static int Count(string source, string value)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = source.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+
+        return count;
+    }
 
     private static HashSet<string> GetResourceKeys(XDocument document)
     {

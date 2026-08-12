@@ -58,6 +58,10 @@
                      automation:AutomationProperties.Name="{DynamicResource i18n.workflow.local.list}"
                      SelectionChanged="WorkflowList_SelectionChanged"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.Resources>
+                    <Style TargetType="ScrollBar"
+                           BasedOn="{StaticResource DarkScrollBarStyle}" />
+                </ListBox.Resources>
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
                         <Setter Property="Margin" Value="0,0,0,5" />
@@ -318,7 +322,9 @@
                         <TextBlock x:Name="PreflightTitle" FontWeight="SemiBold" />
                         <TextBlock x:Name="PreflightDetail" Margin="0,4,0,0" TextWrapping="Wrap"
                                    FontSize="11" Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
-                        <CheckBox x:Name="SensitiveInputCheckBox" Content="{DynamicResource i18n.workflow.sensitive.allowSave}"
+                        <CheckBox x:Name="SensitiveInputCheckBox"
+                                  Style="{StaticResource LongCheckBox}"
+                                  Content="{DynamicResource i18n.workflow.sensitive.allowSave}"
                                   Margin="0,9,0,0" Visibility="Collapsed"
                                   automation:AutomationProperties.Name="{DynamicResource i18n.workflow.sensitive.allowSaveA11y}" />
                     </StackPanel>
@@ -352,6 +358,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <CheckBox x:Name="TerminalOutputApprovalCheckBox"
+                                  Style="{StaticResource LongCheckBox}"
                                   automation:AutomationProperties.AutomationId="Long.Workflow.ExecutionReview.TerminalOutput"
                                   Content="{DynamicResource i18n.workflow.execution.review.terminalApproval}"
                                   Margin="0,9,0,0"
@@ -462,6 +469,10 @@
                         <ListBox x:Name="ReportList" MaxHeight="220" Background="Transparent" BorderThickness="0"
                                  SelectionChanged="ReportList_SelectionChanged"
                                  automation:AutomationProperties.Name="{DynamicResource i18n.workflow.reports.list}">
+                            <ListBox.Resources>
+                                <Style TargetType="ScrollBar"
+                                       BasedOn="{StaticResource DarkScrollBarStyle}" />
+                            </ListBox.Resources>
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource LongCommandItem}">
                                     <Setter Property="Margin" Value="0,0,0,5" />

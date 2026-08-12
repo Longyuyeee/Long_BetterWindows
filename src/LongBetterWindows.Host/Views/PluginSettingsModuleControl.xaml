@@ -178,6 +178,7 @@
                                             <StackPanel Grid.Column="1"
                                                         VerticalAlignment="Center">
                                                 <CheckBox Tag="{Binding Key}"
+                                                          Style="{StaticResource LongCheckBox}"
                                                           Content="{DynamicResource i18n.plugins.command.enabled}"
                                                           IsChecked="{Binding IsEnabled, Mode=OneWay}"
                                                           Margin="0,0,0,8"
