@@ -1851,10 +1851,10 @@ try {
     } 'Clearing management search did not restore the Settings destination.'
     $destinationFocusOrder = @()
     $destinationIds = @(
-        'Long.Management.Destination.Overview',
-        'Long.Management.Destination.Workflows',
         'Long.Management.Destination.Plugins',
         'Long.Management.Destination.Market',
+        'Long.Management.Destination.Workflows',
+        'Long.Management.Destination.Widgets',
         'Long.Management.Destination.System',
         'Long.Management.Destination.Diagnostics',
         'Long.Management.Destination.Developer',

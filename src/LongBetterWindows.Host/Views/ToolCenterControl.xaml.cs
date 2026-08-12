@@ -91,48 +91,25 @@ namespace LongBetterWindows.Host.Views
                 ? new Thickness(18, 0, 18, 18)
                 : new Thickness(32, 0, 32, 32);
             ManagementDestinationGrid.Columns = isNarrow ? 2 : 4;
+            ManagementUtilityGrid.Columns = isNarrow ? 2 : 4;
 
             if (isNarrow)
             {
-                OverviewPrimaryColumn.Width = new GridLength(1, GridUnitType.Star);
-                OverviewGapColumn.Width = new GridLength(0);
-                OverviewStatusColumn.Width = new GridLength(0);
-                Grid.SetRow(OverviewStatusCard, 1);
-                Grid.SetColumn(OverviewStatusCard, 0);
-                OverviewStatusCard.Margin = new Thickness(0, 12, 0, 0);
                 WelcomeTextColumn.Width = new GridLength(1, GridUnitType.Star);
                 WelcomeActionColumn.Width = new GridLength(0);
                 Grid.SetRow(WelcomeDismissButton, 1);
                 Grid.SetColumn(WelcomeDismissButton, 0);
                 WelcomeDismissButton.HorizontalAlignment = HorizontalAlignment.Left;
                 WelcomeDismissButton.Margin = new Thickness(0, 12, 0, 0);
-                OverviewLaunchTextColumn.Width = new GridLength(1, GridUnitType.Star);
-                OverviewLaunchActionColumn.Width = new GridLength(0);
-                Grid.SetRow(OverviewLaunchButton, 1);
-                Grid.SetColumn(OverviewLaunchButton, 0);
-                OverviewLaunchButton.HorizontalAlignment = HorizontalAlignment.Left;
-                OverviewLaunchButton.Margin = new Thickness(0, 14, 0, 0);
             }
             else
             {
-                OverviewPrimaryColumn.Width = new GridLength(1.3, GridUnitType.Star);
-                OverviewGapColumn.Width = new GridLength(16);
-                OverviewStatusColumn.Width = new GridLength(1, GridUnitType.Star);
-                Grid.SetRow(OverviewStatusCard, 0);
-                Grid.SetColumn(OverviewStatusCard, 2);
-                OverviewStatusCard.Margin = new Thickness(0);
                 WelcomeTextColumn.Width = new GridLength(1, GridUnitType.Star);
                 WelcomeActionColumn.Width = GridLength.Auto;
                 Grid.SetRow(WelcomeDismissButton, 0);
                 Grid.SetColumn(WelcomeDismissButton, 1);
                 WelcomeDismissButton.HorizontalAlignment = HorizontalAlignment.Stretch;
                 WelcomeDismissButton.Margin = new Thickness(0);
-                OverviewLaunchTextColumn.Width = new GridLength(1, GridUnitType.Star);
-                OverviewLaunchActionColumn.Width = GridLength.Auto;
-                Grid.SetRow(OverviewLaunchButton, 0);
-                Grid.SetColumn(OverviewLaunchButton, 1);
-                OverviewLaunchButton.HorizontalAlignment = HorizontalAlignment.Stretch;
-                OverviewLaunchButton.Margin = new Thickness(0);
             }
         }
 
@@ -291,20 +268,21 @@ namespace LongBetterWindows.Host.Views
             var normalized = query.Trim();
             (Button Destination, WorkspaceManagementPage Page)[] destinations =
             [
-                (DestinationOverview, WorkspaceManagementPage.Overview),
-                (DestinationWorkflows, WorkspaceManagementPage.Workflows),
                 (DestinationPlugins, WorkspaceManagementPage.Plugins),
-                (DestinationWidgets, WorkspaceManagementPage.Widgets),
                 (DestinationMarket, WorkspaceManagementPage.Market),
+                (DestinationWorkflows, WorkspaceManagementPage.Workflows),
+                (DestinationWidgets, WorkspaceManagementPage.Widgets),
                 (DestinationSystem, WorkspaceManagementPage.System),
                 (DestinationDiagnostics, WorkspaceManagementPage.Diagnostics),
                 (DestinationDeveloper, WorkspaceManagementPage.Developer),
                 (DestinationSettings, WorkspaceManagementPage.Settings),
             ];
             var hasMatch = false;
+            var hasPrimaryMatch = false;
+            var hasSecondaryMatch = false;
             foreach (var (destination, page) in destinations)
             {
-                var label = destination.Content?.ToString() ?? string.Empty;
+                var label = ManagementNavigationLabel(page);
                 var isMatch = string.IsNullOrEmpty(normalized)
                     || label.Contains(normalized, StringComparison.OrdinalIgnoreCase)
                     || page.ToString().Contains(
@@ -314,18 +292,46 @@ namespace LongBetterWindows.Host.Views
                     ? Visibility.Visible
                     : Visibility.Collapsed;
                 hasMatch |= isMatch;
+                if (page is WorkspaceManagementPage.Plugins
+                    or WorkspaceManagementPage.Market
+                    or WorkspaceManagementPage.Workflows
+                    or WorkspaceManagementPage.Widgets)
+                {
+                    hasPrimaryMatch |= isMatch;
+                }
+                else
+                {
+                    hasSecondaryMatch |= isMatch;
+                }
             }
             var hasQuery = !string.IsNullOrEmpty(normalized);
-            OverviewMetricsGrid.Visibility = hasQuery
+            OverviewSummaryCard.Visibility = hasQuery
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-            OverviewActionsGrid.Visibility = hasQuery
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+            ManagementPrimaryTitle.Visibility = hasPrimaryMatch
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ManagementSecondaryTitle.Visibility = hasSecondaryMatch
+                ? Visibility.Visible
+                : Visibility.Collapsed;
             ManagementNoResultsText.Visibility = hasMatch
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         }
+
+        private static string ManagementNavigationLabel(WorkspaceManagementPage page)
+            => I18n(page switch
+            {
+                WorkspaceManagementPage.Workflows => "nav.workflows",
+                WorkspaceManagementPage.Plugins => "nav.plugins",
+                WorkspaceManagementPage.Widgets => "nav.widgets",
+                WorkspaceManagementPage.Market => "nav.market",
+                WorkspaceManagementPage.System => "nav.system",
+                WorkspaceManagementPage.Diagnostics => "nav.diagnostics",
+                WorkspaceManagementPage.Developer => "nav.developer",
+                WorkspaceManagementPage.Settings => "nav.settings",
+                _ => "nav.overview",
+            });
 
         internal bool OpenPluginSettingsModule(string pluginId)
         {

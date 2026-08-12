@@ -1318,7 +1318,10 @@ public class QualityGateTests
         Assert.Contains("x:Key=\"OverviewCard\"", xaml);
         Assert.Contains("BasedOn=\"{StaticResource ManagementCard}\"", xaml);
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
-        Assert.Equal(5, xaml.Split("Style=\"{StaticResource OverviewCard}\"").Length - 1);
+        Assert.Equal(1, xaml.Split("Style=\"{StaticResource OverviewCard}\"").Length - 1);
+        Assert.Contains("x:Name=\"OverviewSummaryCard\"", xaml);
+        Assert.Contains("x:Key=\"OverviewTaskButton\"", xaml);
+        Assert.Contains("x:Key=\"OverviewUtilityButton\"", xaml);
 
         var code = Read("src", "LongBetterWindows.Host", "Views", "ToolCenterControl.xaml.cs");
         Assert.Contains("App.ShowManagementCardShadowsForQuality", code);
@@ -1377,26 +1380,32 @@ public class QualityGateTests
             "LongBetterWindows.Host",
             "Views",
             "InstalledPluginRailControl.xaml");
+        var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
 
         Assert.Contains("MinWidth=\"720\" MinHeight=\"560\"", main);
         Assert.Contains("Width=\"220\"", pluginRail);
         Assert.DoesNotContain("x:Name=\"NavigationColumn\"", toolCenter);
         Assert.DoesNotContain("LongNavigationItem", toolCenter);
         Assert.Contains("x:Name=\"ManagementDestinationGrid\"", toolCenter);
+        Assert.Contains("x:Name=\"ManagementUtilityGrid\"", toolCenter);
+        Assert.DoesNotContain("DestinationOverview", toolCenter);
         Assert.Contains("ManagementDestination_Click", code);
         Assert.Equal(
-            9,
+            8,
             toolCenter.Split(
                 "automation:AutomationProperties.AutomationId=\"Long.Management.Destination.",
                 StringSplitOptions.None).Length - 1);
         Assert.Equal(
-            9,
+            8,
             toolCenter.Split(
                 "KeyboardNavigation.TabIndex=\"",
                 StringSplitOptions.None).Length - 1);
         Assert.Contains("KeyboardNavigation.TabNavigation=\"Local\"", toolCenter);
         Assert.Contains("ManagementDestinationGrid.Columns = isNarrow ? 2 : 4", code);
-        Assert.Contains("x:Name=\"OverviewStatusCard\"", toolCenter);
+        Assert.Contains("ManagementUtilityGrid.Columns = isNarrow ? 2 : 4", code);
+        Assert.Contains("ManagementNavigationLabel", code);
+        Assert.DoesNotContain("Long.Management.Destination.Overview", desktopSmoke);
+        Assert.Contains("Long.Management.Destination.Widgets", desktopSmoke);
         Assert.Contains("ApplyResponsiveLayout", code);
         Assert.Contains("width < 860", code);
         Assert.Contains(

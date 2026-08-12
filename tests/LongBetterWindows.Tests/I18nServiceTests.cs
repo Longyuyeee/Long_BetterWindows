@@ -143,7 +143,9 @@ public sealed class I18nServiceTests : IDisposable
 
         Assert.Contains("i18n.overview.welcome.title", xaml);
         Assert.Contains("i18n.overview.metrics.plugins", xaml);
-        Assert.Contains("i18n.overview.action.title", xaml);
+        Assert.Contains("i18n.overview.management.primary", xaml);
+        Assert.Contains("i18n.overview.management.secondary", xaml);
+        Assert.Contains("i18n.overview.management.plugins", xaml);
         Assert.Contains("i18n.overview.status.releasePending", xaml);
         Assert.DoesNotContain("阶段 5 本机基线通过", xaml);
     }

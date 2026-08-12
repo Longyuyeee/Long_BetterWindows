@@ -9,6 +9,43 @@
             <Setter Property="Effect" Value="{x:Null}" />
         </Style>
         <Style x:Key="OverviewCard" TargetType="Border" BasedOn="{StaticResource ManagementCard}" />
+        <Style x:Key="OverviewTaskButton" TargetType="Button" BasedOn="{StaticResource LongButton}">
+            <Setter Property="Height" Value="76" />
+            <Setter Property="Padding" Value="14,11" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                CornerRadius="{DynamicResource Long.Radius.Control}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Left"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Long.Brush.Surface.Hover}" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Long.Brush.Stroke.Strong}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource Long.Brush.Surface.Pressed}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource Long.Brush.Focus}" />
+                                <Setter TargetName="Chrome" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="OverviewUtilityButton" TargetType="Button" BasedOn="{StaticResource OverviewTaskButton}">
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="14,0" />
+        </Style>
     </UserControl.Resources>
     <Grid>
         <Grid>
@@ -70,23 +107,66 @@
                             </Grid>
                         </Border>
 
-                        <UniformGrid x:Name="OverviewMetricsGrid" Columns="3" Margin="0,0,0,20">
-                            <Border Style="{StaticResource OverviewCard}" Margin="0,0,12,0">
-                                <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.plugins}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                                    <TextBlock x:Name="OverviewPluginCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
-                            </Border>
-                            <Border Style="{StaticResource OverviewCard}" Margin="0,0,12,0">
-                                <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.commands}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                                    <TextBlock x:Name="OverviewCommandCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
-                            </Border>
-                            <Border Style="{StaticResource OverviewCard}">
-                                <StackPanel><TextBlock Text="{DynamicResource i18n.overview.metrics.capabilities}" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" />
-                                    <TextBlock x:Name="OverviewCapabilityCount" Text="0" FontSize="28" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel>
-                            </Border>
-                        </UniformGrid>
+                        <Border x:Name="OverviewSummaryCard"
+                                Style="{StaticResource OverviewCard}"
+                                Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,18,0">
+                                        <TextBlock Text="{DynamicResource i18n.overview.status.title}"
+                                                   FontSize="16" FontWeight="SemiBold" />
+                                        <TextBlock Text="{DynamicResource i18n.overview.status.ready}"
+                                                   Margin="0,7,0,0" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.State.Success}" />
+                                        <TextBlock Text="{DynamicResource i18n.overview.status.releasePending}"
+                                                   Margin="0,5,0,0" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="{DynamicResource i18n.app.openCommandCenter}"
+                                            automation:AutomationProperties.Name="{DynamicResource i18n.app.openCommandCenter}"
+                                            Style="{StaticResource LongButton.Primary}"
+                                            VerticalAlignment="Top"
+                                            Click="OpenPalette_Click" />
+                                </Grid>
+                                <UniformGrid x:Name="OverviewMetricsGrid" Grid.Row="1"
+                                             Columns="3" Margin="0,18,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource i18n.overview.metrics.plugins}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                        <TextBlock x:Name="OverviewPluginCount" Text="0"
+                                                   FontSize="24" FontWeight="SemiBold" Margin="0,5,0,0" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource i18n.overview.metrics.commands}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                        <TextBlock x:Name="OverviewCommandCount" Text="0"
+                                                   FontSize="24" FontWeight="SemiBold" Margin="0,5,0,0" />
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource i18n.overview.metrics.capabilities}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Muted}" />
+                                        <TextBlock x:Name="OverviewCapabilityCount" Text="0"
+                                                   FontSize="24" FontWeight="SemiBold" Margin="0,5,0,0" />
+                                    </StackPanel>
+                                </UniformGrid>
+                            </Grid>
+                        </Border>
 
                         <StackPanel x:Name="ManagementDestinationsPanel" Margin="0,0,0,20">
-                            <TextBlock Text="{DynamicResource i18n.shell.managementConfig}"
+                            <TextBlock x:Name="ManagementPrimaryTitle"
+                                       Text="{DynamicResource i18n.overview.management.primary}"
                                        Margin="0,0,0,10"
                                        FontSize="14"
                                        FontWeight="SemiBold"
@@ -94,77 +174,103 @@
                             <UniformGrid x:Name="ManagementDestinationGrid"
                                          Columns="4"
                                          KeyboardNavigation.TabNavigation="Local">
-                                <Button x:Name="DestinationOverview"
-                                        Content="{DynamicResource i18n.nav.overview}"
-                                        Tag="Overview" Height="40" Margin="0,0,8,8"
-                                        Style="{StaticResource LongButton}"
-                                        automation:AutomationProperties.AutomationId="Long.Management.Destination.Overview"
-                                        automation:AutomationProperties.Name="{DynamicResource i18n.nav.overview}"
-                                        KeyboardNavigation.TabIndex="0"
-                                        Click="ManagementDestination_Click" />
-                                <Button x:Name="DestinationWorkflows"
-                                        Content="{DynamicResource i18n.nav.workflows}"
-                                        Tag="Workflows" Height="40" Margin="0,0,8,8"
-                                        Style="{StaticResource LongButton}"
-                                        automation:AutomationProperties.AutomationId="Long.Management.Destination.Workflows"
-                                        automation:AutomationProperties.Name="{DynamicResource i18n.nav.workflows}"
-                                        KeyboardNavigation.TabIndex="1"
-                                        Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationPlugins"
-                                        Content="{DynamicResource i18n.nav.plugins}"
-                                        Tag="Plugins" Height="40" Margin="0,0,8,8"
-                                        Style="{StaticResource LongButton}"
+                                        Tag="Plugins"
+                                        Style="{StaticResource OverviewTaskButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Plugins"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.plugins}"
+                                        KeyboardNavigation.TabIndex="0"
+                                        Click="ManagementDestination_Click">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource i18n.nav.plugins}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{DynamicResource i18n.overview.management.plugins}"
+                                                   Margin="0,5,0,0" FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="DestinationMarket"
+                                        Tag="Market"
+                                        Style="{StaticResource OverviewTaskButton}"
+                                        automation:AutomationProperties.AutomationId="Long.Management.Destination.Market"
+                                        automation:AutomationProperties.Name="{DynamicResource i18n.nav.market}"
+                                        KeyboardNavigation.TabIndex="1"
+                                        Click="ManagementDestination_Click">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource i18n.nav.market}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{DynamicResource i18n.overview.management.market}"
+                                                   Margin="0,5,0,0" FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="DestinationWorkflows"
+                                        Tag="Workflows"
+                                        Style="{StaticResource OverviewTaskButton}"
+                                        automation:AutomationProperties.AutomationId="Long.Management.Destination.Workflows"
+                                        automation:AutomationProperties.Name="{DynamicResource i18n.nav.workflows}"
                                         KeyboardNavigation.TabIndex="2"
-                                        Click="ManagementDestination_Click" />
+                                        Click="ManagementDestination_Click">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource i18n.nav.workflows}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{DynamicResource i18n.overview.management.workflows}"
+                                                   Margin="0,5,0,0" FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                    </StackPanel>
+                                </Button>
                                 <Button x:Name="DestinationWidgets"
-                                        Content="{DynamicResource i18n.nav.widgets}"
-                                        Tag="Widgets" Height="40" Margin="0,0,8,8"
-                                        Style="{StaticResource LongButton}"
+                                        Tag="Widgets"
+                                        Style="{StaticResource OverviewTaskButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Widgets"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.widgets}"
                                         KeyboardNavigation.TabIndex="3"
-                                        Click="ManagementDestination_Click" />
-                                <Button x:Name="DestinationMarket"
-                                        Content="{DynamicResource i18n.nav.market}"
-                                        Tag="Market" Height="40" Margin="0,0,0,8"
-                                        Style="{StaticResource LongButton}"
-                                        automation:AutomationProperties.AutomationId="Long.Management.Destination.Market"
-                                        automation:AutomationProperties.Name="{DynamicResource i18n.nav.market}"
-                                        KeyboardNavigation.TabIndex="4"
-                                        Click="ManagementDestination_Click" />
+                                        Click="ManagementDestination_Click">
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource i18n.nav.widgets}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{DynamicResource i18n.overview.management.widgets}"
+                                                   Margin="0,5,0,0" FontSize="11" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                    </StackPanel>
+                                </Button>
+                            </UniformGrid>
+                            <TextBlock x:Name="ManagementSecondaryTitle"
+                                       Text="{DynamicResource i18n.overview.management.secondary}"
+                                       Margin="0,8,0,10"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Long.Brush.Text.Primary}" />
+                            <UniformGrid x:Name="ManagementUtilityGrid"
+                                         Columns="4"
+                                         KeyboardNavigation.TabNavigation="Local">
                                 <Button x:Name="DestinationSystem"
                                         Content="{DynamicResource i18n.nav.system}"
-                                        Tag="System" Height="40" Margin="0,0,8,0"
-                                        Style="{StaticResource LongButton}"
+                                        Tag="System"
+                                        Style="{StaticResource OverviewUtilityButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.System"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.system}"
-                                        KeyboardNavigation.TabIndex="5"
+                                        KeyboardNavigation.TabIndex="4"
                                         Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationDiagnostics"
                                         Content="{DynamicResource i18n.nav.diagnostics}"
-                                        Tag="Diagnostics" Height="40" Margin="0,0,8,0"
-                                        Style="{StaticResource LongButton}"
+                                        Tag="Diagnostics"
+                                        Style="{StaticResource OverviewUtilityButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Diagnostics"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.diagnostics}"
-                                        KeyboardNavigation.TabIndex="6"
+                                        KeyboardNavigation.TabIndex="5"
                                         Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationDeveloper"
                                         Content="{DynamicResource i18n.nav.developer}"
-                                        Tag="Developer" Height="40" Margin="0,0,8,0"
-                                        Style="{StaticResource LongButton}"
+                                        Tag="Developer"
+                                        Style="{StaticResource OverviewUtilityButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Developer"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.developer}"
-                                        KeyboardNavigation.TabIndex="7"
+                                        KeyboardNavigation.TabIndex="6"
                                         Click="ManagementDestination_Click" />
                                 <Button x:Name="DestinationSettings"
                                         Content="{DynamicResource i18n.nav.settings}"
-                                        Tag="Settings" Height="40"
-                                        Style="{StaticResource LongButton}"
+                                        Tag="Settings"
+                                        Style="{StaticResource OverviewUtilityButton}"
                                         automation:AutomationProperties.AutomationId="Long.Management.Destination.Settings"
                                         automation:AutomationProperties.Name="{DynamicResource i18n.nav.settings}"
-                                        KeyboardNavigation.TabIndex="8"
+                                        KeyboardNavigation.TabIndex="7"
                                         Click="ManagementDestination_Click" />
                             </UniformGrid>
                             <TextBlock x:Name="ManagementNoResultsText"
@@ -173,37 +279,6 @@
                                        Visibility="Collapsed"
                                        Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                         </StackPanel>
-
-                        <Grid x:Name="OverviewActionsGrid">
-                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition x:Name="OverviewPrimaryColumn" Width="1.3*"/>
-                                <ColumnDefinition x:Name="OverviewGapColumn" Width="16"/>
-                                <ColumnDefinition x:Name="OverviewStatusColumn" Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Style="{StaticResource OverviewCard}">
-                                <Grid x:Name="OverviewLaunchGrid">
-                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition x:Name="OverviewLaunchTextColumn" Width="*"/>
-                                        <ColumnDefinition x:Name="OverviewLaunchActionColumn" Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel><TextBlock Text="{DynamicResource i18n.overview.action.title}" FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock Text="{DynamicResource i18n.overview.action.desc}" Margin="0,7,12,0"
-                                                   TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Secondary}" /></StackPanel>
-                                    <Button x:Name="OverviewLaunchButton" Grid.Column="1"
-                                            Content="{DynamicResource i18n.app.openCommandCenter}"
-                                            automation:AutomationProperties.Name="{DynamicResource i18n.app.openCommandCenter}"
-                                            Style="{StaticResource LongButton.Primary}"
-                                            Click="OpenPalette_Click" />
-                                </Grid>
-                            </Border>
-                            <Border x:Name="OverviewStatusCard" Grid.Column="2" Style="{StaticResource OverviewCard}">
-                                <StackPanel><TextBlock Text="{DynamicResource i18n.overview.status.title}" FontSize="16" FontWeight="SemiBold" />
-                                    <TextBlock Text="{DynamicResource i18n.overview.status.ready}" Margin="0,7,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.State.Success}" />
-                                    <TextBlock Text="{DynamicResource i18n.overview.status.releasePending}" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Long.Brush.Text.Muted}" /></StackPanel>
-                            </Border>
-                        </Grid>
                     </StackPanel>
 
                     <!-- 组合动作 -->
