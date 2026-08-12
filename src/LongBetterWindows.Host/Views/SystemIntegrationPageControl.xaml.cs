@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
@@ -221,7 +222,7 @@ namespace LongBetterWindows.Host.Views
                 CheckFileExists = true,
                 Multiselect = false,
             };
-            if (dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog(DialogOwnerResolver.Resolve(this)) != true) return;
 
             var action = _sparsePackageInstalled
                 ? I18n("system.sparse.action.upgrade")

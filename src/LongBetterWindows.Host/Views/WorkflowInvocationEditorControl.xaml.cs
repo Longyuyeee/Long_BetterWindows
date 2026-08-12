@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
@@ -68,7 +69,9 @@ namespace LongBetterWindows.Host.Views
                     Title = I18n("workflow.invocation.dialog.chooseFolder"),
                     Multiselect = false,
                 };
-                paths = dialog.ShowDialog() == true ? [dialog.FolderName] : null;
+                paths = dialog.ShowDialog(DialogOwnerResolver.Resolve(this)) == true
+                    ? [dialog.FolderName]
+                    : null;
             }
             else
             {
@@ -79,7 +82,9 @@ namespace LongBetterWindows.Host.Views
                     Multiselect = Editor.InputType is AcceptedInputType.Files
                         or AcceptedInputType.ExplorerSelection,
                 };
-                paths = dialog.ShowDialog() == true ? dialog.FileNames : null;
+                paths = dialog.ShowDialog(DialogOwnerResolver.Resolve(this)) == true
+                    ? dialog.FileNames
+                    : null;
             }
             if (paths is null) return;
             Editor.Paths = paths;
@@ -103,7 +108,7 @@ namespace LongBetterWindows.Host.Views
                 CheckFileExists = true,
                 Multiselect = false,
             };
-            if (dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog(DialogOwnerResolver.Resolve(this)) != true) return;
             try
             {
                 var file = new FileInfo(dialog.FileName);

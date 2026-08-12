@@ -441,22 +441,50 @@ public sealed class ReleaseBlockingRegressionTests
         var root = FindRepositoryRoot();
         var developerToolkit = File.ReadAllText(
             Path.Combine(root, "src", "DevToolkit", "index.html"));
-        var scriptDialog = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src",
-                "LongBetterWindows.Host",
-                "Views",
-                "ScriptCreationDialog.xaml"));
 
         Assert.DoesNotMatch("#[0-9a-fA-F]{3,8}\\b", developerToolkit);
-        Assert.DoesNotMatch("#[0-9a-fA-F]{3,8}\\b", scriptDialog);
         Assert.Contains("var(--long-bg-base)", developerToolkit);
         Assert.Contains("class=\"btn-primary\"", developerToolkit);
         Assert.Contains("class=\"btn-secondary\"", developerToolkit);
         Assert.Contains("background: transparent !important", developerToolkit);
         Assert.Contains("prefers-reduced-motion: reduce", developerToolkit);
-        Assert.Contains("DynamicResource Long.Brush.Surface.Card", scriptDialog);
+    }
+
+    [Fact]
+    public void SystemPickers_RequireResolvedOwnerAndLegacyScriptDialogIsRemoved()
+    {
+        var root = FindRepositoryRoot();
+        var hostRoot = Path.Combine(root, "src", "LongBetterWindows.Host");
+        var views = Path.Combine(hostRoot, "Views");
+        var pickerSources = new[]
+        {
+            "MarketplaceControl.xaml.cs",
+            "SystemIntegrationPageControl.xaml.cs",
+            "WorkflowEditorControl.xaml.cs",
+            "WorkflowInvocationEditorControl.xaml.cs",
+        }.Select(file => File.ReadAllText(Path.Combine(views, file))).ToArray();
+        var combined = string.Join(Environment.NewLine, pickerSources);
+        var ownerResolver = File.ReadAllText(Path.Combine(
+            hostRoot,
+            "Helpers",
+            "DialogOwnerResolver.cs"));
+
+        Assert.DoesNotContain("dialog.ShowDialog()", combined);
+        Assert.Equal(
+            8,
+            pickerSources.Sum(source =>
+                source.Split("ShowDialog(DialogOwnerResolver.Resolve(this))")
+                    .Length - 1));
+        Assert.Contains("Window.GetWindow(origin)", ownerResolver);
+        Assert.Contains("window.IsActive && window.IsVisible", ownerResolver);
+        Assert.False(File.Exists(Path.Combine(views, "ScriptCreationDialog.xaml")));
+        Assert.False(File.Exists(Path.Combine(views, "ScriptCreationDialog.xaml.cs")));
+
+        foreach (var locale in new[] { "zh-CN.json", "en-US.json" })
+        {
+            var resources = File.ReadAllText(Path.Combine(hostRoot, "i18n", locale));
+            Assert.DoesNotContain("developer.script.", resources);
+        }
     }
 
     [Fact]

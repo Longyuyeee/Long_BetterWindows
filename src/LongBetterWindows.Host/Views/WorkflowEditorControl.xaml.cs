@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
@@ -228,7 +229,7 @@ namespace LongBetterWindows.Host.Views
                 CheckFileExists = true,
                 Multiselect = false,
             };
-            if (dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog(DialogOwnerResolver.Resolve(this)) != true) return;
             var review = await _session.PreviewImportAsync(dialog.FileName);
             if (!review.IsSuccess)
             {
@@ -501,7 +502,7 @@ namespace LongBetterWindows.Host.Views
                 DefaultExt = ".workflow.json",
                 OverwritePrompt = true,
             };
-            if (dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog(DialogOwnerResolver.Resolve(this)) != true) return;
             ExportWorkflowButton.IsEnabled = false;
             var result = await _session.ExportCurrentAsync(dialog.FileName);
             RenderStatus();
@@ -761,7 +762,7 @@ namespace LongBetterWindows.Host.Views
                 DefaultExt = ".txt",
                 OverwritePrompt = false,
             };
-            if (dialog.ShowDialog() != true) return;
+            if (dialog.ShowDialog(DialogOwnerResolver.Resolve(this)) != true) return;
 
             var review = _terminalOutputExporter.Prepare(item.Source, dialog.FileName);
             if (!review.IsValid)

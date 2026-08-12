@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Engine;
+using LongBetterWindows.Host.Helpers;
 using LongBetterWindows.Host.Interaction;
 using LongBetterWindows.Host.Services;
 using Microsoft.Win32;
@@ -730,7 +731,7 @@ namespace LongBetterWindows.Host.Views
             ShowInstallConfirmation(preparation.PendingAction);
         }
 
-        private static string? PickPackage()
+        private string? PickPackage()
         {
             var dialog = new OpenFileDialog
             {
@@ -739,7 +740,9 @@ namespace LongBetterWindows.Host.Views
                 CheckFileExists = true,
                 Multiselect = false,
             };
-            return dialog.ShowDialog() == true ? dialog.FileName : null;
+            return dialog.ShowDialog(DialogOwnerResolver.Resolve(this)) == true
+                ? dialog.FileName
+                : null;
         }
 
         private void UninstallButton_Click(object sender, RoutedEventArgs e) => PreviewUninstall();
