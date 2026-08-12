@@ -103,7 +103,7 @@ $passed =
     [int]$report.restored_ms -eq 4000 -and
     $plugins.Count -eq 2 -and
     $invalid.Count -eq 0 -and
-    (Compare-Object ($expectedIds | Sort-Object) $actualIds).Count -eq 0
+    @(Compare-Object ($expectedIds | Sort-Object) $actualIds).Count -eq 0
 if (-not $passed) {
     throw "Background activity report did not satisfy the quality gate."
 }
