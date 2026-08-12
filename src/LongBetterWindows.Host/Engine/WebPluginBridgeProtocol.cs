@@ -45,6 +45,13 @@ namespace LongBetterWindows.Host.Engine
                 resources = context.Resources,
             });
 
+        internal static string SerializeHostVisibilityChanged(bool visible) =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                type = "long.host-visibility-changed",
+                visible,
+            });
+
         internal static WebCommandResultMessage? ParseCommandResult(string json)
         {
             using var document = System.Text.Json.JsonDocument.Parse(json);
@@ -286,7 +293,7 @@ namespace LongBetterWindows.Host.Engine
         {
             var js = @"
 (function() {
-var _id=0,_pending={},_hotkeys={},_clipboardChanged=null;
+var _id=0,_pending={},_hotkeys={},_clipboardChanged=null,_hostVisible=true;
 function call(method,args){
   return new Promise(function(resolve,reject){
     var id=++_id;
@@ -304,7 +311,8 @@ window.long = {
     log: function(){return call('app.log',Array.prototype.slice.call(arguments));}
   },
   host: {
-    getInfo: function(){return call('host.getInfo',[]);}
+    getInfo: function(){return call('host.getInfo',[]);},
+    isVisible: function(){return _hostVisible;}
   },
   clipboard: {
     getText: function(){return call('clipboard.getText',[]);},
@@ -506,6 +514,10 @@ window.chrome.webview.addEventListener('message',function(e){
       else console.log('[Long] key:',m.hotkey);
     }
     if(m.type==='clipboard.changed'&&typeof _clipboardChanged==='function')_clipboardChanged(m);
+    if(m.type==='long.host-visibility-changed'){
+      _hostVisible=m.visible===true;
+      window.dispatchEvent(new CustomEvent('long-host-visibilitychange',{detail:{visible:_hostVisible}}));
+    }
     if(typeof m.type==='string'&&m.type.indexOf('long.widget-')===0&&m.detail){
       window.dispatchEvent(new CustomEvent(m.type,{detail:m.detail}));
     }

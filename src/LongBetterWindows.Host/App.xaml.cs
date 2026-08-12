@@ -404,6 +404,18 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityBackgroundActivityReportPath))
+                {
+                    if (MainWindow is not MainWindow backgroundActivityWindow)
+                        throw new InvalidOperationException(
+                            "Background activity probe requires the main window.");
+                    await _qualityRuntime!.RunBackgroundActivityProbeAsync(
+                        backgroundActivityWindow,
+                        _startupOptions.QualityBackgroundActivityReportPath);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId))
                 {
                     if (MainWindow is not MainWindow runtimeWindow)
@@ -495,6 +507,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityWebViewLifecycleReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityWorkspaceSwitchReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityBackgroundActivityReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId)
                     || !string.IsNullOrWhiteSpace(

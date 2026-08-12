@@ -476,6 +476,8 @@ public class CoreTests
         Assert.Contains("startMonitoring: function(callback)", script);
         Assert.Contains("compareExchange: function(k,e,v)", script);
         Assert.Contains("m.type==='clipboard.changed'", script);
+        Assert.Contains("isVisible: function(){return _hostVisible;}", script);
+        Assert.Contains("long-host-visibilitychange", script);
         Assert.Contains("window.dispatchEvent(new CustomEvent(m.type,{detail:m.detail}))", script);
         Assert.Contains("com.test.bridge", script);
     }

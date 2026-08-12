@@ -1044,6 +1044,12 @@ namespace LongBetterWindows.Host.Services
             => new WorkspaceSwitchQualityProbe(_application)
                 .RunAsync(mainWindow, reportPath);
 
+        public Task RunBackgroundActivityProbeAsync(
+            MainWindow mainWindow,
+            string reportPath)
+            => new BackgroundPluginActivityQualityProbe(_application)
+                .RunAsync(mainWindow, reportPath);
+
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
         {
             var originalTheme = App.IsLightTheme;

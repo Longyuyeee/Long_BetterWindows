@@ -99,6 +99,7 @@ namespace LongBetterWindows.Host.Engine
             if (_isEmbedded && webView is not null
                 && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
             {
+                _runtime.NotifyPresentationVisibility(false);
                 _session?.Hide();
                 mainWindow.ReleasePluginRuntimeView(webView);
                 _isEmbedded = false;
@@ -164,11 +165,13 @@ namespace LongBetterWindows.Host.Engine
                     {
                         _isEmbedded = true;
                         session.ShowEmbedded();
+                        _runtime.NotifyPresentationVisibility(true);
                     },
                     () =>
                     {
                         _isEmbedded = false;
                         session.Hide();
+                        _runtime.NotifyPresentationVisibility(false);
                     },
                     () => CloseWorkspaceViewAsync(session),
                     () =>
@@ -218,6 +221,7 @@ namespace LongBetterWindows.Host.Engine
         {
             var session = GetOrCreateSession();
             session.ShowDetached();
+            _runtime.NotifyPresentationVisibility(true);
             _window = new PluginWindowHost(
                 _pluginId,
                 _pluginName,
@@ -243,6 +247,7 @@ namespace LongBetterWindows.Host.Engine
                         ShowEmbedded(mainWindow!, webView);
                         break;
                     case PluginSurfaceCloseAction.HideAndApplyLifecycle:
+                        _runtime.NotifyPresentationVisibility(false);
                         session.Hide();
                         await NotifyWindowClosedAsync();
                         if (mainWindow is not null)
@@ -280,11 +285,15 @@ namespace LongBetterWindows.Host.Engine
                     {
                         _isEmbedded = true;
                         session.ShowEmbedded();
+                        _runtime.NotifyPresentationVisibility(true);
                     },
                     () =>
                     {
                         if (_window is null)
+                        {
                             session.Hide();
+                            _runtime.NotifyPresentationVisibility(false);
+                        }
                         _isEmbedded = false;
                     },
                     () => CloseWorkspaceViewAsync(session),
@@ -315,6 +324,7 @@ namespace LongBetterWindows.Host.Engine
             _closingForStop = true;
             try
             {
+                _runtime.NotifyPresentationVisibility(false);
                 var webView = _runtime.WebView;
                 if (_isEmbedded && webView is not null
                     && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)

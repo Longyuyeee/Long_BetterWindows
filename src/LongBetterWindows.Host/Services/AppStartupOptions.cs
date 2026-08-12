@@ -29,6 +29,7 @@ namespace LongBetterWindows.Host.Services
         public string? QualityPluginRuntimeSessionReportPath { get; private init; }
         public string? QualityWebViewLifecycleReportPath { get; private init; }
         public string? QualityWorkspaceSwitchReportPath { get; private init; }
+        public string? QualityBackgroundActivityReportPath { get; private init; }
         public string? QualityTaskbarIdentityReportPath { get; private init; }
         public string? QualityUiServiceThemeReportPath { get; private init; }
         public string? QualityThemedMessageDialogReportPath { get; private init; }
@@ -140,6 +141,9 @@ namespace LongBetterWindows.Host.Services
                 QualityWorkspaceSwitchReportPath = ReadArgument(
                     arguments,
                     "--quality-workspace-switch-report"),
+                QualityBackgroundActivityReportPath = ReadArgument(
+                    arguments,
+                    "--quality-background-activity-report"),
                 QualityTaskbarIdentityReportPath = ReadArgument(
                     arguments,
                     "--quality-taskbar-identity-report"),
