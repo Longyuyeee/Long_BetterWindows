@@ -6,6 +6,17 @@
         <Style x:Key="DeveloperCard" TargetType="Border" BasedOn="{StaticResource LongCard}">
             <Setter Property="Effect" Value="{x:Null}" />
         </Style>
+        <Style x:Key="DeveloperDocumentButton"
+               TargetType="Button" BasedOn="{StaticResource LongButton}">
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Padding" Value="9,0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
     </UserControl.Resources>
     <Grid x:Name="DeveloperGrid" VerticalAlignment="Top">
         <Grid.ColumnDefinitions>
@@ -22,9 +33,10 @@
         <Border x:Name="WorkbenchCard" Style="{StaticResource DeveloperCard}" Margin="0,0,0,12">
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <StackPanel>
+                <StackPanel Margin="0,0,12,0">
                     <TextBlock Text="{DynamicResource i18n.developer.workbench.title}" FontSize="14" FontWeight="SemiBold"/>
                     <TextBlock Text="{DynamicResource i18n.developer.workbench.desc}" Margin="0,5,0,0"
+                               TextWrapping="Wrap"
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
                 </StackPanel>
                 <Button Grid.Column="1" Content="{DynamicResource i18n.action.open}"
@@ -36,9 +48,10 @@
                 Style="{StaticResource DeveloperCard}" Margin="0,0,0,12">
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <StackPanel>
+                <StackPanel Margin="0,0,12,0">
                     <TextBlock Text="{DynamicResource i18n.developer.design.title}" FontSize="14" FontWeight="SemiBold"/>
                     <TextBlock Text="{DynamicResource i18n.developer.design.desc}" Margin="0,5,0,0"
+                               TextWrapping="Wrap"
                                Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
                 </StackPanel>
                 <Button Grid.Column="1" Content="{DynamicResource i18n.developer.design.preview}"
@@ -51,10 +64,13 @@
             <StackPanel>
                 <TextBlock Text="{DynamicResource i18n.developer.docs.title}" FontSize="14" FontWeight="SemiBold"/>
                 <TextBlock Text="{DynamicResource i18n.developer.docs.desc}" Margin="0,5,0,8"
+                           TextWrapping="Wrap"
                            Foreground="{DynamicResource Long.Brush.Text.Secondary}"/>
                 <ScrollViewer MaxHeight="240"
                               Style="{StaticResource DarkScrollViewerStyle}"
-                              VerticalScrollBarVisibility="Auto">
+                              VerticalScrollBarVisibility="Auto"
+                              AutomationProperties.AutomationId="Long.Developer.Documents"
+                              AutomationProperties.Name="{DynamicResource i18n.developer.docs.title}">
                     <StackPanel x:Name="DocLinksPanel"/>
                 </ScrollViewer>
             </StackPanel>

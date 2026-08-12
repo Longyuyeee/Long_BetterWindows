@@ -26,6 +26,9 @@ public class QualityGateTests
         Assert.Contains("MaxHeight=\"280\"", xaml);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", xaml);
         Assert.Contains("AutomationProperties.Name=\"{Binding AccessibilityName}\"", xaml);
+        Assert.DoesNotContain("<ColumnDefinition Width=\"180\"", xaml);
+        Assert.DoesNotContain("<ColumnDefinition Width=\"110\"", xaml);
+        Assert.Contains("var compact = width < 560", code);
         Assert.Contains("Value=\"{DynamicResource Long.Brush.State.Danger}\"", xaml);
         Assert.DoesNotContain("StatusBrush", code);
         Assert.Contains("RefreshHealthButton_Click", code);
@@ -34,7 +37,7 @@ public class QualityGateTests
         Assert.Contains("PluginRuntimeHealthState.Degraded => 1", presentation);
         Assert.DoesNotContain("PluginRuntimeDiagnostics", performanceRefresh);
         var captureScript = Read("capture-visual-matrix.ps1");
-        Assert.Contains("'super-panel','diagnostics'", captureScript);
+        Assert.Contains("'super-panel','diagnostics','developer','settings'", captureScript);
         Assert.Contains("[int] $CaptureWidth = 1120", captureScript);
         Assert.Contains("'--quality-width', $CaptureWidth.ToString()", captureScript);
     }
@@ -1334,6 +1337,11 @@ public class QualityGateTests
         Assert.Equal(4, developerXaml.Split("Style=\"{StaticResource DeveloperCard}\"").Length - 1);
         Assert.Contains("VerticalAlignment=\"Top\"", developerXaml);
         Assert.Contains("MaxHeight=\"240\"", developerXaml);
+        Assert.Contains("DeveloperDocumentButton", developerXaml);
+        Assert.Contains("Long.Developer.Documents", developerXaml);
+        Assert.Contains("new Button", developerCode);
+        Assert.Contains("Long.Developer.Document.", developerCode);
+        Assert.DoesNotContain("MouseLeftButtonDown", developerCode);
         Assert.Contains("IDisposable", developerCode);
         Assert.Contains("PluginsChanged -= OnPluginsChanged", developerCode);
         Assert.Contains("x:Name=\"SystemHost\"", xaml);
@@ -1363,6 +1371,9 @@ public class QualityGateTests
         Assert.Contains("SettingsNavigationExpectedMode", desktopSmoke);
         Assert.Contains("Find-ProcessSelectionItemByAutomationId", desktopSmoke);
         Assert.Contains("The compact Settings category", desktopSmoke);
+        Assert.Contains("Long.Developer.Documents", desktopSmoke);
+        Assert.Contains("Long.Developer.Document.1", desktopSmoke);
+        Assert.Contains("developer_document_keyboard_access", desktopSmoke);
         Assert.Contains("ExportBrokerDiagnostics_Click", settingsCode);
         Assert.Contains("VerticalAlignment=\"Top\"", settingsXaml);
         Assert.Contains("IDisposable", settingsCode);

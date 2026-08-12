@@ -179,7 +179,7 @@ namespace LongBetterWindows.Host.Views
 
         private void ApplyResponsiveLayout(double width)
         {
-            var compact = width < 720;
+            var compact = width < 560;
             MetricsGrid.Columns = compact ? 1 : 3;
             CpuMetricCard.Margin = compact
                 ? new Thickness(0, 0, 0, 10)

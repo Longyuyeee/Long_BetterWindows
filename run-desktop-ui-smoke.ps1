@@ -2089,6 +2089,51 @@ try {
         $rootTab.Current.ItemStatus -like 'active:true;*'
     } 'Closing Settings did not restore the management root.' | Out-Null
 
+    Write-Stage 'Opening Developer resources and validating document keyboard access.'
+    $developerDestination = Wait-Until {
+        Find-DescendantByAutomationId `
+            $managementMain 'Long.Management.Destination.Developer'
+    } 'Developer was not restored after closing Settings.'
+    Invoke-AutomationElement $developerDestination `
+        'The Developer destination did not support InvokePattern.'
+    $developerTab = Wait-Until {
+        $candidate = Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleTab.developer:root'
+        if ($null -ne $candidate -and
+            $candidate.Current.ItemStatus -like 'active:true;*') {
+            $candidate
+        }
+    } 'Opening Developer did not create an active Workspace module tab.'
+    $developerDocuments = Wait-Until {
+        Find-DescendantByAutomationId `
+            $managementMain 'Long.Developer.Documents'
+    } 'The Developer document collection was not discoverable.'
+    $developerDocument = Set-AutomationFocus {
+        Find-DescendantByAutomationId `
+            $developerDocuments 'Long.Developer.Document.1'
+    } 'The first Developer document did not receive keyboard focus.'
+    $developerDocumentSemantics = Get-AutomationSemantics `
+        $developerDocument 'ControlType.Button' `
+        'The Developer document button semantics failed.'
+    $developerClose = Wait-Until {
+        Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleClose.developer:root'
+    } 'The Developer module close action was not discoverable.'
+    Invoke-AutomationElement $developerClose `
+        'The Developer module close action did not support InvokePattern.'
+    Wait-Until {
+        $null -eq (Find-ProcessElementByAutomationId `
+            $managementProcess.Id `
+            'Long.Workspace.ModuleTab.developer:root')
+    } 'Closing Developer did not remove its Workspace tab.' | Out-Null
+    Wait-Until {
+        $rootTab.Current.ItemStatus -like 'active:true;*'
+    } 'Closing Developer did not restore the management root.' | Out-Null
+    $report.automation_semantics.management_navigation[
+        'developer_document'] = $developerDocumentSemantics
+
     Write-Stage 'Activating and closing Plugin Market through its module tab.'
     $marketTab = Wait-Until {
         Find-ProcessElementByAutomationId `
@@ -2128,6 +2173,8 @@ try {
         scoped_search_filtered = $true
         market_opened_as_module = $true
         settings_close_restored_root = $true
+        developer_document_keyboard_access = $true
+        developer_close_restored_root = $true
         market_tab_reactivated = $true
         market_close_restored_root = $true
         coordinate_clicks_used = $false

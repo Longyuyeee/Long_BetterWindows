@@ -1,7 +1,7 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Services;
@@ -103,18 +103,24 @@ namespace LongBetterWindows.Host.Views
                 return;
             }
 
-            foreach (var file in docFiles)
+            for (var index = 0; index < docFiles.Count; index++)
             {
-                var link = new TextBlock
+                var file = docFiles[index];
+                var title = Path.GetFileNameWithoutExtension(file);
+                var link = new Button
                 {
-                    Text = Path.GetFileNameWithoutExtension(file),
-                    FontSize = 12,
-                    Foreground = (Brush)FindResource("AccentBlueBrush"),
-                    Cursor = Cursors.Hand,
-                    Margin = new Thickness(0, 2, 0, 2),
+                    Content = title,
                     Tag = file,
+                    ToolTip = Path.GetFileName(file),
                 };
-                link.MouseLeftButtonDown += (_, _) =>
+                link.SetResourceReference(
+                    FrameworkElement.StyleProperty,
+                    "DeveloperDocumentButton");
+                AutomationProperties.SetAutomationId(
+                    link,
+                    $"Long.Developer.Document.{index + 1}");
+                AutomationProperties.SetName(link, title);
+                link.Click += (_, _) =>
                 {
                     var path = (string)link.Tag;
                     DocViewer.ShowDoc(

@@ -9,7 +9,7 @@ param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
     [ValidateSet('light','dark')] [string[]] $Themes = @('light','dark'),
     [ValidateSet(96,120,144,192)] [int[]] $RenderDpis = @(96,120,144,192),
-    [ValidateSet('main','market','palette','super-panel','diagnostics')] [string[]] $Views = @('main','market','palette'),
+    [ValidateSet('main','market','palette','super-panel','diagnostics','developer','settings')] [string[]] $Views = @('main','market','palette'),
     [ValidateSet('normal','high-contrast','reduced-motion','combined')]
     [string[]] $AccessibilityModes = @('normal'),
     [ValidateRange(640,3840)] [int] $CaptureWidth = 1120,

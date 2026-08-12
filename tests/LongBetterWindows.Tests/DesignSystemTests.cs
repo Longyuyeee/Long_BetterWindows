@@ -810,6 +810,24 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void LongButton_HonorsExplicitContentAlignment()
+    {
+        var root = FindRepositoryRoot();
+        var components = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Themes", "LongComponents.xaml"));
+
+        Assert.Contains(
+            "HorizontalAlignment=\"{TemplateBinding HorizontalContentAlignment}\"",
+            components);
+        Assert.Contains(
+            "VerticalAlignment=\"{TemplateBinding VerticalContentAlignment}\"",
+            components);
+        Assert.Contains(
+            "<Setter Property=\"HorizontalContentAlignment\" Value=\"Center\"",
+            components);
+    }
+
+    [Fact]
     public void CoreInteractiveControls_DoNotFallBackToNativeWpfChrome()
     {
         var root = FindRepositoryRoot();
