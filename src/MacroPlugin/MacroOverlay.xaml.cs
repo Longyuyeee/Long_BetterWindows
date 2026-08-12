@@ -1,7 +1,9 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Media.Animation;
 using System.Windows.Media;
 using System.Windows.Threading;
+using LongBetterWindows.PluginSdk.Wpf;
 
 namespace MacroPlugin;
 
@@ -18,10 +20,14 @@ public partial class MacroOverlay : Window
         new("录制", "播放", "循环", "停止");
     private MacroOverlayState _state = MacroOverlayState.Recording;
     private int _actionCount;
+    private Rect _workArea;
+    private bool _placementReady;
 
     public MacroOverlay()
     {
         InitializeComponent();
+        TransientWindowBehavior.MakeNonActivating(this, clickThrough: true);
+        SizeChanged += (_, _) => PositionInsideWorkArea();
         Closed += (_, _) =>
         {
             CancelPendingHide();
@@ -31,15 +37,18 @@ public partial class MacroOverlay : Window
 
     public static MacroOverlay ShowOverlay(MacroOverlayLocalization localization)
     {
-        var area = LongBetterWindows.PluginSdk.Wpf.MonitorHelper.GetCursorWorkArea();
         var window = new MacroOverlay
         {
-            Left = area.Right - 120,
-            Top = area.Top + 16,
+            Opacity = 0,
         };
         window.ApplyLocalization(localization);
 
         window.Show();
+        window.UpdateLayout();
+        window._workArea = MonitorHelper.GetCursorPlacement(window).WorkArea;
+        window._placementReady = true;
+        window.PositionInsideWorkArea();
+        window.Opacity = 1;
         return window;
     }
 
@@ -54,6 +63,7 @@ public partial class MacroOverlay : Window
             SetForeground("Long.Brush.Text.OnAccent", "Long.Brush.Text.OnAccentMuted");
             StatusText.Text = _localization.Recording;
             CountText.Text = count > 0 ? $"{count}" : "";
+            UpdateAutomationName();
 
             // 录制时闪烁红点
             var duration = Application.Current.Resources["Long.Motion.Slow"] is Duration token
@@ -86,6 +96,7 @@ public partial class MacroOverlay : Window
             StatusText.Text = isLoop
                 ? _localization.Looping
                 : _localization.Playing;
+            UpdateAutomationName();
             StatusDot.BeginAnimation(OpacityProperty, null);
             StatusDot.Opacity = 1;
         });
@@ -99,6 +110,7 @@ public partial class MacroOverlay : Window
             _actionCount = 0;
             StatusText.Text = _localization.Stopped;
             CountText.Text = "";
+            UpdateAutomationName();
             StatusBorder.Background = (Brush)FindResource("Long.Brush.Surface.Card");
             SetForeground("Long.Brush.Text.Primary", "Long.Brush.Text.Muted");
             StatusDot.BeginAnimation(OpacityProperty, null);
@@ -140,6 +152,7 @@ public partial class MacroOverlay : Window
             _ => localization.Stopped,
         };
         CountText.Text = _actionCount > 0 ? _actionCount.ToString() : string.Empty;
+        UpdateAutomationName();
     }
 
     private void SetForeground(string primaryKey, string secondaryKey)
@@ -155,6 +168,31 @@ public partial class MacroOverlay : Window
         _hideTimer = null;
         BeginAnimation(OpacityProperty, null);
         Opacity = 1;
+    }
+
+    private void UpdateAutomationName()
+    {
+        var name = string.IsNullOrEmpty(CountText.Text)
+            ? StatusText.Text
+            : $"{StatusText.Text} {CountText.Text}";
+        AutomationProperties.SetName(this, name);
+        AutomationProperties.SetName(StatusText, name);
+    }
+
+    private void PositionInsideWorkArea()
+    {
+        if (!_placementReady || ActualWidth <= 0 || ActualHeight <= 0)
+            return;
+
+        const double inset = 16;
+        Left = Math.Max(
+            _workArea.Left + inset,
+            _workArea.Right - ActualWidth - inset);
+        Top = Math.Max(
+            _workArea.Top,
+            Math.Min(
+                _workArea.Bottom - ActualHeight - inset,
+                _workArea.Top + inset));
     }
 
     private enum MacroOverlayState

@@ -3,6 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight"
+        ShowActivated="False" Focusable="False" ResizeMode="NoResize"
+        IsHitTestVisible="False"
+        AutomationProperties.AutomationId="Long.Toast.Window"
         AutomationProperties.Name="{DynamicResource i18n.toast.name}">
     <Border x:Name="ToastBorder" Style="{StaticResource LongToast}" MaxWidth="380">
         <Grid>
@@ -13,6 +16,7 @@
             <Border x:Name="AccentBar" Visibility="Collapsed" CornerRadius="2"
                     Background="{DynamicResource Long.Brush.Accent.Primary}" />
             <TextBlock x:Name="MessageText" Grid.Column="1" Margin="12,0,2,0"
+                       AutomationProperties.AutomationId="Long.Toast.Message"
                        AutomationProperties.LiveSetting="Assertive"
                        Foreground="{DynamicResource Long.Brush.Text.Primary}"
                        FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center" />

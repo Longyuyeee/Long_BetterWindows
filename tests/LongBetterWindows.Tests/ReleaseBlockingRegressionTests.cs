@@ -756,8 +756,19 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.DoesNotContain(" KeyDown=\"Window_KeyDown\"", editorXaml);
         Assert.Contains("Long.Sdk.AnchoredTextEditor.Window", editorXaml);
         Assert.Contains("Long.Sdk.AnchoredTextEditor.Input", editorXaml);
+        var floatingHudXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "FloatingHudWindow.xaml"));
+        Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", floatingHudXaml);
+        Assert.DoesNotContain(" KeyDown=\"Window_KeyDown\"", floatingHudXaml);
+        Assert.Contains("Long.FolderNote.Hud.Window", floatingHudXaml);
+        Assert.Contains("Long.FolderNote.Hud.Input", floatingHudXaml);
         Assert.DoesNotContain("Editor.Text.Trim()", hud);
         Assert.Contains("await _onSave(NoteTextBox.Text)", floatingHud);
+        Assert.Contains("e.Handled = true", floatingHud);
         Assert.DoesNotContain("NoteTextBox.Text.Trim()", floatingHud);
         Assert.Contains("catch (Exception exception)", hud);
         Assert.Contains("if (!result.IsSuccess)", folderNote);
@@ -783,6 +794,62 @@ public sealed class ReleaseBlockingRegressionTests
         Assert.Contains("OfType<AnchoredTextEditorWindow>()", qualityRuntime);
         Assert.Contains("TaskCompletionSource", app);
         Assert.Contains("await closed.Task", app);
+    }
+
+    [Fact]
+    public void TransientStatusSurfaces_DoNotActivateOrEscapeTheWorkArea()
+    {
+        var root = FindRepositoryRoot();
+        var toastXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "ToastWindow.xaml"));
+        var toastCode = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "ToastWindow.xaml.cs"));
+        var macroXaml = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "MacroPlugin",
+            "MacroOverlay.xaml"));
+        var macroCode = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "MacroPlugin",
+            "MacroOverlay.xaml.cs"));
+        var behavior = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.PluginSdk.Wpf",
+            "TransientWindowBehavior.cs"));
+
+        Assert.Contains("ShowActivated=\"False\"", toastXaml);
+        Assert.Contains("Focusable=\"False\"", toastXaml);
+        Assert.Contains("IsHitTestVisible=\"False\"", toastXaml);
+        Assert.Contains("Long.Toast.Window", toastXaml);
+        Assert.Contains("Long.Toast.Message", toastXaml);
+        Assert.Contains("ActiveWindows", toastCode);
+        Assert.Contains("GetCursorPlacement(window).WorkArea", toastCode);
+        Assert.Contains("Reposition(window._workArea)", toastCode);
+        Assert.Contains("MakeNonActivating(this, clickThrough: true)", toastCode);
+
+        Assert.Contains("ShowActivated=\"False\"", macroXaml);
+        Assert.Contains("Focusable=\"False\"", macroXaml);
+        Assert.Contains("IsHitTestVisible=\"False\"", macroXaml);
+        Assert.Contains("Long.Macro.Overlay.Window", macroXaml);
+        Assert.Contains("AutomationProperties.LiveSetting=\"Polite\"", macroXaml);
+        Assert.Contains("GetCursorPlacement(window).WorkArea", macroCode);
+        Assert.Contains("SizeChanged +=", macroCode);
+        Assert.Contains("PositionInsideWorkArea", macroCode);
+        Assert.Contains("MakeNonActivating(this, clickThrough: true)", macroCode);
+        Assert.Contains("WsExNoActivate", behavior);
+        Assert.Contains("WsExTransparent", behavior);
+        Assert.Contains("WsExToolWindow", behavior);
     }
 
     [Fact]

@@ -8,9 +8,10 @@
         ShowInTaskbar="False"
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
+        AutomationProperties.AutomationId="Long.FolderNote.Hud.Window"
         Deactivated="Window_Deactivated"
         Activated="Window_Activated"
-        KeyDown="Window_KeyDown"
+        PreviewKeyDown="Window_PreviewKeyDown"
         Loaded="Window_Loaded">
 
     <Border x:Name="HudBorder" Style="{StaticResource LongToast}">
@@ -26,6 +27,7 @@
                        TextTrimming="CharacterEllipsis" />
 
             <TextBox x:Name="NoteTextBox"
+                     AutomationProperties.AutomationId="Long.FolderNote.Hud.Input"
                      AutomationProperties.Name="{DynamicResource i18n.folderNote.hud.inputAutomationName}"
                      FontSize="14"
                      CaretBrush="{DynamicResource Long.Brush.Accent.Primary}"

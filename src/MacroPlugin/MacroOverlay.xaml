@@ -6,8 +6,12 @@
         Background="Transparent"
         Topmost="True"
         ShowInTaskbar="False"
+        ShowActivated="False"
+        Focusable="False"
+        ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
-        IsHitTestVisible="False">
+        IsHitTestVisible="False"
+        AutomationProperties.AutomationId="Long.Macro.Overlay.Window">
 
     <Border x:Name="StatusBorder"
             Background="{DynamicResource Long.Brush.State.Danger}"
@@ -23,6 +27,8 @@
                      Width="8" Height="8" Fill="{DynamicResource Long.Brush.Text.OnAccent}"
                      Margin="0,0,8,0" VerticalAlignment="Center" />
             <TextBlock x:Name="StatusText" Text="REC"
+                       AutomationProperties.AutomationId="Long.Macro.Overlay.Status"
+                       AutomationProperties.LiveSetting="Polite"
                        Foreground="{DynamicResource Long.Brush.Text.OnAccent}" FontSize="12"
                        FontWeight="SemiBold" VerticalAlignment="Center" />
             <TextBlock x:Name="CountText" Text=""

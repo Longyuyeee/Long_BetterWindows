@@ -75,6 +75,7 @@ namespace LongBetterWindows.Host.Views
             AutomationProperties.SetName(
                 NoteTextBox,
                 localization.InputAutomationName);
+            AutomationProperties.SetName(this, localization.Title);
             HintText.Text = _dirty
                 ? localization.ModifiedHint
                 : localization.EmptyHint;
@@ -113,15 +114,17 @@ namespace LongBetterWindows.Host.Views
             _closeCts?.Cancel();
         }
 
-        private async void Window_KeyDown(object sender, KeyEventArgs e)
+        private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             switch (e.Key)
             {
                 case Key.Escape:
+                    e.Handled = true;
                     _dirty = false;
                     Close();
                     break;
                 case Key.Enter when Keyboard.Modifiers == ModifierKeys.Control:
+                    e.Handled = true;
                     _closeCts?.Cancel();
                     await SaveAndCloseAsync();
                     break;

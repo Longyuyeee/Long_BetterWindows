@@ -7,9 +7,18 @@ namespace LongBetterWindows.Host.Views
 {
     public partial class ToastWindow : Window
     {
+        private const double EdgeInset = 20;
+        private const double StackGap = 8;
+        private static readonly List<ToastWindow> ActiveWindows = [];
+
+        private DispatcherTimer? _closeTimer;
+        private Rect _workArea;
+
         public ToastWindow()
         {
             InitializeComponent();
+            TransientWindowBehavior.MakeNonActivating(this, clickThrough: true);
+            Closed += Window_Closed;
         }
 
         public static void Show(string message)
@@ -25,13 +34,9 @@ namespace LongBetterWindows.Host.Views
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
-                var workArea = MonitorHelper.GetCursorWorkArea();
-
                 var window = new ToastWindow
                 {
                     Opacity = 0,
-                    Left = workArea.Right - 360,
-                    Top = workArea.Bottom - 80,
                 };
 
                 if (accentKey != null)
@@ -46,12 +51,10 @@ namespace LongBetterWindows.Host.Views
 
                 window.MessageText.Text = message;
                 window.Show();
-
-                window.Loaded += (_, _) =>
-                {
-                    window.Left = workArea.Right - window.ActualWidth - 20;
-                    window.Top = workArea.Bottom - window.ActualHeight - 20;
-                };
+                window.UpdateLayout();
+                window._workArea = MonitorHelper.GetCursorPlacement(window).WorkArea;
+                ActiveWindows.Add(window);
+                Reposition(window._workArea);
 
                 var normalDuration = Application.Current.Resources["Long.Motion.Normal"] is Duration token
                     ? token.TimeSpan
@@ -65,16 +68,51 @@ namespace LongBetterWindows.Host.Views
                 };
                 window.BeginAnimation(OpacityProperty, fadeIn);
 
-                var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-                timer.Tick += (_, _) =>
+                window._closeTimer = new DispatcherTimer
                 {
-                    timer.Stop();
+                    Interval = TimeSpan.FromSeconds(2),
+                };
+                window._closeTimer.Tick += (_, _) =>
+                {
+                    window._closeTimer?.Stop();
+                    window._closeTimer = null;
+                    if (normalDuration == TimeSpan.Zero)
+                    {
+                        window.Close();
+                        return;
+                    }
+
                     var fadeOut = new DoubleAnimation(1, 0, normalDuration);
                     fadeOut.Completed += (_, _) => window.Close();
                     window.BeginAnimation(OpacityProperty, fadeOut);
                 };
-                timer.Start();
+                window._closeTimer.Start();
             });
+        }
+
+        private static void Reposition(Rect workArea)
+        {
+            var bottom = workArea.Bottom - EdgeInset;
+            foreach (var window in ActiveWindows
+                         .Where(window => window._workArea == workArea)
+                         .Reverse())
+            {
+                window.Left = Math.Max(
+                    workArea.Left + EdgeInset,
+                    workArea.Right - window.ActualWidth - EdgeInset);
+                window.Top = Math.Max(
+                    workArea.Top + EdgeInset,
+                    bottom - window.ActualHeight);
+                bottom = window.Top - StackGap;
+            }
+        }
+
+        private void Window_Closed(object? sender, EventArgs e)
+        {
+            _closeTimer?.Stop();
+            _closeTimer = null;
+            ActiveWindows.Remove(this);
+            Reposition(_workArea);
         }
     }
 }
