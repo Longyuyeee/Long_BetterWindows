@@ -4,10 +4,12 @@
         WindowStyle="None" AllowsTransparency="True" Background="{DynamicResource OverlayDarkBrush}"
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize" Cursor="Cross"
         Focusable="True" Loaded="Window_Loaded"
+        AutomationProperties.AutomationId="Long.Screenshot.RegionSelector.Window"
         Closed="Window_Closed"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Canvas x:Name="SelectionCanvas"
             Focusable="True"
+            AutomationProperties.AutomationId="Long.Screenshot.RegionSelector.Canvas"
             AutomationProperties.Name="截图区域选择器"
             MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
             MouseMove="Canvas_MouseMove"
@@ -22,9 +24,11 @@
             </StackPanel>
         </Border>
         <Rectangle x:Name="SelectionRectangle" Visibility="Collapsed"
+                   AutomationProperties.AutomationId="Long.Screenshot.RegionSelector.Selection"
                    Stroke="{DynamicResource Long.Brush.Accent.Primary}" StrokeThickness="2"
                    Fill="{DynamicResource Long.Brush.Accent.Soft}" />
         <Border x:Name="SizeBadge" Visibility="Collapsed"
+                AutomationProperties.AutomationId="Long.Screenshot.RegionSelector.Size"
                 Style="{StaticResource LongBadge}" Padding="8,4">
             <TextBlock x:Name="SizeText" Foreground="{DynamicResource Long.Brush.Text.Primary}" />
         </Border>

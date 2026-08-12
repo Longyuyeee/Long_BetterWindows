@@ -62,6 +62,7 @@ public partial class RegionSelectorWindow : Window
 
     public void ApplyLocalization(RegionSelectorLocalization localization)
     {
+        AutomationProperties.SetName(this, localization.AutomationName);
         AutomationProperties.SetName(SelectionCanvas, localization.AutomationName);
         InstructionText.Text = localization.Instruction;
         CancelText.Text = "  " + localization.Cancel;

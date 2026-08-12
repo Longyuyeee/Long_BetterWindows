@@ -853,6 +853,35 @@ public sealed class ReleaseBlockingRegressionTests
     }
 
     [Fact]
+    public void NativePluginWindows_ExposeStableAutomationAndDpiPlacement()
+    {
+        var root = FindRepositoryRoot();
+        var quickLaunch = File.ReadAllText(Path.Combine(
+            root, "src", "QuickLaunchPlugin", "LaunchWindow.xaml"));
+        var quickLaunchCode = File.ReadAllText(Path.Combine(
+            root, "src", "QuickLaunchPlugin", "LaunchWindow.xaml.cs"));
+        var colorPicker = File.ReadAllText(Path.Combine(
+            root, "src", "ColorPickerPlugin", "ColorPickerWindow.xaml"));
+        var screenshot = File.ReadAllText(Path.Combine(
+            root, "src", "ScreenshotPlugin", "RegionSelectorWindow.xaml"));
+
+        Assert.Contains("Long.QuickLaunch.Window", quickLaunch);
+        Assert.Contains("Long.QuickLaunch.Search", quickLaunch);
+        Assert.Contains("Long.QuickLaunch.Results", quickLaunch);
+        Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", quickLaunch);
+        Assert.DoesNotContain(" KeyDown=\"Window_KeyDown\"", quickLaunch);
+        Assert.Contains("GetCursorPlacement(this)", quickLaunchCode);
+        Assert.DoesNotContain("GetCursorWorkArea()", quickLaunchCode);
+
+        Assert.Contains("Long.ColorPicker.Window", colorPicker);
+        Assert.Contains("Long.ColorPicker.Hex", colorPicker);
+        Assert.Contains("Long.ColorPicker.Rgb", colorPicker);
+        Assert.Contains("Long.Screenshot.RegionSelector.Window", screenshot);
+        Assert.Contains("Long.Screenshot.RegionSelector.Canvas", screenshot);
+        Assert.Contains("Long.Screenshot.RegionSelector.Selection", screenshot);
+    }
+
+    [Fact]
     public void MacroPlayback_UsesVirtualDesktopCoordinatesAndCancelableLifecycle()
     {
         var root = FindRepositoryRoot();

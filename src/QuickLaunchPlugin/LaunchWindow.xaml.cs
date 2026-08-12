@@ -76,16 +76,24 @@ public partial class LaunchWindow : Window
         QuickLaunchApplicationMatcher applicationMatcher,
         string? initialQuery = null)
     {
-        var area = MonitorHelper.GetCursorWorkArea();
         var window = new LaunchWindow(localization, null, applicationMatcher)
         {
             _onSelect = onSelect,
-            Left = area.Left + (area.Width - 640) / 2,
-            Top = area.Top + area.Height * 0.25,
         };
         window.Show();
         window.ActivateSearch(initialQuery);
         return window;
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        var (_, workArea) = MonitorHelper.GetCursorPlacement(this);
+        var placement = QuickLaunchWindowPlacement.Calculate(
+            workArea,
+            new Size(Width, Height));
+        Left = placement.X;
+        Top = placement.Y;
     }
 
     public void ActivateSearch(string? initialQuery = null)
@@ -312,6 +320,9 @@ public partial class LaunchWindow : Window
         _localization = localization;
         Title = localization.Title;
         System.Windows.Automation.AutomationProperties.SetName(
+            this,
+            localization.Title);
+        System.Windows.Automation.AutomationProperties.SetName(
             SearchBox,
             localization.SearchAutomationName);
         NavigationHintText.Text = localization.NavigationHint;
@@ -374,12 +385,6 @@ public partial class LaunchWindow : Window
                 SelectEntry(entry);
             e.Handled = true;
         }
-        else if (e.Key == Key.Escape)
-        {
-            CompleteSelection(null);
-            Close();
-            e.Handled = true;
-        }
     }
 
     private void ResultsList_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -396,12 +401,6 @@ public partial class LaunchWindow : Window
             SearchBox.CaretIndex = SearchBox.Text.Length;
             e.Handled = true;
         }
-        else if (e.Key == Key.Escape)
-        {
-            CompleteSelection(null);
-            Close();
-            e.Handled = true;
-        }
     }
 
     private void ResultsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -410,14 +409,14 @@ public partial class LaunchWindow : Window
             SelectEntry(entry);
     }
 
-    private void Window_KeyDown(object sender, KeyEventArgs e)
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape && !SearchBox.IsFocused)
-        {
-            CompleteSelection(null);
-            Close();
-            e.Handled = true;
-        }
+        if (e.Key != Key.Escape)
+            return;
+
+        CompleteSelection(null);
+        Close();
+        e.Handled = true;
     }
 
     private void Window_Deactivated(object? sender, EventArgs e)

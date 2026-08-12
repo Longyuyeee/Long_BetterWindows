@@ -1,6 +1,7 @@
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows;
 using System.Windows.Media.Imaging;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
@@ -19,6 +20,36 @@ public sealed class QuickLaunchIsolationTests : IDisposable
     public QuickLaunchIsolationTests()
     {
         Directory.CreateDirectory(_root);
+    }
+
+    [Fact]
+    public void WindowPlacement_UsesLogicalSecondaryMonitorWorkArea()
+    {
+        var workArea = new Rect(1920, 0, 1280, 720);
+
+        var placement = QuickLaunchWindowPlacement.Calculate(
+            workArea,
+            new Size(640, 430));
+
+        Assert.Equal(2240, placement.X);
+        Assert.Equal(180, placement.Y);
+        Assert.InRange(placement.X, workArea.Left + 16, workArea.Right - 640 - 16);
+        Assert.InRange(placement.Y, workArea.Top + 16, workArea.Bottom - 430 - 16);
+    }
+
+    [Fact]
+    public void WindowPlacement_ClampsToCompactWorkArea()
+    {
+        var workArea = new Rect(-800, -500, 800, 500);
+
+        var placement = QuickLaunchWindowPlacement.Calculate(
+            workArea,
+            new Size(640, 430));
+
+        Assert.Equal(-720, placement.X);
+        Assert.Equal(-446, placement.Y);
+        Assert.InRange(placement.X, workArea.Left + 16, workArea.Right - 640 - 16);
+        Assert.InRange(placement.Y, workArea.Top + 16, workArea.Bottom - 430 - 16);
     }
 
     [Fact]

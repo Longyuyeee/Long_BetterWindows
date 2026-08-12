@@ -1817,6 +1817,30 @@ public class QualityGateTests
     }
 
     [Fact]
+    public void CustomChromeWindows_HaveStableAutomationIdentity()
+    {
+        var windows = new[]
+        {
+            Read("src", "ColorPickerPlugin", "ColorPickerWindow.xaml"),
+            Read("src", "LongBetterWindows.PluginSdk.Wpf", "AnchoredTextEditorWindow.xaml"),
+            Read("src", "MacroPlugin", "MacroOverlay.xaml"),
+            Read("src", "QuickLaunchPlugin", "LaunchWindow.xaml"),
+            Read("src", "ScreenshotPlugin", "RegionSelectorWindow.xaml"),
+            Read("src", "WindowManagerPlugin", "WindowManagerGuide.xaml"),
+            Read("src", "LongBetterWindows.Host", "Views", "CommandPaletteWindow.xaml"),
+            Read("src", "LongBetterWindows.Host", "Views", "FloatingHudWindow.xaml"),
+            Read("src", "LongBetterWindows.Host", "Views", "SuperPanelWindow.xaml"),
+            Read("src", "LongBetterWindows.Host", "Views", "ToastWindow.xaml"),
+        };
+
+        Assert.All(windows, window =>
+        {
+            Assert.Contains("WindowStyle=\"None\"", window);
+            Assert.Contains("AutomationProperties.AutomationId=", window);
+        });
+    }
+
+    [Fact]
     public void LightMutedText_MeetsWcagAaOnBaseBackground()
     {
         Assert.True(Contrast("667085", "F4F6FA") >= 4.5);
