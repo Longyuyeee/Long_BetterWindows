@@ -51,6 +51,7 @@ public class AppStartupOptionsTests
             "--quality-skip-auto-start-plugin", "com.long.clipboardhistory",
             "--quality-skip-auto-start-plugin", "COM.LONG.MACRO",
             "--quality-hide-window-during-idle",
+            "--quality-compare-window-idle",
             "--quality-startup-report", "startup.json",
             "--quality-management-card-shadows",
             "--quality-show-welcome",
@@ -130,6 +131,7 @@ public class AppStartupOptionsTests
             "com.long.macro",
             options.QualitySkippedAutoStartPluginIds);
         Assert.True(options.QualityHideWindowDuringIdle);
+        Assert.True(options.QualityCompareWindowIdle);
         Assert.Equal("startup.json", options.QualityStartupReportPath);
         Assert.True(options.QualityManagementCardShadows);
         Assert.True(options.ShowWelcomeForQuality);

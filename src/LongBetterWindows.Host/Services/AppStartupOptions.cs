@@ -35,6 +35,7 @@ namespace LongBetterWindows.Host.Services
         public IReadOnlySet<string> QualitySkippedAutoStartPluginIds { get; private init; } =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public bool QualityHideWindowDuringIdle { get; private init; }
+        public bool QualityCompareWindowIdle { get; private init; }
         public string? QualityStartupReportPath { get; private init; }
         public bool QualityManagementCardShadows { get; private init; }
         public bool OpenSystemForQuality { get; private init; }
@@ -152,6 +153,9 @@ namespace LongBetterWindows.Host.Services
                 QualityHideWindowDuringIdle = HasSwitch(
                     arguments,
                     "--quality-hide-window-during-idle"),
+                QualityCompareWindowIdle = HasSwitch(
+                    arguments,
+                    "--quality-compare-window-idle"),
                 QualityStartupReportPath = ReadArgument(
                     arguments,
                     "--quality-startup-report"),

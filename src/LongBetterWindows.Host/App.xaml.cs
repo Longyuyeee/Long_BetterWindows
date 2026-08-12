@@ -344,7 +344,8 @@ namespace LongBetterWindows.Host
                         _pluginPageTrace,
                         runtimeResult,
                         idleMilliseconds,
-                        _startupOptions.QualityHideWindowDuringIdle);
+                        _startupOptions.QualityHideWindowDuringIdle,
+                        _startupOptions.QualityCompareWindowIdle);
                     return;
                 }
 

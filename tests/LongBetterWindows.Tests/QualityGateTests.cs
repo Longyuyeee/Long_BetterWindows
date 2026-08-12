@@ -1551,6 +1551,7 @@ public class QualityGateTests
         Assert.Contains("--quality-plugin-page-performance-report", options);
         Assert.Contains("--quality-skip-auto-start-plugin", options);
         Assert.Contains("--quality-hide-window-during-idle", options);
+        Assert.Contains("--quality-compare-window-idle", options);
         Assert.Contains("new PluginPagePerformanceTrace", app);
         Assert.Contains("suppressedAutoStartPluginIds", app);
         Assert.Contains("RunPluginPagePerformanceProbeAsync", quality);
@@ -1563,6 +1564,11 @@ public class QualityGateTests
         Assert.Contains("_source.AddHook", windowMessages);
         Assert.Contains("_source.RemoveHook", windowMessages);
         Assert.Contains("window.Hide", quality);
+        Assert.Contains("visible_then_hidden", quality);
+        Assert.Contains("CapturePluginPageIdlePhaseAsync", quality);
+        Assert.Contains("sample_intervals", trace);
+        Assert.Contains("window_message_intervals", trace);
+        Assert.Contains("cpu_machine_percent", trace);
         Assert.Contains("plugin_page_constructor_begin", plugins);
         Assert.Contains("plugin_projection_begin", plugins);
         Assert.Contains("plugin_projection_end", plugins);

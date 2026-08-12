@@ -27,6 +27,7 @@ namespace LongBetterWindows.Host.Services
         private readonly int _uiThreadId = unchecked((int)GetCurrentThreadId());
         private IReadOnlyList<WindowMessageCheckpoint> _windowMessageCheckpoints = [];
         private bool _windowVisibleDuringIdle = true;
+        private string _idleMode = "visible";
 
         public PluginPagePerformanceTrace(
             string reportPath,
@@ -70,6 +71,13 @@ namespace LongBetterWindows.Host.Services
         public void SetWindowVisibleDuringIdle(bool isVisible)
             => _windowVisibleDuringIdle = isVisible;
 
+        public void SetIdleMode(string idleMode)
+        {
+            if (string.IsNullOrWhiteSpace(idleMode))
+                throw new ArgumentException("Idle mode is required.", nameof(idleMode));
+            _idleMode = idleMode;
+        }
+
         public void SetWindowMessageCheckpoints(
             IReadOnlyList<WindowMessageCheckpoint> checkpoints)
             => _windowMessageCheckpoints = checkpoints.ToArray();
@@ -86,7 +94,7 @@ namespace LongBetterWindows.Host.Services
 
             var report = new
             {
-                schema_version = 1,
+                schema_version = 2,
                 captured_at = DateTimeOffset.UtcNow,
                 configuration = BuildConfiguration,
                 process_architecture =
@@ -99,6 +107,8 @@ namespace LongBetterWindows.Host.Services
                 suppressed_auto_start_plugin_ids =
                     _suppressedAutoStartPluginIds,
                 window_visible_during_idle = _windowVisibleDuringIdle,
+                idle_mode = _idleMode,
+                logical_processor_count = Environment.ProcessorCount,
                 running_plugin_ids = runningPluginIds ?? [],
                 window_message_checkpoints =
                     _windowMessageCheckpoints.Select(checkpoint => new
@@ -112,6 +122,8 @@ namespace LongBetterWindows.Host.Services
                             count = message.Count,
                         }),
                     }),
+                window_message_intervals = CreateWindowMessageIntervals(
+                    _windowMessageCheckpoints),
                 samples = samples.Select(sample => new
                 {
                     stage = sample.Stage,
@@ -132,6 +144,7 @@ namespace LongBetterWindows.Host.Services
                     visual_descendant_count = sample.VisualDescendantCount,
                     animated_property_count = sample.AnimatedPropertyCount,
                 }),
+                sample_intervals = CreateSampleIntervals(samples),
             };
 
             Directory.CreateDirectory(Path.GetDirectoryName(_reportPath)!);
@@ -140,6 +153,72 @@ namespace LongBetterWindows.Host.Services
                 JsonSerializer.Serialize(
                     report,
                     new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        private static IReadOnlyList<object> CreateSampleIntervals(
+            IReadOnlyList<PluginPagePerformanceSample> samples)
+        {
+            var intervals = new List<object>(Math.Max(0, samples.Count - 1));
+            for (var index = 1; index < samples.Count; index++)
+            {
+                var previous = samples[index - 1];
+                var current = samples[index];
+                var elapsed = Math.Max(
+                    0,
+                    current.ElapsedMilliseconds - previous.ElapsedMilliseconds);
+                var cpu = Math.Max(
+                    0,
+                    current.CpuMilliseconds - previous.CpuMilliseconds);
+                intervals.Add(new
+                {
+                    from_stage = previous.Stage,
+                    to_stage = current.Stage,
+                    elapsed_ms = Math.Round(elapsed, 1),
+                    cpu_ms = Math.Round(cpu, 1),
+                    cpu_core_percent = elapsed > 0
+                        ? Math.Round(cpu / elapsed * 100, 2)
+                        : 0,
+                    cpu_machine_percent = elapsed > 0
+                        ? Math.Round(
+                            cpu / elapsed / Environment.ProcessorCount * 100,
+                            2)
+                        : 0,
+                    working_set_delta_mb = Math.Round(
+                        current.WorkingSetMegabytes
+                            - previous.WorkingSetMegabytes,
+                        1),
+                    private_memory_delta_mb = Math.Round(
+                        current.PrivateMemoryMegabytes
+                            - previous.PrivateMemoryMegabytes,
+                        1),
+                    managed_heap_delta_mb = Math.Round(
+                        current.ManagedHeapMegabytes
+                            - previous.ManagedHeapMegabytes,
+                        1),
+                    thread_count_delta = current.ThreadCount - previous.ThreadCount,
+                });
+            }
+            return intervals;
+        }
+
+        private static IReadOnlyList<object> CreateWindowMessageIntervals(
+            IReadOnlyList<WindowMessageCheckpoint> checkpoints)
+        {
+            var intervals = new List<object>(Math.Max(0, checkpoints.Count - 1));
+            for (var index = 1; index < checkpoints.Count; index++)
+            {
+                var previous = checkpoints[index - 1];
+                var current = checkpoints[index];
+                intervals.Add(new
+                {
+                    from_stage = previous.Stage,
+                    to_stage = current.Stage,
+                    total_count_delta = Math.Max(
+                        0,
+                        current.TotalCount - previous.TotalCount),
+                });
+            }
+            return intervals;
         }
 
         private static IReadOnlyList<PluginPageThreadSample> GetTopProcessorThreads(

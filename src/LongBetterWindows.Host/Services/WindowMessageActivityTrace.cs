@@ -61,6 +61,7 @@ internal sealed class WindowMessageActivityTrace : IDisposable
             0x0084 => "WM_NCHITTEST",
             0x0113 => "WM_TIMER",
             0x0200 => "WM_MOUSEMOVE",
+            0x0219 => "WM_DEVICECHANGE",
             0x02A3 => "WM_MOUSELEAVE",
             0x031A => "WM_THEMECHANGED",
             0x031E => "WM_DWMCOMPOSITIONCHANGED",

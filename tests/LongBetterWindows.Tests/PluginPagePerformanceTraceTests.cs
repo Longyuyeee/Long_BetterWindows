@@ -7,6 +7,12 @@ namespace LongBetterWindows.Tests;
 public class PluginPagePerformanceTraceTests
 {
     [Fact]
+    public void WindowMessageNames_IdentifyDeviceChangeBroadcasts()
+        => Assert.Equal(
+            "WM_DEVICECHANGE",
+            WindowMessageActivityTrace.GetMessageName(0x0219));
+
+    [Fact]
     public async Task WriteAsync_ProducesResourceAndVisualSamples()
     {
         var directory = Path.Combine(
@@ -23,14 +29,22 @@ public class PluginPagePerformanceTraceTests
             trace.Mark(
                 "projection",
                 new PluginPageVisualMetrics(25, 8, 240));
+            trace.Mark(
+                "idle",
+                new PluginPageVisualMetrics(25, 8, 240));
             trace.SetWindowMessageCheckpoints(
             [
+                new WindowMessageCheckpoint(
+                    "start",
+                    0,
+                    []),
                 new WindowMessageCheckpoint(
                     "projection",
                     3,
                     [new WindowMessageCount(0x000F, "WM_PAINT", 3)]),
             ]);
             trace.SetWindowVisibleDuringIdle(false);
+            trace.SetIdleMode("visible_then_hidden");
             await trace.WriteAsync(
                 new PluginRuntimeStartResult(25, 0, 0, null),
                 commandCount: 42,
@@ -40,7 +54,7 @@ public class PluginPagePerformanceTraceTests
             using var report = JsonDocument.Parse(
                 await File.ReadAllTextAsync(reportPath));
             var root = report.RootElement;
-            Assert.Equal(1, root.GetProperty("schema_version").GetInt32());
+            Assert.Equal(2, root.GetProperty("schema_version").GetInt32());
             Assert.Equal(9_000, root.GetProperty("idle_ms").GetInt32());
             Assert.Equal(25, root.GetProperty("loaded_plugin_count").GetInt32());
             Assert.Equal(42, root.GetProperty("command_count").GetInt32());
@@ -54,8 +68,13 @@ public class PluginPagePerformanceTraceTests
                 root.GetProperty("running_plugin_ids")[0].GetString());
             Assert.False(
                 root.GetProperty("window_visible_during_idle").GetBoolean());
+            Assert.Equal(
+                "visible_then_hidden",
+                root.GetProperty("idle_mode").GetString());
+            Assert.True(
+                root.GetProperty("logical_processor_count").GetInt32() > 0);
             var messageCheckpoint =
-                root.GetProperty("window_message_checkpoints")[0];
+                root.GetProperty("window_message_checkpoints")[1];
             Assert.Equal(
                 "WM_PAINT",
                 messageCheckpoint.GetProperty("top_messages")[0]
@@ -76,6 +95,21 @@ public class PluginPagePerformanceTraceTests
                 sample.GetProperty("animated_property_count").GetInt32());
             Assert.True(sample.GetProperty("private_memory_mb").GetDouble() > 0);
             Assert.True(sample.GetProperty("gc_committed_mb").GetDouble() > 0);
+            var sampleInterval = root.GetProperty("sample_intervals")[0];
+            Assert.Equal(
+                "projection",
+                sampleInterval.GetProperty("from_stage").GetString());
+            Assert.Equal(
+                "idle",
+                sampleInterval.GetProperty("to_stage").GetString());
+            Assert.True(
+                sampleInterval.GetProperty("cpu_machine_percent").GetDouble()
+                    >= 0);
+            Assert.Equal(
+                3,
+                root.GetProperty("window_message_intervals")[0]
+                    .GetProperty("total_count_delta")
+                    .GetInt32());
         }
         finally
         {
