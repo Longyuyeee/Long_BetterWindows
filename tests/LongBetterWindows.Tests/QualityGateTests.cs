@@ -1736,8 +1736,17 @@ public class QualityGateTests
             "QualityRuntimeService.cs");
 
         Assert.Contains("ReleasePluginsForQuality", toolCenter);
-        Assert.Contains("new WeakReference(PluginManagementHost.Content)", toolCenter);
+        Assert.Contains("new WeakReference(plugins)", toolCenter);
         Assert.Contains("plugin_page_collected", qualityRuntime);
+        Assert.Contains("const int cycleCount = 8", qualityRuntime);
+        Assert.Contains("all_cycles_collected", qualityRuntime);
+        Assert.Contains("private_memory_growth_mb", qualityRuntime);
+        Assert.Contains("window.OpenPluginManagementForReleaseQuality", qualityRuntime);
+        Assert.Contains("DispatcherPriority.Loaded", qualityRuntime);
+        Assert.Contains(
+            "release probe requires an active page",
+            toolCenter,
+            StringComparison.OrdinalIgnoreCase);
         Assert.Contains("GCCollectionMode.Forced", qualityRuntime);
         Assert.Contains("reference.IsAlive", qualityRuntime);
     }

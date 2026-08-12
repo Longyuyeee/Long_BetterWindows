@@ -872,6 +872,9 @@ namespace LongBetterWindows.Host
         internal WeakReference ReleasePluginManagementForQuality()
             => ToolCenter.ReleasePluginsForQuality();
 
+        internal void OpenPluginManagementForReleaseQuality()
+            => ToolCenter.OpenPluginsForReleaseQuality();
+
         private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             var modifiers = Keyboard.Modifiers;

@@ -146,12 +146,20 @@ namespace LongBetterWindows.Host.Views
             => PluginManagementHost.Content is PluginManagementControl plugins
                 ? plugins.GetPerformanceMetricsForQuality()
                 : default;
+        internal void OpenPluginsForReleaseQuality()
+            => ShowManagementPage(
+                WorkspaceManagementPage.Plugins,
+                forceRefresh: true);
         internal void OpenDeveloperForQuality()
             => ShowManagementPage(WorkspaceManagementPage.Developer);
         internal WeakReference ReleasePluginsForQuality()
         {
-            ShowManagementPage(WorkspaceManagementPage.Plugins);
-            var reference = new WeakReference(PluginManagementHost.Content);
+            if (PluginManagementHost.Content is not PluginManagementControl plugins)
+            {
+                throw new InvalidOperationException(
+                    "Plugin management release probe requires an active page.");
+            }
+            var reference = new WeakReference(plugins);
             ShowManagementPage(WorkspaceManagementPage.Overview);
             ReleasePluginManagementPage();
             return reference;

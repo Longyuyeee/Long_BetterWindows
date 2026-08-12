@@ -182,36 +182,70 @@ namespace LongBetterWindows.Host.Services
             MainWindow window,
             string reportPath)
         {
-            await Task.Delay(500);
-            await _application.Dispatcher.InvokeAsync(
-                () => { },
-                DispatcherPriority.ContextIdle);
-
+            const int cycleCount = 8;
             var process = System.Diagnostics.Process.GetCurrentProcess();
             process.Refresh();
             var beforeWorkingSet = process.WorkingSet64;
             var beforePrivate = process.PrivateMemorySize64;
-
-            var reference = await _application.Dispatcher.InvokeAsync(
-                window.ReleasePluginManagementForQuality,
-                DispatcherPriority.Send);
-            await Task.Delay(300);
             await _application.Dispatcher.InvokeAsync(
-                () => { },
-                DispatcherPriority.ContextIdle);
+                window.Hide,
+                DispatcherPriority.Send);
 
-            for (var attempt = 0; attempt < 3 && reference.IsAlive; attempt++)
+            var cycles = new List<object>(cycleCount);
+            var allCollected = true;
+            for (var cycle = 1; cycle <= cycleCount; cycle++)
             {
-                GC.Collect(
-                    GC.MaxGeneration,
-                    GCCollectionMode.Forced,
-                    blocking: true,
-                    compacting: true);
-                GC.WaitForPendingFinalizers();
+                await _application.Dispatcher.InvokeAsync(
+                    window.OpenPluginManagementForReleaseQuality,
+                    DispatcherPriority.Send);
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.Loaded);
+                await Task.Delay(100);
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.ContextIdle);
+
+                var reference = await _application.Dispatcher.InvokeAsync(
+                    window.ReleasePluginManagementForQuality,
+                    DispatcherPriority.Send);
+                await _application.Dispatcher.InvokeAsync(
+                    () => { },
+                    DispatcherPriority.ContextIdle);
+                for (var attempt = 0;
+                    attempt < 3 && reference.IsAlive;
+                    attempt++)
+                {
+                    GC.Collect(
+                        GC.MaxGeneration,
+                        GCCollectionMode.Forced,
+                        blocking: true,
+                        compacting: true);
+                    GC.WaitForPendingFinalizers();
+                }
+
+                process.Refresh();
+                var collected = !reference.IsAlive;
+                allCollected &= collected;
+                cycles.Add(new
+                {
+                    cycle,
+                    plugin_page_collected = collected,
+                    working_set_mb = Math.Round(
+                        process.WorkingSet64 / 1024d / 1024d,
+                        1),
+                    private_memory_mb = Math.Round(
+                        process.PrivateMemorySize64 / 1024d / 1024d,
+                        1),
+                    managed_heap_mb = Math.Round(
+                        GC.GetTotalMemory(forceFullCollection: false)
+                            / 1024d / 1024d,
+                        1),
+                    thread_count = process.Threads.Count,
+                });
             }
 
             process.Refresh();
-            var collected = !reference.IsAlive;
             var fullPath = Path.GetFullPath(reportPath);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
             await File.WriteAllTextAsync(
@@ -219,9 +253,11 @@ namespace LongBetterWindows.Host.Services
                 JsonSerializer.Serialize(
                     new
                     {
-                        schema_version = 1,
+                        schema_version = 2,
                         captured_at = DateTimeOffset.UtcNow,
-                        plugin_page_collected = collected,
+                        plugin_page_collected = allCollected,
+                        cycle_count = cycleCount,
+                        all_cycles_collected = allCollected,
                         before_working_set_mb =
                             Math.Round(beforeWorkingSet / 1024d / 1024d, 1),
                         after_working_set_mb =
@@ -230,14 +266,20 @@ namespace LongBetterWindows.Host.Services
                             Math.Round(beforePrivate / 1024d / 1024d, 1),
                         after_private_mb =
                             Math.Round(process.PrivateMemorySize64 / 1024d / 1024d, 1),
+                        private_memory_growth_mb = Math.Round(
+                            (process.PrivateMemorySize64 - beforePrivate)
+                                / 1024d / 1024d,
+                            1),
+                        cycles,
                     },
                     new JsonSerializerOptions { WriteIndented = true }));
 
             Log.Information(
-                "Plugin page release probe: Collected={Collected}, Report={Report}",
-                collected,
+                "Plugin page release probe: Cycles={CycleCount}, AllCollected={AllCollected}, Report={Report}",
+                cycleCount,
+                allCollected,
                 fullPath);
-            _application.Shutdown(collected ? 0 : 4);
+            _application.Shutdown(allCollected ? 0 : 4);
         }
 
         public async Task RunTaskbarIdentityProbeAsync(string reportPath)
