@@ -886,6 +886,7 @@ namespace LongBetterWindows.Host.Services
             var originalTheme = App.IsLightTheme;
             var highContrast = App.IsHighContrastEnabled;
             var dialog = UIService.CreatePromptDialogForQuality();
+            var selectDialog = UIService.CreateSelectDialogForQuality();
             var fullPath = Path.GetFullPath(reportPath);
             var reportDirectory = Path.GetDirectoryName(fullPath)!;
             Directory.CreateDirectory(reportDirectory);
@@ -895,9 +896,16 @@ namespace LongBetterWindows.Host.Services
             var lightScreenshotPath = Path.Combine(
                 reportDirectory,
                 "ui-service-light.png");
+            var selectDarkScreenshotPath = Path.Combine(
+                reportDirectory,
+                "ui-service-select-dark.png");
+            var selectLightScreenshotPath = Path.Combine(
+                reportDirectory,
+                "ui-service-select-light.png");
             try
             {
                 dialog.Show();
+                selectDialog.Show();
                 App.ApplyTheme(isLight: false);
                 await _application.Dispatcher.InvokeAsync(
                     () => { },
@@ -905,6 +913,7 @@ namespace LongBetterWindows.Host.Services
                 dialog.UpdateLayout();
                 var dark = CaptureDialogTheme(dialog, "dark");
                 await CaptureWindowAsync(dialog, darkScreenshotPath);
+                await CaptureWindowAsync(selectDialog, selectDarkScreenshotPath);
 
                 App.ApplyTheme(isLight: true);
                 await _application.Dispatcher.InvokeAsync(
@@ -913,6 +922,7 @@ namespace LongBetterWindows.Host.Services
                 dialog.UpdateLayout();
                 var light = CaptureDialogTheme(dialog, "light");
                 await CaptureWindowAsync(dialog, lightScreenshotPath);
+                await CaptureWindowAsync(selectDialog, selectLightScreenshotPath);
 
                 var changed =
                     dark.WindowBackground != light.WindowBackground
@@ -920,7 +930,17 @@ namespace LongBetterWindows.Host.Services
                     && dark.SecondaryButtonBackground
                         != light.SecondaryButtonBackground;
                 var themeBehaviorPassed = highContrast ? !changed : changed;
-                var passed = themeBehaviorPassed && dark.Passed && light.Passed;
+                var auxiliaryWindowContractPassed =
+                    !dialog.ShowInTaskbar
+                    && !selectDialog.ShowInTaskbar
+                    && dialog.WindowStartupLocation
+                        == WindowStartupLocation.CenterScreen
+                    && selectDialog.WindowStartupLocation
+                        == WindowStartupLocation.CenterScreen;
+                var passed = themeBehaviorPassed
+                    && auxiliaryWindowContractPassed
+                    && dark.Passed
+                    && light.Passed;
                 await File.WriteAllTextAsync(
                     fullPath,
                     JsonSerializer.Serialize(
@@ -932,12 +952,22 @@ namespace LongBetterWindows.Host.Services
                             high_contrast = highContrast,
                             runtime_theme_changed = changed,
                             system_palette_preserved = highContrast && !changed,
+                            auxiliary_window_contract_passed =
+                                auxiliaryWindowContractPassed,
                             screenshots = new
                             {
                                 dark = Path.GetFileName(darkScreenshotPath),
                                 dark_sha256 = GetFileSha256(darkScreenshotPath),
                                 light = Path.GetFileName(lightScreenshotPath),
                                 light_sha256 = GetFileSha256(lightScreenshotPath),
+                                select_dark = Path.GetFileName(
+                                    selectDarkScreenshotPath),
+                                select_dark_sha256 = GetFileSha256(
+                                    selectDarkScreenshotPath),
+                                select_light = Path.GetFileName(
+                                    selectLightScreenshotPath),
+                                select_light_sha256 = GetFileSha256(
+                                    selectLightScreenshotPath),
                             },
                             themes = new[] { dark, light },
                         },
@@ -951,6 +981,7 @@ namespace LongBetterWindows.Host.Services
             finally
             {
                 dialog.Close();
+                selectDialog.Close();
                 App.ApplyTheme(originalTheme);
             }
         }
@@ -1662,6 +1693,9 @@ namespace LongBetterWindows.Host.Services
             Window dialog,
             string theme)
         {
+            var surface = FindVisualChildren<Border>(dialog).Single(border =>
+                System.Windows.Automation.AutomationProperties
+                    .GetAutomationId(border) == "Long.UI.Prompt.Surface");
             var label = FindVisualChildren<TextBlock>(dialog).First();
             var input = FindVisualChildren<System.Windows.Controls.TextBox>(
                 dialog).Single();
@@ -1676,7 +1710,7 @@ namespace LongBetterWindows.Host.Services
                     .GetAutomationId(button)
                     .EndsWith(".Cancel", StringComparison.Ordinal));
 
-            var windowBackground = GetColor(dialog.Background);
+            var windowBackground = GetColor(surface.Background);
             var labelForeground = GetColor(label.Foreground);
             var inputBackground = GetColor(input.Background);
             var inputForeground = GetColor(input.Foreground);

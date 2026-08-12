@@ -337,10 +337,49 @@ public sealed class ReleaseBlockingRegressionTests
             "LongBetterWindows.Host",
             "Services",
             "UIService.cs"));
+        var views = Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views");
+        var inputDialog = File.ReadAllText(Path.Combine(
+            views,
+            "CapabilityInputDialog.xaml"));
+        var selectDialog = File.ReadAllText(Path.Combine(
+            views,
+            "CapabilitySelectDialog.xaml"));
+        var contentWindow = File.ReadAllText(Path.Combine(
+            views,
+            "PluginContentWindow.xaml"));
+        var inputDialogCode = File.ReadAllText(Path.Combine(
+            views,
+            "CapabilityInputDialog.xaml.cs"));
+        var selectDialogCode = File.ReadAllText(Path.Combine(
+            views,
+            "CapabilitySelectDialog.xaml.cs"));
+        var contentWindowCode = File.ReadAllText(Path.Combine(
+            views,
+            "PluginContentWindow.xaml.cs"));
 
-        Assert.Contains("Long.Brush.Background.Base", service);
-        Assert.Contains("LongButton.Primary", service);
-        Assert.Contains("LongTextBox", service);
+        Assert.Contains("Long.Brush.Background.Base", contentWindow);
+        Assert.Contains("LongButton.Primary", inputDialog);
+        Assert.Contains("LongTextBox", inputDialog);
+        Assert.Contains("LongCommandItem", selectDialog);
+        Assert.All(
+            new[] { inputDialog, selectDialog, contentWindow },
+            xaml =>
+            {
+                Assert.Contains("LongWindowChrome", xaml);
+                Assert.Contains("ShowInTaskbar=\"False\"", xaml);
+                Assert.Contains("WindowStartupLocation=\"CenterOwner\"", xaml);
+                Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", xaml);
+            });
+        Assert.Contains("new PluginContentWindow(", service);
+        Assert.Contains("ResolveOwner()", service);
+        Assert.DoesNotContain("new Window", service);
+        Assert.All(
+            new[] { inputDialogCode, selectDialogCode, contentWindowCode },
+            code => Assert.Contains("e.Key != Key.Escape", code));
         Assert.Contains("App.ThemeChanged += themeChanged", service);
         Assert.Contains("NavigationCompleted", service);
         Assert.Contains("data-long-theme", service);

@@ -1,8 +1,6 @@
 using System.Net;
 using System.Text.Json;
 using System.Windows;
-using System.Windows.Automation;
-using System.Windows.Controls;
 using LongBetterWindows.Host.Capabilities;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Views;
@@ -13,7 +11,7 @@ namespace LongBetterWindows.Host.Services
 {
     public class UIService : IUICapability
     {
-        private readonly Dictionary<string, Window> _windows = new();
+        private readonly Dictionary<string, ManagedPluginWindow> _windows = new();
         private readonly object _lock = new();
 
         public async Task<HostApiResponse<string>> CreateWindowAsync(
@@ -38,18 +36,18 @@ namespace LongBetterWindows.Host.Services
             {
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    var window = new Window
-                    {
-                        Title = title,
-                        Width = width,
-                        Height = height,
-                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                        ResizeMode = resizable ? ResizeMode.CanResize : ResizeMode.NoResize
-                    };
-                    ApplyWindowTheme(window);
-
                     var webView = new WebView2();
-                    window.Content = webView;
+                    var window = new PluginContentWindow(
+                        title,
+                        width,
+                        height,
+                        resizable,
+                        webView);
+                    var owner = ResolveOwner();
+                    if (owner is not null)
+                        window.Owner = owner;
+                    else
+                        window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
                     Action<bool> themeChanged = isLight =>
                         _ = ApplyWebThemeAsync(webView, isLight);
                     webView.NavigationCompleted += async (_, args) =>
@@ -84,7 +82,7 @@ namespace LongBetterWindows.Host.Services
 
                     lock (_lock)
                     {
-                        _windows[windowId] = window;
+                        _windows[windowId] = new ManagedPluginWindow(window, webView);
                     }
 
                     window.Show();
@@ -108,7 +106,7 @@ namespace LongBetterWindows.Host.Services
             {
                 var result = await Application.Current.Dispatcher.InvokeAsync(() =>
                     ThemedMessageDialog.ShowConfirmation(
-                        owner: null,
+                        ResolveOwner(),
                         message,
                         title));
 
@@ -132,9 +130,10 @@ namespace LongBetterWindows.Host.Services
             {
                 var result = await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    var dialog = new InputDialog(message, title, defaultValue);
-                    var confirmed = dialog.ShowDialog() == true;
-                    return confirmed ? dialog.InputText : null;
+                    var dialog = new CapabilityInputDialog(
+                        ResolveOwner(), message, title, defaultValue);
+                    dialog.ShowDialog();
+                    return dialog.Confirmed ? dialog.InputText : null;
                 });
 
                 return HostApiResponse<string?>.Success(result);
@@ -161,9 +160,10 @@ namespace LongBetterWindows.Host.Services
             {
                 var result = await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    var dialog = new SelectDialog(message, options, title);
-                    var confirmed = dialog.ShowDialog() == true;
-                    return confirmed ? dialog.SelectedIndex : -1;
+                    var dialog = new CapabilitySelectDialog(
+                        ResolveOwner(), message, options, title);
+                    dialog.ShowDialog();
+                    return dialog.Confirmed ? dialog.SelectedIndex : -1;
                 });
 
                 return HostApiResponse<int>.Success(result);
@@ -179,10 +179,10 @@ namespace LongBetterWindows.Host.Services
         {
             ArgumentNullException.ThrowIfNull(windowId);
 
-            Window? window;
+            ManagedPluginWindow? managed;
             lock (_lock)
             {
-                if (!_windows.TryGetValue(windowId, out window))
+                if (!_windows.TryGetValue(windowId, out managed))
                     return Task.FromResult(HostApiResponse.Failure(ApiErrorCode.NotFound, "窗口不存在"));
             }
 
@@ -190,7 +190,7 @@ namespace LongBetterWindows.Host.Services
             {
                 return Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    window.Close();
+                    managed.Window.Close();
                     Log.Information("关闭窗口: {WindowId}", windowId);
                     return HostApiResponse.Success();
                 }).Task;
@@ -207,10 +207,10 @@ namespace LongBetterWindows.Host.Services
             ArgumentNullException.ThrowIfNull(windowId);
             ArgumentNullException.ThrowIfNull(message);
 
-            Window? window;
+            ManagedPluginWindow? managed;
             lock (_lock)
             {
-                if (!_windows.TryGetValue(windowId, out window))
+                if (!_windows.TryGetValue(windowId, out managed))
                     return Task.FromResult(HostApiResponse.Failure(ApiErrorCode.NotFound, "窗口不存在"));
             }
 
@@ -218,10 +218,10 @@ namespace LongBetterWindows.Host.Services
             {
                 var task = Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
-                    if (window.Content is WebView2 webView && webView.CoreWebView2 != null)
+                    if (managed.WebView.CoreWebView2 != null)
                     {
                         var script = $"window.dispatchEvent(new CustomEvent('hostMessage', {{ detail: {message} }}));";
-                        await webView.CoreWebView2.ExecuteScriptAsync(script);
+                        await managed.WebView.CoreWebView2.ExecuteScriptAsync(script);
                     }
                     return HostApiResponse.Success();
                 });
@@ -278,47 +278,30 @@ namespace LongBetterWindows.Host.Services
         }
 
         internal static Window CreatePromptDialogForQuality()
-            => new InputDialog("Theme probe", "Prompt", "Value");
+            => new CapabilityInputDialog(
+                owner: null,
+                "Theme probe",
+                "Prompt",
+                "Value");
 
-        private static void ApplyWindowTheme(Window window)
+        internal static Window CreateSelectDialogForQuality()
+            => new CapabilitySelectDialog(
+                owner: null,
+                "Select one option",
+                ["First option", "Second option", "Third option"],
+                "Selection");
+
+        private static Window? ResolveOwner()
         {
-            window.SetResourceReference(
-                Control.BackgroundProperty,
-                "Long.Brush.Background.Base");
-            if (Application.Current.MainWindow is { IsVisible: true } owner
-                && !ReferenceEquals(owner, window))
-            {
-                window.Owner = owner;
-            }
-            else
-            {
-                window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            }
-        }
+            var activeWindow = Application.Current.Windows
+                .OfType<Window>()
+                .FirstOrDefault(window => window.IsActive && window.IsVisible);
+            if (activeWindow is not null)
+                return activeWindow;
 
-        private static void ApplyControlStyle(
-            FrameworkElement control,
-            string resourceKey)
-            => control.SetResourceReference(
-                FrameworkElement.StyleProperty,
-                resourceKey);
-
-        private static Button CreateDialogButton(
-            string content,
-            string automationId,
-            bool primary)
-        {
-            var button = new Button
-            {
-                Content = content,
-                Width = 80,
-                Height = 32,
-            };
-            ApplyControlStyle(
-                button,
-                primary ? "LongButton.Primary" : "LongButton");
-            AutomationProperties.SetAutomationId(button, automationId);
-            return button;
+            return Application.Current.MainWindow is { IsVisible: true } main
+                ? main
+                : null;
         }
 
         private static async Task ApplyWebThemeAsync(
@@ -349,164 +332,8 @@ namespace LongBetterWindows.Host.Services
             }
         }
 
-        private class InputDialog : Window
-        {
-            private readonly TextBox _textBox;
-
-            public string InputText => _textBox.Text;
-
-            public InputDialog(string message, string title, string defaultValue)
-            {
-                Title = title;
-                Width = 400;
-                Height = 180;
-                WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                ResizeMode = ResizeMode.NoResize;
-                ApplyWindowTheme(this);
-
-                var grid = new Grid { Margin = new Thickness(20) };
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-                var label = new TextBlock
-                {
-                    Text = message,
-                    Margin = new Thickness(0, 0, 0, 12),
-                    TextWrapping = TextWrapping.Wrap
-                };
-                label.SetResourceReference(
-                    TextBlock.ForegroundProperty,
-                    "Long.Brush.Text.Primary");
-                Grid.SetRow(label, 0);
-                grid.Children.Add(label);
-
-                _textBox = new TextBox
-                {
-                    Text = defaultValue,
-                    VerticalAlignment = VerticalAlignment.Top
-                };
-                ApplyControlStyle(_textBox, "LongTextBox");
-                AutomationProperties.SetAutomationId(
-                    _textBox,
-                    "Long.UI.Prompt.Input");
-                Grid.SetRow(_textBox, 1);
-                grid.Children.Add(_textBox);
-
-                var buttonPanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(0, 12, 0, 0)
-                };
-                Grid.SetRow(buttonPanel, 2);
-
-                var okButton = CreateDialogButton(
-                    ServicesInitializer.I18n.T("action.confirm"),
-                    "Long.UI.Prompt.Confirm",
-                    primary: true);
-                okButton.Click += (_, _) => { DialogResult = true; Close(); };
-                buttonPanel.Children.Add(okButton);
-
-                var cancelButton = CreateDialogButton(
-                    ServicesInitializer.I18n.T("action.cancel"),
-                    "Long.UI.Prompt.Cancel",
-                    primary: false);
-                cancelButton.Margin = new Thickness(8, 0, 0, 0);
-                cancelButton.Click += (_, _) => { DialogResult = false; Close(); };
-                buttonPanel.Children.Add(cancelButton);
-
-                grid.Children.Add(buttonPanel);
-                Content = grid;
-
-                _textBox.Focus();
-                _textBox.SelectAll();
-            }
-        }
-
-        private class SelectDialog : Window
-        {
-            private readonly ListBox _listBox;
-
-            public int SelectedIndex => _listBox.SelectedIndex;
-
-            public SelectDialog(string message, string[] options, string title)
-            {
-                Title = title;
-                Width = 400;
-                Height = 300;
-                WindowStartupLocation = WindowStartupLocation.CenterOwner;
-                ResizeMode = ResizeMode.NoResize;
-                ApplyWindowTheme(this);
-
-                var grid = new Grid { Margin = new Thickness(20) };
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-                var label = new TextBlock
-                {
-                    Text = message,
-                    Margin = new Thickness(0, 0, 0, 12),
-                    TextWrapping = TextWrapping.Wrap
-                };
-                label.SetResourceReference(
-                    TextBlock.ForegroundProperty,
-                    "Long.Brush.Text.Primary");
-                Grid.SetRow(label, 0);
-                grid.Children.Add(label);
-
-                _listBox = new ListBox();
-                _listBox.SetResourceReference(
-                    Control.BackgroundProperty,
-                    "Long.Brush.Background.Raised");
-                _listBox.SetResourceReference(
-                    Control.ForegroundProperty,
-                    "Long.Brush.Text.Primary");
-                _listBox.SetResourceReference(
-                    Control.BorderBrushProperty,
-                    "Long.Brush.Stroke.Default");
-                AutomationProperties.SetAutomationId(
-                    _listBox,
-                    "Long.UI.Select.Options");
-                foreach (var option in options)
-                {
-                    _listBox.Items.Add(option);
-                }
-                if (_listBox.Items.Count > 0)
-                    _listBox.SelectedIndex = 0;
-
-                Grid.SetRow(_listBox, 1);
-                grid.Children.Add(_listBox);
-
-                var buttonPanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(0, 12, 0, 0)
-                };
-                Grid.SetRow(buttonPanel, 2);
-
-                var okButton = CreateDialogButton(
-                    ServicesInitializer.I18n.T("action.confirm"),
-                    "Long.UI.Select.Confirm",
-                    primary: true);
-                okButton.Click += (_, _) => { DialogResult = true; Close(); };
-                buttonPanel.Children.Add(okButton);
-
-                var cancelButton = CreateDialogButton(
-                    ServicesInitializer.I18n.T("action.cancel"),
-                    "Long.UI.Select.Cancel",
-                    primary: false);
-                cancelButton.Margin = new Thickness(8, 0, 0, 0);
-                cancelButton.Click += (_, _) => { DialogResult = false; Close(); };
-                buttonPanel.Children.Add(cancelButton);
-
-                grid.Children.Add(buttonPanel);
-                Content = grid;
-
-                _listBox.Focus();
-            }
-        }
+        private sealed record ManagedPluginWindow(
+            PluginContentWindow Window,
+            WebView2 WebView);
     }
 }
