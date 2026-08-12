@@ -35,10 +35,13 @@
             <TextBlock x:Name="PluginsHeader" Text="{DynamicResource i18n.plugins.installed}" FontSize="16" FontWeight="SemiBold"
                        VerticalAlignment="Center" />
             <Button x:Name="RefreshPluginsButton" Grid.Column="1"
-                    Content="{DynamicResource i18n.action.refresh}"
+                    ToolTip="{DynamicResource i18n.action.refresh}"
                     automation:AutomationProperties.Name="{DynamicResource i18n.action.refresh}"
-                    Style="{StaticResource LongButton}"
-                    Click="RefreshPlugins_Click" />
+                    Style="{StaticResource LongIconButton}"
+                    Click="RefreshPlugins_Click">
+                <Path Data="{StaticResource Long.Icon.Refresh}"
+                      Style="{StaticResource LongIcon}" Width="17" Height="17" />
+            </Button>
         </Grid>
 
         <TextBlock x:Name="EmptyStateText" Text="{DynamicResource i18n.plugins.empty}"
@@ -79,12 +82,14 @@
                             <Ellipse Width="8" Height="8" Style="{StaticResource PluginStateDot}"
                                      Margin="0,0,10,0" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Margin="0,0,12,0">
-                                <StackPanel Orientation="Horizontal">
+                                <WrapPanel>
                                     <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
                                                Foreground="{DynamicResource Long.Brush.Text.Primary}"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxWidth="360"
                                                VerticalAlignment="Center" />
                                     <Border Style="{StaticResource LongBadge}" Margin="7,0,0,0">
-                                        <TextBlock Text="{Binding RuntimeLabel}" FontSize="9"
+                                        <TextBlock Text="{Binding RuntimeLabel}" FontSize="10"
                                                    Foreground="{DynamicResource Long.Brush.Text.Muted}" />
                                     </Border>
                                     <Border Style="{StaticResource LongHotkeyBadge}" Margin="7,0,0,0"
@@ -93,7 +98,7 @@
                                                    Foreground="{DynamicResource Long.Brush.Text.Secondary}"
                                                    FontFamily="{DynamicResource Long.Font.Mono}" />
                                     </Border>
-                                </StackPanel>
+                                </WrapPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                     <TextBlock Text="{Binding StatusText}" FontSize="11"
                                                Foreground="{DynamicResource Long.Brush.Text.Muted}"

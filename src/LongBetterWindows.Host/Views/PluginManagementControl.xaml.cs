@@ -27,7 +27,6 @@ namespace LongBetterWindows.Host.Views
             InitializeComponent();
             _pluginStore = HostProvider.Instance.PluginStore;
             _pluginStore.PluginsChanged += OnPluginsChanged;
-            SizeChanged += PluginManagementControl_SizeChanged;
             Loaded += PluginManagementControl_Loaded;
             App.MarkPluginPageStage("plugin_page_constructor_end");
         }
@@ -186,23 +185,6 @@ namespace LongBetterWindows.Host.Views
                     source.Dispose();
                 }
             }
-        }
-
-        private void PluginManagementControl_SizeChanged(
-            object sender,
-            SizeChangedEventArgs e)
-            => ApplyResponsiveLayout(ActualWidth);
-
-        private void ApplyResponsiveLayout(double width)
-        {
-            PluginHeaderColumn.Width = new GridLength(1, GridUnitType.Star);
-            PluginRefreshColumn.Width = GridLength.Auto;
-            Grid.SetRow(PluginsHeader, 0);
-            Grid.SetColumn(PluginsHeader, 0);
-            Grid.SetColumnSpan(PluginsHeader, 1);
-            Grid.SetRow(RefreshPluginsButton, 0);
-            Grid.SetColumn(RefreshPluginsButton, 1);
-            RefreshPluginsButton.Margin = new Thickness(0);
         }
 
         internal void ApplyWorkspaceSearch(string query)
@@ -415,7 +397,6 @@ namespace LongBetterWindows.Host.Views
                 return;
 
             _pluginStore.PluginsChanged -= OnPluginsChanged;
-            SizeChanged -= PluginManagementControl_SizeChanged;
             Loaded -= PluginManagementControl_Loaded;
             var debounce = Interlocked.Exchange(ref _refreshDebounce, null);
             if (debounce is not null)

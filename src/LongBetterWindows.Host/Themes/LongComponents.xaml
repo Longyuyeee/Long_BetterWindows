@@ -277,7 +277,9 @@
                     <Grid x:Name="ComboRoot">
                         <ToggleButton x:Name="Toggle" ClickMode="Press" Focusable="False"
                                       IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-                                      Content="{TemplateBinding SelectionBoxItem}">
+                                      Content="{TemplateBinding SelectionBoxItem}"
+                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
                                     <Border x:Name="Chrome" Background="{DynamicResource Long.Brush.Background.Raised}"
@@ -286,13 +288,16 @@
                                             Padding="12,0">
                                         <Grid>
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <TextBlock VerticalAlignment="Center"
-                                                       Text="{TemplateBinding Content}"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       Foreground="{DynamicResource Long.Brush.Text.Primary}" />
-                                            <TextBlock Grid.Column="1" Text="⌄" Margin="12,0,0,3"
-                                                       VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource Long.Brush.Text.Secondary}" />
+                                            <ContentPresenter VerticalAlignment="Center"
+                                                              Content="{TemplateBinding Content}"
+                                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                              ContentStringFormat="{TemplateBinding ContentStringFormat}"
+                                                              RecognizesAccessKey="True" />
+                                            <Path Grid.Column="1"
+                                                  Data="{StaticResource Long.Icon.ChevronDown}"
+                                                  Style="{StaticResource LongIcon}"
+                                                  Width="13" Height="13"
+                                                  Margin="12,0,0,0" />
                                         </Grid>
                                     </Border>
                                     <ControlTemplate.Triggers>

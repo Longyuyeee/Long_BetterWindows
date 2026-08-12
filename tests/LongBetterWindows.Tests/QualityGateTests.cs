@@ -1215,6 +1215,8 @@ public class QualityGateTests
         Assert.Contains("DarkScrollBarStyle", xaml);
         Assert.Contains("x:Key=\"PluginListCard\"", xaml);
         Assert.Contains("<Setter Property=\"Effect\" Value=\"{x:Null}\"", xaml);
+        Assert.Contains("<WrapPanel>", xaml);
+        Assert.Contains("Long.Icon.Refresh", xaml);
 
         var code = Read("src", "LongBetterWindows.Host", "Views", "PluginManagementControl.xaml.cs");
         var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml.cs");
@@ -2049,6 +2051,8 @@ public class QualityGateTests
         Assert.Contains("AutomationProperties.ItemStatus", market);
         Assert.Contains("x:Name=\"MarketHeroTitle\"", market);
         Assert.Contains("TextWrapping=\"Wrap\"", market);
+        Assert.Contains("DisplayMemberPath=\"Label\"", market);
+        Assert.Contains("Long.Icon.Refresh", market);
         Assert.Contains("Long.Marketplace.Uninstall", script);
         Assert.Contains("Long.Marketplace.ConfirmCancel", script);
         Assert.Contains("ControlType.ListItem", script);

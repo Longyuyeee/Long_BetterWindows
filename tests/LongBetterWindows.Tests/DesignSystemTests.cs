@@ -842,6 +842,26 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void ComboBoxTemplate_RendersObjectSelectionsAndUsesVectorChevron()
+    {
+        var root = FindRepositoryRoot();
+        var components = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Themes", "LongComponents.xaml"));
+        var icons = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Themes", "Icons.xaml"));
+        var marketplace = File.ReadAllText(Path.Combine(
+            root, "src", "LongBetterWindows.Host", "Views", "MarketplaceControl.xaml"));
+
+        Assert.Contains("Content=\"{TemplateBinding Content}\"", components);
+        Assert.Contains("ContentTemplate=\"{TemplateBinding ContentTemplate}\"", components);
+        Assert.Contains("ContentTemplate=\"{TemplateBinding SelectionBoxItemTemplate}\"", components);
+        Assert.Contains("Long.Icon.ChevronDown", components);
+        Assert.Contains("x:Key=\"Long.Icon.ChevronDown\"", icons);
+        Assert.Contains("DisplayMemberPath=\"Label\"", marketplace);
+        Assert.DoesNotContain("MinHeight=\"650\"", marketplace);
+    }
+
+    [Fact]
     public void TranslatePlugin_BoundsInputAndRejectsStaleNetworkResults()
     {
         var root = FindRepositoryRoot();

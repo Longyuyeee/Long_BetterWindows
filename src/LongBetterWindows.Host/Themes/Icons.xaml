@@ -17,6 +17,7 @@
     <StreamGeometry x:Key="Long.Icon.Delete">M4,7 L20,7 M9,7 L9,4 L15,4 L15,7 M6,7 L7,21 L17,21 L18,7 M10,11 L10,17 M14,11 L14,17</StreamGeometry>
     <StreamGeometry x:Key="Long.Icon.ArrowUp">M12,19 L12,5 M6,11 L12,5 L18,11</StreamGeometry>
     <StreamGeometry x:Key="Long.Icon.ArrowDown">M12,5 L12,19 M6,13 L12,19 L18,13</StreamGeometry>
+    <StreamGeometry x:Key="Long.Icon.ChevronDown">M6,9 L12,15 L18,9</StreamGeometry>
     <StreamGeometry x:Key="Long.Icon.Play">M7,4 L19,12 L7,20 Z</StreamGeometry>
     <StreamGeometry x:Key="Long.Icon.MoreHorizontal">M5,10 A2,2 0 1 0 5,14 A2,2 0 1 0 5,10 M12,10 A2,2 0 1 0 12,14 A2,2 0 1 0 12,10 M19,10 A2,2 0 1 0 19,14 A2,2 0 1 0 19,10</StreamGeometry>
     <StreamGeometry x:Key="Long.Icon.Import">M12,3 L12,15 M7,10 L12,15 L17,10 M4,17 L4,21 L20,21 L20,17</StreamGeometry>
