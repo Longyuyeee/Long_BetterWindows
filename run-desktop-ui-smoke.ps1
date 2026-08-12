@@ -973,7 +973,9 @@ try {
     } 'Command Palette result did not receive focus for the accessibility focus-return probe.' | Out-Null
     $search.SetFocus()
     Wait-Until {
-        $search.Current.HasKeyboardFocus
+        [LongDesktopInput]::Activate($paletteHandle) -and
+            [LongDesktopInput]::ForegroundWindow() -eq $paletteHandle -and
+            $search.Current.HasKeyboardFocus
     } 'Command Palette search did not regain focus for keyboard navigation.' | Out-Null
     if (-not [LongDesktopInput]::KeyPress(0x28)) {
         throw 'SendInput could not deliver Down Arrow to Command Palette.'
@@ -1496,16 +1498,17 @@ try {
         })
     foreach ($continuityTarget in $continuityTargets) {
         $continuityPanel = Wait-Until {
-            Find-WindowByAutomationId `
+            $currentPanel = Find-WindowByAutomationId `
                 $launcherWorkspaceProcess.Id 'Long.SuperPanel'
-        } "Super Panel did not appear before opening $($continuityTarget.name)."
-        $continuityResults = Wait-Until {
+            if ($null -eq $currentPanel) {
+                return $null
+            }
             $candidate = Find-DescendantByAutomationId `
-                $continuityPanel 'Long.SuperPanel.Results'
+                $currentPanel 'Long.SuperPanel.Results'
             if ($null -ne $candidate -and
                 $candidate.Current.ItemStatus -like `
                     'mode:context-list;*context-items:1;inputs:url,clipboard,text') {
-                $candidate
+                $currentPanel
             }
         } "Super Panel lost context before opening $($continuityTarget.name)."
         $continuityPanelHandle = [IntPtr]$continuityPanel.Current.NativeWindowHandle
@@ -1538,18 +1541,19 @@ try {
             throw "Workspace rejected Escape for $($continuityTarget.name)."
         }
         $restoredPanel = Wait-Until {
-            Find-WindowByAutomationId `
+            $currentPanel = Find-WindowByAutomationId `
                 $launcherWorkspaceProcess.Id 'Long.SuperPanel'
-        } "Workspace Escape did not restore Super Panel from $($continuityTarget.name)."
-        Wait-Until {
+            if ($null -eq $currentPanel) {
+                return $null
+            }
             $candidate = Find-DescendantByAutomationId `
-                $restoredPanel 'Long.SuperPanel.Results'
+                $currentPanel 'Long.SuperPanel.Results'
             if ($null -ne $candidate -and
                 $candidate.Current.ItemStatus -like `
                     'mode:context-list;*context-items:1;inputs:url,clipboard,text') {
-                $candidate
+                $currentPanel
             }
-        } "Returning from $($continuityTarget.name) did not preserve Super Panel context." | Out-Null
+        } "Returning from $($continuityTarget.name) did not preserve Super Panel context."
         $report.launcher_workspace_continuity[$continuityTarget.name] = [ordered]@{
             module_activated = $true
             panel_restored = $true

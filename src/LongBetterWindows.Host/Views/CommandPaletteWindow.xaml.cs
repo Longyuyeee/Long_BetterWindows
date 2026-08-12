@@ -515,6 +515,7 @@ namespace LongBetterWindows.Host.Views
                 ResultsList.Items.Count - 1);
             ResultsList.SelectedIndex = next;
             ResultsList.ScrollIntoView(ResultsList.SelectedItem);
+            Keyboard.Focus(SearchBox);
             AnnounceSelection();
         }
 
