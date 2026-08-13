@@ -38,7 +38,7 @@ internal sealed class TrayRecoveryQualityProbe
 
         var samples = new List<TrayRecoveryResourceSample>
         {
-            CaptureResources(0, "warm"),
+            await CaptureResourcesAsync(0, "warm"),
         };
         var cycles = new List<TrayRecoveryCycleResult>();
         for (var cycle = 1; cycle <= CycleCount; cycle++)
@@ -58,7 +58,7 @@ internal sealed class TrayRecoveryQualityProbe
                 3_000);
             var restoredHostState = restored
                 && await WaitForHostVisibilityAsync(webView, expected: true);
-            samples.Add(CaptureResources(cycle, "restored"));
+            samples.Add(await CaptureResourcesAsync(cycle, "restored"));
             cycles.Add(new(
                 cycle,
                 closeIntercepted,
@@ -168,10 +168,14 @@ internal sealed class TrayRecoveryQualityProbe
         return await condition();
     }
 
-    private static TrayRecoveryResourceSample CaptureResources(
+    private static async Task<TrayRecoveryResourceSample> CaptureResourcesAsync(
         int cycle,
         string stage)
     {
+        await Task.Delay(400);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
         using var process = Process.GetCurrentProcess();
         process.Refresh();
         return new(
