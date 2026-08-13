@@ -546,25 +546,44 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task ShutdownEntryAsync(PluginEntry entry)
         {
-            if (entry.State is PluginState.Running or PluginState.Background)
+            await entry.LifecycleGate.WaitAsync().ConfigureAwait(false);
+            try
             {
-                await StopPluginAsync(entry.Id, persistAutoStart: false);
-            }
-            else
-            {
+                try
+                {
+                    await ReleaseHostResourcesAsync(entry.Id).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(
+                        ex,
+                        "Plugin {PluginId} host resource release failed during shutdown",
+                        entry.Id);
+                }
                 using (PluginAccessContext.Enter(entry.Id))
                 {
+                    if (entry.State is PluginState.Running or PluginState.Background
+                        && entry.Instance is ILongPlugin plugin)
+                    {
+                        if (!await plugin.StopAsync().ConfigureAwait(false))
+                        {
+                            Log.Warning(
+                                "Plugin {PluginId} refused to stop during host shutdown",
+                                entry.Id);
+                        }
+                    }
                     if (entry.Instance is IPluginResourceLifecycle resources)
-                        await resources.ReleaseResourcesAsync();
+                        await resources.ReleaseResourcesAsync().ConfigureAwait(false);
                 }
-                if (_hostResourceReleaser is not null)
-                    await _hostResourceReleaser(entry.Id);
+                if (entry.Instance is IAsyncDisposable asyncDisposable)
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                else if (entry.Instance is IDisposable disposable)
+                    disposable.Dispose();
             }
-
-            if (entry.Instance is IAsyncDisposable asyncDisposable)
-                await asyncDisposable.DisposeAsync();
-            else if (entry.Instance is IDisposable disposable)
-                disposable.Dispose();
+            finally
+            {
+                entry.LifecycleGate.Release();
+            }
         }
 
         public static bool CanTransition(PluginState from, PluginState to)
