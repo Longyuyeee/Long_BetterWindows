@@ -180,9 +180,10 @@ public sealed class ExperimentalPluginWorkerTests
 
         var beforeBurn = session.CaptureResourceSnapshot();
         await session.InvokeCommandAsync(
-            new PluginWorkerCommandRequest("burn", "done", 150));
-        var afterBurn = session.CaptureResourceSnapshot();
-        Assert.True(afterBurn.TotalProcessorMilliseconds > beforeBurn.TotalProcessorMilliseconds);
+            new PluginWorkerCommandRequest("burn", "done", 1_000));
+        await AssertEventuallyAsync(() =>
+            session.CaptureResourceSnapshot().TotalProcessorMilliseconds
+                > beforeBurn.TotalProcessorMilliseconds);
         Assert.Equal("background", (await session.InvokeLifecycleAsync(
             PluginWorkerLifecycleOperation.EnterBackground)).State);
         Assert.Equal("running", (await session.InvokeLifecycleAsync(

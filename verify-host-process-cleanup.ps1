@@ -96,10 +96,16 @@ $sourceDirty = -not [string]::IsNullOrWhiteSpace(
 $directory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Force -Path $directory | Out-Null
 $startupReportPath = Join-Path $directory "host-startup.json"
+$shutdownReportPath = Join-Path $directory "host-shutdown.json"
+if (Test-Path -LiteralPath $shutdownReportPath) {
+    throw "Host shutdown evidence already exists: $shutdownReportPath"
+}
 $arguments = @(
     "--quality-open-plugin-runtime", "com.long.base64",
     "--quality-idle-ms", $IdleMilliseconds.ToString(),
     "--quality-startup-report", $startupReportPath,
+    "--quality-shutdown-report", $shutdownReportPath,
+    "--quality-source-commit", $sourceCommit,
     "--theme", "dark",
     "--language", "zh-CN"
 )
@@ -156,11 +162,73 @@ try {
         $_.Name -like "long-plugin-worker*"
     })
     $startupReportExists = Test-Path -LiteralPath $startupReportPath
+    $shutdownReportExists = Test-Path -LiteralPath $shutdownReportPath
+    $shutdownReportValid = $false
+    $shutdownReportIssues = [Collections.Generic.List[string]]::new()
+    if ($shutdownReportExists) {
+        try {
+            $shutdownReport = Get-Content -Raw -LiteralPath `
+                $shutdownReportPath | ConvertFrom-Json
+            $expectedStepNames = @(
+                "broker",
+                "plugins",
+                "plugin_runtime",
+                "host_services"
+            )
+            $actualStepNames = @($shutdownReport.steps | ForEach-Object {
+                [string]$_.name
+            })
+            $expectedHostHash = (
+                Get-FileHash -LiteralPath $HostExecutable -Algorithm SHA256
+            ).Hash.ToLowerInvariant()
+            if ([int]$shutdownReport.schema_version -ne 1) {
+                $shutdownReportIssues.Add("schema_version")
+            }
+            if ([string]$shutdownReport.source_commit -ne $sourceCommit) {
+                $shutdownReportIssues.Add("source_commit")
+            }
+            if ([string]$shutdownReport.host_executable_sha256 `
+                    -ne $expectedHostHash) {
+                $shutdownReportIssues.Add("host_executable_sha256")
+            }
+            if ([int]$shutdownReport.host_process_id -ne $hostProcess.Id) {
+                $shutdownReportIssues.Add("host_process_id")
+            }
+            if ([int]$shutdownReport.host_exit_code -ne $hostExitCode) {
+                $shutdownReportIssues.Add("host_exit_code")
+            }
+            if (($actualStepNames -join "|") `
+                    -ne ($expectedStepNames -join "|")) {
+                $shutdownReportIssues.Add("step_names")
+            }
+            foreach ($step in @($shutdownReport.steps)) {
+                if ([string]$step.status -ne "passed") {
+                    $shutdownReportIssues.Add("step_status:$($step.name)")
+                }
+                if ([double]$step.elapsed_ms -lt 0) {
+                    $shutdownReportIssues.Add("step_elapsed:$($step.name)")
+                }
+                if ([string]$step.error_category -ne "none") {
+                    $shutdownReportIssues.Add("step_error:$($step.name)")
+                }
+            }
+            if (-not [bool]$shutdownReport.passed) {
+                $shutdownReportIssues.Add("passed")
+            }
+            $shutdownReportValid = $shutdownReportIssues.Count -eq 0
+        }
+        catch {
+            $shutdownReportIssues.Add("invalid_json")
+        }
+    } else {
+        $shutdownReportIssues.Add("missing")
+    }
     $passed = $hostExitCode -eq 0 `
         -and $startupReportExists `
+        -and $shutdownReportValid `
         -and $remainingProcesses.Count -eq 0
     $report = [ordered]@{
-        schema_version = 2
+        schema_version = 3
         captured_at = [DateTimeOffset]::UtcNow.ToString("O")
         classification = "development_host_process_cleanup"
         source_commit = $sourceCommit
@@ -171,6 +239,10 @@ try {
         ).Hash.ToLowerInvariant()
         startup_report = $startupReportPath
         startup_report_exists = $startupReportExists
+        shutdown_report = $shutdownReportPath
+        shutdown_report_exists = $shutdownReportExists
+        shutdown_report_valid = $shutdownReportValid
+        shutdown_report_issues = @($shutdownReportIssues)
         host_process_id = $hostProcess.Id
         host_exit_code = $hostExitCode
         elapsed_ms = [Math]::Round(
@@ -195,6 +267,7 @@ try {
     Write-Host "WebView2 descendants: $($webViewProcesses.Count)"
     Write-Host "Plugin Worker descendants: $($workerProcesses.Count)"
     Write-Host "Remaining descendants: $($remainingProcesses.Count)"
+    Write-Host "Shutdown report valid: $shutdownReportValid"
     if (-not $passed) {
         throw "Host process cleanup probe failed."
     }

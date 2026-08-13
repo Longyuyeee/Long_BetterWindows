@@ -40,6 +40,8 @@ namespace LongBetterWindows.Host.Services
         public bool QualityHideWindowDuringIdle { get; private init; }
         public bool QualityCompareWindowIdle { get; private init; }
         public string? QualityStartupReportPath { get; private init; }
+        public string? QualityShutdownReportPath { get; private init; }
+        public string? QualitySourceCommit { get; private init; }
         public bool QualityManagementCardShadows { get; private init; }
         public bool OpenSystemForQuality { get; private init; }
         public bool OpenSettingsForQuality { get; private init; }
@@ -171,6 +173,12 @@ namespace LongBetterWindows.Host.Services
                 QualityStartupReportPath = ReadArgument(
                     arguments,
                     "--quality-startup-report"),
+                QualityShutdownReportPath = ReadArgument(
+                    arguments,
+                    "--quality-shutdown-report"),
+                QualitySourceCommit = ReadArgument(
+                    arguments,
+                    "--quality-source-commit"),
                 QualityManagementCardShadows = HasSwitch(
                     arguments,
                     "--quality-management-card-shadows"),

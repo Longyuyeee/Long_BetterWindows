@@ -23,8 +23,14 @@ public sealed class HostProcessCleanupScriptTests
         Assert.Contains("com.long.base64", source);
         Assert.Contains("--quality-idle-ms", source);
         Assert.Contains("--quality-startup-report", source);
+        Assert.Contains("--quality-shutdown-report", source);
+        Assert.Contains("--quality-source-commit", source);
         Assert.Contains("startup_report_exists", source);
-        Assert.Contains("schema_version = 2", source);
+        Assert.Contains("shutdown_report_valid", source);
+        Assert.Contains("host_process_id", source);
+        Assert.Contains("host_exit_code", source);
+        Assert.Contains("step_status:", source);
+        Assert.Contains("schema_version = 3", source);
         Assert.Contains("taskkill.exe /PID $Process.Id /T /F", source);
         Assert.DoesNotContain("Get-Process -Name msedgewebview2", source);
         Assert.DoesNotContain("Stop-Process -Name", source);
