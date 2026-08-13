@@ -29,7 +29,11 @@ namespace LongBetterWindows.Host.Interaction
             Refresh();
         }
 
-        public void Stop() => _timer.Stop();
+        public void Stop()
+        {
+            _timer.Stop();
+            _monitor.StopMonitoring();
+        }
 
         public void Refresh()
         {
@@ -40,7 +44,7 @@ namespace LongBetterWindows.Host.Interaction
 
         public void Dispose()
         {
-            _timer.Stop();
+            Stop();
             _timer.Tick -= Timer_Tick;
         }
 

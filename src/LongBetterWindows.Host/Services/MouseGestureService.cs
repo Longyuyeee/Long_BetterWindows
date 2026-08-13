@@ -71,6 +71,7 @@ namespace LongBetterWindows.Host.Services
         private const int WmMButtonDown = 0x0207;
         private const int WmMButtonUp = 0x0208;
         private readonly IStorageService _storage;
+        private readonly HostEnvironmentStateService _environmentState;
         private readonly LongRightPressRecognizer _longRight = new();
         private readonly DispatcherTimer _holdTimer;
         private readonly HookProc _hookCallback;
@@ -81,14 +82,24 @@ namespace LongBetterWindows.Host.Services
         public MouseGestureMode Mode { get; private set; }
 
         public MouseGestureService(IStorageService storage)
+            : this(storage, HostEnvironmentStateService.Current)
+        {
+        }
+
+        internal MouseGestureService(
+            IStorageService storage,
+            HostEnvironmentStateService environmentState)
         {
             _storage = storage;
+            _environmentState = environmentState;
             _hookCallback = MouseHook;
             _holdTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(LongRightPressRecognizer.HoldMilliseconds),
             };
             _holdTimer.Tick += HoldTimer_Tick;
+            _environmentState.InteractionAvailabilityChanged +=
+                EnvironmentState_InteractionAvailabilityChanged;
         }
 
         public async Task InitializeAsync()
@@ -112,14 +123,14 @@ namespace LongBetterWindows.Host.Services
         public void Start()
         {
             _started = true;
-            if (Mode != MouseGestureMode.Disabled) InstallHook();
+            if (ShouldInstallHook()) InstallHook();
         }
 
         public async Task SetModeAsync(MouseGestureMode mode)
         {
             Mode = mode;
             UninstallHook();
-            if (_started && mode != MouseGestureMode.Disabled) InstallHook();
+            if (ShouldInstallHook()) InstallHook();
             await _storage.SetAsync(StorageKey, JsonSerializer.Serialize(
                 new MouseGesturePreference { Mode = mode.ToString() }));
             Log.Information("超级面板鼠标手势已设置为 {Mode}", mode);
@@ -193,10 +204,39 @@ namespace LongBetterWindows.Host.Services
                 SuperPanelWindow.ShowPanel();
         }
 
+        private void EnvironmentState_InteractionAvailabilityChanged(
+            bool available)
+        {
+            if (!available)
+            {
+                UninstallHook();
+                return;
+            }
+
+            if (ShouldInstallHook())
+                InstallHook();
+        }
+
+        internal bool ShouldInstallHook()
+            => ShouldInstallHook(
+                _started,
+                Mode,
+                _environmentState.IsInteractionAvailable);
+
+        internal static bool ShouldInstallHook(
+            bool started,
+            MouseGestureMode mode,
+            bool interactionAvailable)
+            => started
+                && mode != MouseGestureMode.Disabled
+                && interactionAvailable;
+
         public void Dispose()
         {
             _started = false;
             UninstallHook();
+            _environmentState.InteractionAvailabilityChanged -=
+                EnvironmentState_InteractionAvailabilityChanged;
             _holdTimer.Tick -= HoldTimer_Tick;
         }
 

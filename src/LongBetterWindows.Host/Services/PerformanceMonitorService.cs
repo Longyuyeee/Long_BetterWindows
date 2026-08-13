@@ -25,7 +25,7 @@ namespace LongBetterWindows.Host.Services
         private readonly Queue<double> _memoryHistory = new();
         private const int MaxHistoryPoints = 60;
 
-        private PerformanceMonitorService()
+        internal PerformanceMonitorService()
         {
             _currentProcess = Process.GetCurrentProcess();
         }
@@ -46,6 +46,8 @@ namespace LongBetterWindows.Host.Services
             _monitorTimer?.Dispose();
             _monitorTimer = null;
         }
+
+        internal bool IsMonitoring => _monitorTimer is not null;
 
         /// <summary>
         /// 收集系统指标

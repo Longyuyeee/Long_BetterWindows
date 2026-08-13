@@ -60,6 +60,27 @@ public class MouseGestureTests
         Assert.DoesNotContain("Path", raw, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void GestureHookPolicy_FollowsHostInteractionAvailability()
+    {
+        Assert.True(MouseGestureService.ShouldInstallHook(
+            started: true,
+            MouseGestureMode.MiddleButton,
+            interactionAvailable: true));
+        Assert.False(MouseGestureService.ShouldInstallHook(
+            started: true,
+            MouseGestureMode.MiddleButton,
+            interactionAvailable: false));
+        Assert.False(MouseGestureService.ShouldInstallHook(
+            started: true,
+            MouseGestureMode.Disabled,
+            interactionAvailable: true));
+        Assert.False(MouseGestureService.ShouldInstallHook(
+            started: false,
+            MouseGestureMode.MiddleButton,
+            interactionAvailable: true));
+    }
+
     private sealed class MemoryStorage : IStorageService
     {
         public Dictionary<string, string> Values { get; } = new();
