@@ -1032,7 +1032,9 @@ public class QualityGateTests
         Assert.Contains("_runtime.Dispose()", presentation);
         Assert.Contains("IPluginResourceLifecycle", registry);
         Assert.Contains("_hostResourceReleaser", registry);
-        Assert.Contains("ShutdownAllAsync", app);
+        Assert.Contains("ShutdownAllForHostAsync", app);
+        Assert.Contains("ShutdownAllAsync", registry);
+        Assert.Contains("IncompletePluginShutdownException", registry);
     }
 
     [Fact]

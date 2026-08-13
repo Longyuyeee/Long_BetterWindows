@@ -16,9 +16,15 @@ public sealed class PluginRegistryShutdownTests
         Register(registry, "stalled", stalled, PluginState.Running);
         Register(registry, "released", released, PluginState.Loaded);
 
-        await registry.ShutdownAllAsync(TimeSpan.FromMilliseconds(40));
+        var report = await registry.ShutdownAllAsync(
+            TimeSpan.FromMilliseconds(40));
 
         Assert.True(released.WasDisposed);
+        Assert.False(report.Completed);
+        Assert.Equal(
+            [PluginShutdownStatus.TimedOut, PluginShutdownStatus.Passed],
+            report.Results.Select(result => result.Status));
+        Assert.Equal(["stalled"], report.IncompletePluginIds);
         var health = registry.RuntimeHealth.GetSnapshot("stalled");
         Assert.Equal(1, health.LifecycleFailureCount);
         Assert.Equal(PluginRuntimeFailureKind.ShutdownTimeout, health.LastFailureKind);
@@ -40,8 +46,10 @@ public sealed class PluginRegistryShutdownTests
             return Task.CompletedTask;
         });
 
-        await registry.ShutdownAllAsync(TimeSpan.FromMilliseconds(40));
+        var report = await registry.ShutdownAllAsync(
+            TimeSpan.FromMilliseconds(40));
 
+        Assert.False(report.Completed);
         Assert.Equal(PluginState.Running, registry.Get("stalled")!.State);
         Assert.Equal(0, notifications);
         Assert.Equal(1, hostReleaseCount);
@@ -65,9 +73,105 @@ public sealed class PluginRegistryShutdownTests
         registry.AttachHostResourceReleaser(_ =>
             Task.FromException(new InvalidOperationException("host release failed")));
 
-        await registry.ShutdownAllAsync(TimeSpan.FromSeconds(1));
+        var report = await registry.ShutdownAllAsync(TimeSpan.FromSeconds(1));
 
         Assert.True(plugin.WasDisposed);
+        Assert.True(report.Completed);
+    }
+
+    [Fact]
+    public async Task ShutdownAllAsync_TotalBudgetBoundsMultipleStallsAndReportsEveryPlugin()
+    {
+        var registry = new PluginRegistry();
+        var first = new StalledPlugin();
+        var second = new StalledPlugin();
+        var skipped = new ReleasablePlugin();
+        Register(registry, "first", first, PluginState.Running);
+        Register(registry, "second", second, PluginState.Running);
+        Register(registry, "skipped", skipped, PluginState.Loaded);
+
+        var report = await registry.ShutdownAllAsync(
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromMilliseconds(140));
+
+        Assert.False(report.Completed);
+        Assert.Equal(3, report.Results.Count);
+        Assert.Equal(
+            [
+                PluginShutdownStatus.TimedOut,
+                PluginShutdownStatus.TimedOut,
+                PluginShutdownStatus.SkippedTotalBudget,
+            ],
+            report.Results.Select(result => result.Status));
+        Assert.Equal(
+            ["first", "second", "skipped"],
+            report.IncompletePluginIds);
+        Assert.False(skipped.WasDisposed);
+        Assert.True(report.ElapsedMilliseconds < 500);
+        Assert.Equal(140, report.TotalBudgetMilliseconds);
+        Assert.Equal(100, report.Results[0].WaitBudgetMilliseconds);
+        Assert.InRange(
+            report.Results[1].WaitBudgetMilliseconds!.Value,
+            1,
+            100);
+        first.AllowStop();
+        second.AllowStop();
+    }
+
+    [Fact]
+    public async Task ShutdownAllAsync_NormalCatalogCompletesWithinTotalBudget()
+    {
+        var registry = new PluginRegistry();
+        var plugins = Enumerable.Range(1, 25)
+            .Select(_ => new ReleasablePlugin())
+            .ToArray();
+        for (var index = 0; index < plugins.Length; index++)
+        {
+            Register(
+                registry,
+                $"plugin-{index + 1}",
+                plugins[index],
+                PluginState.Loaded);
+        }
+
+        var report = await registry.ShutdownAllAsync(
+            TimeSpan.FromMilliseconds(100),
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(report.Completed);
+        Assert.Equal(25, report.Results.Count);
+        Assert.Empty(report.IncompletePluginIds);
+        Assert.All(report.Results, result =>
+            Assert.Equal(PluginShutdownStatus.Passed, result.Status));
+        Assert.All(plugins, plugin => Assert.True(plugin.WasDisposed));
+        Assert.True(report.ElapsedMilliseconds < 2_000);
+    }
+
+    [Fact]
+    public async Task ShutdownAllAsync_RejectsNonPositiveTotalBudget()
+    {
+        var registry = new PluginRegistry();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            registry.ShutdownAllAsync(
+                TimeSpan.FromSeconds(1),
+                TimeSpan.Zero));
+    }
+
+    [Fact]
+    public async Task ShutdownAllForHostAsync_SurfacesIncompleteShutdownToTopLevel()
+    {
+        var registry = new PluginRegistry();
+        var stalled = new StalledPlugin();
+        Register(registry, "stalled", stalled, PluginState.Running);
+
+        var exception = await Assert.ThrowsAsync<IncompletePluginShutdownException>(
+            async () => await registry.ShutdownAllForHostAsync(
+                TimeSpan.FromMilliseconds(40),
+                TimeSpan.FromMilliseconds(80)));
+
+        Assert.Equal(["stalled"], exception.IncompletePluginIds);
+        stalled.AllowStop();
     }
 
     private static void Register(
