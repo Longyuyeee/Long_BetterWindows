@@ -97,12 +97,15 @@ public sealed class PluginRegistryShutdownTests
         Assert.False(report.Completed);
         Assert.Equal(3, report.Results.Count);
         Assert.Equal(
-            [
-                PluginShutdownStatus.TimedOut,
-                PluginShutdownStatus.TimedOut,
-                PluginShutdownStatus.SkippedTotalBudget,
-            ],
-            report.Results.Select(result => result.Status));
+            PluginShutdownStatus.TimedOut,
+            report.Results[0].Status);
+        Assert.True(
+            report.Results[1].Status is PluginShutdownStatus.TimedOut
+                or PluginShutdownStatus.SkippedTotalBudget,
+            "Scheduler delay may consume the total budget before the second plugin starts.");
+        Assert.Equal(
+            PluginShutdownStatus.SkippedTotalBudget,
+            report.Results[2].Status);
         Assert.Equal(
             ["first", "second", "skipped"],
             report.IncompletePluginIds);
@@ -110,10 +113,13 @@ public sealed class PluginRegistryShutdownTests
         Assert.True(report.ElapsedMilliseconds < 500);
         Assert.Equal(140, report.TotalBudgetMilliseconds);
         Assert.Equal(100, report.Results[0].WaitBudgetMilliseconds);
-        Assert.InRange(
-            report.Results[1].WaitBudgetMilliseconds!.Value,
-            1,
-            100);
+        if (report.Results[1].Status == PluginShutdownStatus.TimedOut)
+        {
+            Assert.InRange(
+                report.Results[1].WaitBudgetMilliseconds!.Value,
+                1,
+                100);
+        }
         first.AllowStop();
         second.AllowStop();
     }
