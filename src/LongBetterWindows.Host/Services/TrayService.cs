@@ -130,6 +130,22 @@ namespace LongBetterWindows.Host.Services
             _mainWindow.Activate();
         }
 
+        internal bool IsVisibleForQuality => _visible;
+
+        internal void InvokePrimaryActionForQuality()
+        {
+            var handled = false;
+            WndProc(
+                _hwndSource.Handle,
+                WM_TRAYICON,
+                new IntPtr(1),
+                new IntPtr(0x0202),
+                ref handled);
+            if (!handled)
+                throw new InvalidOperationException(
+                    "Tray primary action was not handled.");
+        }
+
         private void ExitApplication()
         {
             App.IsExiting = true;
