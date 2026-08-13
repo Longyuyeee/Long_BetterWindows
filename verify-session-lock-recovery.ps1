@@ -43,8 +43,9 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 $outputFile = Resolve-RepositoryPath $OutputPath
 $readyFile = [IO.Path]::ChangeExtension($outputFile, ".ready.json")
-if (Test-Path -LiteralPath $outputFile -or
-    Test-Path -LiteralPath $readyFile) {
+$outputExists = Test-Path -LiteralPath $outputFile
+$readyExists = Test-Path -LiteralPath $readyFile
+if ($outputExists -or $readyExists) {
     throw "Physical session recovery output already exists."
 }
 New-Item -ItemType Directory -Force `

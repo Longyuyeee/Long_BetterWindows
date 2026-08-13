@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 
 namespace LongBetterWindows.Tests;
 
@@ -21,6 +22,26 @@ public sealed class SessionRecoveryScriptTests
         Assert.Contains("surface_preserved", source);
         Assert.Contains("cleanup_passed", source);
         Assert.Contains("taskkill.exe /PID $process.Id /T /F", source);
+    }
+
+    [Fact]
+    public void Probe_IsAcceptedByTheWindowsPowerShellParser()
+    {
+        var path = Path.Combine(
+            FindRepositoryRoot(),
+            "verify-session-lock-recovery.ps1");
+        var escapedPath = path.Replace("'", "''", StringComparison.Ordinal);
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -Command \"[scriptblock]::Create([IO.File]::ReadAllText('{escapedPath}')) | Out-Null\"",
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        }) ?? throw new InvalidOperationException("PowerShell could not start.");
+        Assert.True(process.WaitForExit(10_000));
+        var error = process.StandardError.ReadToEnd();
+        Assert.True(process.ExitCode == 0, error);
     }
 
     private static string FindRepositoryRoot()
