@@ -416,6 +416,18 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityTrayRecoveryReportPath))
+                {
+                    if (MainWindow is not MainWindow trayRecoveryWindow)
+                        throw new InvalidOperationException(
+                            "Tray recovery probe requires the main window.");
+                    await _qualityRuntime!.RunTrayRecoveryProbeAsync(
+                        trayRecoveryWindow,
+                        _startupOptions.QualityTrayRecoveryReportPath);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId))
                 {
                     if (MainWindow is not MainWindow runtimeWindow)
@@ -509,6 +521,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityWorkspaceSwitchReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityBackgroundActivityReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityTrayRecoveryReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId)
                     || !string.IsNullOrWhiteSpace(

@@ -44,6 +44,7 @@ public class AppStartupOptionsTests
             "--quality-webview-lifecycle-report", "webview-lifecycle.json",
             "--quality-workspace-switch-report", "workspace-switch.json",
             "--quality-background-activity-report", "background-activity.json",
+            "--quality-tray-recovery-report", "tray-recovery.json",
             "--quality-taskbar-identity-report", "taskbar-identity.json",
             "--quality-ui-service-theme-report", "ui-service-theme.json",
             "--quality-themed-message-dialog-report", "message-dialog.json",
@@ -114,6 +115,9 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "background-activity.json",
             options.QualityBackgroundActivityReportPath);
+        Assert.Equal(
+            "tray-recovery.json",
+            options.QualityTrayRecoveryReportPath);
         Assert.Equal(
             "taskbar-identity.json",
             options.QualityTaskbarIdentityReportPath);

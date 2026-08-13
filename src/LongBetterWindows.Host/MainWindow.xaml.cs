@@ -473,6 +473,20 @@ namespace LongBetterWindows.Host
         internal void NotifyHostWindowVisibilityForQuality(bool visible)
             => WorkspaceShell.NotifyHostWindowVisibility(visible);
 
+        internal bool CloseToTrayForQuality()
+        {
+            Close();
+            return _tray?.IsVisibleForQuality == true && !IsVisible;
+        }
+
+        internal bool RestoreFromTrayForQuality()
+        {
+            _tray?.InvokePrimaryActionForQuality();
+            return _tray?.IsVisibleForQuality == true
+                && IsVisible
+                && WindowState == WindowState.Normal;
+        }
+
         internal bool DetachPluginRuntimeForQuality()
             => WorkspaceShell.DetachActivePluginRuntime();
 

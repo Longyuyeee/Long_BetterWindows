@@ -1082,6 +1082,12 @@ namespace LongBetterWindows.Host.Services
             => new BackgroundPluginActivityQualityProbe(_application)
                 .RunAsync(mainWindow, reportPath);
 
+        public Task RunTrayRecoveryProbeAsync(
+            MainWindow mainWindow,
+            string reportPath)
+            => new TrayRecoveryQualityProbe(_application)
+                .RunAsync(mainWindow, reportPath);
+
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
         {
             var originalTheme = App.IsLightTheme;
