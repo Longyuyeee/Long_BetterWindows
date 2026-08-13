@@ -324,6 +324,7 @@ namespace LongBetterWindows.Host
                         "search.error.workspaceResourceUnsupported",
                         "The plugin runtime view is no longer available.");
                 }
+                HideInactivePluginRuntimePresentations(module.Key);
                 if (runtime.IsDetached)
                 {
                     WorkspaceShell.ShowDetachedPluginRuntime(
@@ -349,6 +350,7 @@ namespace LongBetterWindows.Host
                 return null;
             }
             WorkspaceShell.HidePluginRuntime(notifyHidden: true);
+            HideInactivePluginRuntimePresentations(activeKey: null);
 
             return module.Key.Kind switch
             {
@@ -369,6 +371,17 @@ namespace LongBetterWindows.Host
                         "search.error.workspaceResourceUnsupported",
                         "该资源不支持工作区模块。"),
             };
+        }
+
+        private void HideInactivePluginRuntimePresentations(
+            WorkspaceModuleKey? activeKey)
+        {
+            foreach (var presentation in _pluginRuntimePresentations)
+            {
+                if (activeKey is { } key && presentation.Key == key)
+                    continue;
+                presentation.Value.Hidden();
+            }
         }
 
         internal async Task<string?> ShowPluginRuntimeModuleAsync(

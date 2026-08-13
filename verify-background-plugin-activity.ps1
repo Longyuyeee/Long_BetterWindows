@@ -2,8 +2,8 @@ param(
     [string]$HostDirectory =
         "src/LongBetterWindows.Host/bin/Release/net8.0-windows",
     [string]$OutputPath = "",
-    [ValidateRange(30, 180)]
-    [int]$TimeoutSeconds = 90
+    [ValidateRange(60, 240)]
+    [int]$TimeoutSeconds = 150
 )
 
 $ErrorActionPreference = "Stop"
@@ -96,14 +96,27 @@ $invalid = @($plugins | Where-Object {
 })
 $actualIds = @($plugins | ForEach-Object { [string]$_.plugin_id } |
     Sort-Object)
+$combined = $report.combined_idle
+$combinedSamples = @($combined.samples)
+$invalidCombinedSamples = @($combinedSamples | Where-Object {
+    [double]$_.cpu_core_percent -gt 6 -or
+    [int]$_.window_messages -gt 30 -or
+    [int]$_.api_calls -ne 0
+})
 $passed =
     [bool]$report.passed -and
-    [int]$report.schema_version -eq 2 -and
+    [int]$report.schema_version -eq 3 -and
     [int]$report.visible_ms -eq 6000 -and
     [int]$report.hidden_ms -eq 6000 -and
     [int]$report.restored_ms -eq 4000 -and
     $plugins.Count -eq 3 -and
     $invalid.Count -eq 0 -and
+    [bool]$combined.passed -and
+    [bool]$combined.all_hosts_hidden -and
+    [bool]$combined.cleanup_passed -and
+    [bool]$combined.growth.passed -and
+    $combinedSamples.Count -eq 3 -and
+    $invalidCombinedSamples.Count -eq 0 -and
     @(Compare-Object ($expectedIds | Sort-Object) $actualIds).Count -eq 0
 if (-not $passed) {
     throw "Background activity report did not satisfy the quality gate."
@@ -118,3 +131,7 @@ foreach ($plugin in $plugins) {
         [int]$plugin.hidden_api_calls,
         [int]$plugin.hidden_window_messages)
 }
+Write-Host ("Combined idle: handles {0:+#;-#;0}, threads {1:+#;-#;0}, private {2:N1} MB" -f
+    [int]$combined.growth.handle_count,
+    [int]$combined.growth.thread_count,
+    ([long]$combined.growth.private_memory_bytes / 1MB))

@@ -1064,6 +1064,10 @@ public class QualityGateTests
         var adapter = Read("src", "LongBetterWindows.Host", "Engine", "WebPluginAdapter.cs");
         var presentation = Read(
             "src", "LongBetterWindows.Host", "Engine", "WebPluginPresentationCoordinator.cs");
+        var runtime = Read(
+            "src", "LongBetterWindows.Host", "Engine", "WebPluginRuntime.cs");
+        var viewLifecycle = Read(
+            "src", "LongBetterWindows.Host", "Engine", "WebPluginViewLifecycle.cs");
         var settings = Read("src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml");
         var zhResources = Read("src", "LongBetterWindows.Host", "i18n", "zh-CN.json");
         var gestures = Read("src", "LongBetterWindows.Host", "Services", "MouseGestureService.cs");
@@ -1079,9 +1083,13 @@ public class QualityGateTests
         Assert.Contains("DefaultPresentation", presentation);
         Assert.Contains("ShowDetachedWindow", presentation);
         Assert.Contains("_runtime.NotifyPresentationVisibility", presentation);
+        Assert.Contains("SetPresentationVisibility", runtime);
+        Assert.Contains("_presentationVisible", viewLifecycle);
+        Assert.Contains("SerializeHostVisibilityChanged", viewLifecycle);
         Assert.Contains("StateChanged +=", pluginSource);
         Assert.Contains("WindowState != WindowState.Minimized", pluginSource);
         Assert.Contains("PublishPresentationVisibility(false)", pluginSource);
+        Assert.Contains("HideInactivePluginRuntimePresentations", mainSource);
         Assert.Contains("i18n.settings.gesture.title", settings);
         Assert.Contains("超级面板鼠标手势", zhResources);
         Assert.Contains("MouseGestureMode.LongRightPress", gestures);

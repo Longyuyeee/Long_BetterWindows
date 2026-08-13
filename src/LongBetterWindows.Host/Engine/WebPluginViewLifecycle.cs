@@ -17,6 +17,7 @@ namespace LongBetterWindows.Host.Engine
         private bool _themeSubscribed;
         private bool _accessibilitySubscribed;
         private bool _languageSubscribed;
+        private bool _presentationVisible = true;
         private TaskCompletionSource<bool>? _navigationCompletion;
 
         internal WebPluginViewLifecycle(
@@ -280,6 +281,12 @@ namespace LongBetterWindows.Host.Engine
             _navigationCompletion?.TrySetResult(args.IsSuccess);
             if (message is not null)
                 PostMessageCore(message);
+            if (args.IsSuccess)
+            {
+                PostMessageCore(
+                    WebPluginBridgeProtocol.SerializeHostVisibilityChanged(
+                        _presentationVisible));
+            }
         }
 
         private void OnNewWindowRequested(
@@ -419,6 +426,13 @@ namespace LongBetterWindows.Host.Engine
                 PostMessageCore(json);
             else
                 _ = dispatcher.InvokeAsync(() => PostMessageCore(json));
+        }
+
+        internal void SetPresentationVisibility(bool visible)
+        {
+            _presentationVisible = visible;
+            PostMessage(
+                WebPluginBridgeProtocol.SerializeHostVisibilityChanged(visible));
         }
 
         internal async Task SendMessageAsync(string json)

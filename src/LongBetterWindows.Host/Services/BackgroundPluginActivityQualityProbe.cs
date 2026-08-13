@@ -48,7 +48,9 @@ internal sealed class BackgroundPluginActivityQualityProbe
                 pluginId);
         }
 
-        var passed = results.All(result => result.Passed);
+        var combinedIdle = await ProbeCombinedIdleAsync(mainWindow, messages);
+        var passed = results.All(result => result.Passed)
+            && combinedIdle.Passed;
         var fullPath = Path.GetFullPath(reportPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         await File.WriteAllTextAsync(
@@ -56,7 +58,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
             JsonSerializer.Serialize(
                 new
                 {
-                    schema_version = 2,
+                    schema_version = 3,
                     captured_at = DateTimeOffset.UtcNow,
                     classification = "development_background_plugin_activity",
                     passed,
@@ -70,8 +72,22 @@ internal sealed class BackgroundPluginActivityQualityProbe
                         hidden_window_messages =
                             BackgroundActivityPolicy.MaximumHiddenWindowMessages,
                         hidden_api_calls = 0,
+                        combined_sample_count =
+                            BackgroundActivityPolicy.CombinedIdleSampleCount,
+                        combined_sample_ms = BackgroundActivityPolicy
+                            .CombinedIdleSampleMilliseconds,
+                        combined_window_messages = BackgroundActivityPolicy
+                            .MaximumCombinedWindowMessages,
+                        combined_handle_growth = BackgroundActivityPolicy
+                            .MaximumCombinedHandleGrowth,
+                        combined_thread_growth = BackgroundActivityPolicy
+                            .MaximumCombinedThreadGrowth,
+                        combined_private_memory_growth_bytes =
+                            BackgroundActivityPolicy
+                                .MaximumCombinedPrivateMemoryGrowthBytes,
                     },
                     plugins = results,
+                    combined_idle = combinedIdle,
                 },
                 new JsonSerializerOptions
                 {
@@ -79,6 +95,128 @@ internal sealed class BackgroundPluginActivityQualityProbe
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
                 }));
         _application.Shutdown(passed ? 0 : 8);
+    }
+
+    private async Task<CombinedIdleResult> ProbeCombinedIdleAsync(
+        MainWindow mainWindow,
+        WindowMessageActivityTrace messages)
+    {
+        var registry = HostProvider.Instance.PluginStore;
+        var webViews = new Dictionary<string, WebView2>(
+            StringComparer.OrdinalIgnoreCase);
+        var sessionIds = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var pluginId in PluginIds)
+        {
+            await OpenPluginAsync(pluginId);
+            var webView = await WaitForWebViewAsync(mainWindow, pluginId);
+            var sessionId = mainWindow.GetPluginRuntimeQualityState().SessionId;
+            if (sessionId is null)
+            {
+                throw new InvalidOperationException(
+                    $"Combined idle session was not created: {pluginId}");
+            }
+            webViews[pluginId] = webView;
+            sessionIds[pluginId] = sessionId;
+        }
+
+        await mainWindow.OpenManagementPageForQualityAsync(
+            WorkspaceManagementPage.Overview);
+        var hostStates = new Dictionary<string, bool>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in webViews)
+        {
+            hostStates[pair.Key] = await WaitForHostVisibilityAsync(
+                pair.Value,
+                expected: false);
+        }
+        var allHostsHidden = hostStates.Values.All(hidden => hidden);
+        await Task.Delay(500);
+
+        await MeasureActivityAsync(
+            webViews.Values,
+            BackgroundActivityPolicy.CombinedIdleSampleMilliseconds);
+
+        var baseline = CaptureProcesses(webViews.Values);
+        var samples = new List<CombinedIdleSample>();
+        for (var sample = 1;
+             sample <= BackgroundActivityPolicy.CombinedIdleSampleCount;
+             sample++)
+        {
+            var apiBefore = PluginIds.ToDictionary(
+                pluginId => pluginId,
+                SnapshotApiCalls,
+                StringComparer.OrdinalIgnoreCase);
+            var startStage = $"combined:{sample}:start";
+            var endStage = $"combined:{sample}:end";
+            messages.Mark(startStage);
+            var activity = await MeasureActivityAsync(
+                webViews.Values,
+                BackgroundActivityPolicy.CombinedIdleSampleMilliseconds);
+            messages.Mark(endStage);
+            var apiCallsByPlugin = PluginIds.ToDictionary(
+                pluginId => pluginId,
+                pluginId => GetApiCallDelta(
+                    apiBefore[pluginId],
+                    SnapshotApiCalls(pluginId),
+                    _ => true),
+                StringComparer.OrdinalIgnoreCase);
+            var apiCalls = apiCallsByPlugin.Values.Sum();
+            samples.Add(new CombinedIdleSample(
+                sample,
+                activity.CpuCorePercent,
+                GetMessageDelta(messages.Checkpoints, startStage, endStage),
+                apiCalls,
+                activity.ProcessCount,
+                activity.HandleCount,
+                activity.ThreadCount,
+                activity.PrivateMemoryBytes,
+                activity.WorkingSetBytes,
+                apiCallsByPlugin));
+        }
+
+        var final = CaptureProcesses(webViews.Values);
+        var growth = BackgroundActivityPolicy.EvaluateCombinedGrowth(
+            baseline.Values.Sum(item => item.HandleCount),
+            final.Values.Sum(item => item.HandleCount),
+            baseline.Values.Sum(item => item.ThreadCount),
+            final.Values.Sum(item => item.ThreadCount),
+            baseline.Values.Sum(item => item.PrivateMemoryBytes),
+            final.Values.Sum(item => item.PrivateMemoryBytes));
+
+        var stopRequested = true;
+        foreach (var pluginId in PluginIds)
+        {
+            stopRequested &= await registry.StopPluginAsync(
+                pluginId,
+                persistAutoStart: false);
+        }
+        var cleanupPassed = stopRequested && await WaitUntilAsync(
+            () => PluginIds.All(pluginId =>
+                    registry.Get(pluginId)?.State == PluginState.Stopped)
+                && sessionIds.Values.All(sessionId =>
+                    ServicesInitializer.PluginSessions
+                        .GetBySessionId(sessionId) is null)
+                && mainWindow.GetWorkspaceModuleCountsForQuality()
+                    .PluginRuntime == 0,
+            15_000);
+        var assessments = samples.Select(sample =>
+            new CombinedIdleSampleAssessment(
+                sample.CpuCorePercent,
+                sample.WindowMessages,
+                sample.ApiCalls)).ToArray();
+        var passed = BackgroundActivityPolicy.EvaluateCombinedIdle(
+            assessments,
+            growth,
+            allHostsHidden,
+            cleanupPassed);
+        return new CombinedIdleResult(
+            passed,
+            allHostsHidden,
+            cleanupPassed,
+            growth,
+            samples,
+            hostStates);
     }
 
     private async Task<BackgroundPluginActivityResult> ProbePluginAsync(
@@ -290,16 +428,21 @@ internal sealed class BackgroundPluginActivityQualityProbe
     private async Task<BackgroundProcessActivity> MeasureActivityAsync(
         WebView2 webView,
         int milliseconds)
+        => await MeasureActivityAsync([webView], milliseconds);
+
+    private async Task<BackgroundProcessActivity> MeasureActivityAsync(
+        IEnumerable<WebView2> webViews,
+        int milliseconds)
     {
         await _application.Dispatcher.InvokeAsync(
             () => { },
             DispatcherPriority.ContextIdle);
-        var before = CaptureProcesses(webView);
+        var before = CaptureProcesses(webViews);
         await Task.Delay(milliseconds);
         await _application.Dispatcher.InvokeAsync(
             () => { },
             DispatcherPriority.ContextIdle);
-        var after = CaptureProcesses(webView);
+        var after = CaptureProcesses(webViews);
         var common = before.Keys.Intersect(after.Keys).ToArray();
         var cpuMilliseconds = common.Sum(processId => Math.Max(
             0,
@@ -310,6 +453,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
             Math.Round(cpuMilliseconds, 1),
             Math.Round(cpuMilliseconds / milliseconds * 100, 2),
             after.Count,
+            after.Values.Sum(item => item.HandleCount),
             after.Values.Sum(item => item.ThreadCount),
             after.Values.Sum(item => item.PrivateMemoryBytes),
             after.Values.Sum(item => item.WorkingSetBytes));
@@ -317,20 +461,26 @@ internal sealed class BackgroundPluginActivityQualityProbe
 
     private static Dictionary<int, ProcessActivitySnapshot> CaptureProcesses(
         WebView2 webView)
+        => CaptureProcesses([webView]);
+
+    private static Dictionary<int, ProcessActivitySnapshot> CaptureProcesses(
+        IEnumerable<WebView2> webViews)
     {
-        IEnumerable<int> webViewProcessIds;
-        try
+        var webViewProcessIds = webViews.SelectMany(webView =>
         {
-            webViewProcessIds = webView.CoreWebView2.Environment
-                .GetProcessInfos()
-                .Select(info => checked((int)info.ProcessId))
-                .ToArray();
-        }
-        catch (Exception exception)
-            when (exception is COMException or InvalidOperationException)
-        {
-            webViewProcessIds = [];
-        }
+            try
+            {
+                return webView.CoreWebView2.Environment
+                    .GetProcessInfos()
+                    .Select(info => checked((int)info.ProcessId))
+                    .ToArray();
+            }
+            catch (Exception exception)
+                when (exception is COMException or InvalidOperationException)
+            {
+                return [];
+            }
+        });
         var processIds = webViewProcessIds
             .Append(Environment.ProcessId)
             .Distinct();
@@ -343,6 +493,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
                 process.Refresh();
                 result[processId] = new ProcessActivitySnapshot(
                     process.TotalProcessorTime.TotalMilliseconds,
+                    process.HandleCount,
                     process.Threads.Count,
                     process.PrivateMemorySize64,
                     process.WorkingSet64);
@@ -415,6 +566,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
 
     private sealed record ProcessActivitySnapshot(
         double CpuMilliseconds,
+        int HandleCount,
         int ThreadCount,
         long PrivateMemoryBytes,
         long WorkingSetBytes);
@@ -444,7 +596,28 @@ internal sealed class BackgroundPluginActivityQualityProbe
         double CpuMilliseconds,
         double CpuCorePercent,
         int ProcessCount,
+        int HandleCount,
         int ThreadCount,
         long PrivateMemoryBytes,
         long WorkingSetBytes);
+
+    private sealed record CombinedIdleSample(
+        int Sample,
+        double CpuCorePercent,
+        int WindowMessages,
+        int ApiCalls,
+        int ProcessCount,
+        int HandleCount,
+        int ThreadCount,
+        long PrivateMemoryBytes,
+        long WorkingSetBytes,
+        IReadOnlyDictionary<string, int> ApiCallsByPlugin);
+
+    private sealed record CombinedIdleResult(
+        bool Passed,
+        bool AllHostsHidden,
+        bool CleanupPassed,
+        WebViewLifecycleGrowthResult Growth,
+        IReadOnlyList<CombinedIdleSample> Samples,
+        IReadOnlyDictionary<string, bool> HostStates);
 }

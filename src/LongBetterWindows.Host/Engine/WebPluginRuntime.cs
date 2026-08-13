@@ -137,8 +137,8 @@ namespace LongBetterWindows.Host.Engine
             => _viewLifecycle.SetLanguageMessageAsync(
                 WebPluginBridgeProtocol.SerializeLanguageChanged(context));
 
-        public void NotifyPresentationVisibility(bool visible) => _viewLifecycle.PostMessage(
-            WebPluginBridgeProtocol.SerializeHostVisibilityChanged(visible));
+        public void NotifyPresentationVisibility(bool visible)
+            => _viewLifecycle.SetPresentationVisibility(visible);
         private async Task<object?> DispatchJsCall(string method, object?[] args)
         {
             // ✅ 权限检查：验证插件是否声明了所需的 capability
