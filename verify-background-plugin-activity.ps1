@@ -2,8 +2,8 @@ param(
     [string]$HostDirectory =
         "src/LongBetterWindows.Host/bin/Release/net8.0-windows",
     [string]$OutputPath = "",
-    [ValidateRange(60, 240)]
-    [int]$TimeoutSeconds = 150
+    [ValidateRange(60, 300)]
+    [int]$TimeoutSeconds = 210
 )
 
 $ErrorActionPreference = "Stop"
@@ -103,9 +103,14 @@ $invalidCombinedSamples = @($combinedSamples | Where-Object {
     [int]$_.window_messages -gt 30 -or
     [int]$_.api_calls -ne 0
 })
+$mixed = $report.mixed_presentation
+$mixedCycles = @($mixed.cycles)
+$invalidMixedCycles = @($mixedCycles | Where-Object {
+    -not [bool]$_.passed
+})
 $passed =
     [bool]$report.passed -and
-    [int]$report.schema_version -eq 3 -and
+    [int]$report.schema_version -eq 4 -and
     [int]$report.visible_ms -eq 6000 -and
     [int]$report.hidden_ms -eq 6000 -and
     [int]$report.restored_ms -eq 4000 -and
@@ -117,6 +122,11 @@ $passed =
     [bool]$combined.growth.passed -and
     $combinedSamples.Count -eq 3 -and
     $invalidCombinedSamples.Count -eq 0 -and
+    [bool]$mixed.passed -and
+    [bool]$mixed.cleanup_passed -and
+    [bool]$mixed.growth.passed -and
+    $mixedCycles.Count -eq 4 -and
+    $invalidMixedCycles.Count -eq 0 -and
     @(Compare-Object ($expectedIds | Sort-Object) $actualIds).Count -eq 0
 if (-not $passed) {
     throw "Background activity report did not satisfy the quality gate."
@@ -135,3 +145,9 @@ Write-Host ("Combined idle: handles {0:+#;-#;0}, threads {1:+#;-#;0}, private {2
     [int]$combined.growth.handle_count,
     [int]$combined.growth.thread_count,
     ([long]$combined.growth.private_memory_bytes / 1MB))
+Write-Host ("Mixed presentation: {0}/{1} cycles, handles {2:+#;-#;0}, threads {3:+#;-#;0}, private {4:N1} MB" -f
+    ($mixedCycles.Count - $invalidMixedCycles.Count),
+    $mixedCycles.Count,
+    [int]$mixed.growth.handle_count,
+    [int]$mixed.growth.thread_count,
+    ([long]$mixed.growth.private_memory_bytes / 1MB))

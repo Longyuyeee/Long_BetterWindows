@@ -20,7 +20,10 @@ public sealed class BackgroundActivityScriptTests
         Assert.Contains("$combinedSamples.Count -eq 3", source);
         Assert.Contains("combined.all_hosts_hidden", source);
         Assert.Contains("combined.growth.passed", source);
-        Assert.Contains("schema_version -eq 3", source);
+        Assert.Contains("schema_version -eq 4", source);
+        Assert.Contains("$mixedCycles.Count -eq 4", source);
+        Assert.Contains("mixed.cleanup_passed", source);
+        Assert.Contains("mixed.growth.passed", source);
         Assert.Contains("cleanup_passed", source);
         Assert.Contains("cpu_core_percent -gt 6", source);
         Assert.Contains("taskkill.exe /PID $process.Id /T /F", source);

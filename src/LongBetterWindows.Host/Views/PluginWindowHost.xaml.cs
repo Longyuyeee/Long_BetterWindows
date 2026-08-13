@@ -36,6 +36,7 @@ namespace LongBetterWindows.Host.Views
             Action<bool>? presentationVisibilityChanged = null)
         {
             InitializeComponent();
+            PluginId = pluginId;
             Title = title;
             PluginTitle.Text = title;
             PluginContent.Content = content;
@@ -83,6 +84,8 @@ namespace LongBetterWindows.Host.Views
             };
             ApplyWindowPreference(preference);
         }
+
+        internal string PluginId { get; }
 
         private void PublishPresentationVisibility()
             => PublishPresentationVisibility(
@@ -248,5 +251,6 @@ namespace LongBetterWindows.Host.Views
         public void DetachContent() => PluginContent.Content = null;
 
         internal void ReturnToOwnerForQuality() => ReturnToOwner();
+        internal void CloseForQuality() => Close();
     }
 }

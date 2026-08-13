@@ -1071,6 +1071,11 @@ public class QualityGateTests
         var settings = Read("src", "LongBetterWindows.Host", "Views", "SettingsPageControl.xaml");
         var zhResources = Read("src", "LongBetterWindows.Host", "i18n", "zh-CN.json");
         var gestures = Read("src", "LongBetterWindows.Host", "Services", "MouseGestureService.cs");
+        var backgroundProbe = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "BackgroundPluginActivityQualityProbe.cs");
 
         Assert.DoesNotContain("EmbeddedPluginSurface", mainXaml);
         Assert.DoesNotContain("ShowEmbeddedPlugin", mainSource);
@@ -1089,6 +1094,9 @@ public class QualityGateTests
         Assert.Contains("StateChanged +=", pluginSource);
         Assert.Contains("WindowState != WindowState.Minimized", pluginSource);
         Assert.Contains("PublishPresentationVisibility(false)", pluginSource);
+        Assert.Contains("PluginId = pluginId", pluginSource);
+        Assert.Contains("CloseForQuality", pluginSource);
+        Assert.Contains("public bool Passed => CoexistVisible", backgroundProbe);
         Assert.Contains("HideInactivePluginRuntimePresentations", mainSource);
         Assert.Contains("i18n.settings.gesture.title", settings);
         Assert.Contains("超级面板鼠标手势", zhResources);

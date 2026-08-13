@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
+using LongBetterWindows.Host.Views;
 using Microsoft.Web.WebView2.Wpf;
 using Serilog;
 
@@ -49,8 +50,10 @@ internal sealed class BackgroundPluginActivityQualityProbe
         }
 
         var combinedIdle = await ProbeCombinedIdleAsync(mainWindow, messages);
+        var mixedPresentation = await ProbeMixedPresentationAsync(mainWindow);
         var passed = results.All(result => result.Passed)
-            && combinedIdle.Passed;
+            && combinedIdle.Passed
+            && mixedPresentation.Passed;
         var fullPath = Path.GetFullPath(reportPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         await File.WriteAllTextAsync(
@@ -58,7 +61,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
             JsonSerializer.Serialize(
                 new
                 {
-                    schema_version = 3,
+                    schema_version = 4,
                     captured_at = DateTimeOffset.UtcNow,
                     classification = "development_background_plugin_activity",
                     passed,
@@ -85,9 +88,12 @@ internal sealed class BackgroundPluginActivityQualityProbe
                         combined_private_memory_growth_bytes =
                             BackgroundActivityPolicy
                                 .MaximumCombinedPrivateMemoryGrowthBytes,
+                        mixed_presentation_cycle_count =
+                            BackgroundActivityPolicy.MixedPresentationCycleCount,
                     },
                     plugins = results,
                     combined_idle = combinedIdle,
+                    mixed_presentation = mixedPresentation,
                 },
                 new JsonSerializerOptions
                 {
@@ -95,6 +101,156 @@ internal sealed class BackgroundPluginActivityQualityProbe
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
                 }));
         _application.Shutdown(passed ? 0 : 8);
+    }
+
+    private async Task<MixedPresentationResult> ProbeMixedPresentationAsync(
+        MainWindow mainWindow)
+    {
+        const string detachedPluginId = "com.long.clipboard-tool";
+        const string embeddedPluginId = "com.long.hardwaremonitor";
+        var registry = HostProvider.Instance.PluginStore;
+        var detachedEntry = registry.Get(detachedPluginId)
+            ?? throw new InvalidOperationException(
+                $"Mixed detached plugin was not found: {detachedPluginId}");
+        var embeddedEntry = registry.Get(embeddedPluginId)
+            ?? throw new InvalidOperationException(
+                $"Mixed embedded plugin was not found: {embeddedPluginId}");
+
+        await OpenPluginAsync(detachedPluginId);
+        var detached = await WaitForRuntimeWebViewAsync(
+            mainWindow,
+            detachedPluginId,
+            expectedDetached: true);
+        var detachedInitial = mainWindow.GetPluginRuntimeQualityState();
+        var detachedSessionId = detachedInitial.SessionId;
+        await OpenPluginAsync(embeddedPluginId);
+        var embedded = await WaitForRuntimeWebViewAsync(
+            mainWindow,
+            embeddedPluginId,
+            expectedDetached: false);
+        var embeddedInitial = mainWindow.GetPluginRuntimeQualityState();
+        await Task.Delay(2_000);
+        Dictionary<int, ProcessActivitySnapshot>? baseline = null;
+        var cycles = new List<MixedPresentationCycle>();
+
+        for (var cycle = 1;
+             cycle <= BackgroundActivityPolicy.MixedPresentationCycleCount;
+             cycle++)
+        {
+            var window = FindDetachedWindow(detachedPluginId);
+            var coexistVisible = window is not null
+                && await WaitForHostVisibilityAsync(detached, expected: true)
+                && await WaitForHostVisibilityAsync(embedded, expected: true);
+
+            if (window is not null)
+                window.WindowState = WindowState.Minimized;
+            var minimized = window is not null
+                && await WaitUntilAsync(
+                    () => window.WindowState == WindowState.Minimized,
+                    5_000)
+                && await WaitForHostVisibilityAsync(detached, expected: false)
+                && await WaitForHostVisibilityAsync(embedded, expected: true);
+
+            window?.CloseForQuality();
+            var closedToStopped = await WaitUntilAsync(
+                () => FindDetachedWindow(detachedPluginId) is null
+                    && detachedEntry.State == PluginState.Stopped
+                    && ServicesInitializer.PluginSessions
+                        .GetByPluginId(detachedPluginId) is null
+                    && !mainWindow.HasPluginRuntimeModuleForPluginForQuality(
+                        detachedPluginId),
+                10_000);
+
+            var previousDetached = detached;
+            await OpenPluginAsync(detachedPluginId);
+            var reopenedDetached = await WaitForRuntimeWebViewAsync(
+                mainWindow,
+                detachedPluginId,
+                expectedDetached: true);
+            var reopenedState = mainWindow.GetPluginRuntimeQualityState();
+            var freshRuntime = !ReferenceEquals(
+                    previousDetached,
+                    reopenedDetached)
+                && reopenedState.SessionId is not null
+                && reopenedState.SessionId != detachedSessionId;
+            detached = reopenedDetached;
+            detachedSessionId = reopenedState.SessionId;
+
+            await OpenPluginAsync(embeddedPluginId);
+            var reopenedEmbedded = await WaitForRuntimeWebViewAsync(
+                mainWindow,
+                embeddedPluginId,
+                expectedDetached: false);
+            var embeddedState = mainWindow.GetPluginRuntimeQualityState();
+            var embeddedPreserved = ReferenceEquals(embedded, reopenedEmbedded)
+                && embeddedState.SessionId == embeddedInitial.SessionId
+                && embeddedState.ContentIdentity
+                    == embeddedInitial.ContentIdentity;
+            var restoredVisible = await WaitForHostVisibilityAsync(
+                    reopenedDetached,
+                    expected: true)
+                && await WaitForHostVisibilityAsync(
+                    embedded,
+                    expected: true);
+            await Task.Delay(cycle == 1 ? 2_000 : 400);
+            var currentProcesses = CaptureProcesses(
+                new[] { detached, embedded });
+            baseline ??= currentProcesses;
+            cycles.Add(new MixedPresentationCycle(
+                cycle,
+                coexistVisible,
+                minimized,
+                closedToStopped,
+                freshRuntime,
+                embeddedPreserved,
+                restoredVisible,
+                CreateResourceTotals(currentProcesses)));
+        }
+
+        if (baseline is null)
+        {
+            throw new InvalidOperationException(
+                "Mixed presentation resource baseline was not captured.");
+        }
+        var final = CaptureProcesses(new[] { detached, embedded });
+        var growth = BackgroundActivityPolicy.EvaluateCombinedGrowth(
+            baseline.Values.Sum(item => item.HandleCount),
+            final.Values.Sum(item => item.HandleCount),
+            baseline.Values.Sum(item => item.ThreadCount),
+            final.Values.Sum(item => item.ThreadCount),
+            baseline.Values.Sum(item => item.PrivateMemoryBytes),
+            final.Values.Sum(item => item.PrivateMemoryBytes));
+        var stopRequested = await registry.StopPluginAsync(
+                detachedPluginId,
+                persistAutoStart: false)
+            && await registry.StopPluginAsync(
+                embeddedPluginId,
+                persistAutoStart: false);
+        var cleanupPassed = stopRequested && await WaitUntilAsync(
+            () => detachedEntry.State == PluginState.Stopped
+                && embeddedEntry.State == PluginState.Stopped
+                && ServicesInitializer.PluginSessions
+                    .GetByPluginId(detachedPluginId) is null
+                && ServicesInitializer.PluginSessions
+                    .GetByPluginId(embeddedPluginId) is null
+                && !mainWindow.HasPluginRuntimeModuleForPluginForQuality(
+                    detachedPluginId)
+                && !mainWindow.HasPluginRuntimeModuleForPluginForQuality(
+                    embeddedPluginId)
+                && FindDetachedWindow(detachedPluginId) is null,
+            15_000);
+        var passed = cycles.Count
+                == BackgroundActivityPolicy.MixedPresentationCycleCount
+            && cycles.All(cycle => cycle.Passed)
+            && growth.Passed
+            && cleanupPassed;
+        return new MixedPresentationResult(
+            passed,
+            cleanupPassed,
+            growth,
+            detachedInitial.SessionId,
+            embeddedInitial.SessionId,
+            cycles);
     }
 
     private async Task<CombinedIdleResult> ProbeCombinedIdleAsync(
@@ -379,6 +535,47 @@ internal sealed class BackgroundPluginActivityQualityProbe
         return webView;
     }
 
+    private static async Task<WebView2> WaitForRuntimeWebViewAsync(
+        MainWindow mainWindow,
+        string pluginId,
+        bool expectedDetached)
+    {
+        WebView2? webView = null;
+        var ready = await WaitUntilAsync(
+            () =>
+            {
+                var state = mainWindow.GetPluginRuntimeQualityState();
+                var active = mainWindow.GetActiveWorkspaceModuleKeyForQuality();
+                webView = mainWindow.GetPluginRuntimeContentForQuality()
+                    as WebView2;
+                return state.IsVisible
+                    && state.IsDetached == expectedDetached
+                    && active.Kind == "plugin-runtime"
+                    && string.Equals(
+                        active.ResourceId,
+                        pluginId,
+                        StringComparison.OrdinalIgnoreCase)
+                    && webView?.CoreWebView2 is not null;
+            },
+            15_000);
+        if (!ready || webView?.CoreWebView2 is null)
+        {
+            throw new InvalidOperationException(
+                $"Mixed presentation WebView did not become ready: {pluginId}");
+        }
+        return webView;
+    }
+
+    private PluginWindowHost? FindDetachedWindow(string pluginId)
+        => _application.Windows
+            .OfType<PluginWindowHost>()
+            .FirstOrDefault(window =>
+                window.IsVisible
+                && string.Equals(
+                    window.PluginId,
+                    pluginId,
+                    StringComparison.OrdinalIgnoreCase));
+
     private static Task<bool> WaitForActivePluginAsync(
         MainWindow mainWindow,
         string pluginId)
@@ -508,6 +705,17 @@ internal sealed class BackgroundPluginActivityQualityProbe
         return result;
     }
 
+    private static ProcessResourceTotals CreateResourceTotals(
+        IReadOnlyDictionary<int, ProcessActivitySnapshot> processes)
+    {
+        return new ProcessResourceTotals(
+            processes.Count,
+            processes.Values.Sum(item => item.HandleCount),
+            processes.Values.Sum(item => item.ThreadCount),
+            processes.Values.Sum(item => item.PrivateMemoryBytes),
+            processes.Values.Sum(item => item.WorkingSetBytes));
+    }
+
     private static IReadOnlyDictionary<string, int> SnapshotApiCalls(
         string pluginId)
         => CapabilityUsageTracker.Instance.GetStatsSnapshot(pluginId)?
@@ -620,4 +828,37 @@ internal sealed class BackgroundPluginActivityQualityProbe
         WebViewLifecycleGrowthResult Growth,
         IReadOnlyList<CombinedIdleSample> Samples,
         IReadOnlyDictionary<string, bool> HostStates);
+
+    private sealed record ProcessResourceTotals(
+        int ProcessCount,
+        int HandleCount,
+        int ThreadCount,
+        long PrivateMemoryBytes,
+        long WorkingSetBytes);
+
+    private sealed record MixedPresentationCycle(
+        int Cycle,
+        bool CoexistVisible,
+        bool Minimized,
+        bool ClosedToStopped,
+        bool FreshRuntime,
+        bool EmbeddedPreserved,
+        bool RestoredVisible,
+        ProcessResourceTotals Resources)
+    {
+        public bool Passed => CoexistVisible
+            && Minimized
+            && ClosedToStopped
+            && FreshRuntime
+            && EmbeddedPreserved
+            && RestoredVisible;
+    }
+
+    private sealed record MixedPresentationResult(
+        bool Passed,
+        bool CleanupPassed,
+        WebViewLifecycleGrowthResult Growth,
+        string? DetachedSessionId,
+        string? EmbeddedSessionId,
+        IReadOnlyList<MixedPresentationCycle> Cycles);
 }

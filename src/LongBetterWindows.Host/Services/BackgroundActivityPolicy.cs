@@ -11,6 +11,7 @@ internal static class BackgroundActivityPolicy
     internal const int MaximumCombinedThreadGrowth = 24;
     internal const long MaximumCombinedPrivateMemoryGrowthBytes =
         64L * 1024 * 1024;
+    internal const int MixedPresentationCycleCount = 4;
 
     internal static bool Evaluate(
         string pluginId,
