@@ -428,6 +428,18 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualitySessionRecoveryReportPath))
+                {
+                    if (MainWindow is not MainWindow sessionRecoveryWindow)
+                        throw new InvalidOperationException(
+                            "Physical session recovery probe requires the main window.");
+                    await _qualityRuntime!.RunPhysicalSessionRecoveryProbeAsync(
+                        sessionRecoveryWindow,
+                        _startupOptions.QualitySessionRecoveryReportPath);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId))
                 {
                     if (MainWindow is not MainWindow runtimeWindow)
@@ -523,6 +535,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualityBackgroundActivityReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityTrayRecoveryReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualitySessionRecoveryReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId)
                     || !string.IsNullOrWhiteSpace(

@@ -31,6 +31,7 @@ namespace LongBetterWindows.Host.Services
         public string? QualityWorkspaceSwitchReportPath { get; private init; }
         public string? QualityBackgroundActivityReportPath { get; private init; }
         public string? QualityTrayRecoveryReportPath { get; private init; }
+        public string? QualitySessionRecoveryReportPath { get; private init; }
         public string? QualityTaskbarIdentityReportPath { get; private init; }
         public string? QualityUiServiceThemeReportPath { get; private init; }
         public string? QualityThemedMessageDialogReportPath { get; private init; }
@@ -150,6 +151,9 @@ namespace LongBetterWindows.Host.Services
                 QualityTrayRecoveryReportPath = ReadArgument(
                     arguments,
                     "--quality-tray-recovery-report"),
+                QualitySessionRecoveryReportPath = ReadArgument(
+                    arguments,
+                    "--quality-session-recovery-report"),
                 QualityTaskbarIdentityReportPath = ReadArgument(
                     arguments,
                     "--quality-taskbar-identity-report"),
