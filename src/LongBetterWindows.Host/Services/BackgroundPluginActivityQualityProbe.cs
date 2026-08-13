@@ -90,11 +90,11 @@ internal sealed class BackgroundPluginActivityQualityProbe
         var entry = registry.Get(pluginId)
             ?? throw new InvalidOperationException(
                 $"Background activity plugin was not found: {pluginId}");
+        var visibleStatsBefore = SnapshotApiCalls(pluginId);
         await OpenPluginAsync(pluginId);
         var webView = await WaitForWebViewAsync(mainWindow, pluginId);
         await Task.Delay(500);
 
-        var visibleStatsBefore = SnapshotApiCalls(pluginId);
         messages.Mark($"{pluginId}:visible:start");
         var visibleActivity = await MeasureActivityAsync(
             webView,
