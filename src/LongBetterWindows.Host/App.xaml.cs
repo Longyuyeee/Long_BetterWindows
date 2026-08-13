@@ -725,15 +725,43 @@ namespace LongBetterWindows.Host
         protected override void OnExit(ExitEventArgs e)
         {
             SystemParameters.StaticPropertyChanged -= SystemParameters_StaticPropertyChanged;
+            var steps = new List<ShutdownStep>();
             if (_pluginBroker is not null)
-                _pluginBroker.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            HostProvider.Instance.PluginStore.ShutdownAllAsync().GetAwaiter().GetResult();
-            _pluginRuntime?.Dispose();
-            // 清理服务资源
-            ServicesInitializer.DisposeAll();
-            Log.Information("Long助手 已退出。");
-            Log.CloseAndFlush();
-            base.OnExit(e);
+            {
+                steps.Add(new ShutdownStep(
+                    "plugin-broker",
+                    () => _pluginBroker.DisposeAsync()));
+            }
+            steps.Add(new ShutdownStep(
+                "plugins",
+                () => new ValueTask(
+                    HostProvider.Instance.PluginStore.ShutdownAllAsync())));
+            if (_pluginRuntime is not null)
+            {
+                steps.Add(BestEffortShutdownSequence.Sync(
+                    "plugin-runtime",
+                    _pluginRuntime.Dispose));
+            }
+            steps.Add(BestEffortShutdownSequence.Sync(
+                "host-services",
+                ServicesInitializer.DisposeAll));
+            try
+            {
+                _ = BestEffortShutdownSequence.RunAsync(steps)
+                    .GetAwaiter().GetResult();
+                Log.Information("Long助手 已退出。");
+            }
+            finally
+            {
+                try
+                {
+                    Log.CloseAndFlush();
+                }
+                finally
+                {
+                    base.OnExit(e);
+                }
+            }
         }
 
         #region Theme Persistence

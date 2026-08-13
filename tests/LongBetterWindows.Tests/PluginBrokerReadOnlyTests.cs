@@ -28,6 +28,19 @@ public sealed class PluginBrokerReadOnlyTests
     }
 
     [Fact]
+    public async Task Broker_dispose_is_idempotent()
+    {
+        var service = new LongPluginBrokerService(
+            new PluginRegistry(),
+            $"long-broker-dispose-{Guid.NewGuid():N}");
+
+        await service.DisposeAsync();
+        await service.DisposeAsync();
+
+        Assert.False(service.GetDiagnostics().Running);
+    }
+
+    [Fact]
     public async Task Broker_negotiates_and_returns_sanitized_catalog()
     {
         var registry = CreateRegistry();

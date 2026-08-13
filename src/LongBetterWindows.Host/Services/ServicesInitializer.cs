@@ -261,16 +261,36 @@ namespace LongBetterWindows.Host.Services
 
         public static void DisposeAll()
         {
-            if (_commandPreferenceChangedHandler is not null)
+            var steps = new List<ShutdownStep>
             {
-                CommandPreferences.Changed -= _commandPreferenceChangedHandler;
-                _commandPreferenceChangedHandler = null;
-            }
-            CommandHotkeys?.Dispose();
-            MouseGestures?.Dispose();
-            (HotKey as IDisposable)?.Dispose();
-            (Http as IDisposable)?.Dispose();
-            (Storage as IDisposable)?.Dispose();
+                BestEffortShutdownSequence.Sync(
+                    "command-preference-subscription",
+                    () =>
+                    {
+                        if (_commandPreferenceChangedHandler is null)
+                            return;
+                        CommandPreferences.Changed -=
+                            _commandPreferenceChangedHandler;
+                        _commandPreferenceChangedHandler = null;
+                    }),
+                BestEffortShutdownSequence.Sync(
+                    "command-hotkeys",
+                    () => CommandHotkeys?.Dispose()),
+                BestEffortShutdownSequence.Sync(
+                    "mouse-gestures",
+                    () => MouseGestures?.Dispose()),
+                BestEffortShutdownSequence.Sync(
+                    "hotkeys",
+                    () => (HotKey as IDisposable)?.Dispose()),
+                BestEffortShutdownSequence.Sync(
+                    "http",
+                    () => (Http as IDisposable)?.Dispose()),
+                BestEffortShutdownSequence.Sync(
+                    "storage",
+                    () => (Storage as IDisposable)?.Dispose()),
+            };
+            _ = BestEffortShutdownSequence.RunAsync(steps)
+                .GetAwaiter().GetResult();
         }
     }
 }

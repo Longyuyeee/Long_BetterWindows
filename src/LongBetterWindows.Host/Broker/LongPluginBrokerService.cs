@@ -18,6 +18,8 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
     private readonly object _connectionsLock = new();
     private readonly HashSet<Task> _connections = [];
     private Task? _acceptLoop;
+    private readonly object _disposeLock = new();
+    private Task? _disposeTask;
 
     public LongPluginBrokerService(
         PluginRegistry registry,
@@ -114,7 +116,13 @@ internal sealed class LongPluginBrokerService : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeLock)
+            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+    }
+
+    private async Task DisposeCoreAsync()
     {
         _shutdown.Cancel();
         if (_acceptLoop is not null)

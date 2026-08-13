@@ -1045,7 +1045,8 @@ public class QualityGateTests
         Assert.Contains("new PluginRuntimeCoordinator", app);
         Assert.Contains("_pluginRuntime.StartAsync", app);
         Assert.Contains("_pluginRuntime?.PackageInstaller", app);
-        Assert.Contains("_pluginRuntime?.Dispose()", app);
+        Assert.Contains("BestEffortShutdownSequence.RunAsync", app);
+        Assert.Contains("_pluginRuntime.Dispose", app);
         Assert.DoesNotContain("new PluginScanner", app);
         Assert.DoesNotContain("new CommandExecutor", app);
         Assert.Contains("RecoverInterruptedTransactionsAsync", coordinator);
