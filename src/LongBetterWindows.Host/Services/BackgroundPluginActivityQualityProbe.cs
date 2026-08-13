@@ -61,7 +61,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
             JsonSerializer.Serialize(
                 new
                 {
-                    schema_version = 4,
+                    schema_version = 5,
                     captured_at = DateTimeOffset.UtcNow,
                     classification = "development_background_plugin_activity",
                     passed,
@@ -79,6 +79,9 @@ internal sealed class BackgroundPluginActivityQualityProbe
                             BackgroundActivityPolicy.CombinedIdleSampleCount,
                         combined_sample_ms = BackgroundActivityPolicy
                             .CombinedIdleSampleMilliseconds,
+                        combined_resource_increase_intervals =
+                            BackgroundActivityPolicy
+                                .MaximumConsecutiveResourceIncreaseIntervals,
                         combined_window_messages = BackgroundActivityPolicy
                             .MaximumCombinedWindowMessages,
                         combined_handle_growth = BackgroundActivityPolicy
@@ -361,9 +364,16 @@ internal sealed class BackgroundPluginActivityQualityProbe
                 sample.CpuCorePercent,
                 sample.WindowMessages,
                 sample.ApiCalls)).ToArray();
+        var resourceTrend = BackgroundActivityPolicy
+            .EvaluateCombinedResourceTrend(samples.Select(sample =>
+                new CombinedResourceSampleAssessment(
+                    sample.HandleCount,
+                    sample.ThreadCount,
+                    sample.PrivateMemoryBytes)).ToArray());
         var passed = BackgroundActivityPolicy.EvaluateCombinedIdle(
             assessments,
             growth,
+            resourceTrend,
             allHostsHidden,
             cleanupPassed);
         return new CombinedIdleResult(
@@ -371,6 +381,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
             allHostsHidden,
             cleanupPassed,
             growth,
+            resourceTrend,
             samples,
             hostStates);
     }
@@ -826,6 +837,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
         bool AllHostsHidden,
         bool CleanupPassed,
         WebViewLifecycleGrowthResult Growth,
+        CombinedResourceTrendResult ResourceTrend,
         IReadOnlyList<CombinedIdleSample> Samples,
         IReadOnlyDictionary<string, bool> HostStates);
 

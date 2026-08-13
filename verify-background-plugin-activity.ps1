@@ -3,7 +3,7 @@ param(
         "src/LongBetterWindows.Host/bin/Release/net8.0-windows",
     [string]$OutputPath = "",
     [ValidateRange(60, 300)]
-    [int]$TimeoutSeconds = 210
+    [int]$TimeoutSeconds = 270
 )
 
 $ErrorActionPreference = "Stop"
@@ -110,7 +110,7 @@ $invalidMixedCycles = @($mixedCycles | Where-Object {
 })
 $passed =
     [bool]$report.passed -and
-    [int]$report.schema_version -eq 4 -and
+    [int]$report.schema_version -eq 5 -and
     [int]$report.visible_ms -eq 6000 -and
     [int]$report.hidden_ms -eq 6000 -and
     [int]$report.restored_ms -eq 4000 -and
@@ -120,7 +120,8 @@ $passed =
     [bool]$combined.all_hosts_hidden -and
     [bool]$combined.cleanup_passed -and
     [bool]$combined.growth.passed -and
-    $combinedSamples.Count -eq 3 -and
+    [bool]$combined.resource_trend.passed -and
+    $combinedSamples.Count -eq 6 -and
     $invalidCombinedSamples.Count -eq 0 -and
     [bool]$mixed.passed -and
     [bool]$mixed.cleanup_passed -and
@@ -145,6 +146,10 @@ Write-Host ("Combined idle: handles {0:+#;-#;0}, threads {1:+#;-#;0}, private {2
     [int]$combined.growth.handle_count,
     [int]$combined.growth.thread_count,
     ([long]$combined.growth.private_memory_bytes / 1MB))
+Write-Host ("Combined trend: handles {0}, threads {1}, private {2} consecutive increases" -f
+    [int]$combined.resource_trend.handle_consecutive_increases,
+    [int]$combined.resource_trend.thread_consecutive_increases,
+    [int]$combined.resource_trend.private_memory_consecutive_increases)
 Write-Host ("Mixed presentation: {0}/{1} cycles, handles {2:+#;-#;0}, threads {3:+#;-#;0}, private {4:N1} MB" -f
     ($mixedCycles.Count - $invalidMixedCycles.Count),
     $mixedCycles.Count,
