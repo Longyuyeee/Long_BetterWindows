@@ -95,9 +95,11 @@ $sourceDirty = -not [string]::IsNullOrWhiteSpace(
 
 $directory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Force -Path $directory | Out-Null
+$startupReportPath = Join-Path $directory "host-startup.json"
 $arguments = @(
     "--quality-open-plugin-runtime", "com.long.base64",
     "--quality-idle-ms", $IdleMilliseconds.ToString(),
+    "--quality-startup-report", $startupReportPath,
     "--theme", "dark",
     "--language", "zh-CN"
 )
@@ -153,9 +155,12 @@ try {
     $workerProcesses = @($observedProcesses | Where-Object {
         $_.Name -like "long-plugin-worker*"
     })
-    $passed = $hostExitCode -eq 0 -and $remainingProcesses.Count -eq 0
+    $startupReportExists = Test-Path -LiteralPath $startupReportPath
+    $passed = $hostExitCode -eq 0 `
+        -and $startupReportExists `
+        -and $remainingProcesses.Count -eq 0
     $report = [ordered]@{
-        schema_version = 1
+        schema_version = 2
         captured_at = [DateTimeOffset]::UtcNow.ToString("O")
         classification = "development_host_process_cleanup"
         source_commit = $sourceCommit
@@ -164,6 +169,8 @@ try {
         host_executable_sha256 = (
             Get-FileHash -LiteralPath $HostExecutable -Algorithm SHA256
         ).Hash.ToLowerInvariant()
+        startup_report = $startupReportPath
+        startup_report_exists = $startupReportExists
         host_process_id = $hostProcess.Id
         host_exit_code = $hostExitCode
         elapsed_ms = [Math]::Round(

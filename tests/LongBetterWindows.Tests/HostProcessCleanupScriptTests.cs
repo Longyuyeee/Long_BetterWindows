@@ -22,6 +22,9 @@ public sealed class HostProcessCleanupScriptTests
         Assert.Contains("--quality-open-plugin-runtime", source);
         Assert.Contains("com.long.base64", source);
         Assert.Contains("--quality-idle-ms", source);
+        Assert.Contains("--quality-startup-report", source);
+        Assert.Contains("startup_report_exists", source);
+        Assert.Contains("schema_version = 2", source);
         Assert.Contains("taskkill.exe /PID $Process.Id /T /F", source);
         Assert.DoesNotContain("Get-Process -Name msedgewebview2", source);
         Assert.DoesNotContain("Stop-Process -Name", source);

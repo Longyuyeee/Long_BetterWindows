@@ -749,8 +749,9 @@ namespace LongBetterWindows.Host
                 ServicesInitializer.DisposeAll));
             try
             {
-                _ = BestEffortShutdownSequence.RunAsync(steps)
-                    .GetAwaiter().GetResult();
+                _ = DispatcherTaskWaiter.Wait(
+                    BestEffortShutdownSequence.RunAsync(steps),
+                    Dispatcher);
                 Log.Information("Long助手 已退出。");
             }
             finally
