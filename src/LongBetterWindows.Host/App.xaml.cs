@@ -737,9 +737,9 @@ namespace LongBetterWindows.Host
                     TimeSpan.FromSeconds(5)),
                 new(
                     "plugins",
-                    () => new ValueTask(
-                        HostProvider.Instance.PluginStore.ShutdownAllAsync(
-                            TimeSpan.FromSeconds(3)))),
+                    () => HostProvider.Instance.PluginStore.ShutdownAllForHostAsync(
+                        TimeSpan.FromSeconds(3),
+                        TimeSpan.FromSeconds(20))),
                 BestEffortShutdownSequence.Sync(
                     "plugin_runtime",
                     () =>

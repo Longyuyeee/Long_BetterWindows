@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using LongBetterWindows.Host.Contracts;
 using LongBetterWindows.Host.Core;
@@ -6,6 +7,47 @@ using Serilog;
 
 namespace LongBetterWindows.Host.Engine
 {
+    public enum PluginShutdownStatus
+    {
+        Passed,
+        Failed,
+        TimedOut,
+        SkippedTotalBudget,
+    }
+
+    public sealed record PluginShutdownEntryResult(
+        string PluginId,
+        PluginShutdownStatus Status,
+        double ElapsedMilliseconds,
+        double? WaitBudgetMilliseconds);
+
+    public sealed record PluginShutdownReport(
+        double ElapsedMilliseconds,
+        double? TotalBudgetMilliseconds,
+        IReadOnlyList<PluginShutdownEntryResult> Results)
+    {
+        public bool Completed => Results.All(result =>
+            result.Status == PluginShutdownStatus.Passed);
+
+        public IReadOnlyList<string> IncompletePluginIds => Results
+            .Where(result => result.Status != PluginShutdownStatus.Passed)
+            .Select(result => result.PluginId)
+            .ToArray();
+    }
+
+    public sealed class IncompletePluginShutdownException : Exception
+    {
+        public IncompletePluginShutdownException(
+            IReadOnlyList<string> incompletePluginIds)
+            : base("One or more plugins did not complete host shutdown.")
+        {
+            IncompletePluginIds = incompletePluginIds
+                ?? throw new ArgumentNullException(nameof(incompletePluginIds));
+        }
+
+        public IReadOnlyList<string> IncompletePluginIds { get; }
+    }
+
     public class PluginRegistry
     {
         private readonly Dictionary<string, PluginEntry> _entries = new();
@@ -492,20 +534,47 @@ namespace LongBetterWindows.Host.Engine
                 : StopPluginAsync(pluginId, persistAutoStart: false);
         }
 
-        public async Task ShutdownAllAsync(TimeSpan? perPluginTimeout = null)
+        public async Task<PluginShutdownReport> ShutdownAllAsync(
+            TimeSpan? perPluginTimeout = null,
+            TimeSpan? totalTimeout = null)
         {
             if (perPluginTimeout is { } timeout && timeout <= TimeSpan.Zero)
                 throw new ArgumentOutOfRangeException(nameof(perPluginTimeout));
+            if (totalTimeout is { } totalBudget && totalBudget <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(totalTimeout));
 
-            foreach (var entry in GetAll())
+            var entries = GetAll();
+            var results = new List<PluginShutdownEntryResult>(entries.Count);
+            var totalStopwatch = Stopwatch.StartNew();
+            for (var index = 0; index < entries.Count; index++)
             {
+                var entry = entries[index];
+                var remainingTotalBudget = totalTimeout - totalStopwatch.Elapsed;
+                if (remainingTotalBudget is { } remaining && remaining <= TimeSpan.Zero)
+                {
+                    AddBudgetSkippedResults(entries, index, results);
+                    break;
+                }
+
+                var waitBudget = SelectWaitBudget(
+                    perPluginTimeout,
+                    remainingTotalBudget);
+                var limitedByTotalBudget = remainingTotalBudget is not null
+                    && (perPluginTimeout is null
+                        || remainingTotalBudget <= perPluginTimeout);
                 var cleanup = ShutdownEntryAsync(entry);
+                var entryStopwatch = Stopwatch.StartNew();
                 try
                 {
-                    if (perPluginTimeout is { } budget)
+                    if (waitBudget is { } budget)
                         await cleanup.WaitAsync(budget);
                     else
                         await cleanup;
+                    results.Add(new PluginShutdownEntryResult(
+                        entry.Id,
+                        PluginShutdownStatus.Passed,
+                        entryStopwatch.Elapsed.TotalMilliseconds,
+                        waitBudget?.TotalMilliseconds));
                 }
                 catch (TimeoutException ex)
                 {
@@ -517,13 +586,81 @@ namespace LongBetterWindows.Host.Engine
                         ex,
                         "Plugin {PluginId} shutdown exceeded {TimeoutMs} ms; continuing host cleanup",
                         entry.Id,
-                        perPluginTimeout!.Value.TotalMilliseconds);
+                        waitBudget!.Value.TotalMilliseconds);
+                    results.Add(new PluginShutdownEntryResult(
+                        entry.Id,
+                        PluginShutdownStatus.TimedOut,
+                        entryStopwatch.Elapsed.TotalMilliseconds,
+                        waitBudget.Value.TotalMilliseconds));
                     _ = ObserveLateShutdownAsync(cleanup, entry.Id);
+                    if (limitedByTotalBudget)
+                    {
+                        AddBudgetSkippedResults(entries, index + 1, results);
+                        break;
+                    }
                 }
                 catch (Exception ex)
                 {
                     Log.Error(ex, "插件 {PluginId} 退出释放失败", entry.Id);
+                    results.Add(new PluginShutdownEntryResult(
+                        entry.Id,
+                        PluginShutdownStatus.Failed,
+                        entryStopwatch.Elapsed.TotalMilliseconds,
+                        waitBudget?.TotalMilliseconds));
                 }
+            }
+
+            var report = new PluginShutdownReport(
+                totalStopwatch.Elapsed.TotalMilliseconds,
+                totalTimeout?.TotalMilliseconds,
+                results);
+            if (!report.Completed)
+            {
+                Log.Warning(
+                    "Plugin shutdown completed with incomplete plugins after {ElapsedMs} ms: {@PluginIds}",
+                    report.ElapsedMilliseconds,
+                    report.IncompletePluginIds);
+            }
+            return report;
+        }
+
+        public async ValueTask ShutdownAllForHostAsync(
+            TimeSpan perPluginTimeout,
+            TimeSpan totalTimeout)
+        {
+            var report = await ShutdownAllAsync(
+                perPluginTimeout,
+                totalTimeout).ConfigureAwait(false);
+            if (!report.Completed)
+                throw new IncompletePluginShutdownException(
+                    report.IncompletePluginIds);
+        }
+
+        private static TimeSpan? SelectWaitBudget(
+            TimeSpan? perPluginTimeout,
+            TimeSpan? remainingTotalBudget)
+        {
+            if (perPluginTimeout is null)
+                return remainingTotalBudget;
+            if (remainingTotalBudget is null)
+                return perPluginTimeout;
+            return perPluginTimeout <= remainingTotalBudget
+                ? perPluginTimeout
+                : remainingTotalBudget;
+        }
+
+        private static void AddBudgetSkippedResults(
+            IReadOnlyList<PluginEntry> entries,
+            int startIndex,
+            ICollection<PluginShutdownEntryResult> results)
+        {
+            for (var index = startIndex; index < entries.Count; index++)
+            {
+                results.Add(new PluginShutdownEntryResult(
+                    entries[index].Id,
+                    PluginShutdownStatus.SkippedTotalBudget,
+                    0,
+                    0));
             }
         }
 
