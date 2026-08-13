@@ -116,7 +116,13 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
             pipe.Dispose();
             if (process is not null)
             {
-                TryTerminate(process);
+                try
+                {
+                    await TerminateOwnedProcessAsync(process).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException
+                    or System.ComponentModel.Win32Exception
+                    or TimeoutException) { }
                 process.Dispose();
             }
             if (hostBridge is not null)
@@ -191,6 +197,9 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
     public async Task WaitForExitAsync(CancellationToken cancellationToken = default)
         => await _process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 
+    internal Task ForceTerminateAsync()
+        => TerminateOwnedProcessAsync(_process);
+
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
@@ -222,7 +231,10 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         {
             using var timeout = new CancellationTokenSource(2_000);
             try { await _process.WaitForExitAsync(timeout.Token).ConfigureAwait(false); }
-            catch (OperationCanceledException) { TryTerminate(_process); }
+            catch (OperationCanceledException)
+            {
+                await TerminateOwnedProcessAsync(_process).ConfigureAwait(false);
+            }
         }
         FailPending(new ObjectDisposedException(nameof(ExperimentalPluginWorkerSession)));
         _process.Dispose();
@@ -490,14 +502,28 @@ internal sealed class ExperimentalPluginWorkerSession : IAsyncDisposable
         return start;
     }
 
-    private static void TryTerminate(Process process)
+    private static async Task TerminateOwnedProcessAsync(Process process)
     {
+        if (process.HasExited) return;
+
         try
         {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
+            process.Kill(entireProcessTree: true);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        catch (InvalidOperationException) when (process.HasExited)
+        {
+            return;
+        }
+        using var timeout = new CancellationTokenSource(2_000);
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Plugin worker process {process.Id} did not exit after forced termination.");
+        }
     }
 }
 

@@ -387,18 +387,32 @@ public sealed class ExperimentalPluginWorkerTests
         var processId = session.ProcessId;
         await session.DisposeAsync();
 
-        await AssertEventuallyAsync(() =>
+        Assert.True(ProcessHasExited(processId));
+    }
+
+    [Fact]
+    public async Task Worker_ForcedTerminationWaitsForTheOwnedProcessToExit()
+    {
+        await using var session = await StartWorkerAsync();
+        var processId = session.ProcessId;
+
+        await session.ForceTerminateAsync();
+
+        Assert.True(session.HasExited);
+        Assert.True(ProcessHasExited(processId));
+    }
+
+    private static bool ProcessHasExited(int processId)
+    {
+        try
         {
-            try
-            {
-                using var process = Process.GetProcessById(processId);
-                return process.HasExited;
-            }
-            catch (ArgumentException)
-            {
-                return true;
-            }
-        });
+            using var process = Process.GetProcessById(processId);
+            return process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
     }
 
     [Fact]
