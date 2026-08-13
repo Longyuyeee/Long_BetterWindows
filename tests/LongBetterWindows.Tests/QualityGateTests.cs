@@ -1096,7 +1096,22 @@ public class QualityGateTests
         Assert.Contains("PublishPresentationVisibility(false)", pluginSource);
         Assert.Contains("PluginId = pluginId", pluginSource);
         Assert.Contains("CloseForQuality", pluginSource);
-        Assert.Contains("public bool Passed => CoexistVisible", backgroundProbe);
+        Assert.Contains("public bool Passed => SurfacesAligned", backgroundProbe);
+        var environment = Read(
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "HostEnvironmentStateService.cs");
+        Assert.Contains("WTSRegisterSessionNotification", environment);
+        Assert.Contains("WmPowerBroadcast", environment);
+        Assert.Contains("WmDisplayChange", environment);
+        Assert.Contains("TryConstrainToNearestWorkArea", environment);
+        Assert.Contains("NotifyHostWindowVisibility(IsVisible)", mainSource);
+        Assert.Contains("NotifyHostWindowVisibilityForQuality", mainSource);
+        Assert.Contains("InteractionAvailabilityChanged", presentation);
+        Assert.Contains("_surfaceVisible && available", presentation);
+        Assert.Contains("EnsureEnvironmentSubscription();", presentation);
+        Assert.Contains("_environmentSubscribed = false", presentation);
         Assert.Contains("HideInactivePluginRuntimePresentations", mainSource);
         Assert.Contains("i18n.settings.gesture.title", settings);
         Assert.Contains("超级面板鼠标手势", zhResources);
@@ -1740,6 +1755,11 @@ public class QualityGateTests
         Assert.Contains("CompareExchangeAsync", background);
         Assert.Contains("long.storage.compareExchange", page);
         Assert.DoesNotContain("long.storage.set(storageKey", page);
+        Assert.Contains("monitoringGeneration++", page);
+        Assert.Contains("generation !== monitoringGeneration", page);
+        Assert.Contains(
+            "if (isPageActive()) captureClipboard({ announce: false });",
+            page);
         Assert.Contains("new WebPluginWithBackgroundAdapter", runtime);
         Assert.Contains(
             "ClipboardHistory.Background.dll",

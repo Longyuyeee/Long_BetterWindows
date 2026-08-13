@@ -79,6 +79,7 @@
     let currentRange = 'all';
     let monitorStarted = false;
     let fallbackTimer = 0;
+    let monitoringGeneration = 0;
     let captureRequest = null;
     let mutationQueue = Promise.resolve();
     let strings = {};
@@ -568,7 +569,7 @@
     function startFallbackPolling() {
       if (fallbackTimer) return;
       fallbackTimer = window.setInterval(function () {
-        captureClipboard({ announce: false });
+        if (isPageActive()) captureClipboard({ announce: false });
       }, fallbackIntervalMs);
     }
 
@@ -583,6 +584,7 @@
 
     async function startMonitoring() {
       if (monitorStarted || !isPageActive()) return;
+      const generation = ++monitoringGeneration;
       monitoringError = '';
       try {
         const response = await long.clipboard.startMonitoring(handleClipboardChanged);
@@ -592,6 +594,17 @@
         monitoringError = error && error.message
           ? error.message
           : t('error.monitor', '剪贴板监听启动失败');
+      }
+
+      if (generation !== monitoringGeneration || !isPageActive()) {
+        stopFallbackPolling();
+        if (monitorStarted) {
+          monitorStarted = false;
+          try {
+            await long.clipboard.stopMonitoring();
+          } catch (_) { }
+        }
+        return;
       }
 
       if (monitorStarted) {
@@ -611,6 +624,7 @@
     }
 
     async function stopMonitoring() {
+      monitoringGeneration++;
       stopFallbackPolling();
       if (!monitorStarted) return;
       monitorStarted = false;

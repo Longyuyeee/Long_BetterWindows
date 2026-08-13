@@ -61,7 +61,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
             JsonSerializer.Serialize(
                 new
                 {
-                    schema_version = 5,
+                    schema_version = 6,
                     captured_at = DateTimeOffset.UtcNow,
                     classification = "development_background_plugin_activity",
                     passed,
@@ -141,9 +141,20 @@ internal sealed class BackgroundPluginActivityQualityProbe
              cycle++)
         {
             var window = FindDetachedWindow(detachedPluginId);
-            var coexistVisible = window is not null
+            var surfacesAligned = window is not null
                 && await WaitForHostVisibilityAsync(detached, expected: true)
-                && await WaitForHostVisibilityAsync(embedded, expected: true);
+                && await WaitForHostVisibilityAsync(embedded, expected: false);
+
+            HostEnvironmentStateService.Current
+                .SetInteractionAvailableForQuality(false);
+            var suspendedByEnvironment =
+                await WaitForHostVisibilityAsync(detached, expected: false)
+                && await WaitForHostVisibilityAsync(embedded, expected: false);
+            HostEnvironmentStateService.Current
+                .SetInteractionAvailableForQuality(true);
+            var restoredAfterEnvironment =
+                await WaitForHostVisibilityAsync(detached, expected: true)
+                && await WaitForHostVisibilityAsync(embedded, expected: false);
 
             if (window is not null)
                 window.WindowState = WindowState.Minimized;
@@ -152,7 +163,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
                     () => window.WindowState == WindowState.Minimized,
                     5_000)
                 && await WaitForHostVisibilityAsync(detached, expected: false)
-                && await WaitForHostVisibilityAsync(embedded, expected: true);
+                && await WaitForHostVisibilityAsync(embedded, expected: false);
 
             window?.CloseForQuality();
             var closedToStopped = await WaitUntilAsync(
@@ -194,14 +205,16 @@ internal sealed class BackgroundPluginActivityQualityProbe
                     expected: true)
                 && await WaitForHostVisibilityAsync(
                     embedded,
-                    expected: true);
+                    expected: false);
             await Task.Delay(cycle == 1 ? 2_000 : 400);
             var currentProcesses = CaptureProcesses(
                 new[] { detached, embedded });
             baseline ??= currentProcesses;
             cycles.Add(new MixedPresentationCycle(
                 cycle,
-                coexistVisible,
+                surfacesAligned,
+                suspendedByEnvironment,
+                restoredAfterEnvironment,
                 minimized,
                 closedToStopped,
                 freshRuntime,
@@ -398,6 +411,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
         var visibleStatsBefore = SnapshotApiCalls(pluginId);
         await OpenPluginAsync(pluginId);
         var webView = await WaitForWebViewAsync(mainWindow, pluginId);
+        mainWindow.NotifyHostWindowVisibilityForQuality(visible: true);
         await Task.Delay(500);
 
         messages.Mark($"{pluginId}:visible:start");
@@ -426,6 +440,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
         var restoredReady = await WaitForActivePluginAsync(
             mainWindow,
             pluginId);
+        mainWindow.NotifyHostWindowVisibilityForQuality(visible: true);
         var restoredHostState = restoredReady
             && await WaitForHostVisibilityAsync(webView, expected: true);
         messages.Mark($"{pluginId}:restored:start");
@@ -434,6 +449,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
             RestoredMilliseconds);
         messages.Mark($"{pluginId}:restored:end");
         var restoredStatsAfter = SnapshotApiCalls(pluginId);
+        mainWindow.NotifyHostWindowVisibilityForQuality(visible: false);
 
         var checkpoints = messages.Checkpoints;
         var hiddenMessages = GetMessageDelta(
@@ -850,7 +866,9 @@ internal sealed class BackgroundPluginActivityQualityProbe
 
     private sealed record MixedPresentationCycle(
         int Cycle,
-        bool CoexistVisible,
+        bool SurfacesAligned,
+        bool SuspendedByEnvironment,
+        bool RestoredAfterEnvironment,
         bool Minimized,
         bool ClosedToStopped,
         bool FreshRuntime,
@@ -858,7 +876,9 @@ internal sealed class BackgroundPluginActivityQualityProbe
         bool RestoredVisible,
         ProcessResourceTotals Resources)
     {
-        public bool Passed => CoexistVisible
+        public bool Passed => SurfacesAligned
+            && SuspendedByEnvironment
+            && RestoredAfterEnvironment
             && Minimized
             && ClosedToStopped
             && FreshRuntime

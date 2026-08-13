@@ -110,7 +110,7 @@ $invalidMixedCycles = @($mixedCycles | Where-Object {
 })
 $passed =
     [bool]$report.passed -and
-    [int]$report.schema_version -eq 5 -and
+    [int]$report.schema_version -eq 6 -and
     [int]$report.visible_ms -eq 6000 -and
     [int]$report.hidden_ms -eq 6000 -and
     [int]$report.restored_ms -eq 4000 -and

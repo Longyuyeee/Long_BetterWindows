@@ -18,6 +18,8 @@ namespace LongBetterWindows.Host
     public partial class MainWindow : Window
     {
         private TrayService? _tray;
+        private readonly HostEnvironmentStateService _environmentState =
+            HostEnvironmentStateService.Current;
         private string? _activeWorkflowReviewId;
         private bool _workflowTerminalOutputApproved;
         private int _workflowTerminalOutputLength;
@@ -57,6 +59,9 @@ namespace LongBetterWindows.Host
             };
             LayoutUpdated += firstLayout;
             _tray = new TrayService(this);
+            _environmentState.Attach(this);
+            IsVisibleChanged += (_, _) =>
+                WorkspaceShell.NotifyHostWindowVisibility(IsVisible);
             WorkspaceShell.Bind(
                 ServicesInitializer.Workspace,
                 GetWorkspaceModuleTitle,
@@ -95,6 +100,7 @@ namespace LongBetterWindows.Host
                 HostProvider.Instance.PluginStore.PluginsChanged -=
                     PluginStore_PluginsChanged;
                 _qualityWindowAutomation?.Dispose();
+                _environmentState.Dispose();
             };
             ToolCenter.PageNavigationRequested +=
                 ToolCenter_PageNavigationRequested;
@@ -463,6 +469,9 @@ namespace LongBetterWindows.Host
 
         internal FrameworkElement? GetPluginRuntimeContentForQuality()
             => WorkspaceShell.GetPluginRuntimeContentForQuality();
+
+        internal void NotifyHostWindowVisibilityForQuality(bool visible)
+            => WorkspaceShell.NotifyHostWindowVisibility(visible);
 
         internal bool DetachPluginRuntimeForQuality()
             => WorkspaceShell.DetachActivePluginRuntime();

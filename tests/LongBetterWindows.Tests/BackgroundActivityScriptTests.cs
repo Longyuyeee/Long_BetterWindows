@@ -21,7 +21,7 @@ public sealed class BackgroundActivityScriptTests
         Assert.Contains("combined.all_hosts_hidden", source);
         Assert.Contains("combined.growth.passed", source);
         Assert.Contains("combined.resource_trend.passed", source);
-        Assert.Contains("schema_version -eq 5", source);
+        Assert.Contains("schema_version -eq 6", source);
         Assert.Contains("$mixedCycles.Count -eq 4", source);
         Assert.Contains("mixed.cleanup_passed", source);
         Assert.Contains("mixed.growth.passed", source);

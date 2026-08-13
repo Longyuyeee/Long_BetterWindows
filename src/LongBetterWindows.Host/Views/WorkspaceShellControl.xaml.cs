@@ -106,6 +106,8 @@ namespace LongBetterWindows.Host.Views
                 PluginRuntimeSurface,
                 $"plugin-session:{moduleKey.InstanceId};placement:embedded");
             shown();
+            if (Window.GetWindow(this)?.IsVisible != true)
+                hidden();
         }
 
         internal void ShowDetachedPluginRuntime(
@@ -146,6 +148,21 @@ namespace LongBetterWindows.Host.Views
             if (notifyHidden && wasAttached)
                 _runtimeHidden?.Invoke();
             return true;
+        }
+
+        internal void NotifyHostWindowVisibility(bool visible)
+        {
+            var isAttached = _runtimeContent is not null
+                && ReferenceEquals(
+                    PluginRuntimeContent.Content,
+                    _runtimeContent)
+                && PluginRuntimeSurface.Visibility == Visibility.Visible;
+            if (!isAttached)
+                return;
+            if (visible)
+                _runtimeShown?.Invoke();
+            else
+                _runtimeHidden?.Invoke();
         }
 
         internal void ReleasePluginRuntime(FrameworkElement content)

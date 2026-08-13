@@ -15,6 +15,8 @@ namespace LongBetterWindows.Host.Engine
         private PluginWorkspaceSession? _session;
         private bool _closingForStop;
         private bool _isEmbedded;
+        private bool _surfaceVisible;
+        private bool _environmentSubscribed;
 
         internal WebPluginPresentationCoordinator(
             WebPluginRuntime runtime,
@@ -32,6 +34,7 @@ namespace LongBetterWindows.Host.Engine
             _pluginId = pluginId;
             _pluginName = pluginName;
             _windowClosed = windowClosed;
+            EnsureEnvironmentSubscription();
         }
 
         internal void UpdatePluginName(string pluginName)
@@ -50,6 +53,8 @@ namespace LongBetterWindows.Host.Engine
                 dispatcher.Invoke(EnsureVisible);
                 return;
             }
+
+            EnsureEnvironmentSubscription();
 
             var webView = _runtime.EnsureView();
             Log.Debug("[Web:{Id}] 准备呈现主界面: Presentation={Presentation}, MainWindow={MainWindowType}",
@@ -99,7 +104,7 @@ namespace LongBetterWindows.Host.Engine
             if (_isEmbedded && webView is not null
                 && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
             {
-                _runtime.NotifyPresentationVisibility(false);
+                SetSurfaceVisibility(false);
                 _session?.Hide();
                 mainWindow.ReleasePluginRuntimeView(webView);
                 _isEmbedded = false;
@@ -165,13 +170,13 @@ namespace LongBetterWindows.Host.Engine
                     {
                         _isEmbedded = true;
                         session.ShowEmbedded();
-                        _runtime.NotifyPresentationVisibility(true);
+                        SetSurfaceVisibility(true);
                     },
                     () =>
                     {
                         _isEmbedded = false;
                         session.Hide();
-                        _runtime.NotifyPresentationVisibility(false);
+                        SetSurfaceVisibility(false);
                     },
                     () => CloseWorkspaceViewAsync(session),
                     () =>
@@ -221,7 +226,7 @@ namespace LongBetterWindows.Host.Engine
         {
             var session = GetOrCreateSession();
             session.ShowDetached();
-            _runtime.NotifyPresentationVisibility(true);
+            SetSurfaceVisibility(true);
             _window = new PluginWindowHost(
                 _pluginId,
                 _pluginName,
@@ -229,7 +234,7 @@ namespace LongBetterWindows.Host.Engine
                 _runtime.Manifest.Window,
                 session.State.SessionId,
                 EndRunAsync,
-                _runtime.NotifyPresentationVisibility);
+                SetSurfaceVisibility);
             _window.SetReturnTarget(System.Windows.Application.Current.MainWindow);
             var window = _window;
             window.Closed += async (_, _) =>
@@ -248,7 +253,7 @@ namespace LongBetterWindows.Host.Engine
                         ShowEmbedded(mainWindow!, webView);
                         break;
                     case PluginSurfaceCloseAction.HideAndApplyLifecycle:
-                        _runtime.NotifyPresentationVisibility(false);
+                        SetSurfaceVisibility(false);
                         session.Hide();
                         await NotifyWindowClosedAsync();
                         if (mainWindow is not null)
@@ -286,14 +291,14 @@ namespace LongBetterWindows.Host.Engine
                     {
                         _isEmbedded = true;
                         session.ShowEmbedded();
-                        _runtime.NotifyPresentationVisibility(true);
+                        SetSurfaceVisibility(true);
                     },
                     () =>
                     {
                         if (_window is null)
                         {
                             session.Hide();
-                            _runtime.NotifyPresentationVisibility(false);
+                            SetSurfaceVisibility(false);
                         }
                         _isEmbedded = false;
                     },
@@ -325,7 +330,7 @@ namespace LongBetterWindows.Host.Engine
             _closingForStop = true;
             try
             {
-                _runtime.NotifyPresentationVisibility(false);
+                SetSurfaceVisibility(false);
                 var webView = _runtime.WebView;
                 if (_isEmbedded && webView is not null
                     && System.Windows.Application.Current.MainWindow is MainWindow mainWindow)
@@ -341,6 +346,10 @@ namespace LongBetterWindows.Host.Engine
                     _window = null;
                 }
 
+                HostEnvironmentStateService.Current
+                    .InteractionAvailabilityChanged -=
+                    OnInteractionAvailabilityChanged;
+                _environmentSubscribed = false;
                 _runtime.Dispose();
                 EndSession();
             }
@@ -379,6 +388,27 @@ namespace LongBetterWindows.Host.Engine
             {
                 Log.Warning(ex, "[Web:{Id}] 窗口关闭回调失败", _pluginId);
             }
+        }
+
+        private void SetSurfaceVisibility(bool visible)
+        {
+            _surfaceVisible = visible;
+            _runtime.NotifyPresentationVisibility(
+                visible && HostEnvironmentStateService.Current
+                    .IsInteractionAvailable);
+        }
+
+        private void OnInteractionAvailabilityChanged(bool available)
+            => _runtime.NotifyPresentationVisibility(
+                _surfaceVisible && available);
+
+        private void EnsureEnvironmentSubscription()
+        {
+            if (_environmentSubscribed)
+                return;
+            HostEnvironmentStateService.Current.InteractionAvailabilityChanged +=
+                OnInteractionAvailabilityChanged;
+            _environmentSubscribed = true;
         }
     }
 }
