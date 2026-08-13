@@ -56,6 +56,8 @@ public class AppStartupOptionsTests
             "--quality-hide-window-during-idle",
             "--quality-compare-window-idle",
             "--quality-startup-report", "startup.json",
+            "--quality-shutdown-report", "shutdown.json",
+            "--quality-source-commit", "abc123",
             "--quality-management-card-shadows",
             "--quality-show-welcome",
             "--quality-market-list",
@@ -145,6 +147,8 @@ public class AppStartupOptionsTests
         Assert.True(options.QualityHideWindowDuringIdle);
         Assert.True(options.QualityCompareWindowIdle);
         Assert.Equal("startup.json", options.QualityStartupReportPath);
+        Assert.Equal("shutdown.json", options.QualityShutdownReportPath);
+        Assert.Equal("abc123", options.QualitySourceCommit);
         Assert.True(options.QualityManagementCardShadows);
         Assert.True(options.ShowWelcomeForQuality);
         Assert.True(options.ShowMarketListForQuality);

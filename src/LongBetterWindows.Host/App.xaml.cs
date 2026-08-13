@@ -725,33 +725,53 @@ namespace LongBetterWindows.Host
         protected override void OnExit(ExitEventArgs e)
         {
             SystemParameters.StaticPropertyChanged -= SystemParameters_StaticPropertyChanged;
-            var steps = new List<ShutdownStep>();
-            if (_pluginBroker is not null)
+            var steps = new List<ShutdownStep>
             {
-                steps.Add(new ShutdownStep(
-                    "plugin-broker",
-                    () => _pluginBroker.DisposeAsync(),
-                    TimeSpan.FromSeconds(5)));
-            }
-            steps.Add(new ShutdownStep(
-                "plugins",
-                () => new ValueTask(
-                    HostProvider.Instance.PluginStore.ShutdownAllAsync(
-                        TimeSpan.FromSeconds(3)))));
-            if (_pluginRuntime is not null)
-            {
-                steps.Add(BestEffortShutdownSequence.Sync(
-                    "plugin-runtime",
-                    _pluginRuntime.Dispose));
-            }
-            steps.Add(BestEffortShutdownSequence.Sync(
-                "host-services",
-                ServicesInitializer.DisposeAll));
+                new(
+                    "broker",
+                    async () =>
+                    {
+                        if (_pluginBroker is not null)
+                            await _pluginBroker.DisposeAsync();
+                    },
+                    TimeSpan.FromSeconds(5)),
+                new(
+                    "plugins",
+                    () => new ValueTask(
+                        HostProvider.Instance.PluginStore.ShutdownAllAsync(
+                            TimeSpan.FromSeconds(3)))),
+                BestEffortShutdownSequence.Sync(
+                    "plugin_runtime",
+                    () =>
+                    {
+                        if (_pluginRuntime is not null)
+                            _pluginRuntime.Dispose();
+                    }),
+                BestEffortShutdownSequence.Sync(
+                    "host_services",
+                    ServicesInitializer.DisposeAll),
+            };
             try
             {
-                _ = DispatcherTaskWaiter.Wait(
+                var results = DispatcherTaskWaiter.Wait(
                     BestEffortShutdownSequence.RunAsync(steps),
                     Dispatcher);
+                if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityShutdownReportPath))
+                {
+                    ShutdownQualityReportWriter.WriteNew(
+                        _startupOptions.QualityShutdownReportPath,
+                        _startupOptions.QualitySourceCommit
+                            ?? throw new InvalidOperationException(
+                                "--quality-source-commit is required with " +
+                                "--quality-shutdown-report."),
+                        Environment.ProcessPath
+                            ?? throw new InvalidOperationException(
+                                "The host executable path is unavailable."),
+                        Environment.ProcessId,
+                        e.ApplicationExitCode,
+                        results);
+                }
                 Log.Information("Long助手 已退出。");
             }
             finally
