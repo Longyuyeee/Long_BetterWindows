@@ -492,37 +492,79 @@ namespace LongBetterWindows.Host.Engine
                 : StopPluginAsync(pluginId, persistAutoStart: false);
         }
 
-        public async Task ShutdownAllAsync()
+        public async Task ShutdownAllAsync(TimeSpan? perPluginTimeout = null)
         {
+            if (perPluginTimeout is { } timeout && timeout <= TimeSpan.Zero)
+                throw new ArgumentOutOfRangeException(nameof(perPluginTimeout));
+
             foreach (var entry in GetAll())
             {
+                var cleanup = ShutdownEntryAsync(entry);
                 try
                 {
-                    if (entry.State is PluginState.Running or PluginState.Background)
-                    {
-                        await StopPluginAsync(entry.Id, persistAutoStart: false);
-                    }
+                    if (perPluginTimeout is { } budget)
+                        await cleanup.WaitAsync(budget);
                     else
-                    {
-                        using (PluginAccessContext.Enter(entry.Id))
-                        {
-                            if (entry.Instance is IPluginResourceLifecycle resources)
-                                await resources.ReleaseResourcesAsync();
-                        }
-                        if (_hostResourceReleaser is not null)
-                            await _hostResourceReleaser(entry.Id);
-                    }
-
-                    if (entry.Instance is IAsyncDisposable asyncDisposable)
-                        await asyncDisposable.DisposeAsync();
-                    else if (entry.Instance is IDisposable disposable)
-                        disposable.Dispose();
+                        await cleanup;
+                }
+                catch (TimeoutException ex)
+                {
+                    RuntimeHealth.RecordLifecycleFailure(
+                        entry.Id,
+                        PluginRuntimeFailureKind.ShutdownTimeout,
+                        isException: true);
+                    Log.Error(
+                        ex,
+                        "Plugin {PluginId} shutdown exceeded {TimeoutMs} ms; continuing host cleanup",
+                        entry.Id,
+                        perPluginTimeout!.Value.TotalMilliseconds);
+                    _ = ObserveLateShutdownAsync(cleanup, entry.Id);
                 }
                 catch (Exception ex)
                 {
                     Log.Error(ex, "插件 {PluginId} 退出释放失败", entry.Id);
                 }
             }
+        }
+
+        private static async Task ObserveLateShutdownAsync(
+            Task cleanup,
+            string pluginId)
+        {
+            try
+            {
+                await cleanup.ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                Log.Error(
+                    exception,
+                    "Plugin {PluginId} failed after its shutdown timeout",
+                    pluginId);
+            }
+        }
+
+        private async Task ShutdownEntryAsync(PluginEntry entry)
+        {
+            if (entry.State is PluginState.Running or PluginState.Background)
+            {
+                await StopPluginAsync(entry.Id, persistAutoStart: false);
+            }
+            else
+            {
+                using (PluginAccessContext.Enter(entry.Id))
+                {
+                    if (entry.Instance is IPluginResourceLifecycle resources)
+                        await resources.ReleaseResourcesAsync();
+                }
+                if (_hostResourceReleaser is not null)
+                    await _hostResourceReleaser(entry.Id);
+            }
+
+            if (entry.Instance is IAsyncDisposable asyncDisposable)
+                await asyncDisposable.DisposeAsync();
+            else if (entry.Instance is IDisposable disposable)
+                disposable.Dispose();
         }
 
         public static bool CanTransition(PluginState from, PluginState to)

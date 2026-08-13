@@ -53,4 +53,28 @@ public sealed class BestEffortShutdownSequenceTests
         Assert.Empty(await run);
         Assert.Equal(["async", "next"], executed);
     }
+
+    [Fact]
+    public async Task RunAsync_TimesOutAndContinuesWithNextStep()
+    {
+        var never = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var continued = false;
+
+        var failures = await BestEffortShutdownSequence.RunAsync(
+        [
+            new ShutdownStep(
+                "stalled",
+                () => new ValueTask(never.Task),
+                TimeSpan.FromMilliseconds(30)),
+            BestEffortShutdownSequence.Sync(
+                "next",
+                () => continued = true),
+        ]);
+
+        Assert.True(continued);
+        var failure = Assert.Single(failures);
+        Assert.Equal("stalled", failure.Name);
+        Assert.IsType<TimeoutException>(failure.Exception);
+    }
 }

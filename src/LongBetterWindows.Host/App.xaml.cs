@@ -730,12 +730,14 @@ namespace LongBetterWindows.Host
             {
                 steps.Add(new ShutdownStep(
                     "plugin-broker",
-                    () => _pluginBroker.DisposeAsync()));
+                    () => _pluginBroker.DisposeAsync(),
+                    TimeSpan.FromSeconds(5)));
             }
             steps.Add(new ShutdownStep(
                 "plugins",
                 () => new ValueTask(
-                    HostProvider.Instance.PluginStore.ShutdownAllAsync())));
+                    HostProvider.Instance.PluginStore.ShutdownAllAsync(
+                        TimeSpan.FromSeconds(3)))));
             if (_pluginRuntime is not null)
             {
                 steps.Add(BestEffortShutdownSequence.Sync(

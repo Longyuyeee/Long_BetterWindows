@@ -17,6 +17,7 @@ namespace LongBetterWindows.Host.Engine
         BackgroundTransitionFailed,
         ResourceReleaseFailed,
         CommandFailed,
+        ShutdownTimeout,
         WorkerTimeout,
         WorkerCrashed,
         UnhandledException,
