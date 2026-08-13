@@ -641,9 +641,13 @@
       renderPorts();
     }
 
+    function isPageActive() {
+      return window.long?.host?.isVisible?.() !== false && !document.hidden;
+    }
+
     function startPolling() {
       stopPolling();
-      if (autoRefreshToggle.checked && !document.hidden) {
+      if (autoRefreshToggle.checked && isPageActive()) {
         refreshTimer = window.setInterval(function () { void refreshPorts(false); }, refreshInterval);
       }
     }
@@ -725,7 +729,14 @@
       }
     });
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) stopPolling();
+      if (!isPageActive()) stopPolling();
+      else {
+        void refreshPorts(false);
+        startPolling();
+      }
+    });
+    window.addEventListener('long-host-visibilitychange', function () {
+      if (!isPageActive()) stopPolling();
       else {
         void refreshPorts(false);
         startPolling();

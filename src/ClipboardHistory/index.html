@@ -577,7 +577,12 @@
       fallbackTimer = 0;
     }
 
+    function isPageActive() {
+      return window.long?.host?.isVisible?.() !== false && !document.hidden;
+    }
+
     async function startMonitoring() {
+      if (monitorStarted || !isPageActive()) return;
       monitoringError = '';
       try {
         const response = await long.clipboard.startMonitoring(handleClipboardChanged);
@@ -603,6 +608,15 @@
       }
       renderMonitorState();
       await captureClipboard({ announce: false });
+    }
+
+    async function stopMonitoring() {
+      stopFallbackPolling();
+      if (!monitorStarted) return;
+      monitorStarted = false;
+      try {
+        await long.clipboard.stopMonitoring();
+      } catch (_) { }
     }
 
     async function initialize() {
@@ -711,8 +725,15 @@
       };
     });
     window.addEventListener('beforeunload', function () {
-      stopFallbackPolling();
-      if (monitorStarted) long.clipboard.stopMonitoring().catch(function () { });
+      void stopMonitoring();
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (!isPageActive()) void stopMonitoring();
+      else void startMonitoring();
+    });
+    window.addEventListener('long-host-visibilitychange', function () {
+      if (!isPageActive()) void stopMonitoring();
+      else void startMonitoring();
     });
     window.chrome?.webview?.addEventListener('message', function ({ data }) {
       if (data?.type === 'long.language-changed') applyLocalization(data);

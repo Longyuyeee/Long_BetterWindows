@@ -9,6 +9,7 @@ using LongBetterWindows.Host.Core;
 using LongBetterWindows.Host.Engine;
 using LongBetterWindows.Host.Interaction;
 using Microsoft.Web.WebView2.Wpf;
+using Serilog;
 
 namespace LongBetterWindows.Host.Services;
 
@@ -21,6 +22,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
     [
         "com.long.clipboardhistory",
         "com.long.hardwaremonitor",
+        "com.long.portmanager",
     ];
 
     private readonly Application _application;
@@ -36,7 +38,15 @@ internal sealed class BackgroundPluginActivityQualityProbe
         using var messages = new WindowMessageActivityTrace(mainWindow);
         var results = new List<BackgroundPluginActivityResult>();
         foreach (var pluginId in PluginIds)
+        {
+            Log.Information(
+                "Background activity probe starting {PluginId}",
+                pluginId);
             results.Add(await ProbePluginAsync(mainWindow, messages, pluginId));
+            Log.Information(
+                "Background activity probe completed {PluginId}",
+                pluginId);
+        }
 
         var passed = results.All(result => result.Passed);
         var fullPath = Path.GetFullPath(reportPath);
@@ -46,7 +56,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
             JsonSerializer.Serialize(
                 new
                 {
-                    schema_version = 1,
+                    schema_version = 2,
                     captured_at = DateTimeOffset.UtcNow,
                     classification = "development_background_plugin_activity",
                     passed,
@@ -59,8 +69,7 @@ internal sealed class BackgroundPluginActivityQualityProbe
                             BackgroundActivityPolicy.MaximumHiddenCpuCorePercent,
                         hidden_window_messages =
                             BackgroundActivityPolicy.MaximumHiddenWindowMessages,
-                        hidden_performance_calls = 0,
-                        hidden_clipboard_reads = 0,
+                        hidden_api_calls = 0,
                     },
                     plugins = results,
                 },
@@ -107,13 +116,13 @@ internal sealed class BackgroundPluginActivityQualityProbe
         messages.Mark($"{pluginId}:hidden:end");
         var hiddenStatsAfter = SnapshotApiCalls(pluginId);
 
+        var restoredStatsBefore = SnapshotApiCalls(pluginId);
         await OpenPluginAsync(pluginId);
         var restoredReady = await WaitForActivePluginAsync(
             mainWindow,
             pluginId);
         var restoredHostState = restoredReady
             && await WaitForHostVisibilityAsync(webView, expected: true);
-        var restoredStatsBefore = SnapshotApiCalls(pluginId);
         messages.Mark($"{pluginId}:restored:start");
         var restoredActivity = await MeasureActivityAsync(
             webView,
@@ -126,6 +135,10 @@ internal sealed class BackgroundPluginActivityQualityProbe
             checkpoints,
             $"{pluginId}:hidden:start",
             $"{pluginId}:hidden:end");
+        var hiddenApiCalls = GetApiCallDelta(
+            hiddenStatsBefore,
+            hiddenStatsAfter,
+            _ => true);
         var hiddenPerformanceCalls = GetApiCallDelta(
             hiddenStatsBefore,
             hiddenStatsAfter,
@@ -148,16 +161,23 @@ internal sealed class BackgroundPluginActivityQualityProbe
             method => method.StartsWith(
                 "performance.",
                 StringComparison.Ordinal));
+        var visibleActivityCalls = GetActivityCallDelta(
+            pluginId,
+            visibleStatsBefore,
+            visibleStatsAfter);
+        var restoredActivityCalls = GetActivityCallDelta(
+            pluginId,
+            restoredStatsBefore,
+            restoredStatsAfter);
         var activityPassed = BackgroundActivityPolicy.Evaluate(
             pluginId,
             hiddenActivity.CpuCorePercent,
             hiddenMessages,
-            hiddenPerformanceCalls,
-            hiddenClipboardReads,
+            hiddenApiCalls,
             hiddenHostState,
             restoredHostState);
-        var functionalPassed = pluginId != "com.long.hardwaremonitor"
-            || visiblePerformanceCalls > 0 && restoredPerformanceCalls > 0;
+        var functionalPassed = visibleActivityCalls > 0
+            && restoredActivityCalls > 0;
 
         var state = mainWindow.GetPluginRuntimeQualityState();
         var endRequested = await mainWindow.EndPluginRuntimeForQualityAsync();
@@ -176,8 +196,11 @@ internal sealed class BackgroundPluginActivityQualityProbe
             hiddenHostState,
             restoredHostState,
             hiddenMessages,
+            hiddenApiCalls,
             hiddenPerformanceCalls,
             hiddenClipboardReads,
+            visibleActivityCalls,
+            restoredActivityCalls,
             visiblePerformanceCalls,
             restoredPerformanceCalls,
             visibleActivity,
@@ -348,6 +371,24 @@ internal sealed class BackgroundPluginActivityQualityProbe
         => after.Where(pair => predicate(pair.Key)).Sum(pair =>
             pair.Value - before.GetValueOrDefault(pair.Key));
 
+    private static int GetActivityCallDelta(
+        string pluginId,
+        IReadOnlyDictionary<string, int> before,
+        IReadOnlyDictionary<string, int> after)
+    {
+        var prefix = pluginId switch
+        {
+            "com.long.hardwaremonitor" => "performance.",
+            "com.long.portmanager" => "networkPort.",
+            "com.long.clipboardhistory" => "clipboard.",
+            _ => string.Empty,
+        };
+        return GetApiCallDelta(
+            before,
+            after,
+            method => method.StartsWith(prefix, StringComparison.Ordinal));
+    }
+
     private static int GetMessageDelta(
         IReadOnlyList<WindowMessageCheckpoint> checkpoints,
         string fromStage,
@@ -387,8 +428,11 @@ internal sealed class BackgroundPluginActivityQualityProbe
         bool HiddenHostState,
         bool RestoredHostState,
         int HiddenWindowMessages,
+        int HiddenApiCalls,
         int HiddenPerformanceCalls,
         int HiddenClipboardReads,
+        int VisibleActivityCalls,
+        int RestoredActivityCalls,
         int VisiblePerformanceCalls,
         int RestoredPerformanceCalls,
         BackgroundProcessActivity Visible,

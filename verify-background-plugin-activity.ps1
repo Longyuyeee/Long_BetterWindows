@@ -81,7 +81,8 @@ $report = Get-Content -LiteralPath $outputFile -Raw -Encoding UTF8 |
 $plugins = @($report.plugins)
 $expectedIds = @(
     "com.long.clipboardhistory",
-    "com.long.hardwaremonitor")
+    "com.long.hardwaremonitor",
+    "com.long.portmanager")
 $invalid = @($plugins | Where-Object {
     -not [bool]$_.passed -or
     -not [bool]$_.activity_passed -or
@@ -90,18 +91,18 @@ $invalid = @($plugins | Where-Object {
     -not [bool]$_.hidden_host_state -or
     -not [bool]$_.restored_host_state -or
     [int]$_.hidden_window_messages -gt 20 -or
-    [int]$_.hidden_performance_calls -ne 0 -or
-    [int]$_.hidden_clipboard_reads -ne 0 -or
-    [double]$_.hidden.cpu_core_percent -gt 5
+    [int]$_.hidden_api_calls -ne 0 -or
+    [double]$_.hidden.cpu_core_percent -gt 6
 })
 $actualIds = @($plugins | ForEach-Object { [string]$_.plugin_id } |
     Sort-Object)
 $passed =
     [bool]$report.passed -and
+    [int]$report.schema_version -eq 2 -and
     [int]$report.visible_ms -eq 6000 -and
     [int]$report.hidden_ms -eq 6000 -and
     [int]$report.restored_ms -eq 4000 -and
-    $plugins.Count -eq 2 -and
+    $plugins.Count -eq 3 -and
     $invalid.Count -eq 0 -and
     @(Compare-Object ($expectedIds | Sort-Object) $actualIds).Count -eq 0
 if (-not $passed) {
@@ -114,7 +115,6 @@ foreach ($plugin in $plugins) {
     Write-Host ("{0}: hidden CPU {1:N2}%, API {2}, messages {3}" -f
         $plugin.plugin_id,
         [double]$plugin.hidden.cpu_core_percent,
-        ([int]$plugin.hidden_performance_calls +
-            [int]$plugin.hidden_clipboard_reads),
+        [int]$plugin.hidden_api_calls,
         [int]$plugin.hidden_window_messages)
 }

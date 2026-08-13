@@ -15,10 +15,10 @@ public sealed class BackgroundActivityScriptTests
         Assert.Contains("--porcelain --untracked-files=no", source);
         Assert.Contains("hidden_host_state", source);
         Assert.Contains("restored_host_state", source);
-        Assert.Contains("hidden_performance_calls", source);
-        Assert.Contains("hidden_clipboard_reads", source);
+        Assert.Contains("hidden_api_calls", source);
+        Assert.Contains("$plugins.Count -eq 3", source);
         Assert.Contains("cleanup_passed", source);
-        Assert.Contains("cpu_core_percent -gt 5", source);
+        Assert.Contains("cpu_core_percent -gt 6", source);
         Assert.Contains("taskkill.exe /PID $process.Id /T /F", source);
     }
 

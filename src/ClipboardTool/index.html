@@ -194,8 +194,12 @@
       return true;
     }
 
+    function isPageActive() {
+      return window.long?.host?.isVisible?.() !== false && !document.hidden;
+    }
+
     async function startMonitor() {
-      if (monitorStarted || fallbackTimer || document.hidden) return;
+      if (monitorStarted || fallbackTimer || !isPageActive()) return;
       try {
         const response = await long.clipboard.startMonitoring(handleClipboardChanged);
         responseData(response, t('error.monitor', '剪贴板监听启动失败'));
@@ -479,7 +483,11 @@
       else if (event.ctrlKey && event.key === 'Enter' && currentTab === 'tools') { event.preventDefault(); writeClipboard(); }
     });
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) void stopMonitor();
+      if (!isPageActive()) void stopMonitor();
+      else void startMonitor();
+    });
+    window.addEventListener('long-host-visibilitychange', function () {
+      if (!isPageActive()) void stopMonitor();
       else void startMonitor();
     });
     window.LongUI?.onCommand(async function (command) {
