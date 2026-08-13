@@ -228,7 +228,8 @@ namespace LongBetterWindows.Host.Engine
                 webView,
                 _runtime.Manifest.Window,
                 session.State.SessionId,
-                EndRunAsync);
+                EndRunAsync,
+                _runtime.NotifyPresentationVisibility);
             _window.SetReturnTarget(System.Windows.Application.Current.MainWindow);
             var window = _window;
             window.Closed += async (_, _) =>

@@ -1078,6 +1078,10 @@ public class QualityGateTests
         Assert.Contains("Key.Escape", pluginSource);
         Assert.Contains("DefaultPresentation", presentation);
         Assert.Contains("ShowDetachedWindow", presentation);
+        Assert.Contains("_runtime.NotifyPresentationVisibility", presentation);
+        Assert.Contains("StateChanged +=", pluginSource);
+        Assert.Contains("WindowState != WindowState.Minimized", pluginSource);
+        Assert.Contains("PublishPresentationVisibility(false)", pluginSource);
         Assert.Contains("i18n.settings.gesture.title", settings);
         Assert.Contains("超级面板鼠标手势", zhResources);
         Assert.Contains("MouseGestureMode.LongRightPress", gestures);

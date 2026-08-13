@@ -14,10 +14,12 @@ namespace LongBetterWindows.Host.Views
     {
         private Window? _returnTarget;
         private readonly Func<Task>? _endRequested;
+        private readonly Action<bool>? _presentationVisibilityChanged;
         private readonly QualityWindowAutomation? _qualityAutomation;
         private PluginWindowMode _windowMode = PluginWindowMode.Standard;
         private bool _initialPlacementFinalized;
         private bool _placementRefreshPending;
+        private bool? _lastPresentationVisibility;
         private HwndSource? _windowSource;
 
         private const int WmSettingChange = 0x001A;
@@ -30,13 +32,15 @@ namespace LongBetterWindows.Host.Views
             FrameworkElement content,
             PluginWindowPreference? preference = null,
             string? sessionId = null,
-            Func<Task>? endRequested = null)
+            Func<Task>? endRequested = null,
+            Action<bool>? presentationVisibilityChanged = null)
         {
             InitializeComponent();
             Title = title;
             PluginTitle.Text = title;
             PluginContent.Content = content;
             _endRequested = endRequested;
+            _presentationVisibilityChanged = presentationVisibilityChanged;
             EndRunButton.Visibility = endRequested is null
                 ? Visibility.Collapsed
                 : Visibility.Visible;
@@ -68,13 +72,28 @@ namespace LongBetterWindows.Host.Views
             _qualityAutomation = QualityWindowAutomation.Attach(
                 this,
                 ExecuteQualityWindowAction);
+            IsVisibleChanged += (_, _) => PublishPresentationVisibility();
+            StateChanged += (_, _) => PublishPresentationVisibility();
             Closed += (_, _) =>
             {
+                PublishPresentationVisibility(false);
                 _windowSource?.RemoveHook(WindowMessageHook);
                 _windowSource = null;
                 _qualityAutomation?.Dispose();
             };
             ApplyWindowPreference(preference);
+        }
+
+        private void PublishPresentationVisibility()
+            => PublishPresentationVisibility(
+                IsVisible && WindowState != WindowState.Minimized);
+
+        private void PublishPresentationVisibility(bool isVisible)
+        {
+            if (_lastPresentationVisibility == isVisible)
+                return;
+            _lastPresentationVisibility = isVisible;
+            _presentationVisibilityChanged?.Invoke(isVisible);
         }
 
         internal void SetReturnTarget(Window? target) => _returnTarget = target;

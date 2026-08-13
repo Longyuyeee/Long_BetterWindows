@@ -436,6 +436,21 @@ namespace LongBetterWindows.Host.Services
             var detachedWindow = _application.Windows
                 .OfType<PluginWindowHost>()
                 .FirstOrDefault(window => window.IsVisible);
+            var detachedHostVisible = await ReadHostVisibilityAsync(webView);
+            if (detachedWindow is not null)
+                detachedWindow.WindowState = WindowState.Minimized;
+            var minimizedReady = await WaitUntilAsync(
+                () => detachedWindow?.WindowState == WindowState.Minimized,
+                5_000);
+            var minimizedHostHidden = minimizedReady
+                && !await ReadHostVisibilityAsync(webView);
+            if (detachedWindow is not null)
+                detachedWindow.WindowState = WindowState.Normal;
+            var restoredReady = await WaitUntilAsync(
+                () => detachedWindow?.WindowState == WindowState.Normal,
+                5_000);
+            var restoredHostVisible = restoredReady
+                && await ReadHostVisibilityAsync(webView);
             detachedWindow?.ReturnToOwnerForQuality();
 
             var returnedReady = await WaitUntilAsync(
@@ -762,6 +777,9 @@ namespace LongBetterWindows.Host.Services
                 && physicalScrollPreserved
                 && detachRequested
                 && detachedReady
+                && detachedHostVisible
+                && minimizedHostHidden
+                && restoredHostVisible
                 && returnedReady
                 && closeRequested
                 && closeStopped
@@ -809,13 +827,18 @@ namespace LongBetterWindows.Host.Services
                 JsonSerializer.Serialize(
                     new
                     {
-                        schema_version = 1,
+                        schema_version = 2,
                         captured_at = DateTimeOffset.UtcNow,
                         plugin_id = pluginId,
                         passed,
                         embedded_ready = embeddedReady,
                         detach_requested = detachRequested,
                         detached_ready = detachedReady,
+                        detached_host_visible = detachedHostVisible,
+                        minimized_ready = minimizedReady,
+                        minimized_host_hidden = minimizedHostHidden,
+                        restored_ready = restoredReady,
+                        restored_host_visible = restoredHostVisible,
                         returned_ready = returnedReady,
                         same_session_across_move = sameSessionAcrossMove,
                         same_view_across_move = sameViewAcrossMove,
@@ -909,6 +932,15 @@ namespace LongBetterWindows.Host.Services
                     },
                     new JsonSerializerOptions { WriteIndented = true }));
             _application.Shutdown(passed ? 0 : 3);
+        }
+
+        private static async Task<bool> ReadHostVisibilityAsync(WebView2? webView)
+        {
+            if (webView?.CoreWebView2 is null)
+                return false;
+            var result = await webView.CoreWebView2.ExecuteScriptAsync(
+                "window.long?.host?.isVisible?.() === true");
+            return string.Equals(result, "true", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task OpenPluginRuntimeAsync(
