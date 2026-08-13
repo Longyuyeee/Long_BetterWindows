@@ -73,6 +73,28 @@ public class PluginChangeMonitorTests
         Assert.Empty(changes);
     }
 
+    [Fact]
+    public async Task Dispose_CancelsPendingDebouncedChange()
+    {
+        var changes = new ConcurrentQueue<PluginFileChange>();
+        using var signal = new SemaphoreSlim(0);
+        var monitor = new PluginChangeMonitor(
+            Array.Empty<string>(),
+            change =>
+            {
+                changes.Enqueue(change);
+                signal.Release();
+                return Task.CompletedTask;
+            },
+            TimeSpan.FromMilliseconds(200));
+
+        monitor.NotifyChanged(Path.Combine(Path.GetTempPath(), "pending.dll"));
+        monitor.Dispose();
+
+        Assert.False(await signal.WaitAsync(TimeSpan.FromMilliseconds(350)));
+        Assert.Empty(changes);
+    }
+
     private static PluginChangeMonitor CreateMonitor(
         ConcurrentQueue<PluginFileChange> changes,
         SemaphoreSlim signal)

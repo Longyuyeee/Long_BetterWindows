@@ -71,6 +71,7 @@ namespace LongBetterWindows.Host.Services
             { get; private set; } = new();
         internal static PluginWorkspaceSessionManager PluginSessions
             { get; private set; } = new();
+        private static Action<string>? _commandPreferenceChangedHandler;
 
         public static void Initialize(
             string? workflowsDirectory = null,
@@ -101,8 +102,9 @@ namespace LongBetterWindows.Host.Services
                 new CommandExecutor(provider.PluginStore),
                 Dispatcher.CurrentDispatcher);
             CommandHotkeys.InitializeAsync().GetAwaiter().GetResult();
-            CommandPreferences.Changed += commandKey =>
+            _commandPreferenceChangedHandler = commandKey =>
                 _ = CommandHotkeys.RefreshCommandAsync(commandKey);
+            CommandPreferences.Changed += _commandPreferenceChangedHandler;
             provider.PluginStore.AttachHostResourceReleaser(
                 async pluginId => { await HotKey.UnregisterPluginAsync(pluginId); });
 
@@ -259,6 +261,12 @@ namespace LongBetterWindows.Host.Services
 
         public static void DisposeAll()
         {
+            if (_commandPreferenceChangedHandler is not null)
+            {
+                CommandPreferences.Changed -= _commandPreferenceChangedHandler;
+                _commandPreferenceChangedHandler = null;
+            }
+            CommandHotkeys?.Dispose();
             MouseGestures?.Dispose();
             (HotKey as IDisposable)?.Dispose();
             (Http as IDisposable)?.Dispose();

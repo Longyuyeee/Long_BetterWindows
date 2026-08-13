@@ -33,6 +33,7 @@ namespace LongBetterWindows.Host.Engine
         private readonly Func<string>? _currentLanguage;
         private readonly Action<string>? _startupMark;
         private readonly Func<string, bool>? _suppressAutoStart;
+        private bool _disposed;
 
         public PluginScanner(
             string? pluginsDir = null,
@@ -147,9 +148,13 @@ namespace LongBetterWindows.Host.Engine
 
         private async Task HandlePluginFileChangeAsync(PluginFileChange change)
         {
+            if (_disposed)
+                return;
             await _reloadGate.WaitAsync();
             try
             {
+                if (_disposed)
+                    return;
                 if (change.OldPath is not null
                     && !string.Equals(
                         change.OldPath, change.NewPath, StringComparison.OrdinalIgnoreCase))
@@ -506,6 +511,9 @@ namespace LongBetterWindows.Host.Engine
 
         public void Dispose()
         {
+            if (_disposed)
+                return;
+            _disposed = true;
             _changeMonitor.Dispose();
 
             Log.Information("PluginScanner 已释放，文件监控已停止。");

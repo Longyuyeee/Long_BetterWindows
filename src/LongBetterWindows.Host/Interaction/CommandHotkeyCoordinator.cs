@@ -407,8 +407,12 @@ namespace LongBetterWindows.Host.Interaction
 
         private void QueueExecution(string commandKey)
         {
+            if (!_active || Volatile.Read(ref _disposed) != 0)
+                return;
             _ = _dispatcher.BeginInvoke(new Action(async () =>
             {
+                if (!_active || Volatile.Read(ref _disposed) != 0)
+                    return;
                 try
                 {
                     var result = await _executor.ExecuteAsync(commandKey);
@@ -450,6 +454,9 @@ namespace LongBetterWindows.Host.Interaction
             }
             _active = false;
         }
+
+        internal bool IsActiveForQuality => _active;
+        internal bool IsSubscribedForQuality => _subscribed;
 
         private sealed record PersistedEntry(string CommandKey, string Hotkey);
     }

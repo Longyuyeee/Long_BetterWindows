@@ -107,6 +107,19 @@ public sealed class CommandHotkeyCoordinatorTests
         Assert.True(restored.IsRegistered);
     }
 
+    [Fact]
+    public async Task Dispose_DeactivatesAndUnsubscribesCoordinator()
+    {
+        var fixture = await Fixture.CreateAsync();
+        Assert.True(fixture.Coordinator.IsActiveForQuality);
+        Assert.True(fixture.Coordinator.IsSubscribedForQuality);
+
+        fixture.Coordinator.Dispose();
+
+        Assert.False(fixture.Coordinator.IsActiveForQuality);
+        Assert.False(fixture.Coordinator.IsSubscribedForQuality);
+    }
+
     private sealed class Fixture
     {
         public string CommandKey => "demo:demo.open";

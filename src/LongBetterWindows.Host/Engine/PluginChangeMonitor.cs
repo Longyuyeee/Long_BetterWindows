@@ -127,6 +127,11 @@ namespace LongBetterWindows.Host.Engine
             try
             {
                 await Task.Delay(_debounceDelay, cancellationToken);
+                lock (_sync)
+                {
+                    if (_disposed || cancellationToken.IsCancellationRequested)
+                        return;
+                }
                 await _onChange(change);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -166,6 +171,7 @@ namespace LongBetterWindows.Host.Engine
                     watcher.Dispose();
                 }
                 _watchers.Clear();
+                _started = false;
 
                 foreach (var pending in _pending.Values)
                 {
