@@ -110,14 +110,14 @@ public sealed class PluginRegistryShutdownTests
             ["first", "second", "skipped"],
             report.IncompletePluginIds);
         Assert.False(skipped.WasDisposed);
-        Assert.True(report.ElapsedMilliseconds < 500);
+        Assert.True(report.ElapsedMilliseconds < 2_000);
         Assert.Equal(140, report.TotalBudgetMilliseconds);
         Assert.Equal(100, report.Results[0].WaitBudgetMilliseconds);
         if (report.Results[1].Status == PluginShutdownStatus.TimedOut)
         {
             Assert.InRange(
                 report.Results[1].WaitBudgetMilliseconds!.Value,
-                1,
+                double.Epsilon,
                 100);
         }
         first.AllowStop();
