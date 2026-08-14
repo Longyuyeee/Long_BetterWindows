@@ -233,6 +233,70 @@ public sealed class ExternalReleaseGateTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyExternalReleaseGate_AcceptsExplicitExternalEcosystemDeferral()
+    {
+        var paths = WriteFixture(PackageHash, externalEcosystemDeferred: true);
+        var output = Path.Combine(_root, "deferred-decision.json");
+
+        var result = await RunVerifierAsync(paths, output);
+
+        Assert.True(result.ExitCode == 0, result.Error);
+        using var decision = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        var root = decision.RootElement;
+        Assert.Equal(3, root.GetProperty("schema_version").GetInt32());
+        Assert.Equal("deferred", root.GetProperty("marketplace").GetProperty("status").GetString());
+        Assert.Equal(3, root.GetProperty("external_ecosystem").GetArrayLength());
+        Assert.All(
+            root.GetProperty("external_ecosystem").EnumerateArray(),
+            item =>
+            {
+                Assert.Equal("deferred", item.GetProperty("status").GetString());
+                Assert.Equal("1.12.0", item.GetProperty("target_version").GetString());
+                Assert.Equal("disabled", item.GetProperty("default_feature_state").GetString());
+            });
+        Assert.Equal(
+            3,
+            root.GetProperty("product_acceptance")
+                .GetProperty("approved_validation_count").GetInt32());
+        Assert.Equal(
+            2,
+            root.GetProperty("product_acceptance")
+                .GetProperty("deferred_validation_count").GetInt32());
+        Assert.True(root.GetProperty("inputs").TryGetProperty(
+            "external_ecosystem_deferral_sha256", out _));
+        Assert.False(root.GetProperty("inputs").TryGetProperty(
+            "marketplace_rehearsal_sha256", out _));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsDeferralMasqueradingAsPassed()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            externalEcosystemDeferred: true,
+            deferredItemStatus: "passed");
+
+        var result = await RunVerifierAsync(paths, Path.Combine(_root, "false-pass.json"));
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("deferral item is invalid", result.Error);
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsDeferralForAnotherCandidateVersion()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            externalEcosystemDeferred: true,
+            deferredCandidateVersion: "1.10.0");
+
+        var result = await RunVerifierAsync(paths, Path.Combine(_root, "wrong-version.json"));
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("does not match the candidate", result.Error);
+    }
+
+    [Fact]
     public async Task VerifyExternalReleaseGate_PreflightRejectsOutputPath()
     {
         var paths = WriteFixture(PackageHash);
@@ -690,7 +754,10 @@ public sealed class ExternalReleaseGateTests : IDisposable
         string downloadOperator = "capture-user",
         string downloadReviewer = "review-user",
         string cleanReviewer = "clean-reviewer",
-        string riskAcceptedVersion = "1.11.0")
+        string riskAcceptedVersion = "1.11.0",
+        bool externalEcosystemDeferred = false,
+        string deferredItemStatus = "deferred",
+        string deferredCandidateVersion = "1.11.0")
     {
         Directory.CreateDirectory(_root);
         var packagePath = Path.Combine(_root, "LongBetterWindows.zip");
@@ -992,7 +1059,10 @@ public sealed class ExternalReleaseGateTests : IDisposable
             "lpwp-widget-desktop",
             "lpwp-signed-reference",
         };
-        var productApprovals = validationIds.Select(id =>
+        var approvedValidationIds = externalEcosystemDeferred
+            ? new[] { "taskbar-visual-grouping", "native-performance", "lpwp-widget-desktop" }
+            : validationIds;
+        var productApprovals = approvedValidationIds.Select(id =>
         {
             var relativePath = $"product.sources/{id}.json";
             WritePortableSource(relativePath, new
@@ -1024,20 +1094,56 @@ public sealed class ExternalReleaseGateTests : IDisposable
             contract_valid = true,
             release_eligible = true,
         });
-        var productAcceptance = WriteJson("product.json", new
+        string? externalDeferral = null;
+        object? deferralSource = null;
+        object[]? deferredItems = null;
+        if (externalEcosystemDeferred)
         {
-            schema_version = 1,
-            classification = "approved_final_product_acceptance",
-            passed = true,
-            source_commit = Commit,
-            plugin_count = 25,
-            command_count = 42,
-            plugin_approval_receipt_count = 25,
-            required_validation_ids = validationIds,
-            approved_validation_count = 5,
-            plugin_matrix = EvidenceEntry(pluginMatrixRelative),
-            approvals = productApprovals,
-        });
+            deferredItems = new object[]
+            {
+                new { id = "lpwp-long-grid-e2e", status = deferredItemStatus, reason = "missing_long_grid_repository", target_version = "1.12.0", default_feature_state = "disabled" },
+                new { id = "lpwp-signed-reference", status = deferredItemStatus, reason = "missing_approved_plugin_publisher_identity", target_version = "1.12.0", default_feature_state = "disabled" },
+                new { id = "production-marketplace-rehearsal", status = deferredItemStatus, reason = "missing_production_registry_or_cdn_credentials", target_version = "1.12.0", default_feature_state = "disabled" },
+            };
+            var deferralDocument = new
+            {
+                schema_version = 1,
+                classification = "external_ecosystem_deferral",
+                status = "deferred",
+                source_commit = Commit,
+                candidate_version = deferredCandidateVersion,
+                target_version = "1.12.0",
+                default_feature_state = "disabled",
+                accepted_by = "release-maintainer",
+                accepted_at = "2026-08-14T00:00:00Z",
+                items = deferredItems,
+            };
+            externalDeferral = WriteJson("external-ecosystem-deferral.json", deferralDocument);
+            const string deferralRelative = "product.sources/external-ecosystem-deferral.json";
+            WritePortableSource(deferralRelative, deferralDocument);
+            deferralSource = EvidenceEntry(deferralRelative);
+        }
+        var productDocument = new Dictionary<string, object?>
+        {
+            ["schema_version"] = externalEcosystemDeferred ? 2 : 1,
+            ["classification"] = "approved_final_product_acceptance",
+            ["passed"] = true,
+            ["source_commit"] = Commit,
+            ["plugin_count"] = 25,
+            ["command_count"] = 42,
+            ["plugin_approval_receipt_count"] = 25,
+            ["required_validation_ids"] = validationIds,
+            ["approved_validation_count"] = approvedValidationIds.Length,
+            ["plugin_matrix"] = EvidenceEntry(pluginMatrixRelative),
+            ["approvals"] = productApprovals,
+        };
+        if (externalEcosystemDeferred)
+        {
+            productDocument["deferred_validation_count"] = 2;
+            productDocument["external_ecosystem"] = deferredItems;
+            productDocument["external_ecosystem_deferral"] = deferralSource;
+        }
+        var productAcceptance = WriteJson("product.json", productDocument);
         return new FixturePaths(
             release,
             download,
@@ -1046,6 +1152,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
             accessibility,
             marketplace,
             productAcceptance,
+            externalDeferral,
             marketplaceEvidence,
             packagePath,
             frameworkPackagePath,
@@ -1218,13 +1325,22 @@ public sealed class ExternalReleaseGateTests : IDisposable
             "-CleanEnvironmentGatePath", paths.Clean,
             "-PhysicalDpiGatePath", paths.Dpi,
             "-AccessibilityGatePath", paths.Accessibility,
-            "-MarketplaceRehearsalPath", paths.Marketplace,
             "-ProductAcceptanceGatePath", paths.ProductAcceptance,
             "-ExpectedSourceCommit", Commit,
             "-ExpectedDistributionChannel", "unsigned",
         })
         {
             start.ArgumentList.Add(argument);
+        }
+        if (paths.ExternalDeferral is null)
+        {
+            start.ArgumentList.Add("-MarketplaceRehearsalPath");
+            start.ArgumentList.Add(paths.Marketplace);
+        }
+        else
+        {
+            start.ArgumentList.Add("-ExternalEcosystemDeferralPath");
+            start.ArgumentList.Add(paths.ExternalDeferral);
         }
         if (preflightOnly)
             start.ArgumentList.Add("-PreflightOnly");
@@ -1274,6 +1390,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
         string Accessibility,
         string Marketplace,
         string ProductAcceptance,
+        string? ExternalDeferral,
         string MarketplaceDeploymentEvidence,
         string Package,
         string FrameworkPackage,

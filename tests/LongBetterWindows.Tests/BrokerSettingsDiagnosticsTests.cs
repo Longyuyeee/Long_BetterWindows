@@ -8,27 +8,27 @@ namespace LongBetterWindows.Tests;
 public sealed class BrokerSettingsDiagnosticsTests
 {
     [Fact]
-    public async Task Settings_default_enabled_and_persist_atomically()
+    public async Task Settings_default_disabled_and_persist_atomically()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"long-broker-settings-{Guid.NewGuid():N}");
         var path = Path.Combine(directory, "broker.json");
         var store = new BrokerSettingsStore(path);
 
-        Assert.True(store.Load().Enabled);
-        await store.SaveAsync(new BrokerSettings(false));
         Assert.False(store.Load().Enabled);
+        await store.SaveAsync(new BrokerSettings(true));
+        Assert.True(store.Load().Enabled);
         Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
     }
 
     [Fact]
-    public void Settings_malformed_file_falls_back_to_enabled()
+    public void Settings_malformed_file_falls_back_to_disabled()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"long-broker-settings-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "broker.json");
         File.WriteAllText(path, "not-json");
 
-        Assert.True(new BrokerSettingsStore(path).Load().Enabled);
+        Assert.False(new BrokerSettingsStore(path).Load().Enabled);
     }
 
     [Fact]

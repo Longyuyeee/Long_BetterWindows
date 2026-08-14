@@ -64,6 +64,19 @@ public sealed class FinalProductAcceptanceScriptTests
     }
 
     [Fact]
+    public void Aggregator_keeps_local_acceptance_mandatory_when_external_ecosystem_is_deferred()
+    {
+        var source = Read("verify-final-product-acceptance.ps1");
+
+        Assert.Contains("ExternalEcosystemDeferralPath", source);
+        Assert.Contains("Resolve-LongExternalEcosystemDeferral", source);
+        Assert.Contains("taskbar-visual-grouping','native-performance','lpwp-widget-desktop", source);
+        Assert.Contains("deferred_validation_count = 2", source);
+        Assert.Contains("external_ecosystem_deferral", source);
+        Assert.Contains("required_validation_ids = $allRequiredIds", source);
+    }
+
+    [Fact]
     public void External_gate_consumes_product_acceptance_as_a_mandatory_hashed_input()
     {
         var source = Read("verify-external-release-gate.ps1");
@@ -72,6 +85,8 @@ public sealed class FinalProductAcceptanceScriptTests
         Assert.Contains("Assert-ProductAcceptanceContract", source);
         Assert.Contains("product_acceptance_sha256", source);
         Assert.Contains("Final product-acceptance portable approval content is invalid", source);
+        Assert.Contains("ExternalEcosystemDeferralPath", source);
+        Assert.Contains("Deferred external ecosystem mode must not include", source);
     }
 
     private static string Read(string name) => File.ReadAllText(Path.Combine(FindRoot(), name));

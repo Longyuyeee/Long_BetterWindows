@@ -5,7 +5,7 @@ namespace LongBetterWindows.Host.Broker;
 
 internal sealed record BrokerSettings(bool Enabled)
 {
-    public static BrokerSettings Default { get; } = new(true);
+    public static BrokerSettings Default { get; } = new(false);
 }
 
 internal sealed class BrokerSettingsStore

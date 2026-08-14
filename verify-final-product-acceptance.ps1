@@ -4,12 +4,14 @@ param(
     [string] $SubjectExecutable =
         'src/LongBetterWindows.Host/bin/Release/net8.0-windows/LongBetterWindows.Host.exe',
     [Parameter(Mandatory=$true)] [string] $OutputPath,
-    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit
+    [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
+    [string] $ExternalEcosystemDeferralPath
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
+. (Join-Path $PSScriptRoot 'external-ecosystem-deferral-policy.ps1')
 
 function Resolve-RepositoryPath([string] $PathValue) {
     if ([IO.Path]::IsPathRooted($PathValue)) {
@@ -18,17 +20,30 @@ function Resolve-RepositoryPath([string] $PathValue) {
     return [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $PathValue))
 }
 
-$requiredIds = @(
+$allRequiredIds = @(
     'taskbar-visual-grouping',
     'native-performance',
     'lpwp-long-grid-e2e',
     'lpwp-widget-desktop',
     'lpwp-signed-reference')
+$localRequiredIds = @('taskbar-visual-grouping','native-performance','lpwp-widget-desktop')
 $currentHead = (& git -C $PSScriptRoot rev-parse HEAD).Trim().ToLowerInvariant()
 $sourceCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($sourceCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit.'
 }
+$deferral = $null
+$deferralPath = $null
+if (-not [string]::IsNullOrWhiteSpace($ExternalEcosystemDeferralPath)) {
+    $deferralPath = Resolve-RepositoryPath $ExternalEcosystemDeferralPath
+    if (-not (Test-Path -LiteralPath $deferralPath -PathType Leaf)) {
+        throw "External ecosystem deferral was not found: $deferralPath"
+    }
+    $deferralDocument = Get-Content -LiteralPath $deferralPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $deferral = Resolve-LongExternalEcosystemDeferral `
+        -Document $deferralDocument -ExpectedSourceCommit $sourceCommit
+}
+$requiredIds = if ($null -eq $deferral) { $allRequiredIds } else { $localRequiredIds }
 & git -C $PSScriptRoot merge-base --is-ancestor $sourceCommit HEAD 2>$null
 if ($LASTEXITCODE -ne 0) {
     throw 'ExpectedSourceCommit must be an ancestor of HEAD.'
@@ -167,6 +182,16 @@ try {
             }
         }
     })
+    $deferralEntry = $null
+    if ($null -ne $deferral) {
+        $deferralName = 'external-ecosystem-deferral.json'
+        $deferralTarget = Join-Path $stage $deferralName
+        Copy-Item -LiteralPath $deferralPath -Destination $deferralTarget
+        $deferralEntry = [ordered]@{
+            file = "$sourceDirectoryName/$deferralName"
+            sha256 = (Get-FileHash -LiteralPath $deferralTarget -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    }
     $portableMatrix = [ordered]@{
         schema_version = 1
         classification = 'plugin_positive_matrix'
@@ -185,7 +210,7 @@ try {
         ($portableMatrix | ConvertTo-Json -Depth 6),
         [Text.UTF8Encoding]::new($false))
     $summary = [ordered]@{
-        schema_version = 1
+        schema_version = if ($null -eq $deferral) { 1 } else { 2 }
         generated_at = [DateTimeOffset]::UtcNow.ToString('O')
         classification = 'approved_final_product_acceptance'
         passed = $true
@@ -193,13 +218,18 @@ try {
         plugin_count = 25
         command_count = 42
         plugin_approval_receipt_count = 25
-        required_validation_ids = $requiredIds
+        required_validation_ids = $allRequiredIds
         approved_validation_count = $approvalEntries.Count
         plugin_matrix = [ordered]@{
             file = "$sourceDirectoryName/$matrixName"
             sha256 = (Get-FileHash -LiteralPath $matrixPath -Algorithm SHA256).Hash.ToLowerInvariant()
         }
         approvals = $approvalEntries
+    }
+    if ($null -ne $deferral) {
+        $summary.deferred_validation_count = 2
+        $summary.external_ecosystem = @($deferral.items)
+        $summary.external_ecosystem_deferral = $deferralEntry
     }
     [IO.Directory]::Move($stage, $sourceDirectory)
     $sourceCommitted = $true

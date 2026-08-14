@@ -13,8 +13,9 @@ param(
     [Parameter(Mandatory=$true)] [string] $CleanEnvironmentGatePath,
     [Parameter(Mandatory=$true)] [string] $PhysicalDpiGatePath,
     [Parameter(Mandatory=$true)] [string] $AccessibilityGatePath,
-    [Parameter(Mandatory=$true)] [string] $MarketplaceRehearsalPath,
+    [string] $MarketplaceRehearsalPath,
     [Parameter(Mandatory=$true)] [string] $ProductAcceptanceGatePath,
+    [string] $ExternalEcosystemDeferralPath,
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)]
     [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
@@ -27,6 +28,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
 . (Join-Path $PSScriptRoot 'release-review-policy.ps1')
+. (Join-Path $PSScriptRoot 'external-ecosystem-deferral-policy.ps1')
 
 function Read-GateJson([string] $path, [string] $label) {
     $resolved = [IO.Path]::GetFullPath($path)
@@ -196,30 +198,39 @@ function Assert-AccessibilityContract($gate, [string] $sourceCommit) {
     }
 }
 
-function Assert-ProductAcceptanceContract($gate, [string] $sourceCommit) {
+function Assert-ProductAcceptanceContract(
+    $gate,
+    [string] $sourceCommit,
+    $deferralGate,
+    [string] $candidateVersion) {
     $document = $gate.document
-    $required = @(
+    $allRequired = @(
         'taskbar-visual-grouping',
         'native-performance',
         'lpwp-long-grid-e2e',
         'lpwp-widget-desktop',
         'lpwp-signed-reference')
-    if ([int]$document.schema_version -ne 1 `
+    $deferred = $null -ne $deferralGate
+    $approvedRequired = if ($deferred) {
+        @('taskbar-visual-grouping','native-performance','lpwp-widget-desktop')
+    } else { $allRequired }
+    $expectedSchema = if ($deferred) { 2 } else { 1 }
+    if ([int]$document.schema_version -ne $expectedSchema `
         -or [string]$document.source_commit -ne $sourceCommit `
         -or [int]$document.plugin_count -ne 25 `
         -or [int]$document.command_count -ne 42 `
         -or [int]$document.plugin_approval_receipt_count -ne 25 `
-        -or [int]$document.approved_validation_count -ne 5) {
+        -or [int]$document.approved_validation_count -ne $approvedRequired.Count) {
         throw 'Final product-acceptance gate contract is incomplete.'
     }
     Assert-ExactSet @($document.required_validation_ids | ForEach-Object { [string]$_ }) `
-        $required 'Final product-acceptance validation IDs'
+        $allRequired 'Final product-acceptance validation IDs'
     $approvals = @($document.approvals)
-    if ($approvals.Count -ne 5) {
-        throw 'Final product-acceptance gate must contain exactly five approvals.'
+    if ($approvals.Count -ne $approvedRequired.Count) {
+        throw "Final product-acceptance gate must contain exactly $($approvedRequired.Count) approvals."
     }
     Assert-ExactSet @($approvals | ForEach-Object { [string]$_.validation_id }) `
-        $required 'Final product-acceptance approvals'
+        $approvedRequired 'Final product-acceptance approvals'
     foreach ($entry in $approvals) {
         if ([string]$entry.source_commit -ne $sourceCommit) {
             throw 'Final product-acceptance approval does not match the candidate.'
@@ -233,6 +244,22 @@ function Assert-ProductAcceptanceContract($gate, [string] $sourceCommit) {
             -or [string]$source.status -ne 'passed' `
             -or [string]::IsNullOrWhiteSpace([string]$source.reviewer)) {
             throw 'Final product-acceptance portable approval content is invalid.'
+        }
+    }
+    if ($deferred) {
+        if ([int]$document.deferred_validation_count -ne 2 `
+            -or [string]$document.external_ecosystem_deferral.sha256 -ne $deferralGate.sha256) {
+            throw 'Final product-acceptance external ecosystem deferral is incomplete.'
+        }
+        $portableDeferral = Read-PortableMatrixSource $gate `
+            $document.external_ecosystem_deferral 'External ecosystem deferral'
+        Resolve-LongExternalEcosystemDeferral -Document $portableDeferral `
+            -ExpectedSourceCommit $sourceCommit `
+            -ExpectedCandidateVersion $candidateVersion | Out-Null
+        $expectedItems = @($deferralGate.policy.items | ConvertTo-Json -Compress -Depth 5)
+        $summaryItems = @($document.external_ecosystem | ConvertTo-Json -Compress -Depth 5)
+        if ($summaryItems -ne $expectedItems) {
+            throw 'Final product-acceptance deferred items do not match the approved deferral.'
         }
     }
     $pluginMatrix = Read-PortableMatrixSource `
@@ -668,14 +695,32 @@ $download = Read-GateJson $DownloadGatePath 'Release-download gate'
 $clean = Read-GateJson $CleanEnvironmentGatePath 'Clean-environment gate'
 $dpi = Read-GateJson $PhysicalDpiGatePath 'Physical DPI gate'
 $accessibility = Read-GateJson $AccessibilityGatePath 'Accessibility gate'
-$marketplace = Read-GateJson $MarketplaceRehearsalPath 'Marketplace rehearsal'
 $productAcceptance = Read-GateJson $ProductAcceptanceGatePath 'Final product-acceptance gate'
+$marketplace = $null
+$deferral = $null
+if ([string]::IsNullOrWhiteSpace($ExternalEcosystemDeferralPath)) {
+    if ([string]::IsNullOrWhiteSpace($MarketplaceRehearsalPath)) {
+        throw 'MarketplaceRehearsalPath is required unless an external ecosystem deferral is supplied.'
+    }
+    $marketplace = Read-GateJson $MarketplaceRehearsalPath 'Marketplace rehearsal'
+}
+else {
+    if (-not [string]::IsNullOrWhiteSpace($MarketplaceRehearsalPath)) {
+        throw 'Deferred external ecosystem mode must not include passing marketplace rehearsal evidence.'
+    }
+    $deferral = Read-GateJson $ExternalEcosystemDeferralPath 'External ecosystem deferral'
+    $deferral['policy'] = Resolve-LongExternalEcosystemDeferral `
+        -Document $deferral.document -ExpectedSourceCommit $expectedCommit `
+        -ExpectedCandidateVersion ([string]$release.document.version)
+}
 
 Assert-Classification $download 'approved_release_download_gate' 'Release-download gate'
 Assert-Classification $clean 'approved_clean_windows_release_gate' 'Clean-environment gate'
 Assert-Classification $dpi 'approved_physical_device_dpi_matrix' 'Physical DPI gate'
 Assert-Classification $accessibility 'approved_physical_accessibility_matrix' 'Accessibility gate'
-Assert-Classification $marketplace 'marketplace_https_rehearsal' 'Marketplace rehearsal'
+if ($null -ne $marketplace) {
+    Assert-Classification $marketplace 'marketplace_https_rehearsal' 'Marketplace rehearsal'
+}
 Assert-Classification $productAcceptance 'approved_final_product_acceptance' 'Final product-acceptance gate'
 
 if ([string]$release.document.commit -ne $expectedCommit) {
@@ -705,7 +750,8 @@ $reviewPolicy = Assert-DownloadContract `
 Assert-CleanEnvironmentContract $clean $ExpectedDistributionChannel
 Assert-PhysicalDpiContract $dpi $expectedCommit
 Assert-AccessibilityContract $accessibility $expectedCommit
-Assert-ProductAcceptanceContract $productAcceptance $expectedCommit
+Assert-ProductAcceptanceContract $productAcceptance $expectedCommit $deferral `
+    ([string]$release.document.version)
 foreach ($gate in @($download, $clean)) {
     if ([string]$gate.document.distribution_channel -ne $ExpectedDistributionChannel) {
         throw "External gate distribution channel mismatch: $($gate.document.classification)"
@@ -741,29 +787,71 @@ if ($ReviewModel -eq 'single_maintainer' `
     throw 'Single-maintainer review identities are inconsistent across release gates.'
 }
 
-$rehearsal = $marketplace.document
+$rehearsal = $null
 $destination = $null
-if (-not [uri]::TryCreate([string]$rehearsal.destination, [UriKind]::Absolute, [ref]$destination) `
-    -or $destination.Scheme -ne 'https') {
-    throw 'Marketplace rehearsal destination must be absolute HTTPS.'
+$marketplaceDecision = $null
+if ($null -ne $marketplace) {
+    $rehearsal = $marketplace.document
+    if (-not [uri]::TryCreate([string]$rehearsal.destination, [UriKind]::Absolute, [ref]$destination) `
+        -or $destination.Scheme -ne 'https') {
+        throw 'Marketplace rehearsal destination must be absolute HTTPS.'
+    }
+    if ([bool]$rehearsal.preflight_only `
+        -or [string]::IsNullOrWhiteSpace([string]$rehearsal.release_id) `
+        -or -not [bool]$rehearsal.preflight_dry_run_verified `
+        -or -not [bool]$rehearsal.baseline_verified `
+        -or -not [bool]$rehearsal.deployment_completed `
+        -or -not [bool]$rehearsal.deployment_verified `
+        -or -not [bool]$rehearsal.rollback_completed `
+        -or -not [bool]$rehearsal.rollback_verified `
+        -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.failure) `
+        -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.rollback_failure) `
+        -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.rollback_verification_failure)) {
+        throw 'Marketplace rehearsal is not a complete passing deploy and rollback cycle.'
+    }
+    Assert-MarketplaceEvidenceContract $marketplace
+    $marketplaceDecision = [ordered]@{
+        status = 'passed'
+        release_id = [string]$rehearsal.release_id
+        destination_host = $destination.DnsSafeHost
+        registry_committed_last = [bool]$rehearsal.preflight_dry_run_verified
+        deployment_verified = [bool]$rehearsal.deployment_verified
+        rollback_verified = [bool]$rehearsal.rollback_verified
+    }
 }
-if ([bool]$rehearsal.preflight_only `
-    -or [string]::IsNullOrWhiteSpace([string]$rehearsal.release_id) `
-    -or -not [bool]$rehearsal.preflight_dry_run_verified `
-    -or -not [bool]$rehearsal.baseline_verified `
-    -or -not [bool]$rehearsal.deployment_completed `
-    -or -not [bool]$rehearsal.deployment_verified `
-    -or -not [bool]$rehearsal.rollback_completed `
-    -or -not [bool]$rehearsal.rollback_verified `
-    -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.failure) `
-    -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.rollback_failure) `
-    -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.rollback_verification_failure)) {
-    throw 'Marketplace rehearsal is not a complete passing deploy and rollback cycle.'
+else {
+    $marketplaceItem = @($deferral.policy.items | Where-Object { $_.id -eq 'production-marketplace-rehearsal' })[0]
+    $marketplaceDecision = $marketplaceItem
 }
-Assert-MarketplaceEvidenceContract $marketplace
+
+$evidenceContract = [ordered]@{
+    physical_dpi_schema_version = [int]$dpi.document.schema_version
+    physical_dpi_capture_count = [int]$dpi.document.capture_count
+    accessibility_schema_version = [int]$accessibility.document.schema_version
+    screen_reader_approval_count = [int]$accessibility.document.screen_reader_approval_count
+    download_schema_version = [int]$download.document.schema_version
+    clean_environment_schema_version = [int]$clean.document.schema_version
+    product_acceptance_schema_version = [int]$productAcceptance.document.schema_version
+}
+$decisionInputs = [ordered]@{
+    release_manifest_sha256 = $release.sha256
+    release_download_gate_sha256 = $download.sha256
+    clean_environment_gate_sha256 = $clean.sha256
+    physical_dpi_gate_sha256 = $dpi.sha256
+    accessibility_gate_sha256 = $accessibility.sha256
+    product_acceptance_sha256 = $productAcceptance.sha256
+}
+if ($null -ne $marketplace) {
+    $evidenceContract.marketplace_rehearsal_schema_version = [int]$marketplace.document.schema_version
+    $decisionInputs.marketplace_rehearsal_sha256 = $marketplace.sha256
+}
+else {
+    $evidenceContract.external_ecosystem_deferral_schema_version = [int]$deferral.document.schema_version
+    $decisionInputs.external_ecosystem_deferral_sha256 = $deferral.sha256
+}
 
 $decision = [ordered]@{
-    schema_version = 2
+    schema_version = if ($null -eq $deferral) { 2 } else { 3 }
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = if ($PreflightOnly) {
         'external_release_gate_preflight'
@@ -800,41 +888,18 @@ $decision = [ordered]@{
         download_reviewer = $downloadReviewer
         clean_environment_reviewer = $cleanReviewer
     }
-    marketplace = [ordered]@{
-        release_id = [string]$rehearsal.release_id
-        destination_host = $destination.DnsSafeHost
-        registry_committed_last = [bool]$rehearsal.preflight_dry_run_verified
-        deployment_verified = [bool]$rehearsal.deployment_verified
-        rollback_verified = [bool]$rehearsal.rollback_verified
-    }
+    marketplace = $marketplaceDecision
+    external_ecosystem = if ($null -eq $deferral) { @() } else { @($deferral.policy.items) }
     product_acceptance = [ordered]@{
         plugin_count = [int]$productAcceptance.document.plugin_count
         command_count = [int]$productAcceptance.document.command_count
         plugin_approval_receipt_count =
             [int]$productAcceptance.document.plugin_approval_receipt_count
-        approved_validation_count =
-            [int]$productAcceptance.document.approved_validation_count
+        approved_validation_count = [int]$productAcceptance.document.approved_validation_count
+        deferred_validation_count = if ($null -eq $deferral) { 0 } else { 2 }
     }
-    evidence_contract = [ordered]@{
-        physical_dpi_schema_version = [int]$dpi.document.schema_version
-        physical_dpi_capture_count = [int]$dpi.document.capture_count
-        accessibility_schema_version = [int]$accessibility.document.schema_version
-        screen_reader_approval_count =
-            [int]$accessibility.document.screen_reader_approval_count
-        download_schema_version = [int]$download.document.schema_version
-        clean_environment_schema_version = [int]$clean.document.schema_version
-        marketplace_rehearsal_schema_version = [int]$marketplace.document.schema_version
-        product_acceptance_schema_version = [int]$productAcceptance.document.schema_version
-    }
-    inputs = [ordered]@{
-        release_manifest_sha256 = $release.sha256
-        release_download_gate_sha256 = $download.sha256
-        clean_environment_gate_sha256 = $clean.sha256
-        physical_dpi_gate_sha256 = $dpi.sha256
-        accessibility_gate_sha256 = $accessibility.sha256
-        marketplace_rehearsal_sha256 = $marketplace.sha256
-        product_acceptance_sha256 = $productAcceptance.sha256
-    }
+    evidence_contract = $evidenceContract
+    inputs = $decisionInputs
 }
 
 if ($PreflightOnly) {
