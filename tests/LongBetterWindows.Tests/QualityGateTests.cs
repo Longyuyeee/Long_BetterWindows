@@ -987,7 +987,9 @@ public class QualityGateTests
         Assert.Contains("context_list_mode", Read("run-desktop-ui-smoke.ps1"));
         Assert.Contains("compact_grid_mode", Read("run-desktop-ui-smoke.ps1"));
         Assert.Contains("context_matrix", Read("run-desktop-ui-smoke.ps1"));
-        Assert.Contains("--quality-context", Read("run-desktop-ui-smoke.ps1"));
+        var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
+        Assert.Contains("--quality-context", desktopSmoke);
+        Assert.Contains("'--quality-context', 'url'", desktopSmoke);
         Assert.Contains("ContextMetadataProjection.Project", source);
         Assert.Contains("ContextInputClassifier.ClassifyExplorerSelection", Read(
             "src", "LongBetterWindows.Host", "Interaction", "ExplorerContextProvider.cs"));
@@ -1155,7 +1157,7 @@ public class QualityGateTests
         Assert.Contains("$(PublishDir)Plugins", project);
         Assert.Contains("docs\\protocol\\*.md", project);
         Assert.Contains("CopyToPublishDirectory=\"PreserveNewest\"", project);
-        Assert.Contains("<Version>1.11.0-rc.11</Version>", project);
+        Assert.Contains("<Version>1.11.0-rc.12</Version>", project);
         Assert.Contains("<AssemblyVersion>1.11.0.0</AssemblyVersion>", project);
     }
 
@@ -1176,7 +1178,7 @@ public class QualityGateTests
     [Fact]
     public void ReleaseCandidateVersion_IsConsistentAcrossPackagingAndIpcFixture()
     {
-        const string version = "1.11.0-rc.11";
+        const string version = "1.11.0-rc.12";
         var project = Read("src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj");
         var release = Read("release.ps1");
         var installerBuild = Read("build-installer.ps1");
@@ -1400,6 +1402,13 @@ public class QualityGateTests
         Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", docViewerXaml);
         Assert.Contains("private void Window_PreviewKeyDown", docViewerCode);
         Assert.Contains("=> CloseOnEscape(e);", docViewerCode);
+        var workbenchXaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "PluginDevTools.xaml");
+        var workbenchCode = Read(
+            "src", "LongBetterWindows.Host", "Views", "PluginDevTools.xaml.cs");
+        Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", workbenchXaml);
+        Assert.Contains("private void Window_PreviewKeyDown", workbenchCode);
+        Assert.Contains("e.Key != Key.Escape", workbenchCode);
         Assert.DoesNotContain("MouseLeftButtonDown", developerCode);
         Assert.Contains("IDisposable", developerCode);
         Assert.Contains("PluginsChanged -= OnPluginsChanged", developerCode);

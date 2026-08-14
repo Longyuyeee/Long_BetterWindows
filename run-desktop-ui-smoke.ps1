@@ -1198,7 +1198,9 @@ try {
     $paletteMenuProcess = $null
 
     Write-Stage 'Starting Super Panel host.'
-    $superPanelProcess = Start-QualityHost '--quality-open-super-panel'
+    $superPanelProcess = Start-QualityHost @(
+        '--quality-open-super-panel',
+        '--quality-context', 'url')
     $superPanel = Wait-Until {
         Find-WindowByAutomationId $superPanelProcess.Id 'Long.SuperPanel'
     } 'Super Panel did not appear through Windows UI Automation.'

@@ -289,6 +289,15 @@ namespace LongBetterWindows.Host.Views
             }
         }
 
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape)
+                return;
+
+            e.Handled = true;
+            Close();
+        }
+
         private void ListPlugins()
         {
             var dirs = new List<object>();

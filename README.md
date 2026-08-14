@@ -77,7 +77,7 @@ Long助手不是 uTools 插件兼容层。我们参考的是成熟的统一入�
 - 已安装 [.NET 8 Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/8.0) 的便携用户可选择体积更小的 `framework-dependent.zip`
 - Web 插件需要 Microsoft Edge WebView2 Runtime
 
-当前源码版本为 `v1.11.0-rc.11`，用于稳定版前最后一次收尾演练。冻结的 `rc.2` 至 `rc.10` 均为不可覆盖的历史候选；RC11 必须从精确干净提交生成全套新资产，不得复用或覆盖旧目录。当前并非最终稳定版。Windows 安装包暂未使用 Authenticode 商业证书；首次运行可能出现 SmartScreen 提示，请核对 SHA-256。
+当前源码版本为 `v1.11.0-rc.12`，用于稳定版前最后一次收尾演练。冻结的 `rc.2` 至 `rc.11` 均为不可覆盖的历史候选；RC12 必须从精确干净提交生成全套新资产，不得复用或覆盖旧目录。当前并非最终稳定版。Windows 安装包暂未使用 Authenticode 商业证书；首次运行可能出现 SmartScreen 提示，请核对 SHA-256。
 
 完整安装、升级、校验和卸载说明见 [安装升级与卸载](docs/安装升级与卸载.md)。
 
