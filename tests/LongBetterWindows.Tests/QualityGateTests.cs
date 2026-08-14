@@ -1155,7 +1155,7 @@ public class QualityGateTests
         Assert.Contains("$(PublishDir)Plugins", project);
         Assert.Contains("docs\\protocol\\*.md", project);
         Assert.Contains("CopyToPublishDirectory=\"PreserveNewest\"", project);
-        Assert.Contains("<Version>1.11.0-rc.10</Version>", project);
+        Assert.Contains("<Version>1.11.0-rc.11</Version>", project);
         Assert.Contains("<AssemblyVersion>1.11.0.0</AssemblyVersion>", project);
     }
 
@@ -1176,7 +1176,7 @@ public class QualityGateTests
     [Fact]
     public void ReleaseCandidateVersion_IsConsistentAcrossPackagingAndIpcFixture()
     {
-        const string version = "1.11.0-rc.10";
+        const string version = "1.11.0-rc.11";
         var project = Read("src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj");
         var release = Read("release.ps1");
         var installerBuild = Read("build-installer.ps1");
@@ -1393,6 +1393,13 @@ public class QualityGateTests
         Assert.Contains("Long.Developer.Document.", developerCode);
         Assert.Contains("SearchOption.AllDirectories", developerCode);
         Assert.Contains("Path.GetRelativePath(docsDir, file)", developerCode);
+        var docViewerXaml = Read(
+            "src", "LongBetterWindows.Host", "Views", "DocViewer.xaml");
+        var docViewerCode = Read(
+            "src", "LongBetterWindows.Host", "Views", "DocViewer.xaml.cs");
+        Assert.Contains("PreviewKeyDown=\"Window_PreviewKeyDown\"", docViewerXaml);
+        Assert.Contains("private void Window_PreviewKeyDown", docViewerCode);
+        Assert.Contains("=> CloseOnEscape(e);", docViewerCode);
         Assert.DoesNotContain("MouseLeftButtonDown", developerCode);
         Assert.Contains("IDisposable", developerCode);
         Assert.Contains("PluginsChanged -= OnPluginsChanged", developerCode);

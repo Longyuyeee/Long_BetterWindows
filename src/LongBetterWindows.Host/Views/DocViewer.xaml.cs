@@ -93,6 +93,12 @@ namespace LongBetterWindows.Host.Views
         }
 
         private void OnWebViewPreviewKeyDown(object sender, KeyEventArgs e)
+            => CloseOnEscape(e);
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+            => CloseOnEscape(e);
+
+        private void CloseOnEscape(KeyEventArgs e)
         {
             if (e.Key != Key.Escape)
                 return;

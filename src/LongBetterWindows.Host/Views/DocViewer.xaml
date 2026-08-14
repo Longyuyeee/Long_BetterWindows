@@ -5,6 +5,7 @@
         Width="800" Height="600" MinWidth="500" MinHeight="400"
         Style="{StaticResource LongWindowChrome}"
         ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        PreviewKeyDown="Window_PreviewKeyDown"
         AutomationProperties.AutomationId="Long.Developer.DocViewer.Window">
     <Border Background="{DynamicResource Long.Brush.Background.Base}"
             BorderBrush="{DynamicResource Long.Brush.Stroke.Default}"
