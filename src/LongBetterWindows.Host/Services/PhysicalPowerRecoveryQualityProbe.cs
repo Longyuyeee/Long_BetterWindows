@@ -96,9 +96,11 @@ internal sealed class PhysicalPowerRecoveryQualityProbe
                 15_000);
             await Task.Delay(1_000);
             var after = mainWindow.GetPluginRuntimeQualityState();
-            var restoredHostState = restored
-                && resumed.InteractionAvailable
-                && await WaitForHostVisibilityAsync(webView, expected: true);
+            var hostVisibleAfterRestore =
+                await WaitForHostVisibilityAsync(webView, expected: true);
+            var restoredHostState = IsRestoredHostStateForQuality(
+                restored,
+                hostVisibleAfterRestore);
             var afterResources = await CaptureResourcesAsync("after_resume");
             var identityPreserved = before.SessionId is not null
                 && before.SessionId == after.SessionId
@@ -132,6 +134,8 @@ internal sealed class PhysicalPowerRecoveryQualityProbe
                     suspended_at = suspended.ObservedAt,
                     resumed_at = resumed.ObservedAt,
                     resume_kind = resumed.Transition.ToString(),
+                    interaction_available_at_resume =
+                        resumed.InteractionAvailable,
                     unavailable_after_suspend = unavailableAfterSuspend,
                     restored,
                     restored_host_state = restoredHostState,
@@ -149,6 +153,11 @@ internal sealed class PhysicalPowerRecoveryQualityProbe
             environment.PowerTransitionObserved -= PowerTransitionObserved;
         }
     }
+
+    internal static bool IsRestoredHostStateForQuality(
+        bool interactionRestored,
+        bool hostVisibleAfterRestore)
+        => interactionRestored && hostVisibleAfterRestore;
 
     private static void WriteNewJson(string path, object value)
     {

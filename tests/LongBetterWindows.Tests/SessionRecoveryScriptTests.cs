@@ -1,5 +1,6 @@
 using System.IO;
 using System.Diagnostics;
+using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Tests;
 
@@ -78,6 +79,20 @@ public sealed class SessionRecoveryScriptTests
         Assert.Contains("HostPowerTransition.Suspended", source);
         Assert.DoesNotContain("InteractionAvailabilityChanged", source);
     }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void SleepWakeProbe_WaitsForUnlockBeforeCheckingHostVisibility(
+        bool interactionRestored,
+        bool hostVisibleAfterRestore,
+        bool expected)
+        => Assert.Equal(
+            expected,
+            PhysicalPowerRecoveryQualityProbe.IsRestoredHostStateForQuality(
+                interactionRestored,
+                hostVisibleAfterRestore));
 
     [Fact]
     public void SleepWakeProbe_IsAcceptedByTheWindowsPowerShellParser()
