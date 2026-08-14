@@ -434,7 +434,19 @@ function Find-WindowByAutomationId([int] $processId, [string] $automationId) {
         $element = [Windows.Automation.AutomationElement]::FromHandle($window)
         if ($element.Current.AutomationId -eq $automationId) { return $element }
     }
-    return $null
+
+    # EnumWindows can briefly miss a newly rendered WPF window during repeated
+    # host restarts. Query the refreshed UIA desktop tree before declaring it absent.
+    $condition = [Windows.Automation.AndCondition]::new(@(
+        [Windows.Automation.PropertyCondition]::new(
+            [Windows.Automation.AutomationElement]::ProcessIdProperty,
+            $processId),
+        [Windows.Automation.PropertyCondition]::new(
+            [Windows.Automation.AutomationElement]::AutomationIdProperty,
+            $automationId)))
+    return [Windows.Automation.AutomationElement]::RootElement.FindFirst(
+        [Windows.Automation.TreeScope]::Children,
+        $condition)
 }
 
 function Find-WindowHandleByAutomationId([int] $processId, [string] $automationId) {
