@@ -681,8 +681,16 @@ function Set-AutomationFocus(
         $element = & $ResolveElement
         if ($null -eq $element -or
             -not $element.Current.IsEnabled -or
-            -not $element.Current.IsKeyboardFocusable -or
-            $element.Current.IsOffscreen) {
+            -not $element.Current.IsKeyboardFocusable) {
+            return $null
+        }
+        if ($element.Current.IsOffscreen) {
+            $scrollItem = $null
+            if ($element.TryGetCurrentPattern(
+                [Windows.Automation.ScrollItemPattern]::Pattern,
+                [ref]$scrollItem)) {
+                ([Windows.Automation.ScrollItemPattern]$scrollItem).ScrollIntoView()
+            }
             return $null
         }
         $element.SetFocus()

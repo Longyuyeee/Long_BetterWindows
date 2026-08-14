@@ -1153,7 +1153,7 @@ public class QualityGateTests
         Assert.Contains("<RemoveDir Directories=\"$(OutputPath)Plugins", project);
         Assert.Contains("CopyPluginsToPublish", project);
         Assert.Contains("$(PublishDir)Plugins", project);
-        Assert.Contains("<Version>1.11.0-rc.8</Version>", project);
+        Assert.Contains("<Version>1.11.0-rc.9</Version>", project);
         Assert.Contains("<AssemblyVersion>1.11.0.0</AssemblyVersion>", project);
     }
 
@@ -1174,7 +1174,7 @@ public class QualityGateTests
     [Fact]
     public void ReleaseCandidateVersion_IsConsistentAcrossPackagingAndIpcFixture()
     {
-        const string version = "1.11.0-rc.8";
+        const string version = "1.11.0-rc.9";
         var project = Read("src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj");
         var release = Read("release.ps1");
         var installerBuild = Read("build-installer.ps1");
@@ -2089,6 +2089,8 @@ public class QualityGateTests
         Assert.Contains("$element.SetFocus()", script);
         Assert.Contains("function Set-AutomationFocus", script);
         Assert.Contains("Set-AutomationFocus {", script);
+        Assert.Contains("[Windows.Automation.ScrollItemPattern]::Pattern", script);
+        Assert.Contains(".ScrollIntoView()", script);
         Assert.Contains("function Find-VisibleDescendantByAutomationId", script);
         Assert.Contains("-not $match.Current.IsOffscreen", script);
         Assert.Contains("--quality-storage-path", script);
