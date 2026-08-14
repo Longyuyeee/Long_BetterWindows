@@ -278,6 +278,7 @@
                 <ControlTemplate TargetType="ComboBox">
                     <Grid x:Name="ComboRoot">
                         <ToggleButton x:Name="Toggle" ClickMode="Press" Focusable="False"
+                                      Foreground="{TemplateBinding Foreground}"
                                       IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
                                       Content="{TemplateBinding SelectionBoxItem}"
                                       ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
@@ -290,7 +291,8 @@
                                             Padding="12,0">
                                         <Grid>
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                            <ContentPresenter VerticalAlignment="Center"
+                                             <ContentPresenter VerticalAlignment="Center"
+                                                              TextElement.Foreground="{TemplateBinding Foreground}"
                                                               Content="{TemplateBinding Content}"
                                                               ContentTemplate="{TemplateBinding ContentTemplate}"
                                                               ContentStringFormat="{TemplateBinding ContentStringFormat}"

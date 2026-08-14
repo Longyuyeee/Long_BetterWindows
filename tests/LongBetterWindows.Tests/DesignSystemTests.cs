@@ -873,6 +873,8 @@ public class DesignSystemTests
         Assert.Contains("Content=\"{TemplateBinding Content}\"", components);
         Assert.Contains("ContentTemplate=\"{TemplateBinding ContentTemplate}\"", components);
         Assert.Contains("ContentTemplate=\"{TemplateBinding SelectionBoxItemTemplate}\"", components);
+        Assert.Contains("Foreground=\"{TemplateBinding Foreground}\"", components);
+        Assert.Contains("TextElement.Foreground=\"{TemplateBinding Foreground}\"", components);
         Assert.Contains("Long.Icon.ChevronDown", components);
         Assert.Contains("x:Key=\"Long.Icon.ChevronDown\"", icons);
         Assert.Contains("DisplayMemberPath=\"Label\"", marketplace);
