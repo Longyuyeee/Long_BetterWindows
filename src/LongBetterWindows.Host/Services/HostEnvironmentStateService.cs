@@ -35,6 +35,7 @@ internal sealed class HostEnvironmentStateService : IDisposable
         => _sessionAvailable && _powerAvailable;
     internal event Action<bool>? InteractionAvailabilityChanged;
     internal event Action<HostPowerTransition>? PowerTransitionObserved;
+    internal event Action? DisplayTopologyChanged;
 
     internal void Attach(Window mainWindow)
     {
@@ -83,6 +84,7 @@ internal sealed class HostEnvironmentStateService : IDisposable
                 break;
             case WmDisplayChange:
                 ConstrainMainWindow();
+                PublishDisplayTopologyChanged();
                 break;
         }
         return IntPtr.Zero;
@@ -155,6 +157,25 @@ internal sealed class HostEnvironmentStateService : IDisposable
                 Log.Warning(
                     exception,
                     "A host interaction availability subscriber failed");
+            }
+        }
+    }
+
+    private void PublishDisplayTopologyChanged()
+    {
+        var handlers = DisplayTopologyChanged?.GetInvocationList()
+            .Cast<Action>() ?? [];
+        foreach (var handler in handlers)
+        {
+            try
+            {
+                handler();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "A host display topology subscriber failed");
             }
         }
     }

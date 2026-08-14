@@ -452,6 +452,18 @@ namespace LongBetterWindows.Host
                 }
 
                 if (!string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityDisplayTopologyReportPath))
+                {
+                    if (MainWindow is not MainWindow displayTopologyWindow)
+                        throw new InvalidOperationException(
+                            "Physical display topology probe requires the main window.");
+                    await _qualityRuntime!.RunPhysicalDisplayTopologyProbeAsync(
+                        displayTopologyWindow,
+                        _startupOptions.QualityDisplayTopologyReportPath);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId))
                 {
                     if (MainWindow is not MainWindow runtimeWindow)
@@ -551,6 +563,8 @@ namespace LongBetterWindows.Host
                         _startupOptions.QualitySessionRecoveryReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPowerRecoveryReportPath)
+                    || !string.IsNullOrWhiteSpace(
+                        _startupOptions.QualityDisplayTopologyReportPath)
                     || !string.IsNullOrWhiteSpace(
                         _startupOptions.QualityPluginRuntimeId)
                     || !string.IsNullOrWhiteSpace(

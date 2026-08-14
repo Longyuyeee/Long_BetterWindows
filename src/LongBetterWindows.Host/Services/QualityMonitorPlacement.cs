@@ -89,6 +89,10 @@ internal static class QualityMonitorPlacement
         return monitor is not null;
     }
 
+    internal static IReadOnlyList<QualityMonitorDescriptor>
+        EnumerateForQuality()
+        => Enumerate();
+
     private static IReadOnlyList<QualityMonitorDescriptor> Enumerate()
     {
         var monitors = new List<QualityMonitorDescriptor>();
