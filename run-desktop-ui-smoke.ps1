@@ -677,26 +677,44 @@ function Find-ProcessSelectionItemByAutomationId(
 function Set-AutomationFocus(
     [scriptblock] $ResolveElement,
     [string] $failureMessage) {
-    return Wait-Until {
-        $element = & $ResolveElement
-        if ($null -eq $element -or
-            -not $element.Current.IsEnabled -or
-            -not $element.Current.IsKeyboardFocusable) {
-            return $null
-        }
-        if ($element.Current.IsOffscreen) {
+    $focusState = [pscustomobject]@{ Value = 'element:not-resolved' }
+    try {
+        return Wait-Until {
+            $element = & $ResolveElement
+            if ($null -eq $element) {
+                $focusState.Value = 'element:not-resolved'
+                return $null
+            }
             $scrollItem = $null
-            if ($element.TryGetCurrentPattern(
+            $supportsScrollItem = $element.TryGetCurrentPattern(
                 [Windows.Automation.ScrollItemPattern]::Pattern,
-                [ref]$scrollItem)) {
+                [ref]$scrollItem)
+            $focusState.Value = 'id:{0};enabled:{1};focusable:{2};offscreen:{3};scroll-item:{4}' -f `
+                $element.Current.AutomationId,
+                $element.Current.IsEnabled,
+                $element.Current.IsKeyboardFocusable,
+                $element.Current.IsOffscreen,
+                $supportsScrollItem
+            if (-not $element.Current.IsEnabled -or
+                -not $element.Current.IsKeyboardFocusable) {
+                return $null
+            }
+            if ($element.Current.IsOffscreen -and $supportsScrollItem) {
                 ([Windows.Automation.ScrollItemPattern]$scrollItem).ScrollIntoView()
             }
+            $element.SetFocus()
+            $focused = [Windows.Automation.AutomationElement]::FocusedElement
+            $focusState.Value = '{0};has-focus:{1};focused-id:{2}' -f `
+                $focusState.Value,
+                $element.Current.HasKeyboardFocus,
+                $(if ($null -eq $focused) { '' } else { $focused.Current.AutomationId })
+            if ($element.Current.HasKeyboardFocus) { return $element }
             return $null
-        }
-        $element.SetFocus()
-        if ($element.Current.HasKeyboardFocus) { return $element }
-        return $null
-    } $failureMessage
+        } $failureMessage
+    }
+    catch {
+        throw "$failureMessage Last focus state: $($focusState.Value)"
+    }
 }
 
 function Wait-CommandFeedback(

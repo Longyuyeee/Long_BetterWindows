@@ -8,7 +8,7 @@
   .\release.ps1 -PackageKind SelfContained
 #>
 param(
-    [string] $Version = '1.11.0-rc.9',
+    [string] $Version = '1.11.0-rc.10',
     [ValidateSet('All', 'FrameworkDependent', 'SelfContained')]
     [string] $PackageKind = 'All',
     [switch] $Force
@@ -175,6 +175,11 @@ try {
 
         $hostExecutable = Join-Path $publishDirectory 'LongBetterWindows.Host.exe'
         $pluginDirectory = Join-Path $publishDirectory 'Plugins'
+        $developerDocsDirectory = Join-Path $publishDirectory 'docs'
+        $developerDocumentCount = if (Test-Path -LiteralPath $developerDocsDirectory) {
+            @(Get-ChildItem -LiteralPath $developerDocsDirectory -Filter *.md -File -Recurse).Count
+        }
+        else { 0 }
         $pluginCount = @(Get-ChildItem -LiteralPath $pluginDirectory -Directory).Count
         $manifestFiles = @(Get-ChildItem -LiteralPath $pluginDirectory -Filter manifest.json -File -Recurse)
         $manifestCount = $manifestFiles.Count
@@ -194,8 +199,9 @@ try {
             -or $manifestCount -ne $expectedPluginCount `
             -or $uniquePluginIdCount -ne $expectedPluginCount `
             -or $hasMissingPluginId `
-            -or $commandCount -ne $expectedCommandCount) {
-            throw "$($variant.Name) 完整性检查失败：Plugins=$pluginCount, Manifests=$manifestCount, UniqueIds=$uniquePluginIdCount, Commands=$commandCount"
+            -or $commandCount -ne $expectedCommandCount `
+            -or $developerDocumentCount -lt 12) {
+            throw "$($variant.Name) 完整性检查失败：Plugins=$pluginCount, Manifests=$manifestCount, UniqueIds=$uniquePluginIdCount, Commands=$commandCount, DeveloperDocs=$developerDocumentCount"
         }
 
         Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\安装升级与卸载.md') -Destination $publishDirectory
@@ -259,6 +265,7 @@ try {
             manifests = $manifestCount
             unique_plugin_ids = $uniquePluginIdCount
             commands = $commandCount
+            developer_documents = $developerDocumentCount
             startup_smoke_elapsed_ms = [math]::Round($smokeStopwatch.Elapsed.TotalMilliseconds)
             command_smoke = $smokeCommandKey
             command_smoke_exit_code = $commandProcess.ExitCode

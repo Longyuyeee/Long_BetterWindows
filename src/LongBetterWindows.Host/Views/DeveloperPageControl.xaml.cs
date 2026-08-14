@@ -94,8 +94,11 @@ namespace LongBetterWindows.Host.Views
                 return;
             }
 
-            var docFiles = Directory.GetFiles(docsDir, "*.md")
-                .OrderBy(path => path)
+            var docFiles = Directory.GetFiles(
+                    docsDir,
+                    "*.md",
+                    SearchOption.AllDirectories)
+                .OrderBy(path => Path.GetRelativePath(docsDir, path))
                 .ToList();
             if (docFiles.Count == 0)
             {
@@ -106,7 +109,10 @@ namespace LongBetterWindows.Host.Views
             for (var index = 0; index < docFiles.Count; index++)
             {
                 var file = docFiles[index];
-                var title = Path.GetFileNameWithoutExtension(file);
+                var title = Path.ChangeExtension(
+                        Path.GetRelativePath(docsDir, file),
+                        null)
+                    .Replace(Path.DirectorySeparatorChar, '/');
                 var link = new Button
                 {
                     Content = title,

@@ -82,7 +82,7 @@ public sealed class OneClickEntryPointTests
             "long_assistant_package_preflight",
             package.RootElement.GetProperty("classification").GetString());
         Assert.Equal(
-            "1.11.0-rc.9",
+            "1.11.0-rc.10",
             package.RootElement.GetProperty("version").GetString());
         Assert.True(
             package.RootElement.GetProperty("release_script_available")

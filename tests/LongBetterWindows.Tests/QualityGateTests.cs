@@ -1153,7 +1153,9 @@ public class QualityGateTests
         Assert.Contains("<RemoveDir Directories=\"$(OutputPath)Plugins", project);
         Assert.Contains("CopyPluginsToPublish", project);
         Assert.Contains("$(PublishDir)Plugins", project);
-        Assert.Contains("<Version>1.11.0-rc.9</Version>", project);
+        Assert.Contains("docs\\protocol\\*.md", project);
+        Assert.Contains("CopyToPublishDirectory=\"PreserveNewest\"", project);
+        Assert.Contains("<Version>1.11.0-rc.10</Version>", project);
         Assert.Contains("<AssemblyVersion>1.11.0.0</AssemblyVersion>", project);
     }
 
@@ -1174,7 +1176,7 @@ public class QualityGateTests
     [Fact]
     public void ReleaseCandidateVersion_IsConsistentAcrossPackagingAndIpcFixture()
     {
-        const string version = "1.11.0-rc.9";
+        const string version = "1.11.0-rc.10";
         var project = Read("src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj");
         var release = Read("release.ps1");
         var installerBuild = Read("build-installer.ps1");
@@ -1205,6 +1207,8 @@ public class QualityGateTests
         Assert.Contains("publisher_identity = $releasePolicy.publisher_identity", release);
         Assert.Contains("update_manifest_signature_required = $releasePolicy.update_manifest_signature_required", release);
         Assert.Contains("release_eligible = -not $sourceDirty", release);
+        Assert.Contains("$developerDocumentCount -lt 12", release);
+        Assert.Contains("developer_documents = $developerDocumentCount", release);
         Assert.Contains("Get-FileHash", release);
         Assert.Contains("release-evidence-io.ps1", release);
         Assert.Contains("Write-NewJsonFileAtomically", release);
@@ -1387,6 +1391,8 @@ public class QualityGateTests
         Assert.Contains("Long.Developer.Documents", developerXaml);
         Assert.Contains("new Button", developerCode);
         Assert.Contains("Long.Developer.Document.", developerCode);
+        Assert.Contains("SearchOption.AllDirectories", developerCode);
+        Assert.Contains("Path.GetRelativePath(docsDir, file)", developerCode);
         Assert.DoesNotContain("MouseLeftButtonDown", developerCode);
         Assert.Contains("IDisposable", developerCode);
         Assert.Contains("PluginsChanged -= OnPluginsChanged", developerCode);
