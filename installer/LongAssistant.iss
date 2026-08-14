@@ -3,7 +3,7 @@
 #endif
 
 #ifndef AppVersion
-  #define AppVersion "1.11.0-rc.14"
+  #define AppVersion "1.11.0-rc.15"
 #endif
 
 #ifndef NumericVersion

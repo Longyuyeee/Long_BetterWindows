@@ -428,6 +428,13 @@ function Wait-Until([scriptblock] $Probe, [string] $FailureMessage) {
     throw $FailureMessage
 }
 
+function Set-QualityClipboard([string] $value) {
+    Wait-Until {
+        Set-Clipboard -Value $value
+        return $true
+    } 'The quality workflow could not acquire the Windows clipboard.' | Out-Null
+}
+
 function Find-WindowByAutomationId([int] $processId, [string] $automationId) {
     $windows = [LongDesktopInput]::TopLevelWindows($processId)
     foreach ($window in $windows) {
@@ -989,7 +996,7 @@ try {
          -not $WorkflowSchemaOnly)) {
     if (-not $SettingsNavigationOnly) {
     Write-Stage 'Starting Command Palette host.'
-    Set-Clipboard -Value 'long-ui-smoke-pending'
+    Set-QualityClipboard 'long-ui-smoke-pending'
     $paletteProcess = Start-QualityHost '--quality-open-palette'
     [LongDesktopInput]::StartAutomationEventCapture($paletteProcess.Id)
     $automationEventCaptureActive = $true
@@ -1143,7 +1150,7 @@ try {
     $paletteProcess = $null
 
     Write-Stage 'Starting an isolated Command Palette menu workflow.'
-    Set-Clipboard -Value 'long-ui-menu-pending'
+    Set-QualityClipboard 'long-ui-menu-pending'
     $paletteMenuProcess = Start-QualityHost '--quality-open-palette'
     $menuPalette = Wait-Until {
         Find-WindowByAutomationId $paletteMenuProcess.Id 'Long.CommandPalette'

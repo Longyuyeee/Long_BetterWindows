@@ -1157,7 +1157,7 @@ public class QualityGateTests
         Assert.Contains("$(PublishDir)Plugins", project);
         Assert.Contains("docs\\protocol\\*.md", project);
         Assert.Contains("CopyToPublishDirectory=\"PreserveNewest\"", project);
-        Assert.Contains("<Version>1.11.0-rc.14</Version>", project);
+        Assert.Contains("<Version>1.11.0-rc.15</Version>", project);
         Assert.Contains("<AssemblyVersion>1.11.0.0</AssemblyVersion>", project);
     }
 
@@ -1178,7 +1178,7 @@ public class QualityGateTests
     [Fact]
     public void ReleaseCandidateVersion_IsConsistentAcrossPackagingAndIpcFixture()
     {
-        const string version = "1.11.0-rc.14";
+        const string version = "1.11.0-rc.15";
         var project = Read("src", "LongBetterWindows.Host", "LongBetterWindows.Host.csproj");
         var release = Read("release.ps1");
         var installerBuild = Read("build-installer.ps1");
@@ -1986,6 +1986,8 @@ public class QualityGateTests
         Assert.Matches(
             @"RootElement\.FindFirst\(\s*\[Windows\.Automation\.TreeScope\]::Descendants",
             script);
+        Assert.Contains("function Set-QualityClipboard", script);
+        Assert.Contains("Set-QualityClipboard 'long-ui-menu-pending'", script);
         var workflowUpgradeScript = Read("run-isolated-workflow-upgrade.ps1");
         var appResources = Read("src", "LongBetterWindows.Host", "App.xaml");
         var main = Read("src", "LongBetterWindows.Host", "MainWindow.xaml");
