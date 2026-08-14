@@ -20,6 +20,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$releasePolicyScript = Join-Path $repoRoot 'release-policy.ps1'
+if (-not (Test-Path -LiteralPath $releasePolicyScript -PathType Leaf)) {
+    throw "Release policy was not found: $releasePolicyScript"
+}
+. $releasePolicyScript
+$releasePolicy = New-LongUnsignedReleasePolicy -Version $Version
 $installerScript = Join-Path $repoRoot 'installer\LongAssistant.iss'
 $source = [IO.Path]::GetFullPath($SourceDirectory)
 $output = [IO.Path]::GetFullPath($OutputDirectory)
@@ -109,10 +115,14 @@ $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowe
     kind = 'installer'
     format = 'inno-setup-exe'
     install_scope = 'current-user'
+    installer_privileges = $releasePolicy.installer_privileges
     requires_elevation = $false
+    distribution_channel = $releasePolicy.distribution_channel
+    publisher_identity = $releasePolicy.publisher_identity
+    authenticode_status = $releasePolicy.authenticode_status
     sha256 = $hash
     bytes = $installerInfo.Length
     plugins = $uniquePluginIds.Count
     commands = $commandCount
-    signed = $false
+    signed = $releasePolicy.signed
 } | ConvertTo-Json -Depth 3

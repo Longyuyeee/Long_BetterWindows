@@ -17,10 +17,15 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $evidenceIo = Join-Path $repoRoot 'release-evidence-io.ps1'
+$releasePolicyScript = Join-Path $repoRoot 'release-policy.ps1'
 if (-not (Test-Path -LiteralPath $evidenceIo -PathType Leaf)) {
     throw "Release evidence writer was not found: $evidenceIo"
 }
+if (-not (Test-Path -LiteralPath $releasePolicyScript -PathType Leaf)) {
+    throw "Release policy was not found: $releasePolicyScript"
+}
 . $evidenceIo
+. $releasePolicyScript
 $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
 $project = Join-Path $repoRoot 'src\LongBetterWindows.Host\LongBetterWindows.Host.csproj'
 $tests = Join-Path $repoRoot 'tests\LongBetterWindows.Tests\LongBetterWindows.Tests.csproj'
@@ -125,6 +130,7 @@ $declaredVersion = [regex]::Match($projectText, '<Version>([^<]+)</Version>').Gr
 if ($declaredVersion -ne $Version) {
     throw "请求版本 $Version 与项目版本 $declaredVersion 不一致。请先统一版本元数据。"
 }
+$releasePolicy = New-LongUnsignedReleasePolicy -Version $Version
 
 if (Test-Path -LiteralPath $releaseRoot) {
     if (-not $Force) { throw "候选目录已存在：$releaseRoot。确认覆盖时使用 -Force。" }
@@ -272,6 +278,14 @@ try {
             -NumericVersion "$(([version]($Version -replace '-.*$','')).ToString(3)).0"
         if ($LASTEXITCODE -ne 0) { throw 'Setup.exe 安装器构建失败。' }
         $installerResult = $installerResultJson | ConvertFrom-Json
+        if ($installerResult.signed -ne $releasePolicy.signed `
+            -or $installerResult.distribution_channel -ne $releasePolicy.distribution_channel `
+            -or $installerResult.publisher_identity -ne $releasePolicy.publisher_identity `
+            -or $installerResult.authenticode_status -ne $releasePolicy.authenticode_status `
+            -or $installerResult.installer_privileges -ne $releasePolicy.installer_privileges `
+            -or $installerResult.requires_elevation) {
+            throw 'Setup.exe installer release policy does not match the release manifest policy.'
+        }
         $installers += $installerResult
     }
 
@@ -295,10 +309,17 @@ try {
         source_dirty = $sourceDirty
         packages = $packages
         installers = $installers
-        distribution_channel = 'unsigned'
-        publisher_identity = 'unverified'
-        security_notice = 'Windows publisher identity is not verified; validate the SHA-256 checksums before running.'
-        signed = $false
+        release_channel = $releasePolicy.release_channel
+        distribution_channel = $releasePolicy.distribution_channel
+        publisher_identity = $releasePolicy.publisher_identity
+        authenticode_status = $releasePolicy.authenticode_status
+        installer_privileges = $releasePolicy.installer_privileges
+        smartscreen_disclosure_required = $releasePolicy.smartscreen_disclosure_required
+        sha256_verification_required = $releasePolicy.sha256_verification_required
+        update_manifest_signature_required = $releasePolicy.update_manifest_signature_required
+        update_manifest_signature_algorithm = $releasePolicy.update_manifest_signature_algorithm
+        security_notice = $releasePolicy.security_notice
+        signed = $releasePolicy.signed
         release_eligible = -not $sourceDirty
     }
     Write-NewJsonFileAtomically `

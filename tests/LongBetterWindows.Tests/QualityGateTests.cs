@@ -1196,8 +1196,10 @@ public class QualityGateTests
         Assert.Contains("source_dirty", release);
         Assert.Contains("schema_version = 1", release);
         Assert.Contains("release_eligible", release);
-        Assert.Contains("distribution_channel = 'unsigned'", release);
-        Assert.Contains("publisher_identity = 'unverified'", release);
+        Assert.Contains("release-policy.ps1", release);
+        Assert.Contains("distribution_channel = $releasePolicy.distribution_channel", release);
+        Assert.Contains("publisher_identity = $releasePolicy.publisher_identity", release);
+        Assert.Contains("update_manifest_signature_required = $releasePolicy.update_manifest_signature_required", release);
         Assert.Contains("release_eligible = -not $sourceDirty", release);
         Assert.Contains("Get-FileHash", release);
         Assert.Contains("release-evidence-io.ps1", release);
@@ -1232,6 +1234,8 @@ public class QualityGateTests
         Assert.Contains("JRSoftware.InnoSetup", build);
         Assert.Contains("inno-setup-exe", build);
         Assert.Contains("requires_elevation = $false", build);
+        Assert.Contains("release-policy.ps1", build);
+        Assert.Contains("authenticode_status = $releasePolicy.authenticode_status", build);
         Assert.Contains("Get-FileHash", build);
         Assert.Contains("AppId={{7B95AC62-8C5A-45E3-B0F0-A77EA8CF318A}", installer);
         Assert.Contains(@"DefaultDirName={localappdata}\Programs\LongAssistant", installer);
