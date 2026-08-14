@@ -589,17 +589,7 @@ function Find-ProcessElementByAutomationId([int] $processId, [string] $automatio
         $match = Find-DescendantByAutomationId $root $automationId
         if ($null -ne $match) { return $match }
     }
-
-    $condition = [Windows.Automation.AndCondition]::new(@(
-        [Windows.Automation.PropertyCondition]::new(
-            [Windows.Automation.AutomationElement]::ProcessIdProperty,
-            $processId),
-        [Windows.Automation.PropertyCondition]::new(
-            [Windows.Automation.AutomationElement]::AutomationIdProperty,
-            $automationId)))
-    return [Windows.Automation.AutomationElement]::RootElement.FindFirst(
-        [Windows.Automation.TreeScope]::Descendants,
-        $condition)
+    return $null
 }
 
 function Invoke-WindowWorkflowAction(
@@ -660,6 +650,21 @@ function Invoke-AutomationElement(
         throw $failureMessage
     }
     ([Windows.Automation.InvokePattern]$pattern).Invoke()
+}
+
+function Invoke-AutomationElementByKeyboard(
+    [Windows.Automation.AutomationElement] $element,
+    [string] $failureMessage) {
+    if ($null -eq $element -or -not $element.Current.IsKeyboardFocusable) {
+        throw $failureMessage
+    }
+    $element.SetFocus()
+    Wait-Until {
+        if ($element.Current.HasKeyboardFocus) { $true }
+    } "$failureMessage The element did not receive keyboard focus." | Out-Null
+    if (-not [LongDesktopInput]::KeyPress(0x20)) {
+        throw "$failureMessage SendInput could not deliver Space."
+    }
 }
 
 function Find-AncestorByControlType(
@@ -1743,11 +1748,13 @@ try {
         '--quality-open-super-panel',
         '--quality-context', 'url',
         '--language', 'en-US')
+    Write-Stage 'Super Panel module-close host started.'
     for ($cycle = 1; $cycle -le 2; $cycle++) {
         $closePanel = Wait-Until {
             Find-WindowByAutomationId `
                 $panelModuleCloseProcess.Id 'Long.SuperPanel'
         } "Super Panel did not appear for module-close cycle $cycle."
+        Write-Stage "Super Panel module-close cycle $cycle panel discovered."
         $closePanelResults = Wait-Until {
             $candidate = Find-DescendantByAutomationId `
                 $closePanel 'Long.SuperPanel.Results'
@@ -1757,6 +1764,7 @@ try {
                 $candidate
             }
         } "Super Panel context was not preserved before module-close cycle $cycle."
+        Write-Stage "Super Panel module-close cycle $cycle context confirmed."
         $closePanelHandle = [IntPtr]$closePanel.Current.NativeWindowHandle
         if ([LongDesktopInput]::WindowAction($closePanelHandle, 7) -ne 1) {
             throw "Super Panel could not select Plugin Market in close cycle $cycle."
@@ -1764,17 +1772,21 @@ try {
         if ([LongDesktopInput]::WindowAction($closePanelHandle, 1) -ne 1) {
             throw "Super Panel could not open Plugin Market in close cycle $cycle."
         }
+        Write-Stage "Super Panel module-close cycle $cycle Plugin Market requested."
         $closeMain = Wait-Until {
             Find-WindowByAutomationId `
                 $panelModuleCloseProcess.Id 'Long.MainWindow'
         } "Workspace did not appear for Super Panel close cycle $cycle."
+        Write-Stage "Super Panel module-close cycle $cycle workspace discovered."
         $marketClose = Wait-Until {
             Find-ProcessElementByAutomationId `
                 $panelModuleCloseProcess.Id `
                 'Long.Workspace.ModuleClose.marketplace:catalog'
         } "Plugin Market close action was unavailable in Super Panel cycle $cycle."
-        Invoke-AutomationElement $marketClose `
+        Write-Stage "Super Panel module-close cycle $cycle close action discovered."
+        Invoke-AutomationElementByKeyboard $marketClose `
             "Plugin Market close action failed in Super Panel cycle $cycle."
+        Write-Stage "Super Panel module-close cycle $cycle close action invoked."
         Wait-Until {
             $null -eq (Find-ProcessElementByAutomationId `
                 $panelModuleCloseProcess.Id `
@@ -1853,7 +1865,7 @@ try {
                 $paletteModuleCloseProcess.Id `
                 'Long.Workspace.ModuleClose.marketplace:catalog'
         } "Plugin Market close action was unavailable in Command Palette cycle $cycle."
-        Invoke-AutomationElement $marketClose `
+        Invoke-AutomationElementByKeyboard $marketClose `
             "Plugin Market close action failed in Command Palette cycle $cycle."
         Wait-Until {
             $null -eq (Find-ProcessElementByAutomationId `
