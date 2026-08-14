@@ -11,6 +11,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
+. (Join-Path $PSScriptRoot 'release-review-policy.ps1')
 $expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
 if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
     throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
@@ -60,11 +61,17 @@ if ([string]$approval.package.file -ne [string]$evidence.package.file -or
     [string]$approval.package.sha256 -ne [string]$evidence.package.sha256) {
     throw 'Release-download approval package identity does not match the captured evidence.'
 }
-if ([string]::IsNullOrWhiteSpace([string]$approval.operator) -or
-    [string]::IsNullOrWhiteSpace([string]$approval.reviewer) -or
-    [string]$approval.operator -eq [string]$approval.reviewer) {
-    throw 'Release-download approval requires distinct operator and reviewer identities.'
-}
+$reviewModel = Get-LongReviewModel $approval
+$riskAcceptance = $approval.risk_acceptance
+$reviewPolicy = Resolve-LongReleaseReviewPolicy `
+    -ReviewModel $reviewModel `
+    -CandidateVersion ([string]$evidence.release.version) `
+    -Operator ([string]$approval.operator) `
+    -Reviewer ([string]$approval.reviewer) `
+    -RiskAcceptedBy ([string]$riskAcceptance.risk_accepted_by) `
+    -RiskAcceptedAt ([string]$riskAcceptance.risk_accepted_at) `
+    -RiskReason ([string]$riskAcceptance.risk_reason) `
+    -RiskAcceptedVersion ([string]$riskAcceptance.risk_accepted_version)
 foreach ($property in $approval.checklist.psobject.Properties) {
     if (-not [bool]$property.Value) { throw "Interactive release-download checklist is incomplete: $($property.Name)" }
 }
@@ -75,17 +82,21 @@ foreach ($property in $approval.observations.psobject.Properties) {
 }
 
 $summary = [ordered]@{
-    schema_version = 2
+    schema_version = 3
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'approved_release_download_gate'
     passed = $true
     source_commit = $expectedCommit
     distribution_channel = $ExpectedDistributionChannel
+    version = [string]$evidence.release.version
+    review_model = $reviewPolicy.review_model
+    independent_review = $reviewPolicy.independent_review
     package_file = [string]$evidence.package.file
     package_sha256 = [string]$evidence.package.sha256
     download_host = [string]$evidence.windows_origin.host.host
-    operator = [string]$approval.operator
-    reviewer = [string]$approval.reviewer
+    operator = $reviewPolicy.operator
+    reviewer = $reviewPolicy.reviewer
+    risk_acceptance = $reviewPolicy.risk_acceptance
     evidence = [ordered]@{
         file = [IO.Path]::GetFileName($resolvedEvidencePath)
         sha256 = $actualEvidenceHash

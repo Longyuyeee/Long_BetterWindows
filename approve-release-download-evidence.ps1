@@ -7,6 +7,12 @@ param(
     [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
     [Parameter(Mandatory=$true)] [string] $Operator,
     [Parameter(Mandatory=$true)] [string] $Reviewer,
+    [ValidateSet('independent','single_maintainer')]
+    [string] $ReviewModel = 'independent',
+    [string] $RiskAcceptedBy,
+    [string] $RiskAcceptedAt,
+    [string] $RiskReason,
+    [string] $RiskAcceptedVersion,
     [Parameter(Mandatory=$true)] [string] $ExtractionMethod,
     [Parameter(Mandatory=$true)] [string] $SmartScreenObservation,
     [Parameter(Mandatory=$true)] [string] $AntivirusObservation,
@@ -22,6 +28,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
+. (Join-Path $PSScriptRoot 'release-review-policy.ps1')
 
 function Assert-MeaningfulText([string] $value, [string] $name, [int] $minimumLength) {
     if ([string]::IsNullOrWhiteSpace($value) -or $value.Trim().Length -lt $minimumLength) {
@@ -36,9 +43,6 @@ Assert-MeaningfulText $SmartScreenObservation 'SmartScreenObservation' 8
 Assert-MeaningfulText $AntivirusObservation 'AntivirusObservation' 8
 Assert-MeaningfulText $FirstLaunchObservation 'FirstLaunchObservation' 8
 Assert-MeaningfulText $ReviewNotes 'ReviewNotes' 12
-if ($Operator.Trim() -eq $Reviewer.Trim()) {
-    throw 'Reviewer must differ from the operator who performed the interactive checks.'
-}
 if (@(
     $ConfirmExtractionCompleted,
     $ConfirmExtractedExecutableOriginChecked,
@@ -77,9 +81,18 @@ if ([string]$evidence.release.distribution_channel -ne $ExpectedDistributionChan
 if ([int]$evidence.windows_origin.zone_id -ne 3 -or [bool]$evidence.windows_origin.query_parameters_recorded) {
     throw 'Release-download evidence does not contain an eligible sanitized Internet Zone origin.'
 }
+$reviewPolicy = Resolve-LongReleaseReviewPolicy `
+    -ReviewModel $ReviewModel `
+    -CandidateVersion ([string]$evidence.release.version) `
+    -Operator $Operator `
+    -Reviewer $Reviewer `
+    -RiskAcceptedBy $RiskAcceptedBy `
+    -RiskAcceptedAt $RiskAcceptedAt `
+    -RiskReason $RiskReason `
+    -RiskAcceptedVersion $RiskAcceptedVersion
 
 $approval = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     approved_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = 'release_download_human_approval'
     source_commit = $expectedCommit
@@ -92,8 +105,12 @@ $approval = [ordered]@{
         file = [IO.Path]::GetFileName($resolvedEvidencePath)
         sha256 = $evidenceHashBeforeReview
     }
-    operator = $Operator.Trim()
-    reviewer = $Reviewer.Trim()
+    version = [string]$evidence.release.version
+    review_model = $reviewPolicy.review_model
+    independent_review = $reviewPolicy.independent_review
+    operator = $reviewPolicy.operator
+    reviewer = $reviewPolicy.reviewer
+    risk_acceptance = $reviewPolicy.risk_acceptance
     observations = [ordered]@{
         extraction_method = $ExtractionMethod.Trim()
         smartscreen = $SmartScreenObservation.Trim()

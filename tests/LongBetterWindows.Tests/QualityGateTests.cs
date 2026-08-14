@@ -276,7 +276,10 @@ public class QualityGateTests
         Assert.Contains("marketplace_https_rehearsal", gate);
         Assert.Contains("Release Manifest source commit", gate);
         Assert.Contains("refer to different packages", gate);
-        Assert.Contains("independent operator and reviewer", gate);
+        Assert.Contains("ReviewModel", gate);
+        Assert.Contains("single_maintainer", gate);
+        Assert.Contains("risk_accepted_version", gate);
+        Assert.Contains("release-review-policy.ps1", gate);
         Assert.Contains("preflight_only", gate);
         Assert.Contains("deployment_verified", gate);
         Assert.Contains("rollback_verified", gate);
@@ -597,7 +600,7 @@ public class QualityGateTests
         Assert.Contains("first_launch_observed = $false", capture);
         Assert.DoesNotContain("Start-Process", capture);
         Assert.DoesNotContain("Expand-Archive", capture);
-        Assert.Contains("Reviewer must differ", approve);
+        Assert.Contains("single_maintainer", approve);
         Assert.Contains("ConfirmExtractedExecutableOriginChecked", approve);
         Assert.Contains("ConfirmSmartScreenObserved", approve);
         Assert.Contains("ConfirmAntivirusObserved", approve);
@@ -608,10 +611,11 @@ public class QualityGateTests
         Assert.Contains("Write-NewJsonFileAtomically", approve);
         Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutputPath", approve);
         Assert.Contains("Release-download evidence changed after human approval", verify);
-        Assert.Contains("distinct operator and reviewer identities", verify);
+        Assert.Contains("Resolve-LongReleaseReviewPolicy", verify);
+        Assert.Contains("release-review-policy.ps1", verify);
         Assert.Contains("Interactive release-download checklist is incomplete", verify);
         Assert.Contains("approved_release_download_gate", verify);
-        Assert.Contains("schema_version = 2", verify);
+        Assert.Contains("schema_version = 3", verify);
         Assert.Contains("evidence = [ordered]@", verify);
         Assert.Contains("approval = [ordered]@", verify);
         Assert.Contains("summary and source files must share one directory", verify);

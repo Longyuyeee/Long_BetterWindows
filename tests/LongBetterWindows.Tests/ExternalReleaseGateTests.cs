@@ -32,6 +32,9 @@ public sealed class ExternalReleaseGateTests : IDisposable
         Assert.Equal(Commit, root.GetProperty("source_commit").GetString());
         Assert.Equal("unsigned", root.GetProperty("distribution_channel").GetString());
         Assert.False(root.GetProperty("signed").GetBoolean());
+        Assert.Equal("independent", root.GetProperty("review_model").GetString());
+        Assert.True(root.GetProperty("independent_review").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("risk_accepted_by").ValueKind);
         Assert.Equal(
             PackageHash,
             root.GetProperty("package").GetProperty("sha256").GetString());
@@ -97,6 +100,104 @@ public sealed class ExternalReleaseGateTests : IDisposable
             root.GetProperty("inputs").EnumerateObject(),
             input => Assert.Matches("^[0-9a-f]{64}$", input.Value.GetString()));
         Assert.Empty(Directory.GetFiles(_root, ".*.tmp"));
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_AcceptsExplicitSingleMaintainerRisk()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            reviewModel: "single_maintainer",
+            downloadOperator: "real-maintainer",
+            downloadReviewer: "real-maintainer",
+            cleanReviewer: "real-maintainer");
+        var output = Path.Combine(_root, "single-maintainer-decision.json");
+
+        var result = await RunVerifierAsync(
+            paths,
+            output,
+            reviewModel: "single_maintainer");
+
+        Assert.True(result.ExitCode == 0, result.Error);
+        using var decision = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        var root = decision.RootElement;
+        Assert.Equal(2, root.GetProperty("schema_version").GetInt32());
+        Assert.Equal("single_maintainer", root.GetProperty("review_model").GetString());
+        Assert.False(root.GetProperty("independent_review").GetBoolean());
+        Assert.Equal("real-maintainer", root.GetProperty("risk_accepted_by").GetString());
+        Assert.Equal(
+            "no_second_machine_or_independent_reviewer",
+            root.GetProperty("risk_reason").GetString());
+        Assert.Equal("1.11.0", root.GetProperty("risk_accepted_version").GetString());
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_DefaultStrictModeRejectsSameIdentity()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            downloadOperator: "same-maintainer",
+            downloadReviewer: "same-maintainer");
+
+        var result = await RunVerifierAsync(paths, Path.Combine(_root, "strict-rejected.json"));
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("Independent review requires distinct", result.Error);
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_SingleMaintainerRequiresExplicitFinalMode()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            reviewModel: "single_maintainer",
+            downloadOperator: "real-maintainer",
+            downloadReviewer: "real-maintainer",
+            cleanReviewer: "real-maintainer");
+
+        var result = await RunVerifierAsync(paths, Path.Combine(_root, "implicit-rejected.json"));
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("summary contract is incomplete", result.Error);
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsContradictorySingleMaintainerIdentity()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            reviewModel: "single_maintainer",
+            downloadOperator: "real-maintainer",
+            downloadReviewer: "different-name",
+            cleanReviewer: "real-maintainer");
+
+        var result = await RunVerifierAsync(
+            paths,
+            Path.Combine(_root, "identity-rejected.json"),
+            reviewModel: "single_maintainer");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("one consistent operator and reviewer", result.Error);
+    }
+
+    [Fact]
+    public async Task VerifyExternalReleaseGate_RejectsRiskAcceptedForAnotherVersion()
+    {
+        var paths = WriteFixture(
+            PackageHash,
+            reviewModel: "single_maintainer",
+            downloadOperator: "real-maintainer",
+            downloadReviewer: "real-maintainer",
+            cleanReviewer: "real-maintainer",
+            riskAcceptedVersion: "1.10.0");
+
+        var result = await RunVerifierAsync(
+            paths,
+            Path.Combine(_root, "version-rejected.json"),
+            reviewModel: "single_maintainer");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("version does not match", result.Error);
     }
 
     [Fact]
@@ -584,7 +685,12 @@ public sealed class ExternalReleaseGateTests : IDisposable
         bool downloadSourcePackageMismatch = false,
         bool cleanSourceReviewerMismatch = false,
         bool marketplaceDeploymentReleaseMismatch = false,
-        bool marketplaceRollbackMismatch = false)
+        bool marketplaceRollbackMismatch = false,
+        string reviewModel = "independent",
+        string downloadOperator = "capture-user",
+        string downloadReviewer = "review-user",
+        string cleanReviewer = "clean-reviewer",
+        string riskAcceptedVersion = "1.11.0")
     {
         Directory.CreateDirectory(_root);
         var packagePath = Path.Combine(_root, "LongBetterWindows.zip");
@@ -653,6 +759,16 @@ public sealed class ExternalReleaseGateTests : IDisposable
         var downloadEvidencePath = Path.Combine(_root, "download-evidence.json");
         var downloadApprovalPath = Path.Combine(_root, "download-approval.json");
         var cleanEvidencePath = Path.Combine(_root, "clean-environment-evidence.json");
+        const string riskAcceptedAt = "2026-08-14T04:00:00.0000000Z";
+        var riskAcceptance = reviewModel == "single_maintainer"
+            ? new
+            {
+                risk_accepted_by = downloadOperator,
+                risk_accepted_at = riskAcceptedAt,
+                risk_reason = "no_second_machine_or_independent_reviewer",
+                risk_accepted_version = riskAcceptedVersion,
+            }
+            : null;
         WritePortableSource("download-evidence.json", new
         {
             classification = "verified_release_download_provenance",
@@ -673,17 +789,22 @@ public sealed class ExternalReleaseGateTests : IDisposable
         });
         WritePortableSource("download-approval.json", new
         {
+            schema_version = 2,
             classification = "release_download_human_approval",
             source_commit = Commit,
             distribution_channel = "unsigned",
+            version = "1.11.0",
+            review_model = reviewModel,
+            independent_review = reviewModel == "independent",
             package = new
             {
                 file = "LongBetterWindows.zip",
                 sha256 = PackageHash,
             },
             evidence = EvidenceEntry("download-evidence.json"),
-            @operator = "capture-user",
-            reviewer = "review-user",
+            @operator = downloadOperator,
+            reviewer = downloadReviewer,
+            risk_acceptance = riskAcceptance,
         });
         WritePortableSource("clean-environment-evidence.json", new
         {
@@ -703,21 +824,27 @@ public sealed class ExternalReleaseGateTests : IDisposable
                 status = "approved",
                 reviewer = cleanSourceReviewerMismatch
                     ? "different-reviewer"
-                    : "clean-reviewer",
+                    : cleanReviewer,
             },
         });
         var download = WriteJson("download.json", new
         {
-            schema_version = downloadSchemaVersion,
+            schema_version = reviewModel == "single_maintainer"
+                ? 3
+                : downloadSchemaVersion,
             classification = "approved_release_download_gate",
             passed = true,
             source_commit = Commit,
             distribution_channel = "unsigned",
+            version = "1.11.0",
+            review_model = reviewModel,
+            independent_review = reviewModel == "independent",
             package_file = "LongBetterWindows.zip",
             package_sha256 = PackageHash,
             download_host = "github.com",
-            @operator = "capture-user",
-            reviewer = "review-user",
+            @operator = downloadOperator,
+            reviewer = downloadReviewer,
+            risk_acceptance = riskAcceptance,
             evidence = EvidenceEntry("download-evidence.json"),
             approval = EvidenceEntry("download-approval.json"),
         });
@@ -732,7 +859,7 @@ public sealed class ExternalReleaseGateTests : IDisposable
             signed = false,
             package_sha256 = cleanPackageHash,
             environment_label = "clean-vm",
-            reviewer = "clean-reviewer",
+            reviewer = cleanReviewer,
             evidence_manifest = EvidenceEntry("clean-environment-evidence.json"),
         });
         var dpiEvidence = new[] { 100, 125, 150, 200 }.Select(scale =>
@@ -1071,7 +1198,8 @@ public sealed class ExternalReleaseGateTests : IDisposable
     private async Task<ProcessResult> RunVerifierAsync(
         FixturePaths paths,
         string? output,
-        bool preflightOnly = false)
+        bool preflightOnly = false,
+        string? reviewModel = null)
     {
         var start = new ProcessStartInfo
         {
@@ -1100,6 +1228,11 @@ public sealed class ExternalReleaseGateTests : IDisposable
         }
         if (preflightOnly)
             start.ArgumentList.Add("-PreflightOnly");
+        if (reviewModel is not null)
+        {
+            start.ArgumentList.Add("-ReviewModel");
+            start.ArgumentList.Add(reviewModel);
+        }
         if (output is not null)
         {
             start.ArgumentList.Add("-OutputPath");

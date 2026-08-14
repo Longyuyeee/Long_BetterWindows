@@ -18,12 +18,15 @@ param(
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)]
     [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
+    [ValidateSet('independent','single_maintainer')]
+    [string] $ReviewModel = 'independent',
     [string] $OutputPath,
     [switch] $PreflightOnly
 )
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
+. (Join-Path $PSScriptRoot 'release-review-policy.ps1')
 
 function Read-GateJson([string] $path, [string] $label) {
     $resolved = [IO.Path]::GetFullPath($path)
@@ -269,9 +272,15 @@ function Read-HashLockedSource($gate, $entry, [string] $label) {
     }
 }
 
-function Assert-DownloadContract($gate) {
+function Assert-DownloadContract(
+    $gate,
+    [string] $candidateVersion,
+    [string] $expectedReviewModel) {
     $document = $gate.document
-    if ([int]$document.schema_version -ne 2 `
+    $documentReviewModel = Get-LongReviewModel $document
+    if ([int]$document.schema_version -notin @(2, 3) `
+        -or ($expectedReviewModel -eq 'single_maintainer' -and [int]$document.schema_version -ne 3) `
+        -or $documentReviewModel -ne $expectedReviewModel `
         -or [string]::IsNullOrWhiteSpace([string]$document.download_host)) {
         throw 'Release-download gate summary contract is incomplete.'
     }
@@ -279,6 +288,11 @@ function Assert-DownloadContract($gate) {
         $gate $document.evidence 'Release-download evidence'
     $approval = Read-HashLockedSource `
         $gate $document.approval 'Release-download approval'
+    $approvalReviewModel = Get-LongReviewModel $approval
+    if (($documentReviewModel -eq 'single_maintainer' -and [int]$approval.schema_version -ne 2) `
+        -or ($documentReviewModel -eq 'independent' -and [int]$approval.schema_version -notin @(0, 1, 2))) {
+        throw 'Release-download approval review schema is incompatible with its review model.'
+    }
     if ([string]$evidence.classification -ne 'verified_release_download_provenance' `
         -or -not [bool]$evidence.passed `
         -or [string]$evidence.release.source_commit -ne [string]$document.source_commit `
@@ -295,10 +309,39 @@ function Assert-DownloadContract($gate) {
         -or [string]$approval.package.sha256 -ne [string]$document.package_sha256 `
         -or [string]$approval.operator -ne [string]$document.operator `
         -or [string]$approval.reviewer -ne [string]$document.reviewer `
+        -or $approvalReviewModel -ne $documentReviewModel `
         -or [string]$approval.evidence.file -ne [string]$document.evidence.file `
         -or [string]$approval.evidence.sha256 -ne [string]$document.evidence.sha256) {
         throw 'Release-download approval source content does not match its summary.'
     }
+    $riskAcceptance = $approval.risk_acceptance
+    $policy = Resolve-LongReleaseReviewPolicy `
+        -ReviewModel $documentReviewModel `
+        -CandidateVersion $candidateVersion `
+        -Operator ([string]$document.operator) `
+        -Reviewer ([string]$document.reviewer) `
+        -RiskAcceptedBy ([string]$riskAcceptance.risk_accepted_by) `
+        -RiskAcceptedAt ([string]$riskAcceptance.risk_accepted_at) `
+        -RiskReason ([string]$riskAcceptance.risk_reason) `
+        -RiskAcceptedVersion ([string]$riskAcceptance.risk_accepted_version)
+    if ($documentReviewModel -eq 'single_maintainer' `
+        -and ([string]$document.version -ne $candidateVersion `
+            -or [bool]$document.independent_review `
+            -or [string]$document.risk_acceptance.risk_accepted_by -ne [string]$policy.risk_acceptance.risk_accepted_by `
+            -or [string]$document.risk_acceptance.risk_accepted_at -ne [string]$policy.risk_acceptance.risk_accepted_at `
+            -or [string]$document.risk_acceptance.risk_reason -ne [string]$policy.risk_acceptance.risk_reason `
+            -or [string]$document.risk_acceptance.risk_accepted_version -ne [string]$policy.risk_acceptance.risk_accepted_version)) {
+        throw 'Single-maintainer release-download risk acceptance does not match its hash-locked approval.'
+    }
+    if ($documentReviewModel -eq 'independent') {
+        $independentProperty = $document.PSObject.Properties['independent_review']
+        $riskProperty = $document.PSObject.Properties['risk_acceptance']
+        if (($null -ne $independentProperty -and -not [bool]$independentProperty.Value) `
+            -or ($null -ne $riskProperty -and $null -ne $riskProperty.Value)) {
+            throw 'Independent release-download summary contains contradictory risk acceptance fields.'
+        }
+    }
+    return $policy
 }
 
 function Assert-CleanEnvironmentContract(
@@ -655,7 +698,10 @@ foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
         throw "External gate source commit mismatch: $($gate.document.classification)"
     }
 }
-Assert-DownloadContract $download
+$reviewPolicy = Assert-DownloadContract `
+    $download `
+    ([string]$release.document.version) `
+    $ReviewModel
 Assert-CleanEnvironmentContract $clean $ExpectedDistributionChannel
 Assert-PhysicalDpiContract $dpi $expectedCommit
 Assert-AccessibilityContract $accessibility $expectedCommit
@@ -681,15 +727,18 @@ if ($manifestPackages.Count -ne 1) {
     throw 'Approved package identity does not match exactly one Release Manifest package.'
 }
 
-$downloadOperator = ([string]$download.document.operator).Trim()
-$downloadReviewer = ([string]$download.document.reviewer).Trim()
-if ([string]::IsNullOrWhiteSpace($downloadOperator) `
-    -or [string]::IsNullOrWhiteSpace($downloadReviewer) `
-    -or $downloadOperator -eq $downloadReviewer) {
-    throw 'Release-download gate does not preserve independent operator and reviewer identities.'
-}
-if ([string]::IsNullOrWhiteSpace(([string]$clean.document.reviewer).Trim())) {
+$downloadOperator = $reviewPolicy.operator
+$downloadReviewer = $reviewPolicy.reviewer
+$cleanReviewer = ([string]$clean.document.reviewer).Trim()
+if ([string]::IsNullOrWhiteSpace($cleanReviewer)) {
     throw 'Clean-environment gate reviewer is missing.'
+}
+if ($ReviewModel -eq 'single_maintainer' `
+    -and -not [string]::Equals(
+        $cleanReviewer,
+        [string]$reviewPolicy.risk_acceptance.risk_accepted_by,
+        [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Single-maintainer review identities are inconsistent across release gates.'
 }
 
 $rehearsal = $marketplace.document
@@ -714,7 +763,7 @@ if ([bool]$rehearsal.preflight_only `
 Assert-MarketplaceEvidenceContract $marketplace
 
 $decision = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
     classification = if ($PreflightOnly) {
         'external_release_gate_preflight'
@@ -726,6 +775,12 @@ $decision = [ordered]@{
     source_commit = $expectedCommit
     distribution_channel = $ExpectedDistributionChannel
     signed = [bool]$release.document.signed
+    review_model = $reviewPolicy.review_model
+    independent_review = $reviewPolicy.independent_review
+    risk_accepted_by = if ($null -eq $reviewPolicy.risk_acceptance) { $null } else { [string]$reviewPolicy.risk_acceptance.risk_accepted_by }
+    risk_accepted_at = if ($null -eq $reviewPolicy.risk_acceptance) { $null } else { [string]$reviewPolicy.risk_acceptance.risk_accepted_at }
+    risk_reason = if ($null -eq $reviewPolicy.risk_acceptance) { $null } else { [string]$reviewPolicy.risk_acceptance.risk_reason }
+    risk_accepted_version = if ($null -eq $reviewPolicy.risk_acceptance) { $null } else { [string]$reviewPolicy.risk_acceptance.risk_accepted_version }
     package = [ordered]@{
         file = $packageFile
         sha256 = $packageSha256
@@ -740,10 +795,10 @@ $decision = [ordered]@{
         artifact_files_verified = $true
         checksum_file_verified = $true
     }
-    independent_review = [ordered]@{
+    review_identities = [ordered]@{
         download_operator = $downloadOperator
         download_reviewer = $downloadReviewer
-        clean_environment_reviewer = [string]$clean.document.reviewer
+        clean_environment_reviewer = $cleanReviewer
     }
     marketplace = [ordered]@{
         release_id = [string]$rehearsal.release_id
