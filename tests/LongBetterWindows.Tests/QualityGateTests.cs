@@ -1984,8 +1984,22 @@ public class QualityGateTests
         Assert.Contains("AutomationElement]::RootElement.FindFirst", script);
         Assert.Contains("AutomationElement]::ProcessIdProperty", script);
         Assert.Matches(
-            @"RootElement\.FindFirst\(\s*\[Windows\.Automation\.TreeScope\]::Descendants",
+            @"RootElement\.FindFirst\(\s*\[Windows\.Automation\.TreeScope\]::Children",
             script);
+        var processElementFinderStart = script.IndexOf(
+            "function Find-ProcessElementByAutomationId",
+            StringComparison.Ordinal);
+        Assert.True(processElementFinderStart >= 0);
+        var processElementFinderEnd = script.IndexOf(
+            "function Invoke-WindowWorkflowAction",
+            processElementFinderStart,
+            StringComparison.Ordinal);
+        Assert.True(processElementFinderEnd > processElementFinderStart);
+        var processElementFinder = script[processElementFinderStart..processElementFinderEnd];
+        Assert.Contains("[LongDesktopInput]::TopLevelWindows($processId)", processElementFinder);
+        Assert.DoesNotContain("AutomationElement]::RootElement", processElementFinder);
+        Assert.Contains("function Invoke-AutomationElementByKeyboard", script);
+        Assert.Contains("Invoke-AutomationElementByKeyboard $marketClose", script);
         Assert.Contains("function Set-QualityClipboard", script);
         Assert.Contains("Set-QualityClipboard 'long-ui-menu-pending'", script);
         var workflowUpgradeScript = Read("run-isolated-workflow-upgrade.ps1");
