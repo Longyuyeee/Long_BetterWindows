@@ -63,6 +63,25 @@ namespace LongBetterWindows.Host.Interaction
         public SearchResultIconKind IconKind { get; init; } =
             SearchResultIconKind.Command;
         public string? IconPath { get; init; }
+        public string IconLabel
+        {
+            get
+            {
+                var candidate = string.IsNullOrWhiteSpace(Source)
+                    ? Title
+                    : Source;
+                var trimmed = candidate.Trim();
+                return trimmed.Length == 0
+                    ? string.Empty
+                    : System.Globalization.StringInfo
+                        .GetNextTextElement(trimmed)
+                        .ToUpperInvariant();
+            }
+        }
+        public bool HasIconLabel =>
+            IconKind == SearchResultIconKind.Plugin
+            && string.IsNullOrWhiteSpace(IconPath)
+            && IconLabel.Length > 0;
         public int Score { get; init; }
         public int ProviderPriority { get; init; }
         public int PreferenceScore { get; init; }

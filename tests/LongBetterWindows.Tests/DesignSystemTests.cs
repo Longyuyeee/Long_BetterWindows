@@ -357,6 +357,39 @@ public class DesignSystemTests
     }
 
     [Fact]
+    public void LauncherSurfaces_ShareAccessiblePluginIdentityBadgeFallback()
+    {
+        var root = FindRepositoryRoot();
+        var palette = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "CommandPaletteWindow.xaml"));
+        var superPanel = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Views",
+            "SuperPanelWindow.xaml"));
+        var decorativeText = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "LongBetterWindows.Host",
+            "Controls",
+            "DecorativeTextBlock.cs"));
+
+        foreach (var surface in new[] { palette, superPanel })
+        {
+            Assert.Contains("Text=\"{Binding IconLabel}\"", surface);
+            Assert.Contains("Binding=\"{Binding HasIconLabel}\"", surface);
+            Assert.Contains("Long.Brush.Accent.Soft", surface);
+            Assert.Contains("controls:DecorativeTextBlock", surface);
+        }
+        Assert.Contains("OnCreateAutomationPeer() => null", decorativeText);
+    }
+
+    [Fact]
     public void ToolCenter_DefinesAllManagementWorkspaces()
     {
         var root = FindRepositoryRoot();

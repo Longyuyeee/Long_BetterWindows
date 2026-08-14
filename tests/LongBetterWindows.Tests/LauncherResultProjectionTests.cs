@@ -64,6 +64,54 @@ public class LauncherResultProjectionTests
         Assert.All(projected, item => Assert.Equal("results", item.SectionKey));
     }
 
+    [Theory]
+    [InlineData("快捷启动器", "命令", "快")]
+    [InlineData("url toolkit", "命令", "U")]
+    [InlineData("🧰 Tools", "命令", "🧰")]
+    [InlineData("", "翻译文本", "翻")]
+    public void PluginWithoutImage_UsesFirstUnicodeTextElementAsIdentityBadge(
+        string source,
+        string title,
+        string expected)
+    {
+        var result = Result("plugin", SearchResultKind.Command) with
+        {
+            Source = source,
+            Title = title,
+            IconKind = SearchResultIconKind.Plugin,
+        };
+
+        var projected = Assert.Single(LauncherResultProjection.Build(
+            [result],
+            string.Empty,
+            ContextSnapshot.Empty,
+            []));
+
+        Assert.Equal(expected, result.IconLabel);
+        Assert.True(result.HasIconLabel);
+        Assert.Equal(expected, projected.IconLabel);
+        Assert.True(projected.HasIconLabel);
+    }
+
+    [Fact]
+    public void ImageOrNonPluginResult_DoesNotExposeIdentityBadge()
+    {
+        var image = Result("image", SearchResultKind.Command) with
+        {
+            Source = "URL Toolkit",
+            IconKind = SearchResultIconKind.Plugin,
+            IconPath = "icon.png",
+        };
+        var management = Result("management", SearchResultKind.Data) with
+        {
+            Source = "管理中心",
+            IconKind = SearchResultIconKind.Management,
+        };
+
+        Assert.False(image.HasIconLabel);
+        Assert.False(management.HasIconLabel);
+    }
+
     private static SearchResultItem Result(
         string id,
         SearchResultKind kind,

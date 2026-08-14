@@ -13,6 +13,8 @@ namespace LongBetterWindows.Host.Interaction
         public SearchResultIconKind IconKind => Result.IconKind;
         public string? IconPath => Result.IconPath;
         public bool HasIconPath => !string.IsNullOrWhiteSpace(IconPath);
+        public string IconLabel => Result.IconLabel;
+        public bool HasIconLabel => Result.HasIconLabel;
         public bool HasSecondaryActions => Result.HasSecondaryActions;
         public bool CanPin => Result.CanPin;
         public bool IsPinned => Result.IsPinned;
