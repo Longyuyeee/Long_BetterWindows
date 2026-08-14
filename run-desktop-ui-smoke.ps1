@@ -582,7 +582,17 @@ function Find-ProcessElementByAutomationId([int] $processId, [string] $automatio
         $match = Find-DescendantByAutomationId $root $automationId
         if ($null -ne $match) { return $match }
     }
-    return $null
+
+    $condition = [Windows.Automation.AndCondition]::new(@(
+        [Windows.Automation.PropertyCondition]::new(
+            [Windows.Automation.AutomationElement]::ProcessIdProperty,
+            $processId),
+        [Windows.Automation.PropertyCondition]::new(
+            [Windows.Automation.AutomationElement]::AutomationIdProperty,
+            $automationId)))
+    return [Windows.Automation.AutomationElement]::RootElement.FindFirst(
+        [Windows.Automation.TreeScope]::Descendants,
+        $condition)
 }
 
 function Invoke-WindowWorkflowAction(
