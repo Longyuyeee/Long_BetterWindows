@@ -1094,6 +1094,12 @@ namespace LongBetterWindows.Host.Services
             => new PhysicalSessionRecoveryQualityProbe(_application)
                 .RunAsync(mainWindow, reportPath);
 
+        public Task RunPhysicalPowerRecoveryProbeAsync(
+            MainWindow mainWindow,
+            string reportPath)
+            => new PhysicalPowerRecoveryQualityProbe(_application)
+                .RunAsync(mainWindow, reportPath);
+
         public async Task RunUiServiceThemeProbeAsync(string reportPath)
         {
             var originalTheme = App.IsLightTheme;

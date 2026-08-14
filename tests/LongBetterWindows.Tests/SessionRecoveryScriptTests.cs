@@ -44,6 +44,61 @@ public sealed class SessionRecoveryScriptTests
         Assert.True(process.ExitCode == 0, error);
     }
 
+    [Fact]
+    public void SleepWakeProbe_RequiresPhysicalPowerEventsIdentityAndCleanup()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "verify-sleep-wake-recovery.ps1"));
+
+        Assert.Contains("--quality-power-recovery-report", source);
+        Assert.Contains("--porcelain --untracked-files=no", source);
+        Assert.Contains("SetSuspendState", source);
+        Assert.Contains("physical_sleep_wake_recovery", source);
+        Assert.Contains("WM_POWERBROADCAST", source);
+        Assert.Contains("unavailable_after_suspend", source);
+        Assert.Contains("restored_host_state", source);
+        Assert.Contains("identity_preserved", source);
+        Assert.Contains("surface_preserved", source);
+        Assert.Contains("cleanup_passed", source);
+        Assert.Contains("taskkill.exe /PID $process.Id /T /F", source);
+    }
+
+    [Fact]
+    public void SleepWakeProbe_UsesDedicatedPhysicalPowerTransitionContract()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "LongBetterWindows.Host",
+            "Services",
+            "PhysicalPowerRecoveryQualityProbe.cs"));
+
+        Assert.Contains("PowerTransitionObserved", source);
+        Assert.Contains("HostPowerTransition.Suspended", source);
+        Assert.DoesNotContain("InteractionAvailabilityChanged", source);
+    }
+
+    [Fact]
+    public void SleepWakeProbe_IsAcceptedByTheWindowsPowerShellParser()
+    {
+        var path = Path.Combine(
+            FindRepositoryRoot(),
+            "verify-sleep-wake-recovery.ps1");
+        var escapedPath = path.Replace("'", "''", StringComparison.Ordinal);
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -Command \"[scriptblock]::Create([IO.File]::ReadAllText('{escapedPath}')) | Out-Null\"",
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        }) ?? throw new InvalidOperationException("PowerShell could not start.");
+        Assert.True(process.WaitForExit(10_000));
+        var error = process.StandardError.ReadToEnd();
+        Assert.True(process.ExitCode == 0, error);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

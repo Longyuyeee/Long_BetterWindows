@@ -6,6 +6,13 @@ using Serilog;
 
 namespace LongBetterWindows.Host.Services;
 
+internal enum HostPowerTransition
+{
+    Suspended,
+    ResumedFromSuspend,
+    ResumedAutomatically,
+}
+
 internal sealed class HostEnvironmentStateService : IDisposable
 {
     private const int WmDisplayChange = 0x007E;
@@ -27,6 +34,7 @@ internal sealed class HostEnvironmentStateService : IDisposable
     internal bool IsInteractionAvailable
         => _sessionAvailable && _powerAvailable;
     internal event Action<bool>? InteractionAvailabilityChanged;
+    internal event Action<HostPowerTransition>? PowerTransitionObserved;
 
     internal void Attach(Window mainWindow)
     {
@@ -70,12 +78,8 @@ internal sealed class HostEnvironmentStateService : IDisposable
             case WmWtsSessionChange when wParam.ToInt32() == WtsSessionUnlock:
                 SetSessionAvailable(true);
                 break;
-            case WmPowerBroadcast when wParam.ToInt32() == PbtApmSuspend:
-                SetPowerAvailable(false);
-                break;
-            case WmPowerBroadcast when wParam.ToInt32() is PbtApmResumeSuspend
-                or PbtApmResumeAutomatic:
-                SetPowerAvailable(true);
+            case WmPowerBroadcast:
+                ApplyPowerTransition(wParam.ToInt32());
                 break;
             case WmDisplayChange:
                 ConstrainMainWindow();
@@ -99,6 +103,40 @@ internal sealed class HostEnvironmentStateService : IDisposable
         _powerAvailable = available;
         PublishAvailability();
     }
+
+    private void ApplyPowerTransition(int notification)
+    {
+        var transition = ParsePowerTransitionForQuality(notification);
+        if (transition is null)
+            return;
+
+        SetPowerAvailable(transition != HostPowerTransition.Suspended);
+        var handlers = PowerTransitionObserved?.GetInvocationList()
+            .Cast<Action<HostPowerTransition>>() ?? [];
+        foreach (var handler in handlers)
+        {
+            try
+            {
+                handler(transition.Value);
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "A host power transition subscriber failed");
+            }
+        }
+    }
+
+    internal static HostPowerTransition? ParsePowerTransitionForQuality(
+        int notification)
+        => notification switch
+        {
+            PbtApmSuspend => HostPowerTransition.Suspended,
+            PbtApmResumeSuspend => HostPowerTransition.ResumedFromSuspend,
+            PbtApmResumeAutomatic => HostPowerTransition.ResumedAutomatically,
+            _ => null,
+        };
 
     private void PublishAvailability()
     {

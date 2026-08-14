@@ -17,4 +17,34 @@ public sealed class HostEnvironmentStateServiceTests
         Assert.True(service.IsInteractionAvailable);
         Assert.Equal([false, true], transitions);
     }
+
+    [Fact]
+    public void QualityTransition_DoesNotPublishPhysicalPowerEvidence()
+    {
+        using var service = new HostEnvironmentStateService();
+        var transitions = new List<HostPowerTransition>();
+        service.PowerTransitionObserved += transitions.Add;
+
+        service.SetInteractionAvailableForQuality(false);
+        service.SetInteractionAvailableForQuality(true);
+
+        Assert.Empty(transitions);
+    }
+
+    [Theory]
+    [InlineData(0x0004, "Suspended")]
+    [InlineData(0x0007, "ResumedFromSuspend")]
+    [InlineData(0x0012, "ResumedAutomatically")]
+    public void PowerBroadcast_MapsOnlyPhysicalSuspendAndResumeMessages(
+        int notification,
+        string expected)
+        => Assert.Equal(
+            expected,
+            HostEnvironmentStateService.ParsePowerTransitionForQuality(
+                notification)?.ToString());
+
+    [Fact]
+    public void PowerBroadcast_IgnoresUnrelatedNotifications()
+        => Assert.Null(
+            HostEnvironmentStateService.ParsePowerTransitionForQuality(0x000A));
 }

@@ -46,6 +46,7 @@ public class AppStartupOptionsTests
             "--quality-background-activity-report", "background-activity.json",
             "--quality-tray-recovery-report", "tray-recovery.json",
             "--quality-session-recovery-report", "session-recovery.json",
+            "--quality-power-recovery-report", "power-recovery.json",
             "--quality-taskbar-identity-report", "taskbar-identity.json",
             "--quality-ui-service-theme-report", "ui-service-theme.json",
             "--quality-themed-message-dialog-report", "message-dialog.json",
@@ -122,6 +123,9 @@ public class AppStartupOptionsTests
         Assert.Equal(
             "session-recovery.json",
             options.QualitySessionRecoveryReportPath);
+        Assert.Equal(
+            "power-recovery.json",
+            options.QualityPowerRecoveryReportPath);
         Assert.Equal(
             "taskbar-identity.json",
             options.QualityTaskbarIdentityReportPath);
