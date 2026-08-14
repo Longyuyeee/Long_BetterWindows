@@ -15,9 +15,12 @@ public sealed class DisplayTopologyRecoveryScriptTests
 
         Assert.Contains("--quality-display-topology-report", source);
         Assert.Contains("--porcelain --untracked-files=no", source);
-        Assert.Contains("DisplaySwitch.exe", source);
-        Assert.Contains("/internal", source);
-        Assert.Contains("/extend", source);
+        Assert.Contains("SetDisplayConfig", source);
+        Assert.Contains("$sdcTopologyInternal", source);
+        Assert.Contains("$sdcTopologyExtend", source);
+        Assert.Contains("Set-DisplayTopology", source);
+        Assert.DoesNotContain("DisplaySwitch.exe", source);
+        Assert.Contains("extend recovery", source);
         Assert.Contains("physical_display_topology_recovery", source);
         Assert.Contains("WM_DISPLAYCHANGE", source);
         Assert.Contains("identity_preserved", source);

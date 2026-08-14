@@ -71,9 +71,36 @@ if ((Test-Path -LiteralPath $outputFile) `
 New-Item -ItemType Directory -Force `
     -Path ([IO.Path]::GetDirectoryName($outputFile)) | Out-Null
 
-$displaySwitch = Join-Path $env:WINDIR "System32\DisplaySwitch.exe"
-if (-not (Test-Path -LiteralPath $displaySwitch -PathType Leaf)) {
-    throw "DisplaySwitch.exe was not found: $displaySwitch"
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class LongBetterWindowsDisplayTopology
+{
+    [DllImport("user32.dll")]
+    public static extern int SetDisplayConfig(
+        uint pathCount,
+        IntPtr paths,
+        uint modeCount,
+        IntPtr modes,
+        uint flags);
+}
+"@
+
+$sdcTopologyInternal = [uint32]0x00000001
+$sdcTopologyExtend = [uint32]0x00000004
+$sdcApply = [uint32]0x00000080
+
+function Set-DisplayTopology([uint32]$Topology, [string]$Name) {
+    $result = [LongBetterWindowsDisplayTopology]::SetDisplayConfig(
+        0,
+        [IntPtr]::Zero,
+        0,
+        [IntPtr]::Zero,
+        ($sdcApply -bor $Topology))
+    if ($result -ne 0) {
+        throw "SetDisplayConfig $Name failed with Win32 status $result."
+    }
 }
 
 $process = Start-Process `
@@ -103,31 +130,23 @@ try {
 
     Write-Host "Display topology probe is ready on $TargetMonitorDeviceName."
     Write-Host "Reducing Windows to the internal display."
-    $switch = Start-Process -FilePath $displaySwitch `
-        -ArgumentList "/internal" -WindowStyle Hidden -Wait -PassThru
-    if ($switch.ExitCode -ne 0) {
-        throw "DisplaySwitch /internal failed with exit code $($switch.ExitCode)."
-    }
+    Set-DisplayTopology $sdcTopologyInternal "internal"
     $reducedRequested = $true
 
-    $reducedDeadline = [DateTime]::UtcNow.AddMinutes(2)
+    $reducedDeadline = [DateTime]::UtcNow.AddSeconds(30)
     while (-not (Test-Path -LiteralPath $reducedReadyFile -PathType Leaf)) {
         if ($process.HasExited) {
             throw "Display topology host exited before reduced topology readiness."
         }
         if ([DateTime]::UtcNow -ge $reducedDeadline) {
-            throw "Reduced display topology was not confirmed within 2 minutes."
+            throw "Reduced display topology was not confirmed within 30 seconds."
         }
         Start-Sleep -Milliseconds 200
         $process.Refresh()
     }
 
     Write-Host "Reduced topology confirmed. Restoring extended displays."
-    $switch = Start-Process -FilePath $displaySwitch `
-        -ArgumentList "/extend" -WindowStyle Hidden -Wait -PassThru
-    if ($switch.ExitCode -ne 0) {
-        throw "DisplaySwitch /extend failed with exit code $($switch.ExitCode)."
-    }
+    Set-DisplayTopology $sdcTopologyExtend "extend"
     $restoreRequested = $true
 
     if (-not $process.WaitForExit($TimeoutMinutes * 60 * 1000)) {
@@ -139,8 +158,7 @@ try {
 }
 finally {
     if ($reducedRequested -and -not $restoreRequested) {
-        Start-Process -FilePath $displaySwitch -ArgumentList "/extend" `
-            -WindowStyle Hidden -Wait | Out-Null
+        Set-DisplayTopology $sdcTopologyExtend "extend recovery"
     }
     $process.Refresh()
     if (-not $process.HasExited) {
