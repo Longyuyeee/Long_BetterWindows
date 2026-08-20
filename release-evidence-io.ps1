@@ -1,3 +1,38 @@
+function Get-FileHash {
+    [CmdletBinding(DefaultParameterSetName='Path')]
+    param(
+        [Parameter(Mandatory=$true, Position=0, ParameterSetName='Path')]
+        [string] $Path,
+        [Parameter(Mandatory=$true, ParameterSetName='LiteralPath')]
+        [string] $LiteralPath,
+        [ValidateSet('SHA256')]
+        [string] $Algorithm = 'SHA256'
+    )
+
+    $inputPath = if ($PSCmdlet.ParameterSetName -eq 'LiteralPath') {
+        $LiteralPath
+    }
+    else {
+        $Path
+    }
+    $resolvedPath = [IO.Path]::GetFullPath($inputPath)
+    $stream = [IO.File]::OpenRead($resolvedPath)
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hash = ([BitConverter]::ToString(
+            $hasher.ComputeHash($stream))).Replace('-', '')
+        return [pscustomobject]@{
+            Algorithm = $Algorithm
+            Hash = $hash
+            Path = $resolvedPath
+        }
+    }
+    finally {
+        $hasher.Dispose()
+        $stream.Dispose()
+    }
+}
+
 function Get-NormalizedTextSha256 {
     param(
         [Parameter(Mandatory=$true)] [string] $Path
