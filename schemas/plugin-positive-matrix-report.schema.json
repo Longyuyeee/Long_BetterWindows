@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://long-assistant.local/schemas/plugin-positive-matrix-report.schema.json",
+  "title": "Long Assistant Plugin Positive Matrix Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schema_version",
+    "classification",
+    "generated_at_utc",
+    "matrix_path",
+    "matrix_sha256",
+    "source_commit",
+    "source_dirty",
+    "plugin_count",
+    "command_count",
+    "acceptance_scenario_count",
+    "automated_gate_count",
+    "passed_gate_count",
+    "failed_gate_count",
+    "environment_blocked_gate_count",
+    "not_run_gate_count",
+    "not_applicable_gate_count",
+    "gates",
+    "automated_evidence_count",
+    "required_manual_check_count",
+    "approval_receipt_count",
+    "stale_approval_receipt_count",
+    "pending_or_blocked_manual_count",
+    "failed_manual_count",
+    "contract_valid",
+    "release_eligible",
+    "errors"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://long-assistant.local/schemas/plugin-positive-matrix-report.schema.json"
+    },
+    "schema_version": { "const": 2 },
+    "classification": { "const": "plugin_positive_matrix" },
+    "generated_at_utc": { "type": "string", "format": "date-time" },
+    "matrix_path": { "type": "string", "minLength": 1 },
+    "matrix_sha256": { "$ref": "#/$defs/sha256" },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_dirty": { "type": "boolean" },
+    "plugin_count": { "type": "integer", "minimum": 0 },
+    "command_count": { "type": "integer", "minimum": 0 },
+    "acceptance_scenario_count": { "type": "integer", "minimum": 0 },
+    "automated_gate_count": { "type": "integer", "minimum": 0 },
+    "passed_gate_count": { "type": "integer", "minimum": 0 },
+    "failed_gate_count": { "type": "integer", "minimum": 0 },
+    "environment_blocked_gate_count": { "type": "integer", "minimum": 0 },
+    "not_run_gate_count": { "type": "integer", "minimum": 0 },
+    "not_applicable_gate_count": { "type": "integer", "minimum": 0 },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/gate" }
+    },
+    "automated_evidence_count": { "type": "integer", "minimum": 0 },
+    "required_manual_check_count": { "type": "integer", "minimum": 0 },
+    "approval_receipt_count": { "const": 0 },
+    "stale_approval_receipt_count": { "const": 0 },
+    "pending_or_blocked_manual_count": { "type": "integer", "minimum": 0 },
+    "failed_manual_count": { "type": "integer", "minimum": 0 },
+    "contract_valid": { "type": "boolean" },
+    "release_eligible": { "type": "boolean" },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "summary",
+        "level",
+        "evidence_path",
+        "evidence_symbol",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{0,159}$" },
+        "status": {
+          "enum": [
+            "not_run",
+            "passed",
+            "failed",
+            "blocked_environment",
+            "not_applicable"
+          ]
+        },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "level": { "enum": ["component", "contract", "integration"] },
+        "evidence_path": { "type": "string", "minLength": 1 },
+        "evidence_symbol": { "type": "string" },
+        "evidence_sha256": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

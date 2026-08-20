@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Json.Schema;
 
 namespace LongBetterWindows.Tests;
 
@@ -174,10 +176,30 @@ public sealed class PluginPositiveFunctionMatrixTests
 
         Assert.Equal(0, normal.ExitCode);
         using var report = JsonDocument.Parse(normal.StandardOutput);
+        var reportSchema = JsonSchema.FromText(await File.ReadAllTextAsync(
+            Path.Combine(
+                root,
+                "schemas",
+                "plugin-positive-matrix-report.schema.json")));
+        var schemaResult = reportSchema.Evaluate(
+            report.RootElement,
+            new EvaluationOptions
+            {
+                OutputFormat = OutputFormat.List,
+            });
+        Assert.True(
+            schemaResult.IsValid,
+            JsonSerializer.Serialize(schemaResult.Details));
         Assert.True(
             report.RootElement.GetProperty("contract_valid").GetBoolean());
+        Assert.Equal(
+            2,
+            report.RootElement.GetProperty("schema_version").GetInt32());
         var releaseEligible = report.RootElement
             .GetProperty("release_eligible")
+            .GetBoolean();
+        var sourceDirty = report.RootElement
+            .GetProperty("source_dirty")
             .GetBoolean();
         Assert.Equal(
             25,
@@ -185,28 +207,107 @@ public sealed class PluginPositiveFunctionMatrixTests
         Assert.Equal(
             42,
             report.RootElement.GetProperty("command_count").GetInt32());
-        var approvalCount = report.RootElement
-            .GetProperty("approval_receipt_count")
-            .GetInt32();
-        var staleApprovalCount = report.RootElement
-            .GetProperty("stale_approval_receipt_count")
-            .GetInt32();
-        var pendingCount = report.RootElement
-            .GetProperty("pending_or_blocked_manual_count")
-            .GetInt32();
-        var failedCount = report.RootElement
-            .GetProperty("failed_manual_count")
-            .GetInt32();
-        Assert.Equal(0, approvalCount);
-        Assert.Equal(0, staleApprovalCount);
-        Assert.Equal(25, pendingCount);
-        Assert.Equal(0, failedCount);
-        Assert.False(releaseEligible);
+        Assert.Equal(
+            25,
+            report.RootElement
+                .GetProperty("acceptance_scenario_count")
+                .GetInt32());
+        Assert.Equal(
+            87,
+            report.RootElement.GetProperty("automated_gate_count").GetInt32());
+        Assert.Equal(
+            87,
+            report.RootElement.GetProperty("passed_gate_count").GetInt32());
+        Assert.Equal(
+            0,
+            report.RootElement.GetProperty("failed_gate_count").GetInt32());
+        Assert.Equal(
+            0,
+            report.RootElement
+                .GetProperty("environment_blocked_gate_count")
+                .GetInt32());
+        Assert.Equal(
+            0,
+            report.RootElement.GetProperty("not_run_gate_count").GetInt32());
+        Assert.Equal(
+            0,
+            report.RootElement
+                .GetProperty("not_applicable_gate_count")
+                .GetInt32());
+        var gates = report.RootElement.GetProperty("gates").EnumerateArray().ToArray();
+        Assert.Equal(87, gates.Length);
+        Assert.Equal(
+            87,
+            gates.Select(gate => gate.GetProperty("id").GetString())
+                .Distinct(StringComparer.Ordinal)
+                .Count());
+        Assert.All(gates, gate =>
+        {
+            Assert.Equal("passed", gate.GetProperty("status").GetString());
+            Assert.Matches(
+                "^[a-f0-9]{64}$",
+                gate.GetProperty("evidence_sha256").GetString()!);
+        });
+        Assert.Equal(!sourceDirty, releaseEligible);
 
         var release = await RunVerifierAsync(
             root,
             requireReleaseEligible: true);
         Assert.Equal(releaseEligible ? 0 : 2, release.ExitCode);
+    }
+
+    [Fact]
+    public async Task Verifier_ReportsFailedGateForTamperedEvidenceBinding()
+    {
+        var root = FindRepositoryRoot();
+        var matrixPath = Path.Combine(
+            root,
+            "docs",
+            "plugin-positive-function-matrix.json");
+        var matrix = JsonNode.Parse(await File.ReadAllTextAsync(matrixPath))!;
+        matrix["plugins"]![0]!["automated_evidence"]![0]!["symbol"] =
+            $"a004-missing-symbol-{Guid.NewGuid():N}";
+        var tamperedPath = Path.Combine(
+            Path.GetTempPath(),
+            $"long-a004-matrix-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            await File.WriteAllTextAsync(
+                tamperedPath,
+                matrix.ToJsonString(new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                }));
+            var result = await RunVerifierAsync(
+                root,
+                requireReleaseEligible: false,
+                matrixPath: tamperedPath);
+
+            Assert.Equal(1, result.ExitCode);
+            using var report = JsonDocument.Parse(result.StandardOutput);
+            Assert.Equal(
+                86,
+                report.RootElement
+                    .GetProperty("passed_gate_count")
+                    .GetInt32());
+            Assert.Equal(
+                1,
+                report.RootElement
+                    .GetProperty("failed_gate_count")
+                    .GetInt32());
+            Assert.False(
+                report.RootElement.GetProperty("contract_valid").GetBoolean());
+            Assert.False(
+                report.RootElement.GetProperty("release_eligible").GetBoolean());
+            Assert.Contains(
+                report.RootElement.GetProperty("gates").EnumerateArray(),
+                gate => gate.GetProperty("status").GetString() == "failed");
+        }
+        finally
+        {
+            File.Delete(tamperedPath);
+        }
     }
 
     [Fact]
@@ -634,7 +735,8 @@ public sealed class PluginPositiveFunctionMatrixTests
 
     private static async Task<ProcessResult> RunVerifierAsync(
         string root,
-        bool requireReleaseEligible)
+        bool requireReleaseEligible,
+        string? matrixPath = null)
     {
         var arguments = new List<string>
         {
@@ -643,11 +745,11 @@ public sealed class PluginPositiveFunctionMatrixTests
             "Bypass",
             "-File",
             Path.Combine(root, "verify-plugin-positive-matrix.ps1"),
-            "-MatrixPath",
-            Path.Combine(
-                root,
-                "docs",
-                "plugin-positive-function-matrix.json"),
+             "-MatrixPath",
+             matrixPath ?? Path.Combine(
+                 root,
+                 "docs",
+                 "plugin-positive-function-matrix.json"),
             "-SourceRoot",
             Path.Combine(root, "src"),
         };

@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "release-evidence-io.ps1")
+. (Join-Path $PSScriptRoot "automated-acceptance-policy.ps1")
 function Resolve-RepositoryPath([string]$PathValue) {
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
         return [System.IO.Path]::GetFullPath($PathValue)
@@ -61,10 +62,8 @@ foreach ($manifestFile in $manifestFiles) {
 }
 
 $matrixById = @{}
-$automatedEvidenceCount = 0
-$manualPendingCount = 0
-$manualFailedCount = 0
-$manualRequiredCount = 0
+$gates = [System.Collections.Generic.List[object]]::new()
+$acceptanceScenarioCount = 0
 $matrixCommandCount = 0
 foreach ($plugin in @($matrix.plugins)) {
     $pluginId = [string]$plugin.id
@@ -109,25 +108,41 @@ foreach ($plugin in @($matrix.plugins)) {
         Add-MatrixError $errors `
             "Plugin has no automated evidence binding: $pluginId"
     }
+    $evidenceIndex = 0
     foreach ($evidence in $evidenceItems) {
-        $automatedEvidenceCount++
+        $evidenceIndex++
+        $gateStatus = "passed"
+        $gateSummary = "Evidence binding resolved."
+        $evidenceSha256 = $null
         $evidenceFile = Resolve-RepositoryPath ([string]$evidence.path)
         if (-not (Test-Path -LiteralPath $evidenceFile -PathType Leaf)) {
-            Add-MatrixError $errors `
-                "Evidence file is missing for ${pluginId}: $($evidence.path)"
-            continue
+            $gateStatus = "failed"
+            $gateSummary = "Evidence file is missing."
+            Add-MatrixError $errors "Evidence file is missing for ${pluginId}: $($evidence.path)"
+        } else {
+            $evidenceSha256 = (Get-FileHash -LiteralPath $evidenceFile `
+                -Algorithm SHA256).Hash.ToLowerInvariant()
+            $symbol = [string]$evidence.symbol
+            if ([string]::IsNullOrWhiteSpace($symbol)) {
+                $gateStatus = "failed"
+                $gateSummary = "Evidence symbol is empty."
+                Add-MatrixError $errors "Evidence symbol is empty for ${pluginId}: $($evidence.path)"
+            } elseif (-not (Select-String -LiteralPath $evidenceFile `
+                    -SimpleMatch $symbol -Quiet)) {
+                $gateStatus = "failed"
+                $gateSummary = "Evidence symbol was not found."
+                Add-MatrixError $errors "Evidence symbol '$symbol' was not found for $pluginId in $($evidence.path)"
+            }
         }
-        $symbol = [string]$evidence.symbol
-        if ([string]::IsNullOrWhiteSpace($symbol)) {
-            Add-MatrixError $errors `
-                "Evidence symbol is empty for ${pluginId}: $($evidence.path)"
-            continue
-        }
-        if (-not (Select-String -LiteralPath $evidenceFile `
-                -SimpleMatch $symbol -Quiet)) {
-            Add-MatrixError $errors `
-                "Evidence symbol '$symbol' was not found for $pluginId in $($evidence.path)"
-        }
+        $gates.Add([ordered]@{
+            id = "$pluginId.evidence-$($evidenceIndex.ToString('D2'))"
+            status = $gateStatus
+            summary = $gateSummary
+            level = [string]$evidence.level
+            evidence_path = [string]$evidence.path
+            evidence_symbol = [string]$evidence.symbol
+            evidence_sha256 = $evidenceSha256
+        })
     }
 
     $acceptanceScenarios = @($plugin.acceptance_scenarios)
@@ -153,8 +168,7 @@ foreach ($plugin in @($matrix.plugins)) {
             $manualCommandCoverage[$commandText] = $true
         }
         if ([bool]$manualCheck.required_for_release) {
-            $manualRequiredCount++
-            $manualPendingCount++
+            $acceptanceScenarioCount++
         }
     }
     foreach ($commandId in $matrixCommands) {
@@ -199,27 +213,53 @@ if ($LASTEXITCODE -ne 0) {
     throw "Unable to inspect the source worktree."
 }
 $sourceDirty = $trackedStatus.Count -gt 0
-$releaseEligible = $errors.Count -eq 0 -and
-    $manualPendingCount -eq 0 -and
-    $manualFailedCount -eq 0 -and
-    -not $sourceDirty
+$automatedGateCount = $gates.Count
+$passedGateCount = @($gates | Where-Object { $_.status -eq "passed" }).Count
+$failedGateCount = @($gates | Where-Object { $_.status -eq "failed" }).Count
+$environmentBlockedGateCount = @($gates | Where-Object {
+    $_.status -eq "blocked_environment"
+}).Count
+$notRunGateCount = @($gates | Where-Object { $_.status -eq "not_run" }).Count
+$notApplicableGateCount = @($gates | Where-Object {
+    $_.status -eq "not_applicable"
+}).Count
+$contractValid = $errors.Count -eq 0
+$releaseEligible = Get-AutomatedReleaseEligibility `
+    -AutomatedGateCount $automatedGateCount `
+    -PassedGateCount $passedGateCount `
+    -FailedGateCount $failedGateCount `
+    -EnvironmentBlockedGateCount $environmentBlockedGateCount `
+    -NotRunGateCount $notRunGateCount `
+    -NotApplicableGateCount $notApplicableGateCount `
+    -ContractValid $contractValid `
+    -SourceDirty $sourceDirty
 $report = [ordered]@{
-    schema_version = 1
+    '$schema' = "https://long-assistant.local/schemas/plugin-positive-matrix-report.schema.json"
+    schema_version = 2
     classification = "plugin_positive_matrix"
-    generated_at = [DateTimeOffset]::Now.ToString("o")
+    generated_at_utc = [DateTimeOffset]::UtcNow.ToString("o")
     matrix_path = $matrixFile
     matrix_sha256 = $matrixSha256
     source_commit = ([string]$sourceCommit).Trim()
     source_dirty = $sourceDirty
     plugin_count = $matrixById.Count
     command_count = $matrixCommandCount
-    automated_evidence_count = $automatedEvidenceCount
-    required_manual_check_count = $manualRequiredCount
+    acceptance_scenario_count = $acceptanceScenarioCount
+    automated_gate_count = $automatedGateCount
+    passed_gate_count = $passedGateCount
+    failed_gate_count = $failedGateCount
+    environment_blocked_gate_count = $environmentBlockedGateCount
+    not_run_gate_count = $notRunGateCount
+    not_applicable_gate_count = $notApplicableGateCount
+    gates = @($gates)
+    automated_evidence_count = $automatedGateCount
+    required_manual_check_count = $acceptanceScenarioCount
     approval_receipt_count = 0
     stale_approval_receipt_count = 0
-    pending_or_blocked_manual_count = $manualPendingCount
-    failed_manual_count = $manualFailedCount
-    contract_valid = $errors.Count -eq 0
+    pending_or_blocked_manual_count = $environmentBlockedGateCount +
+        $notRunGateCount
+    failed_manual_count = $failedGateCount
+    contract_valid = $contractValid
     release_eligible = $releaseEligible
     errors = @($errors)
 }
