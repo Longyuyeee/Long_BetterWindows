@@ -1,13 +1,15 @@
 param(
     [string]$OutputPath,
+    [string]$PluginMatrixPath = "docs\plugin-positive-function-matrix.json",
     [switch]$SkipBuildAndTests,
     [switch]$AllowDirty,
-    [switch]$RequireHumanValidationReady
+    [switch]$RequireReleaseEligible
 )
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "release-evidence-io.ps1")
+. (Join-Path $PSScriptRoot "automated-acceptance-policy.ps1")
 
 function Resolve-RepositoryPath([string]$PathValue) {
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
@@ -17,7 +19,60 @@ function Resolve-RepositoryPath([string]$PathValue) {
 }
 
 function Get-CommandFailureSummary([object[]]$Output) {
-    return (@($Output | Select-Object -Last 20) -join "`n").Trim()
+    $summary = (@($Output | Select-Object -Last 20) -join "`n").Trim()
+    if ($summary.Length -gt 1500) {
+        return $summary.Substring($summary.Length - 1500)
+    }
+    return $summary
+}
+
+function Get-StringSha256([string]$Value) {
+    $bytes = [Text.UTF8Encoding]::new($false).GetBytes($Value)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString(
+            $algorithm.ComputeHash($bytes))).Replace("-", "").ToLowerInvariant()
+    }
+    finally {
+        $algorithm.Dispose()
+    }
+}
+
+function New-Evidence(
+    [string]$Id,
+    [string]$Kind,
+    [string]$Path,
+    [string]$Sha256) {
+    return [ordered]@{
+        id = $Id
+        kind = $Kind
+        path = $Path
+        sha256 = $Sha256
+    }
+}
+
+function New-Gate(
+    [string]$Id,
+    [string]$Status,
+    [string]$Summary,
+    [string]$Category,
+    [object[]]$Evidence = @(),
+    [string]$EnvironmentBlocker = "",
+    [string]$NotApplicableReason = "") {
+    $gate = [ordered]@{
+        id = $Id
+        status = $Status
+        summary = $Summary
+        category = $Category
+        evidence = @($Evidence)
+    }
+    if ($Status -eq "blocked_environment") {
+        $gate.environment_blocker = $EnvironmentBlocker
+    }
+    if ($Status -eq "not_applicable") {
+        $gate.not_applicable_reason = $NotApplicableReason
+    }
+    return $gate
 }
 
 $dotnet = "C:\Program Files\dotnet\dotnet.exe"
@@ -29,75 +84,77 @@ if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) {
     $dotnet = $dotnetCommand.Source
 }
 
-$sourceCommit = (& git -C $PSScriptRoot rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch "^[0-9a-fA-F]{40}$") {
+$sourceCommit = (& git -C $PSScriptRoot rev-parse HEAD).Trim().ToLowerInvariant()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch "^[0-9a-f]{40}$") {
     throw "Unable to resolve the source commit."
 }
-$trackedStatus = @(& git -C $PSScriptRoot status `
-    --porcelain --untracked-files=no)
+$trackedStatus = @(& git -C $PSScriptRoot status --porcelain --untracked-files=no)
 if ($LASTEXITCODE -ne 0) {
     throw "Unable to inspect the tracked worktree."
 }
 $sourceDirty = $trackedStatus.Count -gt 0
 
-$restorePassed = $true
-$buildPassed = $true
-$testPassed = $true
-$restoreFailure = ""
-$buildFailure = ""
-$testFailure = ""
+$restoreOutput = @()
+$buildOutput = @()
+$testOutput = @()
+$restorePassed = $false
+$buildPassed = $false
+$testPassed = $false
 if (-not $SkipBuildAndTests) {
     $solutionPath = Join-Path $PSScriptRoot "LongBetterWindows.sln"
     $restoreOutput = @(& $dotnet restore $solutionPath --nologo 2>&1)
     $restorePassed = $LASTEXITCODE -eq 0
-    if (-not $restorePassed) {
-        $restoreFailure = Get-CommandFailureSummary $restoreOutput
-        $buildPassed = $false
-        $testPassed = $false
-    } else {
-        $buildOutput = @(& $dotnet build $solutionPath `
-            -c Release --no-restore 2>&1)
+    if ($restorePassed) {
+        $buildOutput = @(& $dotnet build $solutionPath -c Release --no-restore 2>&1)
         $buildPassed = $LASTEXITCODE -eq 0
-        if (-not $buildPassed) {
-            $buildFailure = Get-CommandFailureSummary $buildOutput
-            $testPassed = $false
-        } else {
+        if ($buildPassed) {
             $testOutput = @(& $dotnet test `
                 (Join-Path $PSScriptRoot `
                     "tests\LongBetterWindows.Tests\LongBetterWindows.Tests.csproj") `
                 -c Release --no-build --no-restore 2>&1)
             $testPassed = $LASTEXITCODE -eq 0
-            if (-not $testPassed) {
-                $testFailure = Get-CommandFailureSummary $testOutput
-            }
         }
     }
 }
 
+$resolvedMatrixPath = Resolve-RepositoryPath $PluginMatrixPath
 $matrixOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass `
     -File (Join-Path $PSScriptRoot "verify-plugin-positive-matrix.ps1") `
-    2>&1)
+    -MatrixPath $resolvedMatrixPath 2>&1)
 $matrixExitCode = $LASTEXITCODE
+$matrixJson = $matrixOutput -join "`n"
 $matrix = $null
-if ($matrixExitCode -eq 0) {
-    $matrix = ($matrixOutput -join "`n") | ConvertFrom-Json
+try {
+    $matrix = $matrixJson | ConvertFrom-Json
+}
+catch {
+    $matrix = $null
+}
+$matrixReportSha256 = Get-StringSha256 $matrixJson
+$matrixFileSha256 = if (Test-Path -LiteralPath $resolvedMatrixPath -PathType Leaf) {
+    (Get-FileHash -LiteralPath $resolvedMatrixPath -Algorithm SHA256).
+        Hash.ToLowerInvariant()
+} else {
+    $null
 }
 
-$nativePreflightOutput = @(& powershell.exe -NoProfile `
-    -ExecutionPolicy Bypass `
-    -File (Join-Path $PSScriptRoot `
-        "capture-native-performance-evidence.ps1") `
+$nativePreflightOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass `
+    -File (Join-Path $PSScriptRoot "capture-native-performance-evidence.ps1") `
     -PreflightOnly 2>&1)
 $nativePreflightExitCode = $LASTEXITCODE
+$nativePreflightJson = $nativePreflightOutput -join "`n"
 $nativePreflight = $null
-if ($nativePreflightExitCode -eq 0) {
-    $nativePreflight = (
-        $nativePreflightOutput -join "`n") | ConvertFrom-Json
+try {
+    $nativePreflight = $nativePreflightJson | ConvertFrom-Json
+}
+catch {
+    $nativePreflight = $null
 }
 
 $lpwp = $null
 $lpwpFailure = ""
 $lpwpExitCode = $null
+$lpwpReportSha256 = $null
 $lpwpOutputRoot = $null
 if (-not $SkipBuildAndTests) {
     $lpwpOutputRoot = Join-Path ([IO.Path]::GetTempPath()) (
@@ -108,10 +165,14 @@ if (-not $SkipBuildAndTests) {
             -OutputDirectory $lpwpOutputRoot -NoBuild 2>&1)
         $lpwpExitCode = $LASTEXITCODE
         $lpwpReportPath = Join-Path $lpwpOutputRoot "lpwp-compatibility-report.json"
-        if ($lpwpExitCode -eq 0 -and (Test-Path -LiteralPath $lpwpReportPath -PathType Leaf)) {
+        if (Test-Path -LiteralPath $lpwpReportPath -PathType Leaf) {
+            $lpwpReportSha256 = (Get-FileHash `
+                -LiteralPath $lpwpReportPath -Algorithm SHA256).
+                Hash.ToLowerInvariant()
             $lpwp = Get-Content -LiteralPath $lpwpReportPath -Raw -Encoding UTF8 |
                 ConvertFrom-Json
-        } else {
+        }
+        if ($lpwpExitCode -ne 0) {
             $lpwpFailure = Get-CommandFailureSummary $lpwpOutput
         }
     }
@@ -137,171 +198,273 @@ $hostSha256 = if ($hostExists) {
 } else {
     $null
 }
+$projectSha256 = (Get-FileHash -LiteralPath $projectPath -Algorithm SHA256).
+    Hash.ToLowerInvariant()
 
-$machineBlockers = [Collections.Generic.List[string]]::new()
+$gates = [Collections.Generic.List[object]]::new()
 if ($SkipBuildAndTests) {
-    $machineBlockers.Add("Release build and full tests were skipped.")
-    $machineBlockers.Add("LPWP compatibility verification was skipped.")
+    $gates.Add((New-Gate "dependency-restore" "not_run" `
+        "Dependency restore was skipped by request." "build"))
+    $gates.Add((New-Gate "release-build" "not_run" `
+        "Release build was skipped by request." "build"))
+    $gates.Add((New-Gate "full-automated-tests" "not_run" `
+        "Full automated tests were skipped by request." "test"))
+} else {
+    $restoreEvidence = @(New-Evidence "restore-output" "log" `
+        "process://dotnet/restore" `
+        (Get-StringSha256 ($restoreOutput -join "`n")))
+    $gates.Add((New-Gate "dependency-restore" `
+        $(if ($restorePassed) { "passed" } else { "failed" }) `
+        $(if ($restorePassed) {
+            "Dependency restore completed successfully."
+        } else {
+            "Dependency restore failed: $(Get-CommandFailureSummary $restoreOutput)"
+        }) "build" $restoreEvidence))
+
+    if (-not $restorePassed) {
+        $gates.Add((New-Gate "release-build" "not_run" `
+            "Release build did not run because dependency restore failed." "build"))
+        $gates.Add((New-Gate "full-automated-tests" "not_run" `
+            "Full automated tests did not run because dependency restore failed." "test"))
+    } else {
+        $buildEvidence = @(New-Evidence "build-output" "log" `
+            "process://dotnet/build" `
+            (Get-StringSha256 ($buildOutput -join "`n")))
+        $gates.Add((New-Gate "release-build" `
+            $(if ($buildPassed) { "passed" } else { "failed" }) `
+            $(if ($buildPassed) {
+                "Release build completed successfully."
+            } else {
+                "Release build failed: $(Get-CommandFailureSummary $buildOutput)"
+            }) "build" $buildEvidence))
+
+        if (-not $buildPassed) {
+            $gates.Add((New-Gate "full-automated-tests" "not_run" `
+                "Full automated tests did not run because Release build failed." "test"))
+        } else {
+            $testEvidence = @(New-Evidence "test-output" "log" `
+                "process://dotnet/test" `
+                (Get-StringSha256 ($testOutput -join "`n")))
+            $gates.Add((New-Gate "full-automated-tests" `
+                $(if ($testPassed) { "passed" } else { "failed" }) `
+                $(if ($testPassed) {
+                    "Full automated tests completed successfully."
+                } else {
+                    "Full automated tests failed: $(Get-CommandFailureSummary $testOutput)"
+                }) "test" $testEvidence))
+        }
+    }
 }
-if (-not $SkipBuildAndTests -and -not $restorePassed) {
-    $machineBlockers.Add("Dependency restore failed.")
-} elseif (-not $buildPassed) {
-    $machineBlockers.Add("Release build failed.")
-} elseif (-not $testPassed) {
-    $machineBlockers.Add("Full automated tests failed.")
+
+$matrixReportEvidence = @(New-Evidence "plugin-matrix-report" "json" `
+    "process://verify-plugin-positive-matrix" $matrixReportSha256)
+$matrixGateItems = if ($null -eq $matrix) { @() } else { @($matrix.gates) }
+$matrixClassifiedCount = if ($null -eq $matrix) {
+    -1
+} else {
+    [int]$matrix.passed_gate_count +
+        [int]$matrix.failed_gate_count +
+        [int]$matrix.environment_blocked_gate_count +
+        [int]$matrix.not_run_gate_count +
+        [int]$matrix.not_applicable_gate_count
 }
-if ($matrixExitCode -ne 0 -or $null -eq $matrix `
-    -or -not [bool]$matrix.contract_valid) {
-    $machineBlockers.Add("Plugin positive-function contract is invalid.")
+$matrixUniqueGateCount = @($matrixGateItems | ForEach-Object {
+    [string]$_.id
+} | Sort-Object -Unique).Count
+$matrixShapeValid = $null -ne $matrix `
+    -and [int]$matrix.schema_version -eq 2 `
+    -and [string]$matrix.source_commit -eq $sourceCommit `
+    -and [bool]$matrix.source_dirty -eq $sourceDirty `
+    -and $matrixGateItems.Count -eq [int]$matrix.automated_gate_count `
+    -and $matrixClassifiedCount -eq [int]$matrix.automated_gate_count `
+    -and $matrixUniqueGateCount -eq $matrixGateItems.Count
+$matrixContractPassed = $matrixShapeValid `
+    -and $matrixExitCode -eq 0 `
+    -and [bool]$matrix.contract_valid
+$gates.Add((New-Gate "plugin-matrix-contract" `
+    $(if ($matrixContractPassed) { "passed" } else { "failed" }) `
+    $(if ($matrixContractPassed) {
+        "Plugin matrix schema v2 contract is valid."
+    } else {
+        "Plugin matrix schema v2 contract is invalid or execution failed."
+    }) "plugin_matrix" $matrixReportEvidence))
+
+if ($matrixShapeValid) {
+    foreach ($matrixGate in $matrixGateItems) {
+        $evidence = @()
+        if ([string]$matrixGate.evidence_sha256 -match "^[0-9a-f]{64}$") {
+            $evidence = @(New-Evidence "binding" "other" `
+                ([string]$matrixGate.evidence_path) `
+                ([string]$matrixGate.evidence_sha256))
+        } elseif ($null -ne $matrixFileSha256) {
+            $evidence = @(New-Evidence "matrix-definition" "json" `
+                $resolvedMatrixPath $matrixFileSha256)
+        }
+        $gates.Add((New-Gate `
+            ("plugin-matrix." + [string]$matrixGate.id) `
+            ([string]$matrixGate.status) `
+            ([string]$matrixGate.summary) `
+            "plugin_matrix" `
+            $evidence `
+            $(if ([string]$matrixGate.status -eq "blocked_environment") {
+                "Plugin evidence environment is unavailable."
+            } else { "" }) `
+            $(if ([string]$matrixGate.status -eq "not_applicable") {
+                "Plugin evidence does not apply to this configuration."
+            } else { "" })))
+    }
 }
+
+$hostEvidence = if ($hostExists) {
+    @(New-Evidence "release-host" "executable" $hostExecutable $hostSha256)
+} else {
+    @(New-Evidence "host-project" "other" $projectPath $projectSha256)
+}
+$gates.Add((New-Gate "release-host-executable" `
+    $(if ($hostExists) { "passed" } else { "failed" }) `
+    $(if ($hostExists) {
+        "Release host executable exists and is bound by SHA-256."
+    } else {
+        "Release host executable is missing."
+    }) "artifact" $hostEvidence))
+
+$nativeEvidence = @(New-Evidence "native-preflight-output" "json" `
+    "process://capture-native-performance-evidence/preflight" `
+    (Get-StringSha256 $nativePreflightJson))
+if ($nativePreflightExitCode -ne 0 -or $null -eq $nativePreflight) {
+    $gates.Add((New-Gate "native-performance-preflight" "failed" `
+        "Native performance preflight did not return a valid report." `
+        "performance" $nativeEvidence))
+} elseif ([bool]$nativePreflight.ready) {
+    $gates.Add((New-Gate "native-performance-preflight" "passed" `
+        "Native performance capture prerequisites are available." `
+        "performance" $nativeEvidence))
+} else {
+    $missing = [Collections.Generic.List[string]]::new()
+    if (-not [bool]$nativePreflight.administrator) { $missing.Add("administrator") }
+    if (-not [bool]$nativePreflight.wpr_available) { $missing.Add("wpr") }
+    if (-not [bool]$nativePreflight.required_profiles_available) {
+        $missing.Add("required_profiles")
+    }
+    if (-not [bool]$nativePreflight.wpa_exporter_available) {
+        $missing.Add("wpa_exporter")
+    }
+    $gates.Add((New-Gate "native-performance-preflight" `
+        "blocked_environment" `
+        "Native performance capture prerequisites are unavailable." `
+        "performance" $nativeEvidence `
+        ("Missing prerequisites: " + (@($missing) -join ", "))))
+}
+
 $lpwpValid = $null -ne $lpwp `
-    -and [string]$lpwp.source_commit -eq $sourceCommit.ToLowerInvariant() `
+    -and [string]$lpwp.source_commit -eq $sourceCommit `
     -and [string]$lpwp.protocol -eq "long.plugin.ipc/1.0" `
     -and [bool]$lpwp.dotnet_contract_tests `
     -and [bool]$lpwp.web_sdk_tests `
     -and [bool]$lpwp.runtime_matrix `
     -and [int]$lpwp.fixture_count -eq 6
-if (-not $SkipBuildAndTests -and ($lpwpExitCode -ne 0 -or -not $lpwpValid)) {
-    $machineBlockers.Add("LPWP compatibility contract is invalid.")
-}
-if (-not $hostExists) {
-    $machineBlockers.Add("Release host executable is missing.")
-}
-if ($sourceDirty -and -not $AllowDirty) {
-    $machineBlockers.Add("Tracked worktree is dirty.")
-}
-
-$pluginApprovalStatus = if (
-    $null -ne $matrix `
-    -and [int]$matrix.pending_or_blocked_manual_count -eq 0 `
-    -and [int]$matrix.failed_manual_count -eq 0) {
-    "passed"
+if ($SkipBuildAndTests) {
+    $gates.Add((New-Gate "lpwp-compatibility" "not_run" `
+        "LPWP compatibility verification was skipped by request." "lpwp"))
 } else {
-    "pending"
-}
-$nativeStatus = if (
-    $null -ne $nativePreflight `
-    -and [bool]$nativePreflight.ready) {
-    "pending_capture_and_analysis"
-} else {
-    "blocked_requires_elevated_session"
-}
-$humanValidation = @(
-    [ordered]@{
-        id = "plugin-positive-functions"
-        status = $pluginApprovalStatus
-        scope = "25 plugin checks covering 42 commands"
-        guide_id = "plugin-manual-evidence"
-    },
-    [ordered]@{
-        id = "taskbar-visual-grouping"
-        status = "pending"
-        scope = "Explorer grouping, icon appearance, pin and unpin"
-        guide_id = "final-closure-handoff"
-    },
-    [ordered]@{
-        id = "physical-dpi"
-        status = "pending"
-        scope = "100%, 125%, 150% and 200% light/dark matrix"
-        guide_id = "physical-dpi-release"
-    },
-    [ordered]@{
-        id = "physical-accessibility"
-        status = "pending"
-        scope = "high contrast, reduced motion and Narrator/NVDA"
-        guide_id = "accessibility-release"
-    },
-    [ordered]@{
-        id = "native-performance"
-        status = $nativeStatus
-        scope = "elevated WPR CPU and DesktopComposition analysis"
-        guide_id = "native-wpr-performance"
-    },
-    [ordered]@{
-        id = "clean-windows-and-download"
-        status = "pending"
-        scope = "SmartScreen, antivirus, install, upgrade and uninstall"
-        guide_id = "final-closure-handoff"
-    },
-    [ordered]@{
-        id = "production-marketplace-rehearsal"
-        status = "blocked_requires_controlled_credentials"
-        scope = "real HTTPS Registry/CDN deploy and rollback"
-        guide_id = "marketplace-registry-release"
-    },
-    [ordered]@{
-        id = "lpwp-long-grid-e2e"
-        status = "blocked_requires_long_grid_repository"
-        scope = "Long Grid handshake, catalog, command cancellation and plugin.open cross-repository E2E"
-        guide_id = "lpwp-integration"
-    },
-    [ordered]@{
-        id = "lpwp-widget-desktop"
-        status = "pending"
-        scope = "Reference Widget install, dual instance, move, resize, restart restore, pause and help"
-        guide_id = "user-final-validation"
-    },
-    [ordered]@{
-        id = "lpwp-signed-reference"
-        status = "blocked_requires_publisher_identity"
-        scope = "Approved Marketplace publisher key, signed reference bundle and independent fingerprint review"
-        guide_id = "lpwp-signed-reference-release"
+    $lpwpEvidence = if ($lpwpReportSha256 -match "^[0-9a-f]{64}$") {
+        @(New-Evidence "lpwp-report" "json" `
+            "process://verify-lpwp-compatibility" $lpwpReportSha256)
+    } else {
+        @(New-Evidence "lpwp-output" "log" `
+            "process://verify-lpwp-compatibility" `
+            (Get-StringSha256 $lpwpFailure))
     }
-)
+    $gates.Add((New-Gate "lpwp-compatibility" `
+        $(if ($lpwpExitCode -eq 0 -and $lpwpValid) { "passed" } else { "failed" }) `
+        $(if ($lpwpExitCode -eq 0 -and $lpwpValid) {
+            "LPWP compatibility contract completed successfully."
+        } else {
+            "LPWP compatibility contract failed: $lpwpFailure"
+        }) "lpwp" $lpwpEvidence))
+}
 
-$readyForHumanValidation = $machineBlockers.Count -eq 0
-$remainingHumanCount = @($humanValidation | Where-Object {
-    [string]$_.status -ne "passed"
+$gateItems = @($gates)
+$gateIds = @($gateItems | ForEach-Object { [string]$_.id })
+$uniqueGateCount = @($gateIds | Sort-Object -Unique).Count
+$automatedGateCount = $gateItems.Count
+$passedGateCount = @($gateItems | Where-Object { $_.status -eq "passed" }).Count
+$failedGateCount = @($gateItems | Where-Object { $_.status -eq "failed" }).Count
+$environmentBlockedGateCount = @($gateItems | Where-Object {
+    $_.status -eq "blocked_environment"
 }).Count
+$notRunGateCount = @($gateItems | Where-Object { $_.status -eq "not_run" }).Count
+$notApplicableGateCount = @($gateItems | Where-Object {
+    $_.status -eq "not_applicable"
+}).Count
+$contractErrors = [Collections.Generic.List[string]]::new()
+if (-not $matrixShapeValid) {
+    $contractErrors.Add("Plugin matrix report shape or source identity is invalid.")
+}
+if ($uniqueGateCount -ne $automatedGateCount) {
+    $contractErrors.Add("Automated gate IDs must be unique.")
+}
+$contractValid = $contractErrors.Count -eq 0
+$releaseEligible = Get-AutomatedReleaseEligibility `
+    -AutomatedGateCount $automatedGateCount `
+    -PassedGateCount $passedGateCount `
+    -FailedGateCount $failedGateCount `
+    -EnvironmentBlockedGateCount $environmentBlockedGateCount `
+    -NotRunGateCount $notRunGateCount `
+    -NotApplicableGateCount $notApplicableGateCount `
+    -ContractValid $contractValid `
+    -SourceDirty $sourceDirty
+
 $report = [ordered]@{
-    schema_version = 1
-    generated_at = [DateTimeOffset]::Now.ToString("O")
-    classification = "final_closure_readiness"
-    source_commit = $sourceCommit.ToLowerInvariant()
+    '$schema' = "https://long-assistant.local/schemas/final-closure-report.schema.json"
+    schema_version = 2
+    generated_at_utc = [DateTimeOffset]::UtcNow.ToString("O")
+    classification = "final_closure"
+    source_commit = $sourceCommit
     source_dirty = $sourceDirty
     allow_dirty = [bool]$AllowDirty
     version = $version
     checks_skipped = [bool]$SkipBuildAndTests
-    restore_passed = if ($SkipBuildAndTests) {
-        $null
-    } else {
-        $restorePassed
-    }
-    release_build_passed = if ($SkipBuildAndTests) {
-        $null
-    } else {
-        $buildPassed
-    }
-    full_tests_passed = if ($SkipBuildAndTests) {
-        $null
-    } else {
-        $testPassed
-    }
-    restore_failure = $restoreFailure
-    build_failure = $buildFailure
-    test_failure = $testFailure
     release_host = [ordered]@{
         exists = $hostExists
+        path = $hostExecutable
         sha256 = $hostSha256
     }
     plugin_matrix = if ($null -eq $matrix) {
         $null
     } else {
         [ordered]@{
-            contract_valid = [bool]$matrix.contract_valid
+            schema_version = [int]$matrix.schema_version
+            source_commit = [string]$matrix.source_commit
+            source_dirty = [bool]$matrix.source_dirty
             plugin_count = [int]$matrix.plugin_count
             command_count = [int]$matrix.command_count
-            automated_evidence_count =
-                [int]$matrix.automated_evidence_count
-            approval_receipt_count =
-                [int]$matrix.approval_receipt_count
-            pending_or_blocked_manual_count =
-                [int]$matrix.pending_or_blocked_manual_count
-            failed_manual_count =
-                [int]$matrix.failed_manual_count
+            acceptance_scenario_count = [int]$matrix.acceptance_scenario_count
+            automated_gate_count = [int]$matrix.automated_gate_count
+            passed_gate_count = [int]$matrix.passed_gate_count
+            failed_gate_count = [int]$matrix.failed_gate_count
+            environment_blocked_gate_count =
+                [int]$matrix.environment_blocked_gate_count
+            not_run_gate_count = [int]$matrix.not_run_gate_count
+            not_applicable_gate_count = [int]$matrix.not_applicable_gate_count
+            contract_valid = [bool]$matrix.contract_valid
+            release_eligible = [bool]$matrix.release_eligible
+            report_sha256 = $matrixReportSha256
         }
     }
-    native_performance_preflight = $nativePreflight
+    native_performance_preflight = if ($null -eq $nativePreflight) {
+        $null
+    } else {
+        [ordered]@{
+            windows = [bool]$nativePreflight.windows
+            administrator = [bool]$nativePreflight.administrator
+            wpr_available = [bool]$nativePreflight.wpr_available
+            required_profiles_available =
+                [bool]$nativePreflight.required_profiles_available
+            wpa_exporter_available = [bool]$nativePreflight.wpa_exporter_available
+            ready = [bool]$nativePreflight.ready
+        }
+    }
     lpwp_compatibility = if ($null -eq $lpwp) {
         $null
     } else {
@@ -315,24 +478,29 @@ $report = [ordered]@{
             fixture_count = [int]$lpwp.fixture_count
             ipc_package_sha256 = [string]$lpwp.ipc_package_sha256
             reference_widget_sha256 = [string]$lpwp.reference_widget_sha256
+            report_sha256 = $lpwpReportSha256
             valid = $lpwpValid
         }
     }
-    lpwp_failure = $lpwpFailure
-    machine_blockers = @($machineBlockers)
-    ready_for_human_validation = $readyForHumanValidation
-    remaining_human_validation_count = $remainingHumanCount
-    human_validation = $humanValidation
-    release_eligible = $readyForHumanValidation `
-        -and $remainingHumanCount -eq 0
+    automated_acceptance = [ordered]@{
+        automated_gate_count = $automatedGateCount
+        passed_gate_count = $passedGateCount
+        failed_gate_count = $failedGateCount
+        environment_blocked_gate_count = $environmentBlockedGateCount
+        not_run_gate_count = $notRunGateCount
+        not_applicable_gate_count = $notApplicableGateCount
+        contract_valid = $contractValid
+        gates = $gateItems
+        errors = @($contractErrors)
+    }
+    release_eligible = $releaseEligible
 }
-$json = $report | ConvertTo-Json -Depth 8
+$json = $report | ConvertTo-Json -Depth 12
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
     $resolvedOutput = Resolve-RepositoryPath $OutputPath
     $outputDirectory = Split-Path -Parent $resolvedOutput
     if (-not (Test-Path -LiteralPath $outputDirectory)) {
-        New-Item -ItemType Directory -Path $outputDirectory -Force |
-            Out-Null
+        New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
     }
     [IO.File]::WriteAllText(
         $resolvedOutput,
@@ -341,6 +509,9 @@ if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
 }
 $json
 
-if ($RequireHumanValidationReady -and -not $readyForHumanValidation) {
+if (-not $contractValid -or $failedGateCount -gt 0) {
+    exit 1
+}
+if ($RequireReleaseEligible -and -not $releaseEligible) {
     exit 2
 }
