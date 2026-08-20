@@ -1,7 +1,6 @@
 param(
     [string]$MatrixPath = "docs/plugin-positive-function-matrix.json",
     [string]$SourceRoot = "src",
-    [string]$ApprovalDirectory = "docs/plugin-manual-approvals",
     [string]$OutputPath,
     [switch]$RequireReleaseEligible
 )
@@ -9,9 +8,6 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "release-evidence-io.ps1")
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$script:candidateBindingCache = @{}
-
 function Resolve-RepositoryPath([string]$PathValue) {
     if ([System.IO.Path]::IsPathRooted($PathValue)) {
         return [System.IO.Path]::GetFullPath($PathValue)
@@ -25,249 +21,8 @@ function Add-MatrixError(
     $Errors.Add($Message)
 }
 
-function Get-RepositoryRelativePath([string]$FullPath) {
-    $root = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd(
-        [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-    if (-not $FullPath.StartsWith(
-            $root,
-            [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Path is outside the repository: $FullPath"
-    }
-    return $FullPath.Substring($root.Length).Replace("\", "/")
-}
-
-function Get-StreamSha256([System.IO.Stream]$Stream) {
-    $algorithm = [Security.Cryptography.SHA256]::Create()
-    try {
-        return ([BitConverter]::ToString(
-            $algorithm.ComputeHash($Stream))).Replace("-", "").ToLowerInvariant()
-    }
-    finally {
-        $algorithm.Dispose()
-    }
-}
-
-function Get-CandidateBinding([string]$CandidateDirectory) {
-    if ($script:candidateBindingCache.ContainsKey($CandidateDirectory)) {
-        return $script:candidateBindingCache[$CandidateDirectory]
-    }
-    $binding = $null
-    try {
-        $candidateRoot = Resolve-RepositoryPath $CandidateDirectory
-        $releaseRoot = Resolve-RepositoryPath "artifacts/releases"
-        $releasePrefix = $releaseRoot.TrimEnd(
-            [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-        if (-not $candidateRoot.StartsWith(
-                $releasePrefix,
-                [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Candidate directory is outside artifacts/releases."
-        }
-        $candidatePrefix = $candidateRoot.TrimEnd(
-            [IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-        $manifestPath = Join-Path $candidateRoot "release-manifest.json"
-        $subjectPath = Join-Path $candidateRoot `
-            "self-contained\LongBetterWindows.Host.exe"
-        if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) `
-            -or -not (Test-Path -LiteralPath $subjectPath -PathType Leaf)) {
-            throw "Candidate manifest or subject executable is missing."
-        }
-        $manifest = Get-Content -LiteralPath $manifestPath `
-            -Raw -Encoding UTF8 | ConvertFrom-Json
-        $packages = @($manifest.packages | Where-Object {
-            [string]$_.kind -eq "self-contained"
-        })
-        if ([int]$manifest.schema_version -ne 1 `
-            -or [bool]$manifest.source_dirty `
-            -or -not [bool]$manifest.release_eligible `
-            -or $packages.Count -ne 1) {
-            throw "Candidate release contract is invalid."
-        }
-        $packagePath = [IO.Path]::GetFullPath((Join-Path `
-            $candidateRoot ([string]$packages[0].file)))
-        if (-not $packagePath.StartsWith(
-                $candidatePrefix,
-                [StringComparison]::OrdinalIgnoreCase) `
-            -or -not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
-            throw "Candidate package is missing or outside its directory."
-        }
-        $packageHash = (Get-FileHash -LiteralPath $packagePath `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($packageHash -ne [string]$packages[0].sha256) {
-            throw "Candidate package does not match its manifest."
-        }
-        $subjectHash = (Get-FileHash -LiteralPath $subjectPath `
-            -Algorithm SHA256).Hash.ToLowerInvariant()
-        $archive = [IO.Compression.ZipFile]::OpenRead($packagePath)
-        try {
-            $entries = @($archive.Entries | Where-Object {
-                $_.FullName.Replace("\", "/") -match `
-                    '(^|/)LongBetterWindows\.Host\.exe$'
-            })
-            if ($entries.Count -ne 1) {
-                throw "Candidate ZIP subject identity is ambiguous."
-            }
-            $stream = $entries[0].Open()
-            try {
-                $archiveSubjectHash = Get-StreamSha256 $stream
-            }
-            finally {
-                $stream.Dispose()
-            }
-        }
-        finally {
-            $archive.Dispose()
-        }
-        if ($archiveSubjectHash -ne $subjectHash) {
-            throw "Candidate extracted subject differs from its ZIP."
-        }
-        $binding = [PSCustomObject]@{
-            CandidateCommit = ([string]$manifest.commit).ToLowerInvariant()
-            CandidateVersion = [string]$manifest.version
-            CandidateDirectory = Get-RepositoryRelativePath $candidateRoot
-            ReleaseManifestSha256 = (Get-FileHash -LiteralPath `
-                $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-            SelfContainedPackage = $packagePath
-            SelfContainedPackageSha256 = $packageHash
-            SubjectExecutableSha256 = $subjectHash
-        }
-    }
-    catch {
-        $binding = $null
-    }
-    $script:candidateBindingCache[$CandidateDirectory] = $binding
-    return $binding
-}
-
-function Test-ApprovalReceipt(
-    [System.IO.FileInfo]$ReceiptFile,
-    [string]$PluginId,
-    [string]$ManualCheckId,
-    [string]$ManifestPath,
-    [string[]]$ExpectedCommands,
-    [System.Collections.Generic.List[string]]$Errors) {
-    try {
-        $receipt = Get-Content -LiteralPath $ReceiptFile.FullName `
-            -Raw -Encoding UTF8 | ConvertFrom-Json
-        $label = "$PluginId/$ManualCheckId"
-        if ([int]$receipt.schema_version -ne 2) {
-            $script:staleApprovalReceiptCount++
-            return $false
-        }
-        if ([string]$receipt.plugin_id -ne $PluginId `
-            -or [string]$receipt.manual_check_id -ne $ManualCheckId `
-            -or [string]$receipt.status -ne "passed") {
-            Add-MatrixError $Errors "Manual approval receipt identity/status is invalid: $label"
-            return $false
-        }
-        if ([string]::IsNullOrWhiteSpace([string]$receipt.reviewer) `
-            -or [string]::IsNullOrWhiteSpace([string]$receipt.notes)) {
-            Add-MatrixError $Errors "Manual approval receipt lacks reviewer/notes: $label"
-            return $false
-        }
-        $sourceCommit = [string]$receipt.source_commit
-        if ($sourceCommit -notmatch "^[a-fA-F0-9]{40}$") {
-            Add-MatrixError $Errors "Manual approval source commit is invalid: $label"
-            return $false
-        }
-        & git -C $PSScriptRoot merge-base --is-ancestor `
-            $sourceCommit HEAD 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Add-MatrixError $Errors "Manual approval source commit is not an ancestor: $label"
-            return $false
-        }
-        $sourceChanges = @(& git -C $PSScriptRoot diff `
-            --name-only $sourceCommit HEAD -- src 2>$null)
-        if ($LASTEXITCODE -ne 0 -or $sourceChanges.Count -gt 0) {
-            $script:staleApprovalReceiptCount++
-            return $false
-        }
-        $candidateDirectory = [string]$receipt.candidate_directory
-        $candidateCommit = [string]$receipt.candidate_commit
-        $candidateBinding = Get-CandidateBinding $candidateDirectory
-        $receiptPackagePath = $null
-        try {
-            $receiptPackagePath = Resolve-RepositoryPath `
-                ([string]$receipt.self_contained_package)
-        }
-        catch {}
-        if ($null -eq $candidateBinding `
-            -or $null -eq $receiptPackagePath `
-            -or $candidateCommit -notmatch "^[a-fA-F0-9]{40}$" `
-            -or $candidateBinding.CandidateCommit -ne $candidateCommit `
-            -or $candidateBinding.CandidateDirectory -ne `
-                $candidateDirectory.Replace("\", "/") `
-            -or $candidateBinding.CandidateVersion -ne `
-                [string]$receipt.candidate_version `
-            -or $candidateBinding.ReleaseManifestSha256 -ne `
-                [string]$receipt.release_manifest_sha256 `
-            -or $candidateBinding.SelfContainedPackageSha256 -ne `
-                [string]$receipt.self_contained_package_sha256 `
-            -or $candidateBinding.SelfContainedPackage -ne $receiptPackagePath `
-            -or $candidateBinding.SubjectExecutableSha256 -ne `
-                [string]$receipt.subject_executable_sha256) {
-            $script:staleApprovalReceiptCount++
-            return $false
-        }
-        & git -C $PSScriptRoot merge-base --is-ancestor `
-            $candidateCommit HEAD 2>$null
-        $candidateChanges = if ($LASTEXITCODE -eq 0) {
-            @(& git -C $PSScriptRoot diff --name-only `
-                $candidateCommit HEAD 2>$null | Where-Object {
-                    $_ -notmatch '^docs/plugin-manual-approvals/[^/]+\.json$'
-                })
-        } else {
-            @("candidate-not-ancestor")
-        }
-        if ($LASTEXITCODE -ne 0 -or $candidateChanges.Count -gt 0) {
-            $script:staleApprovalReceiptCount++
-            return $false
-        }
-        $manifestHash = Get-NormalizedTextSha256 $ManifestPath
-        if ([string]$receipt.manifest_hash_format -ne "utf8-lf-v1" `
-            -or [string]$receipt.manifest_sha256 -ne $manifestHash) {
-            Add-MatrixError $Errors "Manual approval manifest hash mismatch: $label"
-            return $false
-        }
-        $receiptCommands = @($receipt.commands |
-            ForEach-Object { [string]$_ } | Sort-Object)
-        if (($receiptCommands -join "`n") -ne `
-            (($ExpectedCommands | Sort-Object) -join "`n")) {
-            Add-MatrixError $Errors "Manual approval command set mismatch: $label"
-            return $false
-        }
-        if ([string]$receipt.subject_executable_sha256 `
-                -notmatch "^[a-fA-F0-9]{64}$") {
-            Add-MatrixError $Errors "Manual approval subject hash is invalid: $label"
-            return $false
-        }
-        $evidenceFiles = @($receipt.evidence_files)
-        if ($evidenceFiles.Count -eq 0) {
-            Add-MatrixError $Errors "Manual approval has no evidence file hashes: $label"
-            return $false
-        }
-        foreach ($evidence in $evidenceFiles) {
-            if ([string]$evidence.relative_path `
-                    -notlike "artifacts/quality/*" `
-                -or [string]$evidence.sha256 `
-                    -notmatch "^[a-fA-F0-9]{64}$" `
-                -or [long]$evidence.size_bytes -le 0) {
-                Add-MatrixError $Errors "Manual approval evidence metadata is invalid: $label"
-                return $false
-            }
-        }
-        return $true
-    }
-    catch {
-        Add-MatrixError $Errors (
-            "Manual approval receipt could not be read: " +
-            "$PluginId/$ManualCheckId ($($_.Exception.Message))")
-        return $false
-    }
-}
-
 $matrixFile = Resolve-RepositoryPath $MatrixPath
 $sourceDirectory = Resolve-RepositoryPath $SourceRoot
-$approvalRoot = Resolve-RepositoryPath $ApprovalDirectory
 if (-not (Test-Path -LiteralPath $matrixFile -PathType Leaf)) {
     throw "Plugin positive matrix was not found: $matrixFile"
 }
@@ -278,27 +33,6 @@ if (-not (Test-Path -LiteralPath $sourceDirectory -PathType Container)) {
 $matrix = Get-Content -LiteralPath $matrixFile -Raw -Encoding UTF8 |
     ConvertFrom-Json
 $errors = [System.Collections.Generic.List[string]]::new()
-$approvalByKey = @{}
-if (Test-Path -LiteralPath $approvalRoot -PathType Container) {
-    foreach ($receiptFile in Get-ChildItem -LiteralPath $approvalRoot `
-            -Filter "*.json" -File) {
-        try {
-            $receipt = Get-Content -LiteralPath $receiptFile.FullName `
-                -Raw -Encoding UTF8 | ConvertFrom-Json
-            $key = "$([string]$receipt.plugin_id)/$([string]$receipt.manual_check_id)"
-            if ($approvalByKey.ContainsKey($key)) {
-                Add-MatrixError $errors "Duplicate manual approval receipt: $key"
-            } else {
-                $approvalByKey[$key] = $receiptFile
-            }
-        }
-        catch {
-            Add-MatrixError $errors (
-                "Manual approval receipt could not be indexed: " +
-                "$($receiptFile.Name) ($($_.Exception.Message))")
-        }
-    }
-}
 $manifestById = @{}
 $manifestFiles = Get-ChildItem -LiteralPath $sourceDirectory -Directory |
     ForEach-Object {
@@ -331,9 +65,6 @@ $automatedEvidenceCount = 0
 $manualPendingCount = 0
 $manualFailedCount = 0
 $manualRequiredCount = 0
-$manualApprovalReceiptCount = 0
-$staleApprovalReceiptCount = 0
-$consumedApprovalKeys = @{}
 $matrixCommandCount = 0
 foreach ($plugin in @($matrix.plugins)) {
     $pluginId = [string]$plugin.id
@@ -421,29 +152,9 @@ foreach ($plugin in @($matrix.plugins)) {
             }
             $manualCommandCoverage[$commandText] = $true
         }
-        $status = "pending"
-        $approvalKey = "$pluginId/$manualId"
-        if ($approvalByKey.ContainsKey($approvalKey)) {
-            $consumedApprovalKeys[$approvalKey] = $true
-            $receiptValid = Test-ApprovalReceipt `
-                $approvalByKey[$approvalKey] `
-                $pluginId `
-                $manualId `
-                $manifestById[$pluginId].Path `
-                @($manualCheck.commands | ForEach-Object { [string]$_ }) `
-                $errors
-            if ($receiptValid) {
-                $status = "passed"
-                $manualApprovalReceiptCount++
-            }
-        }
         if ([bool]$manualCheck.required_for_release) {
             $manualRequiredCount++
-            if ($status -eq "pending" -or $status -eq "blocked") {
-                $manualPendingCount++
-            } elseif ($status -eq "failed") {
-                $manualFailedCount++
-            }
+            $manualPendingCount++
         }
     }
     foreach ($commandId in $matrixCommands) {
@@ -451,13 +162,6 @@ foreach ($plugin in @($matrix.plugins)) {
             Add-MatrixError $errors `
                 "Command has no acceptance scenario: ${pluginId}/$commandId"
         }
-    }
-}
-
-foreach ($approvalKey in $approvalByKey.Keys) {
-    if (-not $consumedApprovalKeys.ContainsKey($approvalKey)) {
-        Add-MatrixError $errors `
-            "Manual approval receipt has no matching matrix check: $approvalKey"
     }
 }
 
@@ -511,8 +215,8 @@ $report = [ordered]@{
     command_count = $matrixCommandCount
     automated_evidence_count = $automatedEvidenceCount
     required_manual_check_count = $manualRequiredCount
-    approval_receipt_count = $manualApprovalReceiptCount
-    stale_approval_receipt_count = $staleApprovalReceiptCount
+    approval_receipt_count = 0
+    stale_approval_receipt_count = 0
     pending_or_blocked_manual_count = $manualPendingCount
     failed_manual_count = $manualFailedCount
     contract_valid = $errors.Count -eq 0

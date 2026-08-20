@@ -176,8 +176,7 @@ $matrix = Get-Content -LiteralPath $matrixFile -Raw -Encoding UTF8 |
 
 $verificationLines = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass `
     -File (Join-Path $PSScriptRoot "verify-plugin-positive-matrix.ps1") `
-    -MatrixPath $matrixFile `
-    -ApprovalDirectory $approvalRoot 2>&1)
+    -MatrixPath $matrixFile 2>&1)
 if ($LASTEXITCODE -ne 0) {
     throw "Plugin matrix verification failed: $($verificationLines -join ' ')"
 }

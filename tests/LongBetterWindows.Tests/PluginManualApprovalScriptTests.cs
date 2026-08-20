@@ -36,36 +36,20 @@ public sealed class PluginManualApprovalScriptTests
     }
 
     [Fact]
-    public void MatrixVerifier_ConsumesPortableReceiptsAndInvalidatesSourceChanges()
+    public void MatrixVerifier_DoesNotConsumeManualApprovalReceipts()
     {
         var source = Read("verify-plugin-positive-matrix.ps1");
 
-        Assert.Contains("plugin-manual-approvals", source);
-        Assert.Contains("approval_receipt_count", source);
-        Assert.DoesNotContain("Path]::GetRelativePath", source);
-        Assert.Contains("manifest_sha256", source);
-        Assert.Contains("manifest_hash_format", source);
-        Assert.Contains("utf8-lf-v1", source);
-        Assert.Contains("Get-NormalizedTextSha256", source);
-        Assert.Contains("subject_executable_sha256", source);
-        Assert.Contains("Get-CandidateBinding", source);
-        Assert.Contains("Get-RepositoryRelativePath", source);
-        Assert.Contains("CandidateDirectory -ne", source);
-        Assert.Contains("candidate_commit", source);
-        Assert.Contains("release_manifest_sha256", source);
-        Assert.Contains("self_contained_package_sha256", source);
-        Assert.Contains("schema_version -ne 2", source);
-        Assert.Contains("candidateChanges", source);
-        Assert.Contains("git -C $PSScriptRoot diff", source);
-        Assert.Contains("-- src", source);
-        Assert.Contains("$status = \"pending\"", source);
-        Assert.Contains("if ($receiptValid)", source);
-        Assert.Contains("$status = \"passed\"", source);
-        Assert.DoesNotContain("manualCheck.status", source);
-        Assert.DoesNotContain("$approvedByReceipt", source);
-        Assert.Contains(
-            "Manual approval receipt has no matching matrix check",
-            source);
+        Assert.DoesNotContain("ApprovalDirectory", source);
+        Assert.DoesNotContain("plugin-manual-approvals", source);
+        Assert.DoesNotContain("Test-ApprovalReceipt", source);
+        Assert.DoesNotContain("Get-CandidateBinding", source);
+        Assert.DoesNotContain("reviewer", source);
+        Assert.DoesNotContain("manifest_sha256", source);
+        Assert.DoesNotContain("subject_executable_sha256", source);
+        Assert.DoesNotContain("evidence_files", source);
+        Assert.Contains("approval_receipt_count = 0", source);
+        Assert.Contains("stale_approval_receipt_count = 0", source);
     }
 
     [Fact]

@@ -19,6 +19,9 @@ public sealed class PluginManualValidationPlannerScriptTests
         Assert.Contains("ZipFile]::OpenRead", source);
         Assert.Contains("archivedSubjectHash", source);
         Assert.Contains("verify-plugin-positive-matrix.ps1", source);
+        Assert.DoesNotContain(
+            "-ApprovalDirectory $approvalRoot 2>&1",
+            source);
         Assert.Contains("Sort-Object RiskRank, PluginIndex, ManualIndex", source);
         Assert.Contains("approval_command", source);
         Assert.Contains("-SubjectExecutable", source);

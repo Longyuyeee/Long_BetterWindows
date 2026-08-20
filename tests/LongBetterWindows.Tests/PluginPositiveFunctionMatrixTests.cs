@@ -197,21 +197,11 @@ public sealed class PluginPositiveFunctionMatrixTests
         var failedCount = report.RootElement
             .GetProperty("failed_manual_count")
             .GetInt32();
-        Assert.Equal(25, approvalCount + pendingCount + failedCount);
-        Assert.Equal(
-            Directory.GetFiles(
-                Path.Combine(root, "docs", "plugin-manual-approvals"),
-                "*.json").Length,
-            approvalCount + staleApprovalCount);
-        var legacyReceiptCount = Directory.GetFiles(
-                Path.Combine(root, "docs", "plugin-manual-approvals"),
-                "*.json")
-            .Count(path => JsonDocument.Parse(File.ReadAllText(path))
-                .RootElement.GetProperty("schema_version").GetInt32() != 2);
-        Assert.True(staleApprovalCount >= legacyReceiptCount);
-        Assert.Equal(
-            approvalCount == 25 && pendingCount == 0 && failedCount == 0,
-            releaseEligible);
+        Assert.Equal(0, approvalCount);
+        Assert.Equal(0, staleApprovalCount);
+        Assert.Equal(25, pendingCount);
+        Assert.Equal(0, failedCount);
+        Assert.False(releaseEligible);
 
         var release = await RunVerifierAsync(
             root,
@@ -641,26 +631,6 @@ public sealed class PluginPositiveFunctionMatrixTests
             .Select(command => command.GetProperty("id").GetString()!)
             .Order(StringComparer.Ordinal)
             .ToArray();
-
-    private static void AssertPassedEvidence(
-        string root,
-        string pluginId,
-        string manualId,
-        JsonElement manualCheck)
-    {
-        var evidencePath = manualCheck
-            .GetProperty("evidence_path")
-            .GetString();
-        var evidenceSha = manualCheck
-            .GetProperty("evidence_sha256")
-            .GetString();
-        Assert.False(
-            string.IsNullOrWhiteSpace(evidencePath),
-            $"Passed check lacks evidence: {pluginId}/{manualId}");
-        Assert.Matches("^[a-fA-F0-9]{64}$", evidenceSha!);
-        Assert.True(File.Exists(Path.GetFullPath(
-            Path.Combine(root, evidencePath!))));
-    }
 
     private static async Task<ProcessResult> RunVerifierAsync(
         string root,
