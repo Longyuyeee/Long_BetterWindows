@@ -1,17 +1,18 @@
 #!/usr/bin/env pwsh
 param(
-    [string] $ApprovalDirectory = 'docs/final-validation-approvals',
+    [Parameter(Mandatory=$true)] [string] $FinalClosureReportPath,
     [string] $SubjectExecutable =
         'src/LongBetterWindows.Host/bin/Release/net8.0-windows/LongBetterWindows.Host.exe',
     [Parameter(Mandatory=$true)] [string] $OutputPath,
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
-    [string] $ExternalEcosystemDeferralPath
+    [switch] $AllowDirty,
+    [switch] $RequireReleaseEligible
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
-. (Join-Path $PSScriptRoot 'external-ecosystem-deferral-policy.ps1')
+. (Join-Path $PSScriptRoot 'automated-acceptance-policy.ps1')
 
 function Resolve-RepositoryPath([string] $PathValue) {
     if ([IO.Path]::IsPathRooted($PathValue)) {
@@ -20,139 +21,148 @@ function Resolve-RepositoryPath([string] $PathValue) {
     return [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $PathValue))
 }
 
-$allRequiredIds = @(
-    'taskbar-visual-grouping',
-    'native-performance',
-    'lpwp-long-grid-e2e',
-    'lpwp-widget-desktop',
-    'lpwp-signed-reference')
-$localRequiredIds = @('taskbar-visual-grouping','native-performance','lpwp-widget-desktop')
+function Assert-CountConsistency($Acceptance) {
+    $total = [int]$Acceptance.automated_gate_count
+    $classified = [int]$Acceptance.passed_gate_count +
+        [int]$Acceptance.failed_gate_count +
+        [int]$Acceptance.environment_blocked_gate_count +
+        [int]$Acceptance.not_run_gate_count +
+        [int]$Acceptance.not_applicable_gate_count
+    if ($total -ne 94 -or $classified -ne $total `
+        -or @($Acceptance.gates).Count -ne $total) {
+        throw 'Final closure automated gate counts are incomplete or inconsistent.'
+    }
+}
+
+function Assert-GateContract($Acceptance) {
+    $allowedStatuses = @(
+        'not_run',
+        'passed',
+        'failed',
+        'blocked_environment',
+        'not_applicable')
+    $gateIds = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal)
+    foreach ($gate in @($Acceptance.gates)) {
+        $id = [string]$gate.id
+        $status = [string]$gate.status
+        if ($id -notmatch '^[a-z0-9][a-z0-9._-]{0,191}$' `
+            -or -not $gateIds.Add($id) `
+            -or $status -notin $allowedStatuses `
+            -or [string]::IsNullOrWhiteSpace([string]$gate.summary)) {
+            throw 'Final closure automated gate identity is invalid.'
+        }
+        $evidenceIds = [Collections.Generic.HashSet[string]]::new(
+            [StringComparer]::Ordinal)
+        $evidence = @($gate.evidence)
+        if ($status -in @('passed','failed') -and $evidence.Count -eq 0) {
+            throw "Final closure gate has no hashed evidence: $id"
+        }
+        foreach ($item in $evidence) {
+            if ([string]$item.id -notmatch '^[a-z0-9][a-z0-9._-]{0,127}$' `
+                -or -not $evidenceIds.Add([string]$item.id) `
+                -or [string]::IsNullOrWhiteSpace([string]$item.path) `
+                -or [string]$item.sha256 -notmatch '^[0-9a-f]{64}$') {
+                throw "Final closure gate evidence is invalid: $id"
+            }
+        }
+        if ($status -eq 'blocked_environment' `
+            -and [string]::IsNullOrWhiteSpace([string]$gate.environment_blocker)) {
+            throw "Final closure environment blocker is missing: $id"
+        }
+        if ($status -eq 'not_applicable' `
+            -and [string]::IsNullOrWhiteSpace([string]$gate.not_applicable_reason)) {
+            throw "Final closure not-applicable reason is missing: $id"
+        }
+    }
+}
+
 $currentHead = (& git -C $PSScriptRoot rev-parse HEAD).Trim().ToLowerInvariant()
 $sourceCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
-if ($sourceCommit -notmatch '^[0-9a-f]{40}$') {
-    throw 'ExpectedSourceCommit must be a full 40-character Git commit.'
-}
-$deferral = $null
-$deferralPath = $null
-if (-not [string]::IsNullOrWhiteSpace($ExternalEcosystemDeferralPath)) {
-    $deferralPath = Resolve-RepositoryPath $ExternalEcosystemDeferralPath
-    if (-not (Test-Path -LiteralPath $deferralPath -PathType Leaf)) {
-        throw "External ecosystem deferral was not found: $deferralPath"
-    }
-    $deferralDocument = Get-Content -LiteralPath $deferralPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $deferral = Resolve-LongExternalEcosystemDeferral `
-        -Document $deferralDocument -ExpectedSourceCommit $sourceCommit
-}
-$requiredIds = if ($null -eq $deferral) { $allRequiredIds } else { $localRequiredIds }
-& git -C $PSScriptRoot merge-base --is-ancestor $sourceCommit HEAD 2>$null
-if ($LASTEXITCODE -ne 0) {
-    throw 'ExpectedSourceCommit must be an ancestor of HEAD.'
+if ($sourceCommit -notmatch '^[0-9a-f]{40}$' -or $sourceCommit -ne $currentHead) {
+    throw 'ExpectedSourceCommit must exactly match the current 40-character HEAD.'
 }
 $trackedStatus = @(& git -C $PSScriptRoot status --porcelain --untracked-files=no)
-if ($LASTEXITCODE -ne 0 -or $trackedStatus.Count -ne 0) {
+if ($LASTEXITCODE -ne 0) {
+    throw 'Unable to inspect the tracked worktree.'
+}
+$sourceDirty = $trackedStatus.Count -ne 0
+if ($sourceDirty -and -not $AllowDirty) {
     throw 'Final product acceptance requires a clean tracked worktree.'
 }
-$postCandidateChanges = @(& git -C $PSScriptRoot diff --name-only $sourceCommit HEAD --)
-if ($LASTEXITCODE -ne 0) {
-    throw 'Unable to compare HEAD with ExpectedSourceCommit.'
+
+$closurePath = Resolve-RepositoryPath $FinalClosureReportPath
+if (-not (Test-Path -LiteralPath $closurePath -PathType Leaf)) {
+    throw "Final closure report was not found: $closurePath"
 }
-$unexpectedChanges = @($postCandidateChanges | Where-Object {
-    $_ -notmatch '^docs/(plugin-manual-approvals|final-validation-approvals)/[^/]+\.json$'
-})
-if ($unexpectedChanges.Count -ne 0) {
-    throw ('Product files changed after ExpectedSourceCommit: ' + ($unexpectedChanges -join ', '))
+$closureJson = Get-Content -LiteralPath $closurePath -Raw -Encoding UTF8
+try {
+    $closure = $closureJson | ConvertFrom-Json
 }
+catch {
+    throw 'Final closure report is not valid JSON.'
+}
+$acceptance = $closure.automated_acceptance
+if ([int]$closure.schema_version -ne 2 `
+    -or [string]$closure.classification -ne 'final_closure' `
+    -or [string]$closure.source_commit -ne $sourceCommit `
+    -or [bool]$closure.source_dirty -ne $sourceDirty `
+    -or $null -eq $acceptance `
+    -or -not [bool]$acceptance.contract_valid `
+    -or @($acceptance.errors).Count -ne 0) {
+    throw 'Final closure report identity or contract is invalid.'
+}
+Assert-CountConsistency $acceptance
+Assert-GateContract $acceptance
+if ([bool]$closure.checks_skipped) {
+    throw 'Final closure contains automated gates that were not run.'
+}
+
+$matrix = $closure.plugin_matrix
+if ($null -eq $matrix `
+    -or [int]$matrix.schema_version -ne 2 `
+    -or [string]$matrix.source_commit -ne $sourceCommit `
+    -or [bool]$matrix.source_dirty -ne $sourceDirty `
+    -or [int]$matrix.plugin_count -ne 25 `
+    -or [int]$matrix.command_count -ne 42 `
+    -or [int]$matrix.acceptance_scenario_count -ne 25 `
+    -or [int]$matrix.automated_gate_count -ne 87 `
+    -or [int]$matrix.failed_gate_count -ne 0 `
+    -or [int]$matrix.not_run_gate_count -ne 0 `
+    -or -not [bool]$matrix.contract_valid `
+    -or [string]$matrix.report_sha256 -notmatch '^[0-9a-f]{64}$') {
+    throw 'Plugin matrix summary in final closure is incomplete or invalid.'
+}
+if ([int]$acceptance.failed_gate_count -ne 0) {
+    throw 'Final closure contains failed automated gates.'
+}
+if ([int]$acceptance.not_run_gate_count -ne 0) {
+    throw 'Final closure contains automated gates that were not run.'
+}
+
 $hostPath = Resolve-RepositoryPath $SubjectExecutable
 if (-not (Test-Path -LiteralPath $hostPath -PathType Leaf)) {
     throw "Release host executable was not found: $hostPath"
 }
-$hostHash = (Get-FileHash -LiteralPath $hostPath -Algorithm SHA256).Hash.ToLowerInvariant()
-
-$matrixOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass
-    -File (Join-Path $PSScriptRoot 'verify-plugin-positive-matrix.ps1')
-    -RequireReleaseEligible 2>&1)
-$matrixExitCode = $LASTEXITCODE
-$matrix = $null
-try { $matrix = ($matrixOutput -join [Environment]::NewLine) | ConvertFrom-Json } catch { }
-if ($matrixExitCode -ne 0 -or $null -eq $matrix `
-    -or -not [bool]$matrix.contract_valid `
-    -or -not [bool]$matrix.release_eligible `
-    -or [string]$matrix.source_commit -ne $currentHead `
-    -or [bool]$matrix.source_dirty `
-    -or [int]$matrix.plugin_count -ne 25 `
-    -or [int]$matrix.command_count -ne 42 `
-    -or [int]$matrix.approval_receipt_count -ne 25) {
-    throw 'Plugin positive matrix is not release eligible with 25 approved plugins and 42 commands.'
+$hostHash = (Get-FileHash -LiteralPath $hostPath -Algorithm SHA256).
+    Hash.ToLowerInvariant()
+if (-not [bool]$closure.release_host.exists `
+    -or [string]$closure.release_host.sha256 -ne $hostHash) {
+    throw 'Final closure Release host identity does not match the current executable.'
 }
 
-$approvalRoot = Resolve-RepositoryPath $ApprovalDirectory
-if (-not (Test-Path -LiteralPath $approvalRoot -PathType Container)) {
-    throw "Final validation approval directory was not found: $approvalRoot"
+$calculatedEligibility = Get-AutomatedReleaseEligibility `
+    -AutomatedGateCount ([int]$acceptance.automated_gate_count) `
+    -PassedGateCount ([int]$acceptance.passed_gate_count) `
+    -FailedGateCount ([int]$acceptance.failed_gate_count) `
+    -EnvironmentBlockedGateCount ([int]$acceptance.environment_blocked_gate_count) `
+    -NotRunGateCount ([int]$acceptance.not_run_gate_count) `
+    -NotApplicableGateCount ([int]$acceptance.not_applicable_gate_count) `
+    -ContractValid ([bool]$acceptance.contract_valid) `
+    -SourceDirty $sourceDirty
+if ([bool]$closure.release_eligible -ne [bool]$calculatedEligibility) {
+    throw 'Final closure release eligibility does not match its automated gate counts.'
 }
-$receiptFiles = @(Get-ChildItem -LiteralPath $approvalRoot -Filter '*.json' -File)
-if ($receiptFiles.Count -ne $requiredIds.Count) {
-    throw "Exactly $($requiredIds.Count) final validation approval receipts are required."
-}
-$receiptIds = @($receiptFiles | ForEach-Object { $_.BaseName } | Sort-Object -Unique)
-if ($receiptIds.Count -ne $requiredIds.Count `
-    -or (Compare-Object ($requiredIds | Sort-Object) $receiptIds).Count -ne 0) {
-    throw 'Final validation approval receipt file set is incomplete or contains unknown IDs.'
-}
-
-$validated = @($receiptFiles | Sort-Object BaseName | ForEach-Object {
-    & git -C $PSScriptRoot ls-files --error-unmatch -- $_.FullName 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Final validation approval receipt must be committed to Git: $($_.Name)"
-    }
-    $receipt = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-    $id = [string]$receipt.validation_id
-    if ([int]$receipt.schema_version -ne 1 `
-        -or [string]$receipt.classification -ne 'final_validation_approval' `
-        -or $id -ne $_.BaseName `
-        -or $id -notin $requiredIds `
-        -or [string]$receipt.status -ne 'passed' `
-        -or [string]$receipt.source_commit -ne $sourceCommit `
-        -or [string]::IsNullOrWhiteSpace([string]$receipt.reviewer) `
-        -or [string]::IsNullOrWhiteSpace([string]$receipt.notes) `
-        -or [string]$receipt.subject_executable_sha256 -ne $hostHash) {
-        throw "Final validation approval identity is invalid: $($_.Name)"
-    }
-    $evidence = @($receipt.evidence_files)
-    if ($evidence.Count -eq 0) {
-        throw "Final validation approval has no evidence metadata: $id"
-    }
-    foreach ($item in $evidence) {
-        if ([string]$item.relative_path -notlike 'artifacts/quality/*' `
-            -or [string]$item.sha256 -notmatch '^[0-9a-f]{64}$' `
-            -or [long]$item.size_bytes -le 0) {
-            throw "Final validation approval evidence metadata is invalid: $id"
-        }
-    }
-    if ($id -eq 'native-performance' `
-        -and ([string]$receipt.verified_contract.native_performance_manifest_sha256 -notmatch '^[0-9a-f]{64}$' `
-            -or [string]$receipt.verified_contract.native_performance_analysis_sha256 -notmatch '^[0-9a-f]{64}$' `
-            -or [string]$receipt.verified_contract.native_performance_export_sha256 -notmatch '^[0-9a-f]{64}$' `
-            -or [string]::IsNullOrWhiteSpace(
-                [string]$receipt.verified_contract.native_performance_analyst))) {
-        throw 'Native performance approval contract is missing structured WPA analysis.'
-    }
-    if ($id -eq 'lpwp-long-grid-e2e' `
-        -and ([string]$receipt.verified_contract.protocol -ne 'long.plugin.ipc/1.0' `
-            -or [string]$receipt.verified_contract.long_grid_commit -notmatch '^[0-9a-f]{40}$')) {
-        throw 'Long Grid E2E approval contract is missing.'
-    }
-    if ($id -eq 'lpwp-signed-reference' `
-        -and ([string]$receipt.verified_contract.publisher_key_id -eq '' `
-            -or [string]$receipt.verified_contract.public_key_fingerprint -notmatch '^[0-9A-F]{64}$' `
-            -or [string]$receipt.verified_contract.package_sha256 -notmatch '^[0-9a-f]{64}$')) {
-        throw 'Signed reference approval contract is missing.'
-    }
-    [ordered]@{
-        id = $id
-        path = $_.FullName
-        receipt = $receipt
-    }
-})
 
 $resolvedOutput = Resolve-RepositoryPath $OutputPath
 if (Test-Path -LiteralPath $resolvedOutput) {
@@ -165,75 +175,66 @@ $sourceDirectory = Join-Path $outputParent $sourceDirectoryName
 if (Test-Path -LiteralPath $sourceDirectory) {
     throw "Final product-acceptance source directory already exists: $sourceDirectory"
 }
-$stage = Join-Path $outputParent ('.product-acceptance-' + [Guid]::NewGuid().ToString('N'))
+$stage = Join-Path $outputParent (
+    '.product-acceptance-' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($stage) | Out-Null
 $sourceCommitted = $false
 try {
-    $approvalEntries = @($validated | ForEach-Object {
-        $name = $_.id + '.json'
-        $target = Join-Path $stage $name
-        Copy-Item -LiteralPath $_.path -Destination $target
+    $closureName = 'final-closure.json'
+    $portableClosure = Join-Path $stage $closureName
+    Copy-Item -LiteralPath $closurePath -Destination $portableClosure
+    $closureHash = (Get-FileHash -LiteralPath $portableClosure -Algorithm SHA256).
+        Hash.ToLowerInvariant()
+    $blockers = @($acceptance.gates | Where-Object {
+        [string]$_.status -eq 'blocked_environment'
+    } | ForEach-Object {
         [ordered]@{
-            validation_id = $_.id
-            source_commit = $sourceCommit
-            source_manifest = [ordered]@{
-                file = "$sourceDirectoryName/$name"
-                sha256 = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
-            }
+            gate_id = [string]$_.id
+            reason = [string]$_.environment_blocker
         }
     })
-    $deferralEntry = $null
-    if ($null -ne $deferral) {
-        $deferralName = 'external-ecosystem-deferral.json'
-        $deferralTarget = Join-Path $stage $deferralName
-        Copy-Item -LiteralPath $deferralPath -Destination $deferralTarget
-        $deferralEntry = [ordered]@{
-            file = "$sourceDirectoryName/$deferralName"
-            sha256 = (Get-FileHash -LiteralPath $deferralTarget -Algorithm SHA256).Hash.ToLowerInvariant()
-        }
-    }
-    $portableMatrix = [ordered]@{
-        schema_version = 1
-        classification = 'plugin_positive_matrix'
-        source_commit = $sourceCommit
-        source_dirty = $false
-        plugin_count = 25
-        command_count = 42
-        approval_receipt_count = 25
-        contract_valid = $true
-        release_eligible = $true
-    }
-    $matrixName = 'plugin-positive-matrix.json'
-    $matrixPath = Join-Path $stage $matrixName
-    [IO.File]::WriteAllText(
-        $matrixPath,
-        ($portableMatrix | ConvertTo-Json -Depth 6),
-        [Text.UTF8Encoding]::new($false))
     $summary = [ordered]@{
-        schema_version = if ($null -eq $deferral) { 1 } else { 2 }
-        generated_at = [DateTimeOffset]::UtcNow.ToString('O')
-        classification = 'approved_final_product_acceptance'
-        passed = $true
+        '$schema' = 'https://long-assistant.local/schemas/final-product-acceptance-report.schema.json'
+        schema_version = 3
+        generated_at_utc = [DateTimeOffset]::UtcNow.ToString('O')
+        classification = 'automated_final_product_acceptance'
         source_commit = $sourceCommit
-        plugin_count = 25
-        command_count = 42
-        plugin_approval_receipt_count = 25
-        required_validation_ids = $allRequiredIds
-        approved_validation_count = $approvalEntries.Count
-        plugin_matrix = [ordered]@{
-            file = "$sourceDirectoryName/$matrixName"
-            sha256 = (Get-FileHash -LiteralPath $matrixPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        source_dirty = $sourceDirty
+        acceptance_status = if ($calculatedEligibility) {
+            'passed'
+        } elseif ($blockers.Count -gt 0) {
+            'blocked_environment'
+        } else {
+            'not_eligible'
         }
-        approvals = $approvalEntries
-    }
-    if ($null -ne $deferral) {
-        $summary.deferred_validation_count = 2
-        $summary.external_ecosystem = @($deferral.items)
-        $summary.external_ecosystem_deferral = $deferralEntry
+        plugin_count = [int]$matrix.plugin_count
+        command_count = [int]$matrix.command_count
+        automated_gate_count = [int]$acceptance.automated_gate_count
+        passed_gate_count = [int]$acceptance.passed_gate_count
+        failed_gate_count = [int]$acceptance.failed_gate_count
+        environment_blocked_gate_count =
+            [int]$acceptance.environment_blocked_gate_count
+        not_run_gate_count = [int]$acceptance.not_run_gate_count
+        not_applicable_gate_count = [int]$acceptance.not_applicable_gate_count
+        contract_valid = $true
+        release_eligible = [bool]$calculatedEligibility
+        release_host = [ordered]@{
+            path = $hostPath
+            sha256 = $hostHash
+        }
+        final_closure = [ordered]@{
+            file = "$sourceDirectoryName/$closureName"
+            sha256 = $closureHash
+        }
+        environment_blockers = $blockers
     }
     [IO.Directory]::Move($stage, $sourceDirectory)
     $sourceCommitted = $true
-    Write-NewJsonFileAtomically -Value $summary -Path $resolvedOutput -Depth 10 -Label 'Final product-acceptance summary'
+    Write-NewJsonFileAtomically `
+        -Value $summary `
+        -Path $resolvedOutput `
+        -Depth 10 `
+        -Label 'Final product-acceptance summary'
 }
 catch {
     if ($sourceCommitted -and (Test-Path -LiteralPath $sourceDirectory)) {
@@ -246,4 +247,8 @@ finally {
         Remove-Item -LiteralPath $stage -Recurse -Force
     }
 }
-Write-Host "Final product-acceptance gate passed: $resolvedOutput"
+
+$summary | ConvertTo-Json -Depth 10
+if ($RequireReleaseEligible -and -not $calculatedEligibility) {
+    exit 2
+}

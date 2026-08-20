@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://long-assistant.local/schemas/final-product-acceptance-report.schema.json",
+  "title": "Long Assistant Automated Final Product Acceptance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "generated_at_utc", "classification",
+    "source_commit", "source_dirty", "acceptance_status", "plugin_count",
+    "command_count", "automated_gate_count", "passed_gate_count",
+    "failed_gate_count", "environment_blocked_gate_count",
+    "not_run_gate_count", "not_applicable_gate_count", "contract_valid",
+    "release_eligible", "release_host", "final_closure", "environment_blockers"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://long-assistant.local/schemas/final-product-acceptance-report.schema.json"
+    },
+    "schema_version": { "const": 3 },
+    "generated_at_utc": { "type": "string", "format": "date-time" },
+    "classification": { "const": "automated_final_product_acceptance" },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_dirty": { "type": "boolean" },
+    "acceptance_status": {
+      "enum": ["passed", "blocked_environment", "not_eligible"]
+    },
+    "plugin_count": { "const": 25 },
+    "command_count": { "const": 42 },
+    "automated_gate_count": { "const": 94 },
+    "passed_gate_count": { "type": "integer", "minimum": 0 },
+    "failed_gate_count": { "const": 0 },
+    "environment_blocked_gate_count": { "type": "integer", "minimum": 0 },
+    "not_run_gate_count": { "const": 0 },
+    "not_applicable_gate_count": { "type": "integer", "minimum": 0 },
+    "contract_valid": { "const": true },
+    "release_eligible": { "type": "boolean" },
+    "release_host": { "$ref": "#/$defs/hashed_path" },
+    "final_closure": { "$ref": "#/$defs/hashed_file" },
+    "environment_blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate_id", "reason"],
+        "properties": {
+          "gate_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,191}$" },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "hashed_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "hashed_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "sha256"],
+      "properties": {
+        "file": { "type": "string", "pattern": "^[^/]+\\.sources/final-closure\\.json$" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

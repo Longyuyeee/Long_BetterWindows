@@ -1,93 +1,329 @@
+using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Json.Schema;
 
 namespace LongBetterWindows.Tests;
 
-public sealed class FinalProductAcceptanceScriptTests
+public sealed class FinalProductAcceptanceScriptTests : IDisposable
 {
-    [Fact]
-    public void Approval_requires_real_evidence_clean_source_and_contract_specific_identity()
-    {
-        var source = Read("approve-final-validation-evidence.ps1");
-
-        Assert.Contains("-ConfirmPassed", source);
-        Assert.Contains("clean tracked worktree", source);
-        Assert.Contains("artifacts/quality", source);
-        Assert.Contains("verify-native-performance-analysis.ps1", source);
-        Assert.Contains("native_performance_analysis_sha256", source);
-        Assert.Contains("final approver must differ from the WPA analyst", source);
-        Assert.Contains("lpwp_long_grid_e2e", source);
-        Assert.Contains("long.plugin.ipc/1.0", source);
-        Assert.Contains("Long Grid E2E raw evidence is missing or does not match", source);
-        Assert.Contains("$document.operator -eq $Reviewer.Trim()", source);
-        Assert.Contains("lpwp_signed_reference", source);
-        Assert.Contains("ExpectedPublicKeyFingerprint", source);
-        Assert.Contains("[Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit", source);
-        Assert.Contains("merge-base --is-ancestor $sourceCommit HEAD", source);
-        Assert.Contains("Product files changed after ExpectedSourceCommit", source);
-        Assert.Contains("Write-NewJsonFileAtomically", source);
-        Assert.DoesNotContain("ExportPkcs8PrivateKey", source);
-        Assert.DoesNotContain("Path]::GetRelativePath", source);
-    }
+    private readonly string _root = Path.Combine(
+        Path.GetTempPath(),
+        "long-a006-tests",
+        Guid.NewGuid().ToString("N"));
+    private static readonly Lazy<JsonSchema> ReportSchema = new(() =>
+        JsonSchema.FromText(File.ReadAllText(Path.Combine(
+            FindRoot(),
+            "schemas",
+            "final-product-acceptance-report.schema.json"))));
 
     [Fact]
-    public void Long_grid_e2e_producer_requires_all_methods_two_commits_and_raw_evidence()
-    {
-        var source = Read("new-lpwp-long-grid-e2e-evidence.ps1");
-
-        Assert.Contains("[Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit", source);
-        Assert.Contains("[Parameter(Mandatory=$true)] [string] $LongGridCommit", source);
-        Assert.Contains("Every LPWP core method must be explicitly confirmed", source);
-        Assert.Contains("'command.cancel'", source);
-        Assert.Contains("'plugin.open'", source);
-        Assert.Contains("At least one raw Long Grid E2E evidence file is required", source);
-        Assert.Contains("Write-NewJsonFileAtomically", source);
-        Assert.Contains("classification = 'lpwp_long_grid_e2e'", source);
-    }
-
-    [Fact]
-    public void Aggregator_requires_exact_committed_receipts_and_release_eligible_plugin_matrix()
+    public void Aggregator_HasNoActiveHumanApprovalContract()
     {
         var source = Read("verify-final-product-acceptance.ps1");
 
-        Assert.Contains("-RequireReleaseEligible", source);
-        Assert.Contains("[Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit", source);
-        Assert.Contains("merge-base --is-ancestor $sourceCommit HEAD", source);
-        Assert.Contains("plugin-manual-approvals|final-validation-approvals", source);
-        Assert.Contains("[string]$matrix.source_commit -ne $currentHead", source);
-        Assert.Contains("ls-files --error-unmatch", source);
-        Assert.Contains("Exactly $($requiredIds.Count)", source);
-        Assert.Contains("plugin_approval_receipt_count = 25", source);
-        Assert.Contains("approved_final_product_acceptance", source);
+        Assert.Contains("FinalClosureReportPath", source);
+        Assert.Contains("automated_final_product_acceptance", source);
+        Assert.Contains("Get-AutomatedReleaseEligibility", source);
+        Assert.Contains("Write-NewJsonFileAtomically", source);
         Assert.Contains(".sources", source);
-        Assert.Contains("Write-NewJsonFileAtomically", source);
-        Assert.Contains("Remove-Item -LiteralPath $sourceDirectory", source);
+        Assert.DoesNotContain("ApprovalDirectory", source);
+        Assert.DoesNotContain("reviewer", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("receipt", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("approved_validation", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ls-files --error-unmatch", source);
     }
 
     [Fact]
-    public void Aggregator_keeps_local_acceptance_mandatory_when_external_ecosystem_is_deferred()
+    public async Task Aggregator_PackagesHashLockedAutomatedClosure()
     {
-        var source = Read("verify-final-product-acceptance.ps1");
+        var closure = await WriteClosureFixtureAsync(blocked: true);
+        var output = Path.Combine(_root, "product.json");
 
-        Assert.Contains("ExternalEcosystemDeferralPath", source);
-        Assert.Contains("Resolve-LongExternalEcosystemDeferral", source);
-        Assert.Contains("taskbar-visual-grouping','native-performance','lpwp-widget-desktop", source);
-        Assert.Contains("deferred_validation_count = 2", source);
-        Assert.Contains("external_ecosystem_deferral", source);
-        Assert.Contains("required_validation_ids = $allRequiredIds", source);
+        var result = await RunAggregatorAsync(closure, output);
+
+        Assert.Equal(0, result.ExitCode);
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        AssertSchemaValid(report);
+        var document = report.RootElement;
+        Assert.Equal(
+            "blocked_environment",
+            document.GetProperty("acceptance_status").GetString());
+        Assert.Equal(94, document.GetProperty("automated_gate_count").GetInt32());
+        Assert.Equal(93, document.GetProperty("passed_gate_count").GetInt32());
+        Assert.Equal(
+            1,
+            document.GetProperty("environment_blocked_gate_count").GetInt32());
+        Assert.False(document.GetProperty("release_eligible").GetBoolean());
+        var sourceEntry = document.GetProperty("final_closure");
+        var portablePath = Path.Combine(
+            _root,
+            sourceEntry.GetProperty("file").GetString()!.Replace('/', Path.DirectorySeparatorChar));
+        Assert.True(File.Exists(portablePath));
+        Assert.Equal(
+            sourceEntry.GetProperty("sha256").GetString(),
+            Hash(await File.ReadAllBytesAsync(portablePath)));
     }
 
     [Fact]
-    public void External_gate_consumes_product_acceptance_as_a_mandatory_hashed_input()
+    public async Task Aggregator_PropagatesFailedGateWithoutWritingPackage()
     {
-        var source = Read("verify-external-release-gate.ps1");
+        var closure = await WriteClosureFixtureAsync(failed: true);
+        var output = Path.Combine(_root, "failed-product.json");
 
-        Assert.Contains("[Parameter(Mandatory=$true)] [string] $ProductAcceptanceGatePath", source);
-        Assert.Contains("Assert-ProductAcceptanceContract", source);
-        Assert.Contains("product_acceptance_sha256", source);
-        Assert.Contains("Final product-acceptance portable approval content is invalid", source);
-        Assert.Contains("ExternalEcosystemDeferralPath", source);
-        Assert.Contains("Deferred external ecosystem mode must not include", source);
+        var result = await RunAggregatorAsync(closure, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("failed automated gates", result.Error);
+        Assert.False(File.Exists(output));
+        Assert.False(Directory.Exists(Path.Combine(_root, "failed-product.sources")));
     }
+
+    [Fact]
+    public async Task Aggregator_RejectsTamperedReleaseHostIdentity()
+    {
+        var closure = await WriteClosureFixtureAsync(tamperHost: true);
+        var output = Path.Combine(_root, "tampered-host.json");
+
+        var result = await RunAggregatorAsync(closure, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("host identity", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(output));
+    }
+
+    [Fact]
+    public async Task Aggregator_RequireReleaseEligibleReturnsTwoForEnvironmentBlocker()
+    {
+        var closure = await WriteClosureFixtureAsync(blocked: true);
+        var output = Path.Combine(_root, "required-product.json");
+
+        var result = await RunAggregatorAsync(
+            closure,
+            output,
+            requireReleaseEligible: true);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.True(File.Exists(output));
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        AssertSchemaValid(report);
+        Assert.False(report.RootElement.GetProperty("release_eligible").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Aggregator_RejectsRealSkippedFinalClosureReport()
+    {
+        Directory.CreateDirectory(_root);
+        var closure = Path.Combine(_root, "real-skipped-closure.json");
+        var closureResult = await RunPowerShellAsync(new[]
+        {
+            "-File",
+            Path.Combine(FindRoot(), "verify-final-closure.ps1"),
+            "-SkipBuildAndTests",
+            "-AllowDirty",
+            "-OutputPath",
+            closure,
+        });
+        Assert.Equal(0, closureResult.ExitCode);
+
+        var output = Path.Combine(_root, "skipped-product.json");
+        var result = await RunAggregatorAsync(closure, output);
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Contains("not run", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(output));
+    }
+
+    private async Task<string> WriteClosureFixtureAsync(
+        bool blocked = false,
+        bool failed = false,
+        bool tamperHost = false)
+    {
+        Directory.CreateDirectory(_root);
+        var repository = FindRoot();
+        var commit = await GitAsync("rev-parse", "HEAD");
+        var dirty = (await GitAsync("status", "--porcelain", "--untracked-files=no"))
+            .Length > 0;
+        var hostPath = Path.Combine(
+            repository,
+            "src",
+            "LongBetterWindows.Host",
+            "bin",
+            "Release",
+            "net8.0-windows",
+            "LongBetterWindows.Host.exe");
+        Assert.True(File.Exists(hostPath));
+        var hostHash = tamperHost
+            ? new string('0', 64)
+            : Hash(await File.ReadAllBytesAsync(hostPath));
+        var gates = new List<object>();
+        for (var index = 0; index < 87; index++)
+            gates.Add(Gate($"plugin-matrix.fixture-{index:000}", "passed"));
+        gates.Add(Gate("dependency-restore", "passed"));
+        gates.Add(Gate("release-build", "passed"));
+        gates.Add(Gate("full-automated-tests", "passed"));
+        gates.Add(Gate("plugin-matrix-contract", "passed"));
+        gates.Add(Gate("release-host-executable", "passed"));
+        gates.Add(blocked
+            ? Gate("native-performance-preflight", "blocked_environment")
+            : failed
+                ? Gate("native-performance-preflight", "failed")
+                : Gate("native-performance-preflight", "passed"));
+        gates.Add(Gate("lpwp-compatibility", "passed"));
+        var passed = gates.Count(gate =>
+            JsonSerializer.Serialize(gate).Contains("\"status\":\"passed\"", StringComparison.Ordinal));
+        var failedCount = failed ? 1 : 0;
+        var blockedCount = blocked ? 1 : 0;
+        var eligible = !dirty && failedCount == 0 && blockedCount == 0;
+        var closure = new
+        {
+            schema_version = 2,
+            classification = "final_closure",
+            source_commit = commit,
+            source_dirty = dirty,
+            checks_skipped = false,
+            release_host = new { exists = true, path = hostPath, sha256 = hostHash },
+            plugin_matrix = new
+            {
+                schema_version = 2,
+                source_commit = commit,
+                source_dirty = dirty,
+                plugin_count = 25,
+                command_count = 42,
+                acceptance_scenario_count = 25,
+                automated_gate_count = 87,
+                passed_gate_count = 87,
+                failed_gate_count = 0,
+                environment_blocked_gate_count = 0,
+                not_run_gate_count = 0,
+                not_applicable_gate_count = 0,
+                contract_valid = true,
+                release_eligible = !dirty,
+                report_sha256 = new string('b', 64),
+            },
+            automated_acceptance = new
+            {
+                automated_gate_count = 94,
+                passed_gate_count = passed,
+                failed_gate_count = failedCount,
+                environment_blocked_gate_count = blockedCount,
+                not_run_gate_count = 0,
+                not_applicable_gate_count = 0,
+                contract_valid = true,
+                gates,
+                errors = Array.Empty<string>(),
+            },
+            release_eligible = eligible,
+        };
+        var path = Path.Combine(_root, $"closure-{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(closure));
+        return path;
+    }
+
+    private static object Gate(string id, string status)
+    {
+        var evidence = new[]
+        {
+            new
+            {
+                id = "fixture",
+                kind = "json",
+                path = $"fixture://{id}",
+                sha256 = new string('a', 64),
+            },
+        };
+        var gate = new Dictionary<string, object?>
+        {
+            ["id"] = id,
+            ["status"] = status,
+            ["summary"] = status == "blocked_environment"
+                ? "Fixture environment is unavailable."
+                : "Fixture gate result.",
+            ["category"] = status == "blocked_environment"
+                ? "performance"
+                : "test",
+            ["evidence"] = evidence,
+        };
+        if (status == "blocked_environment")
+            gate["environment_blocker"] = "fixture prerequisite is unavailable";
+        return gate;
+    }
+
+    private async Task<ProcessResult> RunAggregatorAsync(
+        string closure,
+        string output,
+        bool requireReleaseEligible = false)
+    {
+        var arguments = new List<string>
+        {
+            "-File",
+            Path.Combine(FindRoot(), "verify-final-product-acceptance.ps1"),
+            "-FinalClosureReportPath",
+            closure,
+            "-OutputPath",
+            output,
+            "-ExpectedSourceCommit",
+            await GitAsync("rev-parse", "HEAD"),
+            "-AllowDirty",
+        };
+        if (requireReleaseEligible)
+            arguments.Add("-RequireReleaseEligible");
+        return await RunPowerShellAsync(arguments);
+    }
+
+    private static async Task<ProcessResult> RunPowerShellAsync(
+        IEnumerable<string> arguments)
+    {
+        var start = new ProcessStartInfo("powershell.exe")
+        {
+            WorkingDirectory = FindRoot(),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        start.ArgumentList.Add("-NoProfile");
+        start.ArgumentList.Add("-ExecutionPolicy");
+        start.ArgumentList.Add("Bypass");
+        foreach (var argument in arguments)
+            start.ArgumentList.Add(argument);
+        using var process = Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return new ProcessResult(process.ExitCode, await output, await error);
+    }
+
+    private static async Task<string> GitAsync(params string[] arguments)
+    {
+        var start = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = FindRoot(),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var argument in arguments)
+            start.ArgumentList.Add(argument);
+        using var process = Process.Start(start)!;
+        var output = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        Assert.Equal(0, process.ExitCode);
+        return output.Trim();
+    }
+
+    private static void AssertSchemaValid(JsonDocument report)
+    {
+        var evaluation = ReportSchema.Value.Evaluate(
+            report.RootElement,
+            new EvaluationOptions { OutputFormat = OutputFormat.List });
+        Assert.True(evaluation.IsValid, JsonSerializer.Serialize(evaluation.Details));
+    }
+
+    private static string Hash(byte[] content) =>
+        Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
     private static string Read(string name) => File.ReadAllText(Path.Combine(FindRoot(), name));
 
@@ -102,4 +338,15 @@ public sealed class FinalProductAcceptanceScriptTests
         }
         throw new DirectoryNotFoundException("Repository root was not found.");
     }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_root))
+            Directory.Delete(_root, recursive: true);
+    }
+
+    private sealed record ProcessResult(
+        int ExitCode,
+        string Output,
+        string Error);
 }
