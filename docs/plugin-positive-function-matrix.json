@@ -47,7 +47,7 @@
     "window_manager_isolation_script": "verify-window-manager-desktop-isolation.ps1",
     "window_manager_isolation_test_path": "tests/LongBetterWindows.Tests/WindowManagerDesktopIsolationTests.cs",
     "window_manager_isolation_required_case_count": 10,
-    "release_rule": "Every required manual check must be passed with an existing evidence file and matching SHA-256 before a new release candidate is eligible."
+    "release_rule": "Every required acceptance scenario must be covered by automated evidence before a new release candidate is eligible."
   },
   "plugins": [
     {
@@ -67,15 +67,12 @@
           "symbol": "Base64Tool_UsesUtf8BoundariesAndInvalidatesStaleResults"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "encode-decode-roundtrip",
           "commands": ["base64.encode", "base64.decode"],
           "description": "Encode mixed Chinese/ASCII text, decode it, and confirm an exact round trip in the real plugin view.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -106,15 +103,12 @@
           "symbol": "PersistedHistory_RespectsAggregateCharacterBudget"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "capture-search-reuse",
           "commands": ["clipboard-history.open"],
           "description": "Copy two distinct values, open history, search and reuse one value, then confirm monitoring survives a host restart.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -135,15 +129,12 @@
           "symbol": "ClipboardTool_UsesEventMonitoringAndBoundedHistory"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "open-and-transform",
           "commands": ["clipboard.open"],
           "description": "Open from the command center with text on the clipboard and confirm the displayed content and one transform/copy action.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -179,15 +170,12 @@
           "symbol": "ClipboardWriter_RetriesTransientFailureWithinSingleDelivery"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "pick-visible-color",
           "commands": ["color.pick"],
           "description": "Pick a known visible color through the real overlay and verify the clipboard value and cancel path.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -208,15 +196,12 @@
           "symbol": "DeveloperToolkit_UsesStrictConversionsAndExplicitClipboardWrites"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "open-edit-preview",
           "commands": ["dev-toolkit.open"],
           "description": "Open the workbench, edit a temporary plugin file, preview without losing the edit, and discard the temporary change.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -237,15 +222,12 @@
           "symbol": "WebPluginCommands_ProvideReliableOpenHandlers"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "isolated-preview-and-apply",
           "commands": ["file-organizer.open"],
           "description": "Use an isolated temporary directory, preview an organization plan, apply it, and verify every resulting path.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -276,15 +258,12 @@
           "symbol": "BatchRename_RollsBackEarlierMovesWhenLaterMoveFails"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "isolated-batch-rename",
           "commands": ["file.rename-batch"],
           "description": "Rename multiple files in an isolated directory, verify preview/collision handling, and confirm final names.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -315,15 +294,12 @@
             "symbol": "ConcurrentWrites_AreSerializedWithoutPartialReads"
           }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "explorer-edit-reopen",
           "commands": ["folder-note.edit"],
           "description": "Edit a note for an isolated Explorer folder, reopen it, verify persistence and confirm failure text on an inaccessible target.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -344,15 +320,12 @@
           "symbol": "HardwareMonitor_UsesRealPerformanceApisAndUiKit"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "live-metrics-refresh",
           "commands": ["hardware-monitor.open"],
           "description": "Open the monitor, confirm CPU/memory values are plausible and refresh without freezing or leaking an extra view.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -368,15 +341,12 @@
           "symbol": "BuiltInManifest_CommandContract_IsValid"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "format-minify-invalid",
           "commands": ["json.format", "json.minify"],
           "description": "Format and minify valid Unicode JSON, then verify invalid JSON shows a stable error without replacing the source.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -482,15 +452,12 @@
             "symbol": "MacroPluginLoopInterval_PersistenceFailureLeavesEngineUnchanged"
           }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "record-play-cancel",
           "commands": ["macro.record-toggle", "macro.play-once", "macro.loop-toggle"],
           "description": "In a disposable target, record text with a modifier chord, an extended key such as ArrowRight or numpad Enter, a left-button drag and a right-button action; play once, set the loop interval to 500 ms, start/stop loop playback and confirm the cycle pause is visible with no key/button left pressed.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -506,15 +473,12 @@
           "symbol": "BuiltInManifest_CommandContract_IsValid"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "render-safe-markdown",
           "commands": ["markdown.preview"],
           "description": "Render headings, tables, links and code from mixed-language Markdown and confirm unsafe HTML is not executed.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -530,15 +494,12 @@
           "symbol": "BuiltInManifest_CommandContract_IsValid"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "generate-copy-constraints",
           "commands": ["password.generate"],
           "description": "Generate with multiple length/character settings, verify constraints, regeneration and clipboard copy.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -564,15 +525,12 @@
           "symbol": "KillPortOwnerVerifiedAsync_TerminatesMatchingDisposablePortOwner"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "inspect-owned-port",
           "commands": ["port-manager.open"],
           "description": "Start a disposable local listener, locate it, inspect the owning process and stop only that disposable listener.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -593,15 +551,12 @@
           "symbol": "QuickLaunchMatcher_UsesHostPinyinScores"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "large-directory-cancel-launch",
           "commands": ["launcher.open"],
           "description": "Search a large directory, supersede the query, verify responsive cancellation and launch one harmless result.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -622,15 +577,12 @@
           "symbol": "BuiltInManifest_CommandContract_IsValid"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "create-persist-delete-note",
           "commands": ["note.new"],
           "description": "Create a Unicode note, restart the host, confirm persistence, then delete the test note.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -646,15 +598,12 @@
           "symbol": "BuiltInManifest_CommandContract_IsValid"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "match-groups-invalid-pattern",
           "commands": ["regex.test"],
           "description": "Verify multiple matches and capture groups, then confirm an invalid expression reports an error without freezing.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -675,15 +624,12 @@
           "symbol": "HelloCommand_PreservesPluginSettingAcrossLanguageChanges"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "hello-settings-language",
           "commands": ["sample.hello"],
           "description": "Run hello, open settings and switch language while confirming state remains intact.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -719,15 +665,12 @@
           "symbol": "ClipboardWriter_RetriesWithinSingleImageDelivery"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "full-region-clipboard",
           "commands": ["screenshot.full", "screenshot.region"],
           "description": "Capture full screen and a dragged region, paste both clipboard images and verify cancel leaves the previous clipboard unchanged.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -748,15 +691,12 @@
           "symbol": "TextDiff_NormalizesLineEndingsAndInvalidatesStaleResults"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "unicode-line-diff",
           "commands": ["text.diff"],
           "description": "Compare multiline Unicode text and verify additions, deletions and unchanged lines are visually distinct.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -777,15 +717,12 @@
           "symbol": "TimestampConverter_ReportsUnitsTimezoneAndInvalidatesStaleResults"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "seconds-milliseconds-timezone",
           "commands": ["timestamp.convert"],
           "description": "Convert seconds and milliseconds in both directions and verify the displayed local/UTC timezone labels.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -806,15 +743,12 @@
           "symbol": "SideEffectingPluginCommands_ReportActualCompletion"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "online-and-offline-recovery",
           "commands": ["translate.text"],
           "description": "Translate a known phrase online, then disable networking, verify the offline failure and confirm recovery after reconnecting.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -835,15 +769,12 @@
           "symbol": "UrlToolkit_InvalidatesStaleResultsAndSeparatesEncodingErrors"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "encode-decode-unicode-url",
           "commands": ["url.encode", "url.decode"],
           "description": "Encode and decode a URL containing Chinese text, spaces and query parameters and verify exact round trip.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -864,15 +795,12 @@
           "symbol": "UuidGenerator_ValidatesAmountUniquenessAndResultLifecycle"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "generate-version-format-copy",
           "commands": ["uuid.generate"],
           "description": "Generate supported UUID versions/formats, verify uniqueness and copy the selected value.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     },
@@ -961,7 +889,7 @@
             "symbol": "PluginStop_WindowManagerRetainsFailedHotkeyForRetry"
         }
       ],
-      "manual_checks": [
+      "acceptance_scenarios": [
         {
           "id": "layouts-topmost-multimonitor",
           "commands": [
@@ -979,10 +907,7 @@
             "window.third-right"
           ],
           "description": "Verify guide, topmost and every layout on normal/minimized/maximized windows across available monitors. Confirm maximize enters the Windows maximized state, and include a denied high-integrity target.",
-          "status": "pending",
-          "required_for_release": true,
-          "evidence_path": null,
-          "evidence_sha256": null
+          "required_for_release": true
         }
       ]
     }

@@ -215,7 +215,7 @@ $pending = [System.Collections.Generic.List[object]]::new()
 $pluginIndex = 0
 foreach ($plugin in @($matrix.plugins)) {
     $manualIndex = 0
-    foreach ($check in @($plugin.manual_checks)) {
+    foreach ($check in @($plugin.acceptance_scenarios)) {
         $key = "$([string]$plugin.id)/$([string]$check.id)"
         if ([bool]$check.required_for_release `
             -and -not $approvedKeys.ContainsKey($key)) {

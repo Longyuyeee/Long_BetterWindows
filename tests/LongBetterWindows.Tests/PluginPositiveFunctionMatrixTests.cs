@@ -104,12 +104,11 @@ public sealed class PluginPositiveFunctionMatrixTests
     }
 
     [Fact]
-    public void Matrix_ManualChecksCoverEveryCommandAndRemainAuditable()
+    public void Matrix_AcceptanceScenariosCoverEveryCommandWithoutManualState()
     {
         var root = FindRepositoryRoot();
         using var matrix = LoadMatrix(root);
-        var requiredChecks = 0;
-        var pendingChecks = 0;
+        var requiredScenarios = 0;
 
         foreach (var plugin in matrix.RootElement
                      .GetProperty("plugins")
@@ -121,19 +120,20 @@ public sealed class PluginPositiveFunctionMatrixTests
                 .Select(value => value.GetString()!)
                 .ToHashSet(StringComparer.Ordinal);
             var covered = new HashSet<string>(StringComparer.Ordinal);
-            var manualIds = new HashSet<string>(StringComparer.Ordinal);
-            var manualChecks = plugin.GetProperty("manual_checks")
+            Assert.False(plugin.TryGetProperty("manual_checks", out _));
+            var scenarioIds = new HashSet<string>(StringComparer.Ordinal);
+            var scenarios = plugin.GetProperty("acceptance_scenarios")
                 .EnumerateArray()
                 .ToArray();
-            Assert.NotEmpty(manualChecks);
+            Assert.NotEmpty(scenarios);
 
-            foreach (var manualCheck in manualChecks)
+            foreach (var scenario in scenarios)
             {
-                var manualId = manualCheck.GetProperty("id").GetString()!;
+                var scenarioId = scenario.GetProperty("id").GetString()!;
                 Assert.True(
-                    manualIds.Add(manualId),
-                    $"Duplicate manual id: {pluginId}/{manualId}");
-                foreach (var command in manualCheck
+                    scenarioIds.Add(scenarioId),
+                    $"Duplicate acceptance scenario id: {pluginId}/{scenarioId}");
+                foreach (var command in scenario
                              .GetProperty("commands")
                              .EnumerateArray())
                 {
@@ -142,38 +142,26 @@ public sealed class PluginPositiveFunctionMatrixTests
                     covered.Add(commandId);
                 }
 
-                var status = manualCheck
-                    .GetProperty("status")
-                    .GetString();
-                Assert.Contains(
-                    status,
-                    new[] { "pending", "passed", "failed", "blocked" });
-                if (!manualCheck
+                Assert.False(scenario.TryGetProperty("status", out _));
+                Assert.False(scenario.TryGetProperty("evidence_path", out _));
+                Assert.False(scenario.TryGetProperty("evidence_sha256", out _));
+                Assert.False(string.IsNullOrWhiteSpace(
+                    scenario.GetProperty("description").GetString()));
+                if (!scenario
                         .GetProperty("required_for_release")
                         .GetBoolean())
                 {
                     continue;
                 }
 
-                requiredChecks++;
-                if (status is "pending" or "blocked")
-                    pendingChecks++;
-                if (status == "passed")
-                {
-                    AssertPassedEvidence(
-                        root,
-                        pluginId!,
-                        manualId,
-                        manualCheck);
-                }
+                requiredScenarios++;
             }
             Assert.Equal(
                 commands.Order(StringComparer.Ordinal),
                 covered.Order(StringComparer.Ordinal));
         }
 
-        Assert.Equal(25, requiredChecks);
-        Assert.Equal(25, pendingChecks);
+        Assert.Equal(25, requiredScenarios);
     }
 
     [Fact]

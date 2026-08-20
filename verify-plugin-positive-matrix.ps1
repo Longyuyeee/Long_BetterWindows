@@ -399,31 +399,30 @@ foreach ($plugin in @($matrix.plugins)) {
         }
     }
 
-    $manualChecks = @($plugin.manual_checks)
-    if ($manualChecks.Count -eq 0) {
+    $acceptanceScenarios = @($plugin.acceptance_scenarios)
+    if ($acceptanceScenarios.Count -eq 0) {
         Add-MatrixError $errors `
-            "Plugin has no explicit positive manual check: $pluginId"
+            "Plugin has no explicit acceptance scenario: $pluginId"
     }
     $manualIds = @{}
     $manualCommandCoverage = @{}
-    foreach ($manualCheck in $manualChecks) {
+    foreach ($manualCheck in $acceptanceScenarios) {
         $manualId = [string]$manualCheck.id
         if ($manualIds.ContainsKey($manualId)) {
             Add-MatrixError $errors `
-                "Duplicate manual check id for ${pluginId}: $manualId"
+                "Duplicate acceptance scenario id for ${pluginId}: $manualId"
         }
         $manualIds[$manualId] = $true
         foreach ($commandId in @($manualCheck.commands)) {
             $commandText = [string]$commandId
             if ($commandText -notin $matrixCommands) {
                 Add-MatrixError $errors `
-                    "Manual check references unknown command: ${pluginId}/${manualId}/$commandText"
+                    "Acceptance scenario references unknown command: ${pluginId}/${manualId}/$commandText"
             }
             $manualCommandCoverage[$commandText] = $true
         }
-        $status = [string]$manualCheck.status
+        $status = "pending"
         $approvalKey = "$pluginId/$manualId"
-        $approvedByReceipt = $false
         if ($approvalByKey.ContainsKey($approvalKey)) {
             $consumedApprovalKeys[$approvalKey] = $true
             $receiptValid = Test-ApprovalReceipt `
@@ -435,13 +434,8 @@ foreach ($plugin in @($matrix.plugins)) {
                 $errors
             if ($receiptValid) {
                 $status = "passed"
-                $approvedByReceipt = $true
                 $manualApprovalReceiptCount++
             }
-        }
-        if ($status -notin @("pending", "passed", "failed", "blocked")) {
-            Add-MatrixError $errors `
-                "Invalid manual status for ${pluginId}/${manualId}: $status"
         }
         if ([bool]$manualCheck.required_for_release) {
             $manualRequiredCount++
@@ -451,34 +445,11 @@ foreach ($plugin in @($matrix.plugins)) {
                 $manualFailedCount++
             }
         }
-        if ($status -eq "passed" -and -not $approvedByReceipt) {
-            $evidencePath = [string]$manualCheck.evidence_path
-            $evidenceSha256 = [string]$manualCheck.evidence_sha256
-            if ([string]::IsNullOrWhiteSpace($evidencePath) -or
-                $evidenceSha256 -notmatch '^[a-fA-F0-9]{64}$') {
-                Add-MatrixError $errors `
-                    "Passed manual check lacks evidence path/SHA-256: ${pluginId}/${manualId}"
-            } else {
-                $manualEvidence = Resolve-RepositoryPath $evidencePath
-                if (-not (Test-Path -LiteralPath $manualEvidence `
-                        -PathType Leaf)) {
-                    Add-MatrixError $errors `
-                        "Manual evidence file is missing: ${pluginId}/${manualId}"
-                } else {
-                    $actualSha256 = (Get-FileHash -LiteralPath `
-                        $manualEvidence -Algorithm SHA256).Hash
-                    if ($actualSha256 -ne $evidenceSha256) {
-                        Add-MatrixError $errors `
-                            "Manual evidence hash mismatch: ${pluginId}/${manualId}"
-                    }
-                }
-            }
-        }
     }
     foreach ($commandId in $matrixCommands) {
         if (-not $manualCommandCoverage.ContainsKey($commandId)) {
             Add-MatrixError $errors `
-                "Command has no positive manual check: ${pluginId}/$commandId"
+                "Command has no acceptance scenario: ${pluginId}/$commandId"
         }
     }
 }

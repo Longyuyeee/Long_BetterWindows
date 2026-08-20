@@ -71,7 +71,7 @@ $plugin = @($matrix.plugins | Where-Object {
 if ($plugin.Count -ne 1) {
     throw "Plugin manual matrix entry was not found or is ambiguous: $PluginId"
 }
-$manualCheck = @($plugin[0].manual_checks | Where-Object {
+$manualCheck = @($plugin[0].acceptance_scenarios | Where-Object {
     [string]$_.id -eq $ManualCheckId
 })
 if ($manualCheck.Count -ne 1) {

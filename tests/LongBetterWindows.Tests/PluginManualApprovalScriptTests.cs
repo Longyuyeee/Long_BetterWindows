@@ -58,7 +58,11 @@ public sealed class PluginManualApprovalScriptTests
         Assert.Contains("candidateChanges", source);
         Assert.Contains("git -C $PSScriptRoot diff", source);
         Assert.Contains("-- src", source);
-        Assert.Contains("-and -not $approvedByReceipt", source);
+        Assert.Contains("$status = \"pending\"", source);
+        Assert.Contains("if ($receiptValid)", source);
+        Assert.Contains("$status = \"passed\"", source);
+        Assert.DoesNotContain("manualCheck.status", source);
+        Assert.DoesNotContain("$approvedByReceipt", source);
         Assert.Contains(
             "Manual approval receipt has no matching matrix check",
             source);

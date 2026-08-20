@@ -6,6 +6,7 @@ using LongBetterWindows.Host.Services;
 
 namespace LongBetterWindows.Tests;
 
+[Collection(PerformanceSensitiveCollection.Name)]
 public sealed class ProcessServiceTests
 {
     [Fact]
