@@ -1,911 +1,483 @@
 #!/usr/bin/env pwsh
-<#
-.SYNOPSIS
-  Aggregate approved external evidence into one immutable release decision.
-.DESCRIPTION
-  This verifier does not collect or approve evidence. Each input must be a passing
-  summary produced by its dedicated verifier, and the marketplace input must be a
-  complete HTTPS deploy, public verification, rollback, and re-verification rehearsal.
-#>
 param(
-    [Parameter(Mandatory=$true)] [string] $ReleaseManifestPath,
-    [Parameter(Mandatory=$true)] [string] $DownloadGatePath,
-    [Parameter(Mandatory=$true)] [string] $CleanEnvironmentGatePath,
-    [Parameter(Mandatory=$true)] [string] $PhysicalDpiGatePath,
-    [Parameter(Mandatory=$true)] [string] $AccessibilityGatePath,
-    [string] $MarketplaceRehearsalPath,
     [Parameter(Mandatory=$true)] [string] $ProductAcceptanceGatePath,
-    [string] $ExternalEcosystemDeferralPath,
+    [string] $SubjectExecutable =
+        'src/LongBetterWindows.Host/bin/Release/net8.0-windows/LongBetterWindows.Host.exe',
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
     [Parameter(Mandatory=$true)]
     [ValidateSet('unsigned','signed')] [string] $ExpectedDistributionChannel,
-    [ValidateSet('independent','single_maintainer')]
-    [string] $ReviewModel = 'independent',
+    [Parameter(Mandatory=$true)]
+    [ValidateSet('offline','test_service','production')] [string] $ServiceMode,
+    [string] $TestServiceEndpoint,
+    [string] $TestServiceCertificateSha256,
     [string] $OutputPath,
-    [switch] $PreflightOnly
+    [switch] $PreflightOnly,
+    [switch] $AllowDirty,
+    [switch] $RequireReleaseEligible
 )
 
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'release-evidence-io.ps1')
-. (Join-Path $PSScriptRoot 'release-review-policy.ps1')
-. (Join-Path $PSScriptRoot 'external-ecosystem-deferral-policy.ps1')
 
-function Read-GateJson([string] $path, [string] $label) {
-    $resolved = [IO.Path]::GetFullPath($path)
-    if (-not (Test-Path -LiteralPath $resolved -PathType Leaf)) {
-        throw "$label was not found: $resolved"
+Add-Type -AssemblyName System.Net.Http
+$httpAssemblyPath = [Net.Http.HttpClient].Assembly.Location
+$compilerReferences = @(
+    $httpAssemblyPath
+    [Security.Cryptography.SHA256].Assembly.Location
+    [Security.Cryptography.X509Certificates.X509Certificate2].Assembly.Location
+    [Net.Security.SslPolicyErrors].Assembly.Location
+) | Sort-Object -Unique
+Add-Type -TypeDefinition @'
+using System;
+using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+
+public static class LongAuthenticodeVerifier
+{
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct WinTrustFileInfo
+    {
+        public uint StructSize;
+        public string FilePath;
+        public IntPtr FileHandle;
+        public IntPtr KnownSubject;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct WinTrustData
+    {
+        public uint StructSize;
+        public IntPtr PolicyCallbackData;
+        public IntPtr SipClientData;
+        public uint UiChoice;
+        public uint RevocationChecks;
+        public uint UnionChoice;
+        public IntPtr FileInfo;
+        public uint StateAction;
+        public IntPtr StateData;
+        public string UrlReference;
+        public uint ProviderFlags;
+        public uint UiContext;
+    }
+
+    [DllImport("wintrust.dll", ExactSpelling = true, SetLastError = true)]
+    private static extern int WinVerifyTrust(
+        IntPtr window,
+        [In] ref Guid action,
+        IntPtr trustData);
+
+    public static HttpClientHandler CreatePinnedHandler(string expectedSha256)
+    {
+        var handler = new HttpClientHandler();
+        handler.ServerCertificateCustomValidationCallback =
+            (request, certificate, chain, errors) =>
+            {
+                if (certificate == null)
+                    return false;
+                using (var algorithm = SHA256.Create())
+                {
+                    var actual = BitConverter.ToString(
+                        algorithm.ComputeHash(certificate.RawData))
+                        .Replace("-", "")
+                        .ToLowerInvariant();
+                    return string.Equals(
+                        actual,
+                        expectedSha256,
+                        StringComparison.Ordinal);
+                }
+            };
+        return handler;
+    }
+
+    public static string GetStatus(string path)
+    {
+        var file = new WinTrustFileInfo
+        {
+            StructSize = (uint)Marshal.SizeOf(typeof(WinTrustFileInfo)),
+            FilePath = path,
+        };
+        var filePointer = Marshal.AllocHGlobal(Marshal.SizeOf(file));
+        var dataPointer = IntPtr.Zero;
+        try
+        {
+            Marshal.StructureToPtr(file, filePointer, false);
+            var data = new WinTrustData
+            {
+                StructSize = (uint)Marshal.SizeOf(typeof(WinTrustData)),
+                UiChoice = 2,
+                RevocationChecks = 0,
+                UnionChoice = 1,
+                FileInfo = filePointer,
+                StateAction = 0,
+                ProviderFlags = 0,
+                UiContext = 0,
+            };
+            dataPointer = Marshal.AllocHGlobal(Marshal.SizeOf(data));
+            Marshal.StructureToPtr(data, dataPointer, false);
+            var action = new Guid("00AAC56B-CD44-11D0-8CC2-00C04FC295EE");
+            var result = WinVerifyTrust(IntPtr.Zero, ref action, dataPointer);
+            if (result == 0)
+                return "Valid";
+            if (result == unchecked((int)0x800B0100) ||
+                result == unchecked((int)0x800B0003) ||
+                result == unchecked((int)0x800B0001))
+                return "NotSigned";
+            return "Invalid";
+        }
+        finally
+        {
+            if (dataPointer != IntPtr.Zero)
+                Marshal.FreeHGlobal(dataPointer);
+            Marshal.FreeHGlobal(filePointer);
+        }
+    }
+}
+'@ -ReferencedAssemblies $compilerReferences
+
+function Resolve-RepositoryPath([string] $PathValue) {
+    if ([IO.Path]::IsPathRooted($PathValue)) {
+        return [IO.Path]::GetFullPath($PathValue)
+    }
+    return [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $PathValue))
+}
+
+function Read-JsonFile([string] $Path, [string] $Label) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "$Label was not found: $Path"
     }
     try {
-        $document = Get-Content -LiteralPath $resolved -Raw -Encoding UTF8 | ConvertFrom-Json
-    }
-    catch {
-        throw "$label is not valid JSON: $resolved"
-    }
-    return [ordered]@{
-        path = $resolved
-        document = $document
-        sha256 = (Get-FileHash -LiteralPath $resolved -Algorithm SHA256).Hash.ToLowerInvariant()
-    }
-}
-
-function Assert-Classification($gate, [string] $expected, [string] $label) {
-    if ([string]$gate.document.classification -ne $expected -or -not [bool]$gate.document.passed) {
-        throw "$label is not a passing $expected document."
-    }
-}
-
-function Assert-ExactSet(
-    [object[]] $actual,
-    [object[]] $required,
-    [string] $label) {
-    $actualValues = @($actual | Sort-Object -Unique)
-    $requiredValues = @($required | Sort-Object -Unique)
-    if ($actualValues.Count -ne $requiredValues.Count `
-        -or (Compare-Object -ReferenceObject $requiredValues `
-            -DifferenceObject $actualValues).Count -ne 0) {
-        throw "$label is incomplete. Required: $($requiredValues -join ', '); found: $($actualValues -join ', ')."
-    }
-}
-
-function Read-PortableMatrixSource($gate, $entry, [string] $label) {
-    $file = [string]$entry.file
-    $expectedDirectory = [IO.Path]::GetFileNameWithoutExtension(
-        $gate.path) + '.sources/'
-    if ($file -notmatch '^[A-Za-z0-9._-]+\.sources/[A-Za-z0-9._-]+\.json$' `
-        -or -not $file.StartsWith(
-            $expectedDirectory,
-            [StringComparison]::OrdinalIgnoreCase) `
-        -or [string]$entry.sha256 -notmatch '^[0-9a-f]{64}$') {
-        throw "$label portable source identity is incomplete."
-    }
-    $relativePath = $file.Replace('/', [IO.Path]::DirectorySeparatorChar)
-    $path = Join-Path (Split-Path -Parent $gate.path) $relativePath
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf) `
-        -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).
-            Hash.ToLowerInvariant() -ne [string]$entry.sha256) {
-        throw "$label portable source hash mismatch: $file"
-    }
-    try {
-        return Get-Content -LiteralPath $path -Raw -Encoding UTF8 |
+        return Get-Content -LiteralPath $Path -Raw -Encoding UTF8 |
             ConvertFrom-Json
     }
     catch {
-        throw "$label portable source is not valid JSON: $file"
+        throw "$Label is not valid JSON: $Path"
     }
 }
 
-function Assert-PhysicalDpiContract($gate, [string] $sourceCommit) {
-    $document = $gate.document
-    $requiredScales = @(100,125,150,200)
-    if ([int]$document.schema_version -ne 3) {
-        throw 'Physical DPI gate schema version 3 is required.'
-    }
-    if ([int]$document.capture_count -ne 32) {
-        throw 'Physical DPI gate must contain exactly 32 captures.'
-    }
-    Assert-ExactSet @($document.required_scales | ForEach-Object { [int]$_ }) `
-        $requiredScales 'Physical DPI required scales'
-    $evidence = @($document.evidence)
-    if ($evidence.Count -ne 4) {
-        throw 'Physical DPI gate must contain exactly four evidence entries.'
-    }
-    Assert-ExactSet @($evidence | ForEach-Object { [int]$_.scale_percent }) `
-        $requiredScales 'Physical DPI evidence scales'
-    $sourceFiles = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
-    foreach ($entry in $evidence) {
-        if ([string]$entry.source_commit -ne $sourceCommit `
-            -or [int]$entry.capture_count -ne 8) {
-            throw 'Physical DPI evidence entry does not match the candidate or eight-capture contract.'
-        }
-        if (-not $sourceFiles.Add([string]$entry.source_manifest.file)) {
-            throw 'Physical DPI portable source is duplicated.'
-        }
-        $source = Read-PortableMatrixSource `
-            $gate $entry.source_manifest 'Physical DPI evidence'
-        if ([int]$source.schema_version -ne 2 `
-            -or [string]$source.classification -ne 'physical_device_dpi_evidence' `
-            -or [string]$source.source_commit -ne $sourceCommit `
-            -or [int]$source.expected_scale_percent -ne [int]$entry.scale_percent `
-            -or [string]$source.human_review.status -ne 'approved') {
-            throw 'Physical DPI portable source content does not match its summary.'
-        }
-    }
-}
-
-function Assert-AccessibilityContract($gate, [string] $sourceCommit) {
-    $document = $gate.document
-    $requiredProfiles = @('high_contrast','reduced_motion','combined')
-    if ([int]$document.schema_version -ne 4) {
-        throw 'Accessibility gate schema version 4 is required.'
-    }
-    if ([int]$document.screen_reader_approval_count -lt 1) {
-        throw 'Accessibility gate requires at least one screen-reader approval.'
-    }
-    Assert-ExactSet @($document.required_profiles | ForEach-Object { [string]$_ }) `
-        $requiredProfiles 'Accessibility required profiles'
-    $evidence = @($document.evidence)
-    if ($evidence.Count -ne 3) {
-        throw 'Accessibility gate must contain exactly three evidence entries.'
-    }
-    Assert-ExactSet @($evidence | ForEach-Object { [string]$_.profile }) `
-        $requiredProfiles 'Accessibility evidence profiles'
-    $sourceFiles = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
-    $verifiedScreenReaderApprovalCount = 0
-    foreach ($entry in $evidence) {
-        if ([string]$entry.source_commit -ne $sourceCommit `
-            -or [int]$entry.focus_event_count -lt 1 `
-            -or [int]$entry.live_region_event_count -lt 1) {
-            throw 'Accessibility evidence entry does not match the candidate.'
-        }
-        if (-not $sourceFiles.Add([string]$entry.source_manifest.file)) {
-            throw 'Accessibility portable source is duplicated.'
-        }
-        $source = Read-PortableMatrixSource `
-            $gate $entry.source_manifest 'Accessibility evidence'
-        if ([int]$source.schema_version -ne 3 `
-            -or [string]$source.classification -ne 'physical_accessibility_evidence' `
-            -or [string]$source.source_commit -ne $sourceCommit `
-            -or [string]$source.expected_profile -ne [string]$entry.profile `
-            -or [string]$source.human_review.status -ne 'approved') {
-            throw 'Accessibility portable source content does not match its summary.'
-        }
-        $events = $source.assistive_technology_events
-        if ([string]$events.transport -ne 'windows_ui_automation_events' `
-            -or -not [bool]$events.physical_keyboard_validated `
-            -or [int]$events.focus_event_count -lt 1 `
-            -or [int]$events.live_region_event_count -lt 1 `
-            -or [int]$events.focus_event_count -ne [int]$entry.focus_event_count `
-            -or [int]$events.live_region_event_count -ne [int]$entry.live_region_event_count `
-            -or [string]::IsNullOrWhiteSpace([string]$events.expected_announcement)) {
-            throw 'Accessibility UIA event evidence is incomplete or inconsistent.'
-        }
-        $readerName = [string]$source.screen_reader.name
-        $checks = $source.human_review.checklist
-        if ($readerName -ne 'None' `
-            -and [bool]$source.screen_reader.process_detected `
-            -and [bool]$events.screen_reader_active_during_capture `
-            -and [bool]$checks.screen_reader_announcements `
-            -and [bool]$checks.management_close_announcements) {
-            $verifiedScreenReaderApprovalCount++
-        }
-    }
-    if ($verifiedScreenReaderApprovalCount -lt 1 `
-        -or $verifiedScreenReaderApprovalCount -ne `
-            [int]$document.screen_reader_approval_count) {
-        throw 'Accessibility screen-reader approvals do not match portable sources.'
-    }
-}
-
-function Assert-ProductAcceptanceContract(
-    $gate,
-    [string] $sourceCommit,
-    $deferralGate,
-    [string] $candidateVersion) {
-    $document = $gate.document
-    $allRequired = @(
-        'taskbar-visual-grouping',
-        'native-performance',
-        'lpwp-long-grid-e2e',
-        'lpwp-widget-desktop',
-        'lpwp-signed-reference')
-    $deferred = $null -ne $deferralGate
-    $approvedRequired = if ($deferred) {
-        @('taskbar-visual-grouping','native-performance','lpwp-widget-desktop')
-    } else { $allRequired }
-    $expectedSchema = if ($deferred) { 2 } else { 1 }
-    if ([int]$document.schema_version -ne $expectedSchema `
-        -or [string]$document.source_commit -ne $sourceCommit `
-        -or [int]$document.plugin_count -ne 25 `
-        -or [int]$document.command_count -ne 42 `
-        -or [int]$document.plugin_approval_receipt_count -ne 25 `
-        -or [int]$document.approved_validation_count -ne $approvedRequired.Count) {
-        throw 'Final product-acceptance gate contract is incomplete.'
-    }
-    Assert-ExactSet @($document.required_validation_ids | ForEach-Object { [string]$_ }) `
-        $allRequired 'Final product-acceptance validation IDs'
-    $approvals = @($document.approvals)
-    if ($approvals.Count -ne $approvedRequired.Count) {
-        throw "Final product-acceptance gate must contain exactly $($approvedRequired.Count) approvals."
-    }
-    Assert-ExactSet @($approvals | ForEach-Object { [string]$_.validation_id }) `
-        $approvedRequired 'Final product-acceptance approvals'
-    foreach ($entry in $approvals) {
-        if ([string]$entry.source_commit -ne $sourceCommit) {
-            throw 'Final product-acceptance approval does not match the candidate.'
-        }
-        $source = Read-PortableMatrixSource `
-            $gate $entry.source_manifest 'Final product-acceptance approval'
-        if ([int]$source.schema_version -ne 1 `
-            -or [string]$source.classification -ne 'final_validation_approval' `
-            -or [string]$source.validation_id -ne [string]$entry.validation_id `
-            -or [string]$source.source_commit -ne $sourceCommit `
-            -or [string]$source.status -ne 'passed' `
-            -or [string]::IsNullOrWhiteSpace([string]$source.reviewer)) {
-            throw 'Final product-acceptance portable approval content is invalid.'
-        }
-    }
-    if ($deferred) {
-        if ([int]$document.deferred_validation_count -ne 2 `
-            -or [string]$document.external_ecosystem_deferral.sha256 -ne $deferralGate.sha256) {
-            throw 'Final product-acceptance external ecosystem deferral is incomplete.'
-        }
-        $portableDeferral = Read-PortableMatrixSource $gate `
-            $document.external_ecosystem_deferral 'External ecosystem deferral'
-        Resolve-LongExternalEcosystemDeferral -Document $portableDeferral `
-            -ExpectedSourceCommit $sourceCommit `
-            -ExpectedCandidateVersion $candidateVersion | Out-Null
-        $expectedItems = @($deferralGate.policy.items | ConvertTo-Json -Compress -Depth 5)
-        $summaryItems = @($document.external_ecosystem | ConvertTo-Json -Compress -Depth 5)
-        if ($summaryItems -ne $expectedItems) {
-            throw 'Final product-acceptance deferred items do not match the approved deferral.'
-        }
-    }
-    $pluginMatrix = Read-PortableMatrixSource `
-        $gate $document.plugin_matrix 'Plugin positive matrix'
-    if ([int]$pluginMatrix.schema_version -ne 1 `
-        -or [string]$pluginMatrix.classification -ne 'plugin_positive_matrix' `
-        -or [string]$pluginMatrix.source_commit -ne $sourceCommit `
-        -or [bool]$pluginMatrix.source_dirty `
-        -or [int]$pluginMatrix.plugin_count -ne 25 `
-        -or [int]$pluginMatrix.command_count -ne 42 `
-        -or [int]$pluginMatrix.approval_receipt_count -ne 25 `
-        -or -not [bool]$pluginMatrix.contract_valid `
-        -or -not [bool]$pluginMatrix.release_eligible) {
-        throw 'Plugin positive matrix portable source is not release eligible.'
-    }
-}
-
-function Read-HashLockedSource($gate, $entry, [string] $label) {
-    $file = [string]$entry.file
-    if ([string]::IsNullOrWhiteSpace($file) `
-        -or [IO.Path]::GetFileName($file) -ne $file `
-        -or [string]$entry.sha256 -notmatch '^[0-9a-f]{64}$') {
-        throw "$label source identity is incomplete."
-    }
-    $path = Join-Path (Split-Path -Parent $gate.path) $file
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf) `
-        -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).
-            Hash.ToLowerInvariant() -ne [string]$entry.sha256) {
-        throw "$label source hash mismatch: $file"
-    }
+function Get-ByteSha256([byte[]] $Bytes) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
     try {
-        return Get-Content -LiteralPath $path -Raw -Encoding UTF8 |
-            ConvertFrom-Json
+        return ([BitConverter]::ToString(
+            $algorithm.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant()
     }
-    catch {
-        throw "$label source is not valid JSON: $file"
-    }
-}
-
-function Assert-DownloadContract(
-    $gate,
-    [string] $candidateVersion,
-    [string] $expectedReviewModel) {
-    $document = $gate.document
-    $documentReviewModel = Get-LongReviewModel $document
-    if ([int]$document.schema_version -notin @(2, 3) `
-        -or ($expectedReviewModel -eq 'single_maintainer' -and [int]$document.schema_version -ne 3) `
-        -or $documentReviewModel -ne $expectedReviewModel `
-        -or [string]::IsNullOrWhiteSpace([string]$document.download_host)) {
-        throw 'Release-download gate summary contract is incomplete.'
-    }
-    $evidence = Read-HashLockedSource `
-        $gate $document.evidence 'Release-download evidence'
-    $approval = Read-HashLockedSource `
-        $gate $document.approval 'Release-download approval'
-    $approvalReviewModel = Get-LongReviewModel $approval
-    if (($documentReviewModel -eq 'single_maintainer' -and [int]$approval.schema_version -ne 2) `
-        -or ($documentReviewModel -eq 'independent' -and [int]$approval.schema_version -notin @(0, 1, 2))) {
-        throw 'Release-download approval review schema is incompatible with its review model.'
-    }
-    if ([string]$evidence.classification -ne 'verified_release_download_provenance' `
-        -or -not [bool]$evidence.passed `
-        -or [string]$evidence.release.source_commit -ne [string]$document.source_commit `
-        -or [string]$evidence.release.distribution_channel -ne [string]$document.distribution_channel `
-        -or [string]$evidence.package.file -ne [string]$document.package_file `
-        -or [string]$evidence.package.sha256 -ne [string]$document.package_sha256 `
-        -or [string]$evidence.windows_origin.host.host -ne [string]$document.download_host) {
-        throw 'Release-download evidence source content does not match its summary.'
-    }
-    if ([string]$approval.classification -ne 'release_download_human_approval' `
-        -or [string]$approval.source_commit -ne [string]$document.source_commit `
-        -or [string]$approval.distribution_channel -ne [string]$document.distribution_channel `
-        -or [string]$approval.package.file -ne [string]$document.package_file `
-        -or [string]$approval.package.sha256 -ne [string]$document.package_sha256 `
-        -or [string]$approval.operator -ne [string]$document.operator `
-        -or [string]$approval.reviewer -ne [string]$document.reviewer `
-        -or $approvalReviewModel -ne $documentReviewModel `
-        -or [string]$approval.evidence.file -ne [string]$document.evidence.file `
-        -or [string]$approval.evidence.sha256 -ne [string]$document.evidence.sha256) {
-        throw 'Release-download approval source content does not match its summary.'
-    }
-    $riskAcceptance = $approval.risk_acceptance
-    $policy = Resolve-LongReleaseReviewPolicy `
-        -ReviewModel $documentReviewModel `
-        -CandidateVersion $candidateVersion `
-        -Operator ([string]$document.operator) `
-        -Reviewer ([string]$document.reviewer) `
-        -RiskAcceptedBy ([string]$riskAcceptance.risk_accepted_by) `
-        -RiskAcceptedAt ([string]$riskAcceptance.risk_accepted_at) `
-        -RiskReason ([string]$riskAcceptance.risk_reason) `
-        -RiskAcceptedVersion ([string]$riskAcceptance.risk_accepted_version)
-    if ($documentReviewModel -eq 'single_maintainer' `
-        -and ([string]$document.version -ne $candidateVersion `
-            -or [bool]$document.independent_review `
-            -or [string]$document.risk_acceptance.risk_accepted_by -ne [string]$policy.risk_acceptance.risk_accepted_by `
-            -or [string]$document.risk_acceptance.risk_accepted_at -ne [string]$policy.risk_acceptance.risk_accepted_at `
-            -or [string]$document.risk_acceptance.risk_reason -ne [string]$policy.risk_acceptance.risk_reason `
-            -or [string]$document.risk_acceptance.risk_accepted_version -ne [string]$policy.risk_acceptance.risk_accepted_version)) {
-        throw 'Single-maintainer release-download risk acceptance does not match its hash-locked approval.'
-    }
-    if ($documentReviewModel -eq 'independent') {
-        $independentProperty = $document.PSObject.Properties['independent_review']
-        $riskProperty = $document.PSObject.Properties['risk_acceptance']
-        if (($null -ne $independentProperty -and -not [bool]$independentProperty.Value) `
-            -or ($null -ne $riskProperty -and $null -ne $riskProperty.Value)) {
-            throw 'Independent release-download summary contains contradictory risk acceptance fields.'
-        }
-    }
-    return $policy
-}
-
-function Assert-CleanEnvironmentContract(
-    $gate,
-    [string] $distributionChannel) {
-    $document = $gate.document
-    if ([int]$document.schema_version -ne 2 `
-        -or [string]::IsNullOrWhiteSpace([string]$document.environment_label) `
-        -or [bool]$document.signed -ne ($distributionChannel -eq 'signed')) {
-        throw 'Clean-environment gate summary contract is incomplete.'
-    }
-    if ([string]$document.evidence_manifest.file -ne 'clean-environment-evidence.json') {
-        throw 'Clean-environment evidence source identity is incomplete.'
-    }
-    $evidence = Read-HashLockedSource `
-        $gate $document.evidence_manifest 'Clean-environment evidence'
-    if ([string]$evidence.classification -ne 'clean_windows_release_evidence' `
-        -or [string]$evidence.release.source_commit -ne [string]$document.source_commit `
-        -or [string]$evidence.release.distribution_channel -ne [string]$document.distribution_channel `
-        -or [string]$evidence.release.version -ne [string]$document.version `
-        -or [string]$evidence.release.package_sha256 -ne [string]$document.package_sha256 `
-        -or [bool]$evidence.release.signed -ne [bool]$document.signed `
-        -or -not [bool]$evidence.automated_checks.passed `
-        -or [string]$evidence.environment.label -ne [string]$document.environment_label `
-        -or [string]$evidence.human_review.status -ne 'approved' `
-        -or [string]$evidence.human_review.reviewer -ne [string]$document.reviewer) {
-        throw 'Clean-environment evidence source content does not match its summary.'
+    finally {
+        $algorithm.Dispose()
     }
 }
 
-function Assert-MarketplaceEvidenceContract($gate) {
-    if ([int]$gate.document.schema_version -ne 2) {
-        throw 'Marketplace rehearsal schema version 2 is required.'
+function Assert-FinalProductAcceptance(
+    $Document,
+    [string] $ExpectedCommit,
+    [bool] $ExpectedDirty,
+    [string] $GatePath,
+    [string] $HostPath,
+    [string] $HostHash) {
+    $identityInvalid = (
+        [int]$Document.schema_version -ne 3 -or
+        [string]$Document.classification -ne 'automated_final_product_acceptance' -or
+        [string]$Document.source_commit -ne $ExpectedCommit -or
+        [bool]$Document.source_dirty -ne $ExpectedDirty -or
+        [int]$Document.plugin_count -ne 25 -or
+        [int]$Document.command_count -ne 42 -or
+        [int]$Document.automated_gate_count -ne 94 -or
+        [int]$Document.failed_gate_count -ne 0 -or
+        [int]$Document.not_run_gate_count -ne 0 -or
+        -not [bool]$Document.contract_valid)
+    if ($identityInvalid) {
+        throw 'Automated final product-acceptance contract is incomplete.'
     }
-    $startedAt = [DateTimeOffset]::MinValue
-    $completedAt = [DateTimeOffset]::MinValue
-    if (-not [bool]$gate.document.deployment_started `
-        -or -not [DateTimeOffset]::TryParse(
-            [string]$gate.document.started_at,
-            [ref]$startedAt) `
-        -or -not [DateTimeOffset]::TryParse(
-            [string]$gate.document.completed_at,
-            [ref]$completedAt) `
-        -or $completedAt -lt $startedAt) {
-        throw 'Marketplace rehearsal lifecycle metadata is incomplete.'
+    $classified = [int]$Document.passed_gate_count +
+        [int]$Document.failed_gate_count +
+        [int]$Document.environment_blocked_gate_count +
+        [int]$Document.not_run_gate_count +
+        [int]$Document.not_applicable_gate_count
+    if ($classified -ne 94) {
+        throw 'Automated final product-acceptance gate counts are inconsistent.'
     }
-    $requiredEvidence = [ordered]@{
-        preflight_dry_run = 'preflight-dry-run.json'
-        baseline_verification = 'baseline-verification.json'
-        deployment = 'deployment.json'
-        deployed_verification = 'deployed-verification.json'
-        rollback_verification = 'rollback-verification.json'
+    if ([string]$Document.release_host.sha256 -ne $HostHash) {
+        throw 'Automated final product-acceptance host identity is invalid.'
     }
-    $evidence = $gate.document.evidence
-    if ($null -eq $evidence) {
-        throw 'Marketplace rehearsal evidence entries are missing.'
-    }
-    $reports = [ordered]@{}
-    foreach ($required in $requiredEvidence.GetEnumerator()) {
-        $property = $evidence.psobject.Properties[$required.Key]
-        $entry = if ($null -eq $property) { $null } else { $property.Value }
-        if ($null -eq $entry -or [string]$entry.file -ne $required.Value `
-            -or [string]$entry.sha256 -notmatch '^[0-9a-f]{64}$') {
-            throw "Marketplace rehearsal evidence entry is incomplete: $($required.Key)"
-        }
-        $reports[$required.Key] = Read-HashLockedSource `
-            $gate $entry "Marketplace rehearsal evidence $($required.Key)"
-    }
-
-    $dryRun = $reports.preflight_dry_run
-    $deployment = $reports.deployment
-    $destination = [string]$gate.document.destination
-    if ([int]$dryRun.SchemaVersion -ne 1 `
-        -or [string]$dryRun.ReleaseId -ne [string]$gate.document.release_id `
-        -or [string]$dryRun.Mode -ne 'dry_run' `
-        -or [string]$dryRun.Target -ne 'Https' `
-        -or [string]$dryRun.Destination -ne $destination `
-        -or @($dryRun.Files).Count -eq 0 `
-        -or [string]$dryRun.Files[-1].Kind -ne 'RegistryCommit') {
-        throw 'Marketplace preflight report content does not match its summary.'
-    }
-    if ([int]$deployment.SchemaVersion -ne 1 `
-        -or [string]$deployment.ReleaseId -ne [string]$gate.document.release_id `
-        -or [string]$deployment.Mode -ne 'deployed' `
-        -or [string]$deployment.Target -ne 'Https' `
-        -or [string]$deployment.Destination -ne $destination) {
-        throw 'Marketplace deployment report content does not match its summary.'
-    }
-
-    $dryRunPlan = @($dryRun.Files | Sort-Object RemotePath |
-        Select-Object RemotePath,Sha256,Bytes,Kind) |
-        ConvertTo-Json -Compress -Depth 4
-    $deploymentPlan = @($deployment.Files | Sort-Object RemotePath |
-        Select-Object RemotePath,Sha256,Bytes,Kind) |
-        ConvertTo-Json -Compress -Depth 4
-    if ($dryRunPlan -ne $deploymentPlan) {
-        throw 'Marketplace deployment report differs from the approved preflight plan.'
-    }
-
-    $registryUri = [uri]::new([uri]$destination, 'registry.json').AbsoluteUri
-    $verificationReports = @(
-        $reports.baseline_verification,
-        $reports.deployed_verification,
-        $reports.rollback_verification)
-    foreach ($report in $verificationReports) {
-        if ([int]$report.SchemaVersion -ne 1 `
-            -or [string]$report.RegistryUri -ne $registryUri `
-            -or [int]$report.EntryCount -lt 0 `
-            -or [int]$report.PackageCount -ne @($report.Packages).Count `
-            -or [long]$report.TotalPackageBytes -lt 0 `
-            -or [int]$report.TrustedPublisherKeyCount -lt 1) {
-            throw 'Marketplace verification report content is incomplete.'
-        }
-        $packageBytes = [long]0
-        $pluginIds = [Collections.Generic.HashSet[string]]::new(
-            [StringComparer]::OrdinalIgnoreCase)
-        foreach ($package in @($report.Packages)) {
-            if ([string]::IsNullOrWhiteSpace([string]$package.PluginId) `
-                -or -not $pluginIds.Add([string]$package.PluginId) `
-                -or [string]::IsNullOrWhiteSpace([string]$package.Version) `
-                -or [string]$package.Sha256 -notmatch '^[0-9a-f]{64}$' `
-                -or [string]::IsNullOrWhiteSpace([string]$package.PublisherKeyId) `
-                -or [long]$package.Bytes -le 0) {
-                throw 'Marketplace verification package inventory is invalid.'
-            }
-            $packageBytes += [long]$package.Bytes
-        }
-        if ($packageBytes -ne [long]$report.TotalPackageBytes) {
-            throw 'Marketplace verification package bytes do not match the report total.'
-        }
-    }
-
-    $baselineState = $reports.baseline_verification |
-        Select-Object RegistryGeneratedAt,EntryCount,PackageCount,
-            TotalPackageBytes,TrustedPublisherKeyCount,Packages |
-        ConvertTo-Json -Compress -Depth 6
-    $rollbackState = $reports.rollback_verification |
-        Select-Object RegistryGeneratedAt,EntryCount,PackageCount,
-            TotalPackageBytes,TrustedPublisherKeyCount,Packages |
-        ConvertTo-Json -Compress -Depth 6
-    if ($baselineState -ne $rollbackState) {
-        throw 'Marketplace rollback verification did not restore the baseline Registry.'
-    }
-    $deployedState = $reports.deployed_verification |
-        Select-Object RegistryGeneratedAt,EntryCount,PackageCount,
-            TotalPackageBytes,TrustedPublisherKeyCount,Packages |
-        ConvertTo-Json -Compress -Depth 6
-    if ($deployedState -eq $baselineState) {
-        throw 'Marketplace deployed verification did not observe a Registry change.'
-    }
-
-    $reportTimes = @(
-        [string]$dryRun.ExecutedAt,
-        [string]$reports.baseline_verification.VerifiedAt,
-        [string]$deployment.ExecutedAt,
-        [string]$reports.deployed_verification.VerifiedAt,
-        [string]$reports.rollback_verification.VerifiedAt)
-    $previous = $startedAt
-    foreach ($value in $reportTimes) {
-        $timestamp = [DateTimeOffset]::MinValue
-        if (-not [DateTimeOffset]::TryParse($value, [ref]$timestamp) `
-            -or $timestamp -lt $previous `
-            -or $timestamp -gt $completedAt) {
-            throw 'Marketplace rehearsal report chronology is invalid.'
-        }
-        $previous = $timestamp
-    }
-}
-
-function Assert-ReleaseManifestContract(
-    $document,
-    [string] $sourceCommit,
-    [string] $distributionChannel) {
-    $createdAt = [DateTimeOffset]::MinValue
-    if ([int]$document.schema_version -ne 1 `
-        -or [string]$document.product -ne 'Long Assistant' `
-        -or [string]$document.version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$' `
-        -or [string]$document.runtime -ne 'win-x64' `
-        -or -not [DateTimeOffset]::TryParse([string]$document.created_at, [ref]$createdAt) `
-        -or [bool]$document.source_dirty) {
-        throw 'Release Manifest candidate identity contract is incomplete.'
-    }
-    if ($distributionChannel -eq 'unsigned') {
-        if ([string]$document.publisher_identity -ne 'unverified' `
-            -or [string]::IsNullOrWhiteSpace([string]$document.security_notice)) {
-            throw 'Unsigned Release Manifest publisher disclosure is incomplete.'
-        }
-    }
-    else {
-        if ([string]$document.publisher_identity -ne 'authenticode' `
-            -or [string]$document.signing.source_commit -ne $sourceCommit `
-            -or [string]$document.signing.certificate_thumbprint -notmatch '^[0-9a-fA-F]{40}$') {
-            throw 'Signed Release Manifest publisher identity is incomplete.'
-        }
-    }
-
-    $packages = @($document.packages)
-    if ($packages.Count -lt 1 -or $packages.Count -gt 2) {
-        throw 'Release Manifest must contain one or two package entries.'
-    }
-    $fileNames = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
-    $kinds = [Collections.Generic.HashSet[string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
-    foreach ($package in $packages) {
-        $file = [string]$package.file
-        $kind = [string]$package.kind
-        if ([string]::IsNullOrWhiteSpace($file) `
-            -or [IO.Path]::GetFileName($file) -ne $file `
-            -or -not $fileNames.Add($file) `
-            -or $kind -notin @('self-contained','framework-dependent') `
-            -or -not $kinds.Add($kind) `
-            -or [string]$package.sha256 -notmatch '^[0-9a-f]{64}$' `
-            -or [long]$package.bytes -le 0 `
-            -or [int]$package.plugins -ne 25 `
-            -or [int]$package.manifests -ne 25 `
-            -or [int]$package.unique_plugin_ids -ne 25 `
-            -or [int]$package.commands -ne 42 `
-            -or [int]$package.command_smoke_exit_code -ne 0 `
-            -or [int]$package.added_webview_processes -ne 0) {
-            throw 'Release Manifest package inventory is invalid.'
-        }
-    }
-
-    $installers = @($document.installers)
-    if ($installers.Count -gt 1) {
-        throw 'Release Manifest must contain at most one installer entry.'
-    }
-    foreach ($installer in $installers) {
-        $file = [string]$installer.file
-        if ([string]::IsNullOrWhiteSpace($file) `
-            -or [IO.Path]::GetFileName($file) -ne $file `
-            -or -not $fileNames.Add($file) `
-            -or [string]$installer.kind -ne 'installer' `
-            -or [string]$installer.format -ne 'inno-setup-exe' `
-            -or [string]$installer.install_scope -ne 'current-user' `
-            -or [bool]$installer.requires_elevation `
-            -or [string]$installer.sha256 -notmatch '^[0-9a-f]{64}$' `
-            -or [long]$installer.bytes -le 0 `
-            -or [int]$installer.plugins -ne 25 `
-            -or [int]$installer.commands -ne 42 `
-            -or [bool]$installer.signed -ne ($distributionChannel -eq 'signed')) {
-            throw 'Release Manifest installer inventory is invalid.'
-        }
-    }
-}
-
-function Assert-ReleaseArtifactFiles($releaseGate) {
-    $root = Split-Path -Parent $releaseGate.path
-    $artifacts = @($releaseGate.document.packages) +
-        @($releaseGate.document.installers)
-    foreach ($artifact in $artifacts) {
-        $file = [string]$artifact.file
-        $path = Join-Path $root $file
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-            throw "Release artifact file was not found: $file"
-        }
-        $item = Get-Item -LiteralPath $path
-        if ([long]$item.Length -ne [long]$artifact.bytes) {
-            throw "Release artifact file size does not match the Manifest: $file"
-        }
-        $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).
-            Hash.ToLowerInvariant()
-        if ($actualHash -ne ([string]$artifact.sha256).ToLowerInvariant()) {
-            throw "Release artifact file hash does not match the Manifest: $file"
-        }
-    }
-
-    $checksumPath = Join-Path $root 'SHA256SUMS.txt'
-    if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
-        throw 'Release checksum file was not found: SHA256SUMS.txt'
-    }
-    $checksums = [Collections.Generic.Dictionary[string,string]]::new(
-        [StringComparer]::OrdinalIgnoreCase)
-    foreach ($line in @(Get-Content -LiteralPath $checksumPath -Encoding UTF8)) {
-        if ($line -notmatch '^([0-9a-f]{64})  ([^\\/]+)$' `
-            -or $checksums.ContainsKey($Matches[2])) {
-            throw 'Release checksum file contains an invalid or duplicate entry.'
-        }
-        $checksums.Add($Matches[2], $Matches[1])
-    }
-    if ($checksums.Count -ne $artifacts.Count) {
-        throw 'Release checksum file does not contain the exact Manifest artifact set.'
-    }
-    foreach ($artifact in $artifacts) {
-        $checksum = ''
-        if (-not $checksums.TryGetValue([string]$artifact.file, [ref]$checksum) `
-            -or $checksum -ne ([string]$artifact.sha256).ToLowerInvariant()) {
-            throw 'Release checksum file does not match the Manifest artifacts.'
-        }
-    }
-}
-
-function Write-DecisionAtomically($decision, [string] $path) {
-    Write-NewJsonFileAtomically `
-        -Value $decision `
-        -Path $path `
-        -Depth 7 `
-        -Label 'External release decision'
-}
-
-$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
-if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
-    throw 'ExpectedSourceCommit must be a full 40-character Git commit SHA.'
-}
-$resolvedOutput = $null
-if ($PreflightOnly) {
-    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
-        throw 'PreflightOnly does not accept OutputPath and never writes a decision.'
-    }
-}
-else {
-    if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-        throw 'OutputPath is required unless PreflightOnly is specified.'
-    }
-    $resolvedOutput = [IO.Path]::GetFullPath($OutputPath)
-    if (Test-Path -LiteralPath $resolvedOutput) {
-        throw "External release decision already exists: $resolvedOutput"
-    }
-}
-
-$release = Read-GateJson $ReleaseManifestPath 'Release Manifest'
-$download = Read-GateJson $DownloadGatePath 'Release-download gate'
-$clean = Read-GateJson $CleanEnvironmentGatePath 'Clean-environment gate'
-$dpi = Read-GateJson $PhysicalDpiGatePath 'Physical DPI gate'
-$accessibility = Read-GateJson $AccessibilityGatePath 'Accessibility gate'
-$productAcceptance = Read-GateJson $ProductAcceptanceGatePath 'Final product-acceptance gate'
-$marketplace = $null
-$deferral = $null
-if ([string]::IsNullOrWhiteSpace($ExternalEcosystemDeferralPath)) {
-    if ([string]::IsNullOrWhiteSpace($MarketplaceRehearsalPath)) {
-        throw 'MarketplaceRehearsalPath is required unless an external ecosystem deferral is supplied.'
-    }
-    $marketplace = Read-GateJson $MarketplaceRehearsalPath 'Marketplace rehearsal'
-}
-else {
-    if (-not [string]::IsNullOrWhiteSpace($MarketplaceRehearsalPath)) {
-        throw 'Deferred external ecosystem mode must not include passing marketplace rehearsal evidence.'
-    }
-    $deferral = Read-GateJson $ExternalEcosystemDeferralPath 'External ecosystem deferral'
-    $deferral['policy'] = Resolve-LongExternalEcosystemDeferral `
-        -Document $deferral.document -ExpectedSourceCommit $expectedCommit `
-        -ExpectedCandidateVersion ([string]$release.document.version)
-}
-
-Assert-Classification $download 'approved_release_download_gate' 'Release-download gate'
-Assert-Classification $clean 'approved_clean_windows_release_gate' 'Clean-environment gate'
-Assert-Classification $dpi 'approved_physical_device_dpi_matrix' 'Physical DPI gate'
-Assert-Classification $accessibility 'approved_physical_accessibility_matrix' 'Accessibility gate'
-if ($null -ne $marketplace) {
-    Assert-Classification $marketplace 'marketplace_https_rehearsal' 'Marketplace rehearsal'
-}
-Assert-Classification $productAcceptance 'approved_final_product_acceptance' 'Final product-acceptance gate'
-
-if ([string]$release.document.commit -ne $expectedCommit) {
-    throw 'Release Manifest source commit does not match ExpectedSourceCommit.'
-}
-if ([string]$release.document.distribution_channel -ne $ExpectedDistributionChannel `
-    -or -not [bool]$release.document.release_eligible `
-    -or ($ExpectedDistributionChannel -eq 'signed' -and -not [bool]$release.document.signed) `
-    -or ($ExpectedDistributionChannel -eq 'unsigned' -and [bool]$release.document.signed)) {
-    throw 'Release Manifest does not match the eligible expected distribution channel.'
-}
-Assert-ReleaseManifestContract `
-    $release.document `
-    $expectedCommit `
-    $ExpectedDistributionChannel
-Assert-ReleaseArtifactFiles $release
-
-foreach ($gate in @($download, $clean, $dpi, $accessibility)) {
-    if ([string]$gate.document.source_commit -ne $expectedCommit) {
-        throw "External gate source commit mismatch: $($gate.document.classification)"
-    }
-}
-$reviewPolicy = Assert-DownloadContract `
-    $download `
-    ([string]$release.document.version) `
-    $ReviewModel
-Assert-CleanEnvironmentContract $clean $ExpectedDistributionChannel
-Assert-PhysicalDpiContract $dpi $expectedCommit
-Assert-AccessibilityContract $accessibility $expectedCommit
-Assert-ProductAcceptanceContract $productAcceptance $expectedCommit $deferral `
-    ([string]$release.document.version)
-foreach ($gate in @($download, $clean)) {
-    if ([string]$gate.document.distribution_channel -ne $ExpectedDistributionChannel) {
-        throw "External gate distribution channel mismatch: $($gate.document.classification)"
-    }
-}
-
-$packageFile = [string]$download.document.package_file
-$packageSha256 = ([string]$download.document.package_sha256).ToLowerInvariant()
-if ([string]::IsNullOrWhiteSpace($packageFile) -or $packageSha256 -notmatch '^[0-9a-f]{64}$') {
-    throw 'Release-download gate package identity is invalid.'
-}
-if (([string]$clean.document.package_sha256).ToLowerInvariant() -ne $packageSha256) {
-    throw 'Clean-environment and release-download gates refer to different packages.'
-}
-$manifestPackages = @($release.document.packages | Where-Object {
-    [string]$_.file -eq $packageFile -and ([string]$_.sha256).ToLowerInvariant() -eq $packageSha256
-})
-if ($manifestPackages.Count -ne 1) {
-    throw 'Approved package identity does not match exactly one Release Manifest package.'
-}
-
-$downloadOperator = $reviewPolicy.operator
-$downloadReviewer = $reviewPolicy.reviewer
-$cleanReviewer = ([string]$clean.document.reviewer).Trim()
-if ([string]::IsNullOrWhiteSpace($cleanReviewer)) {
-    throw 'Clean-environment gate reviewer is missing.'
-}
-if ($ReviewModel -eq 'single_maintainer' `
-    -and -not [string]::Equals(
-        $cleanReviewer,
-        [string]$reviewPolicy.risk_acceptance.risk_accepted_by,
+    $reportedHost = [IO.Path]::GetFullPath([string]$Document.release_host.path)
+    if (-not [string]::Equals(
+        $reportedHost,
+        $HostPath,
         [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'Single-maintainer review identities are inconsistent across release gates.'
+        throw 'Automated final product-acceptance host path does not match the subject executable.'
+    }
+    $closureFile = [string]$Document.final_closure.file
+    if ($closureFile -notmatch '^[^/]+\.sources/final-closure\.json$' -or
+        [string]$Document.final_closure.sha256 -notmatch '^[0-9a-f]{64}$') {
+        throw 'Automated final product-acceptance closure identity is incomplete.'
+    }
+    $closurePath = Join-Path (Split-Path -Parent $GatePath) (
+        $closureFile.Replace('/', [IO.Path]::DirectorySeparatorChar))
+    $closureHashMatches = (
+        (Test-Path -LiteralPath $closurePath -PathType Leaf) -and
+        (Get-FileHash -LiteralPath $closurePath -Algorithm SHA256).
+            Hash.ToLowerInvariant() -eq [string]$Document.final_closure.sha256)
+    if (-not $closureHashMatches) {
+        throw 'Automated final product-acceptance closure hash mismatch.'
+    }
+    $closure = Read-JsonFile $closurePath 'Portable final closure'
+    if ([int]$closure.schema_version -ne 2 -or
+        [string]$closure.classification -ne 'final_closure' -or
+        [string]$closure.source_commit -ne $ExpectedCommit -or
+        [bool]$closure.source_dirty -ne $ExpectedDirty) {
+        throw 'Portable final closure identity is invalid.'
+    }
 }
 
-$rehearsal = $null
-$destination = $null
-$marketplaceDecision = $null
-if ($null -ne $marketplace) {
-    $rehearsal = $marketplace.document
-    if (-not [uri]::TryCreate([string]$rehearsal.destination, [UriKind]::Absolute, [ref]$destination) `
-        -or $destination.Scheme -ne 'https') {
-        throw 'Marketplace rehearsal destination must be absolute HTTPS.'
+function Invoke-TestServiceProbe(
+    [string] $Endpoint,
+    [string] $CertificateSha256,
+    [string] $ExpectedCommit) {
+    $baseUri = $null
+    $validEndpoint = (
+        [Uri]::TryCreate($Endpoint, [UriKind]::Absolute, [ref]$baseUri) -and
+        $baseUri.Scheme -eq 'https' -and
+        $baseUri.IsLoopback -and
+        [string]::IsNullOrWhiteSpace($baseUri.Query) -and
+        [string]::IsNullOrWhiteSpace($baseUri.Fragment))
+    if (-not $validEndpoint) {
+        throw 'Test service endpoint must be an absolute loopback HTTPS URI.'
     }
-    if ([bool]$rehearsal.preflight_only `
-        -or [string]::IsNullOrWhiteSpace([string]$rehearsal.release_id) `
-        -or -not [bool]$rehearsal.preflight_dry_run_verified `
-        -or -not [bool]$rehearsal.baseline_verified `
-        -or -not [bool]$rehearsal.deployment_completed `
-        -or -not [bool]$rehearsal.deployment_verified `
-        -or -not [bool]$rehearsal.rollback_completed `
-        -or -not [bool]$rehearsal.rollback_verified `
-        -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.failure) `
-        -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.rollback_failure) `
-        -or -not [string]::IsNullOrWhiteSpace([string]$rehearsal.rollback_verification_failure)) {
-        throw 'Marketplace rehearsal is not a complete passing deploy and rollback cycle.'
+    if ($CertificateSha256 -notmatch '^[0-9a-f]{64}$') {
+        throw 'Test service certificate SHA-256 pin is required.'
     }
-    Assert-MarketplaceEvidenceContract $marketplace
-    $marketplaceDecision = [ordered]@{
-        status = 'passed'
-        release_id = [string]$rehearsal.release_id
-        destination_host = $destination.DnsSafeHost
-        registry_committed_last = [bool]$rehearsal.preflight_dry_run_verified
-        deployment_verified = [bool]$rehearsal.deployment_verified
-        rollback_verified = [bool]$rehearsal.rollback_verified
+    $handler = [LongAuthenticodeVerifier]::CreatePinnedHandler(
+        $CertificateSha256)
+    $client = [Net.Http.HttpClient]::new($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds(10)
+    $client.MaxResponseContentBufferSize = 16MB
+    try {
+        $registryUri = [Uri]::new($baseUri, 'registry.json')
+        $registryBytes = $client.GetByteArrayAsync($registryUri).
+            GetAwaiter().GetResult()
+        try {
+            $registry = [Text.Encoding]::UTF8.GetString($registryBytes) |
+                ConvertFrom-Json
+        }
+        catch {
+            throw 'Test service Registry is not valid JSON.'
+        }
+        $requiredCapabilities = @(
+            'registry_fetch',
+            'package_fetch',
+            'rollback',
+            'offline_fallback')
+        $capabilities = @($registry.capabilities | ForEach-Object {
+            [string]$_
+        } | Sort-Object -Unique)
+        $registryInvalid = (
+            [int]$registry.schema_version -ne 1 -or
+            [string]$registry.classification -ne 'long_marketplace_test_service_registry' -or
+            [string]$registry.source_commit -ne $ExpectedCommit -or
+            $capabilities.Count -ne $requiredCapabilities.Count -or
+            @(Compare-Object (
+                $requiredCapabilities | Sort-Object) $capabilities).Count -ne 0 -or
+            [string]$registry.package.path -notmatch '^[A-Za-z0-9._-]+$' -or
+            [string]$registry.package.sha256 -notmatch '^[0-9a-f]{64}$' -or
+            [long]$registry.package.bytes -le 0)
+        if ($registryInvalid) {
+            throw 'Test service Registry contract is incomplete.'
+        }
+        $packageUri = [Uri]::new($baseUri, [string]$registry.package.path)
+        if ($packageUri.Scheme -ne $baseUri.Scheme -or
+            $packageUri.Host -ne $baseUri.Host -or
+            $packageUri.Port -ne $baseUri.Port) {
+            throw 'Test service package must remain on the same loopback origin.'
+        }
+        $packageBytes = $client.GetByteArrayAsync($packageUri).
+            GetAwaiter().GetResult()
+        $packageHash = Get-ByteSha256 $packageBytes
+        if ($packageBytes.LongLength -ne [long]$registry.package.bytes -or
+            $packageHash -ne [string]$registry.package.sha256) {
+            throw 'Test service package bytes do not match the Registry.'
+        }
+        return [ordered]@{
+            endpoint = $baseUri.AbsoluteUri
+            certificate_sha256 = $CertificateSha256
+            registry_sha256 = Get-ByteSha256 $registryBytes
+            package_file = [string]$registry.package.path
+            package_sha256 = $packageHash
+            package_bytes = $packageBytes.LongLength
+            capabilities = $requiredCapabilities
+        }
     }
-}
-else {
-    $marketplaceItem = @($deferral.policy.items | Where-Object { $_.id -eq 'production-marketplace-rehearsal' })[0]
-    $marketplaceDecision = $marketplaceItem
+    finally {
+        $client.Dispose()
+    }
 }
 
-$evidenceContract = [ordered]@{
-    physical_dpi_schema_version = [int]$dpi.document.schema_version
-    physical_dpi_capture_count = [int]$dpi.document.capture_count
-    accessibility_schema_version = [int]$accessibility.document.schema_version
-    screen_reader_approval_count = [int]$accessibility.document.screen_reader_approval_count
-    download_schema_version = [int]$download.document.schema_version
-    clean_environment_schema_version = [int]$clean.document.schema_version
-    product_acceptance_schema_version = [int]$productAcceptance.document.schema_version
+$head = (& git -C $PSScriptRoot rev-parse HEAD).Trim().ToLowerInvariant()
+$expectedCommit = $ExpectedSourceCommit.Trim().ToLowerInvariant()
+if ($expectedCommit -notmatch '^[0-9a-f]{40}$' -or $expectedCommit -ne $head) {
+    throw 'ExpectedSourceCommit must exactly match the current 40-character HEAD.'
 }
-$decisionInputs = [ordered]@{
-    release_manifest_sha256 = $release.sha256
-    release_download_gate_sha256 = $download.sha256
-    clean_environment_gate_sha256 = $clean.sha256
-    physical_dpi_gate_sha256 = $dpi.sha256
-    accessibility_gate_sha256 = $accessibility.sha256
-    product_acceptance_sha256 = $productAcceptance.sha256
+$trackedStatus = @(& git -C $PSScriptRoot status --porcelain --untracked-files=no)
+if ($LASTEXITCODE -ne 0) {
+    throw 'Unable to inspect the tracked worktree.'
 }
-if ($null -ne $marketplace) {
-    $evidenceContract.marketplace_rehearsal_schema_version = [int]$marketplace.document.schema_version
-    $decisionInputs.marketplace_rehearsal_sha256 = $marketplace.sha256
+$sourceDirty = $trackedStatus.Count -ne 0
+if ($sourceDirty -and -not $AllowDirty) {
+    throw 'Release channel policy requires a clean tracked worktree.'
 }
-else {
-    $evidenceContract.external_ecosystem_deferral_schema_version = [int]$deferral.document.schema_version
-    $decisionInputs.external_ecosystem_deferral_sha256 = $deferral.sha256
+if ($PreflightOnly -and -not [string]::IsNullOrWhiteSpace($OutputPath)) {
+    throw 'PreflightOnly does not accept OutputPath and never writes a report.'
+}
+if (-not $PreflightOnly -and [string]::IsNullOrWhiteSpace($OutputPath)) {
+    throw 'OutputPath is required unless PreflightOnly is specified.'
+}
+if ($ServiceMode -ne 'test_service' -and
+    (-not [string]::IsNullOrWhiteSpace($TestServiceEndpoint) -or
+     -not [string]::IsNullOrWhiteSpace($TestServiceCertificateSha256))) {
+    throw 'Test service endpoint and certificate pin are only valid for test_service mode.'
+}
+if ($ServiceMode -eq 'test_service' -and
+    ([string]::IsNullOrWhiteSpace($TestServiceEndpoint) -or
+     [string]::IsNullOrWhiteSpace($TestServiceCertificateSha256))) {
+    throw 'Test service endpoint and certificate pin are required for test_service mode.'
 }
 
-$decision = [ordered]@{
-    schema_version = if ($null -eq $deferral) { 2 } else { 3 }
-    verified_at = [DateTimeOffset]::UtcNow.ToString('O')
-    classification = if ($PreflightOnly) {
-        'external_release_gate_preflight'
-    } else {
-        'external_release_gate_decision'
+$productPath = Resolve-RepositoryPath $ProductAcceptanceGatePath
+$productJson = Get-Content -LiteralPath $productPath -Raw -Encoding UTF8
+$product = Read-JsonFile $productPath 'Automated final product acceptance'
+$hostPath = Resolve-RepositoryPath $SubjectExecutable
+if (-not (Test-Path -LiteralPath $hostPath -PathType Leaf)) {
+    throw "Subject executable was not found: $hostPath"
+}
+$hostHash = (Get-FileHash -LiteralPath $hostPath -Algorithm SHA256).
+    Hash.ToLowerInvariant()
+Assert-FinalProductAcceptance (
+    $product) $expectedCommit $sourceDirty $productPath $hostPath $hostHash
+
+$signatureStatus = [LongAuthenticodeVerifier]::GetStatus($hostPath)
+if ($ExpectedDistributionChannel -eq 'unsigned') {
+    if ($signatureStatus -ne 'NotSigned') {
+        throw 'Unsigned channel requires an executable with no Authenticode signature.'
     }
-    passed = $true
+}
+elseif ($signatureStatus -ne 'Valid') {
+    throw 'Signed channel requires a valid Authenticode signature.'
+}
+
+$serviceProbe = $null
+$policyBlockers = @()
+switch ($ServiceMode) {
+    'offline' {
+        $serviceStatus = 'disabled_by_policy'
+    }
+    'test_service' {
+        $serviceProbe = Invoke-TestServiceProbe (
+            $TestServiceEndpoint) $TestServiceCertificateSha256 $expectedCommit
+        $serviceStatus = 'verified_test_service'
+    }
+    'production' {
+        $serviceStatus = 'blocked_environment'
+        $policyBlockers += [ordered]@{
+            id = 'production-marketplace'
+            reason = 'Production Registry/CDN credentials are external channel configuration.'
+        }
+    }
+}
+$productBlockers = @($product.environment_blockers | ForEach-Object {
+    [ordered]@{
+        id = [string]$_.gate_id
+        reason = [string]$_.reason
+    }
+})
+$blockers = @($productBlockers) + @($policyBlockers)
+$releaseEligible = (
+    [bool]$product.release_eligible -and
+    $policyBlockers.Count -eq 0 -and
+    -not $sourceDirty)
+$status = if ($releaseEligible) {
+    'passed'
+} elseif ($blockers.Count -gt 0) {
+    'blocked_environment'
+} else {
+    'not_eligible'
+}
+
+$outputName = if ($PreflightOnly) {
+    'preflight'
+} else {
+    [IO.Path]::GetFileNameWithoutExtension($OutputPath)
+}
+$sourceDirectoryName = "$outputName.sources"
+$summary = [ordered]@{
+    '$schema' = 'https://long-assistant.local/schemas/release-channel-policy-report.schema.json'
+    schema_version = 1
+    generated_at_utc = [DateTimeOffset]::UtcNow.ToString('O')
+    classification = 'automated_release_channel_policy'
     preflight_only = [bool]$PreflightOnly
     source_commit = $expectedCommit
+    source_dirty = $sourceDirty
+    policy_status = $status
     distribution_channel = $ExpectedDistributionChannel
-    signed = [bool]$release.document.signed
-    review_model = $reviewPolicy.review_model
-    independent_review = $reviewPolicy.independent_review
-    risk_accepted_by = if ($null -eq $reviewPolicy.risk_acceptance) { $null } else { [string]$reviewPolicy.risk_acceptance.risk_accepted_by }
-    risk_accepted_at = if ($null -eq $reviewPolicy.risk_acceptance) { $null } else { [string]$reviewPolicy.risk_acceptance.risk_accepted_at }
-    risk_reason = if ($null -eq $reviewPolicy.risk_acceptance) { $null } else { [string]$reviewPolicy.risk_acceptance.risk_reason }
-    risk_accepted_version = if ($null -eq $reviewPolicy.risk_acceptance) { $null } else { [string]$reviewPolicy.risk_acceptance.risk_accepted_version }
-    package = [ordered]@{
-        file = $packageFile
-        sha256 = $packageSha256
-    }
-    candidate = [ordered]@{
-        manifest_schema_version = [int]$release.document.schema_version
-        version = [string]$release.document.version
-        runtime = [string]$release.document.runtime
-        source_dirty = [bool]$release.document.source_dirty
-        package_count = @($release.document.packages).Count
-        installer_count = @($release.document.installers).Count
-        artifact_files_verified = $true
-        checksum_file_verified = $true
-    }
-    review_identities = [ordered]@{
-        download_operator = $downloadOperator
-        download_reviewer = $downloadReviewer
-        clean_environment_reviewer = $cleanReviewer
-    }
-    marketplace = $marketplaceDecision
-    external_ecosystem = if ($null -eq $deferral) { @() } else { @($deferral.policy.items) }
+    authenticode_status = $signatureStatus
+    service_mode = $ServiceMode
+    service_status = $serviceStatus
     product_acceptance = [ordered]@{
-        plugin_count = [int]$productAcceptance.document.plugin_count
-        command_count = [int]$productAcceptance.document.command_count
-        plugin_approval_receipt_count =
-            [int]$productAcceptance.document.plugin_approval_receipt_count
-        approved_validation_count = [int]$productAcceptance.document.approved_validation_count
-        deferred_validation_count = if ($null -eq $deferral) { 0 } else { 2 }
+        file = "$sourceDirectoryName/final-product-acceptance.json"
+        sha256 = (Get-FileHash -LiteralPath $productPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        release_eligible = [bool]$product.release_eligible
     }
-    evidence_contract = $evidenceContract
-    inputs = $decisionInputs
+    release_host = [ordered]@{
+        path = $hostPath
+        sha256 = $hostHash
+    }
+    test_service = $serviceProbe
+    environment_blockers = $blockers
+    release_eligible = $releaseEligible
 }
 
 if ($PreflightOnly) {
-    $decision | ConvertTo-Json -Depth 7
-    return
+    $summary | ConvertTo-Json -Depth 10
 }
-Write-DecisionAtomically $decision $resolvedOutput
-Write-Output 'External release gate verified.'
-Write-Output "Decision: $resolvedOutput"
+else {
+    $resolvedOutput = Resolve-RepositoryPath $OutputPath
+    if (Test-Path -LiteralPath $resolvedOutput) {
+        throw "Release channel policy report already exists: $resolvedOutput"
+    }
+    $outputParent = Split-Path -Parent $resolvedOutput
+    [IO.Directory]::CreateDirectory($outputParent) | Out-Null
+    $sourceDirectoryName =
+        [IO.Path]::GetFileNameWithoutExtension($resolvedOutput) + '.sources'
+    $sourceDirectory = Join-Path $outputParent $sourceDirectoryName
+    if (Test-Path -LiteralPath $sourceDirectory) {
+        throw "Release channel policy source directory already exists: $sourceDirectory"
+    }
+    $summary.product_acceptance.file =
+        "$sourceDirectoryName/final-product-acceptance.json"
+    $stage = Join-Path $outputParent (
+        '.release-channel-policy-' + [Guid]::NewGuid().ToString('N'))
+    [IO.Directory]::CreateDirectory($stage) | Out-Null
+    $sourceCommitted = $false
+    try {
+        Copy-Item -LiteralPath $productPath -Destination (
+            Join-Path $stage 'final-product-acceptance.json')
+        [IO.Directory]::Move($stage, $sourceDirectory)
+        $sourceCommitted = $true
+        Write-NewJsonFileAtomically (
+            $summary) $resolvedOutput 10 'Release channel policy report'
+    }
+    catch {
+        if ($sourceCommitted -and (Test-Path -LiteralPath $sourceDirectory)) {
+            Remove-Item -LiteralPath $sourceDirectory -Recurse -Force
+        }
+        throw
+    }
+    finally {
+        if (Test-Path -LiteralPath $stage) {
+            Remove-Item -LiteralPath $stage -Recurse -Force
+        }
+    }
+    $summary | ConvertTo-Json -Depth 10
+}
+if ($RequireReleaseEligible -and -not $releaseEligible) {
+    exit 2
+}

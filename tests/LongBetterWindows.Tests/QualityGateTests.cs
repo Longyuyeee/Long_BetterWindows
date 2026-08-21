@@ -261,76 +261,39 @@ public class QualityGateTests
     }
 
     [Fact]
-    public void ExternalReleaseGate_BindsEveryApprovedGateToOneCandidateAndFullRollback()
+    public void ExternalReleaseGate_UsesAutomatedChannelPolicyAndHashLockedInputs()
     {
         var gate = Read("verify-external-release-gate.ps1");
         var evidenceIo = Read("release-evidence-io.ps1");
-        var rehearsal = Read("rehearse-marketplace.ps1");
-
         Assert.Contains("ExpectedSourceCommit", gate);
         Assert.Contains("ExpectedDistributionChannel", gate);
-        Assert.Contains("approved_release_download_gate", gate);
-        Assert.Contains("approved_clean_windows_release_gate", gate);
-        Assert.Contains("approved_physical_device_dpi_matrix", gate);
-        Assert.Contains("approved_physical_accessibility_matrix", gate);
-        Assert.Contains("marketplace_https_rehearsal", gate);
-        Assert.Contains("Release Manifest source commit", gate);
-        Assert.Contains("refer to different packages", gate);
-        Assert.Contains("ReviewModel", gate);
-        Assert.Contains("single_maintainer", gate);
-        Assert.Contains("risk_accepted_version", gate);
-        Assert.Contains("release-review-policy.ps1", gate);
-        Assert.Contains("preflight_only", gate);
-        Assert.Contains("deployment_verified", gate);
-        Assert.Contains("rollback_verified", gate);
-        Assert.Contains("Physical DPI gate schema version 3 is required", gate);
-        Assert.Contains("Physical DPI gate must contain exactly 32 captures", gate);
-        Assert.Contains("Accessibility gate schema version 4 is required", gate);
-        Assert.Contains("Accessibility UIA event evidence is incomplete or inconsistent", gate);
-        Assert.Contains("Accessibility screen-reader approvals do not match portable sources", gate);
-        Assert.Contains("requires at least one screen-reader approval", gate);
-        Assert.Contains("Read-PortableMatrixSource", gate);
-        Assert.Contains("portable source hash mismatch", gate);
-        Assert.Contains("portable source content does not match its summary", gate);
-        Assert.Contains("Release-download gate summary contract is incomplete", gate);
-        Assert.Contains("Clean-environment gate summary contract is incomplete", gate);
-        Assert.Contains("Read-HashLockedSource", gate);
-        Assert.Contains("'Release-download evidence'", gate);
-        Assert.Contains("'Release-download approval'", gate);
-        Assert.Contains("'Clean-environment evidence'", gate);
-        Assert.Contains("source hash mismatch", gate);
-        Assert.Contains("Release-download evidence source content does not match", gate);
-        Assert.Contains("Release-download approval source content does not match", gate);
-        Assert.Contains("Clean-environment evidence source content does not match", gate);
-        Assert.Contains("Marketplace rehearsal schema version 2 is required", gate);
-        Assert.Contains("$reports[$required.Key] = Read-HashLockedSource", gate);
-        Assert.Contains("\"Marketplace rehearsal evidence $($required.Key)\"", gate);
-        Assert.Contains("Marketplace deployment report differs from the approved preflight plan", gate);
-        Assert.Contains("Marketplace verification package inventory is invalid", gate);
-        Assert.Contains("Marketplace rollback verification did not restore the baseline Registry", gate);
-        Assert.Contains("Marketplace deployed verification did not observe a Registry change", gate);
-        Assert.Contains("Marketplace rehearsal report chronology is invalid", gate);
-        Assert.Contains("Release Manifest candidate identity contract is incomplete", gate);
-        Assert.Contains("Release Manifest package inventory is invalid", gate);
-        Assert.Contains("Release Manifest installer inventory is invalid", gate);
-        Assert.Contains("Release artifact file was not found", gate);
-        Assert.Contains("artifact file size does not match the Manifest", gate);
-        Assert.Contains("artifact file hash does not match the Manifest", gate);
-        Assert.Contains("SHA256SUMS.txt", gate);
-        Assert.Contains("exact Manifest artifact set", gate);
-        Assert.Contains("Unsigned Release Manifest publisher disclosure is incomplete", gate);
-        Assert.Contains("evidence_contract", gate);
-        Assert.Contains("candidate = [ordered]@", gate);
-        Assert.Contains("artifact_files_verified = $true", gate);
-        Assert.Contains("checksum_file_verified = $true", gate);
+        Assert.Contains("ProductAcceptanceGatePath", gate);
+        Assert.Contains("automated_final_product_acceptance", gate);
+        Assert.Contains("ExpectedSourceCommit must exactly match", gate);
+        Assert.Contains("LongAuthenticodeVerifier", gate);
+        Assert.Contains("WinVerifyTrust", gate);
+        Assert.Contains("Unsigned channel requires", gate);
+        Assert.Contains("Signed channel requires", gate);
+        Assert.Contains("ValidateSet('offline','test_service','production')", gate);
+        Assert.Contains("absolute loopback HTTPS", gate);
+        Assert.Contains("CreatePinnedHandler", gate);
+        Assert.Contains("certificate SHA-256 pin", gate);
+        Assert.Contains("long_marketplace_test_service_registry", gate);
+        Assert.Contains("Test service package bytes do not match", gate);
+        Assert.Contains("disabled_by_policy", gate);
+        Assert.Contains("verified_test_service", gate);
+        Assert.Contains("production-marketplace", gate);
+        Assert.Contains("final-product-acceptance.json", gate);
+        Assert.Contains("closure hash mismatch", gate);
         Assert.Contains("Get-FileHash", gate);
-        Assert.Contains("external_release_gate_decision", gate);
-        Assert.Contains("external_release_gate_preflight", gate);
+        Assert.Contains("automated_release_channel_policy", gate);
         Assert.Contains("PreflightOnly does not accept OutputPath", gate);
         Assert.Contains("OutputPath is required unless PreflightOnly", gate);
         Assert.Contains("preflight_only = [bool]$PreflightOnly", gate);
-        Assert.Contains("decision already exists", gate);
-        Assert.Contains("Write-DecisionAtomically", gate);
+        Assert.Contains("policy report already exists", gate);
+        Assert.Contains("Write-NewJsonFileAtomically", gate);
+        Assert.DoesNotContain("Reviewer", gate, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Approval", gate, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Write-NewJsonFileAtomically", gate);
         Assert.Contains("[IO.File]::Move($temporaryPath, $resolvedPath)", evidenceIo);
         Assert.Contains("Remove-Item -LiteralPath $temporaryPath -Force", evidenceIo);
@@ -342,11 +305,6 @@ public class QualityGateTests
             "Set-Content -LiteralPath $resolvedOutput",
             gate,
             StringComparison.Ordinal);
-        Assert.Contains("classification = 'marketplace_https_rehearsal'", rehearsal);
-        Assert.Contains("schema_version = 2", rehearsal);
-        Assert.Contains("preflight_dry_run = $dryRunReport", rehearsal);
-        Assert.Contains("rollback_verification = $rollbackVerification", rehearsal);
-        Assert.Contains("$summary.passed = -not $summary.preflight_only", rehearsal);
     }
 
     [Fact]

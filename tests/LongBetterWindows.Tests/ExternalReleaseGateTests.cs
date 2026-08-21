@@ -1,1371 +1,411 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Text.Json;
+using Json.Schema;
 
 namespace LongBetterWindows.Tests;
 
 public sealed class ExternalReleaseGateTests : IDisposable
 {
-    private const string Commit = "1111111111111111111111111111111111111111";
-    private static readonly byte[] PackageContent = "self-contained fixture"u8.ToArray();
-    private static readonly byte[] FrameworkPackageContent = "framework-dependent fixture"u8.ToArray();
-    private static readonly byte[] InstallerContent = "installer fixture"u8.ToArray();
-    private static readonly string PackageHash = Hash(PackageContent);
     private readonly string _root = Path.Combine(
         Path.GetTempPath(),
-        "long-external-release-gate-tests",
+        "long-a007-tests",
         Guid.NewGuid().ToString("N"));
+    private static readonly Lazy<JsonSchema> ReportSchema = new(() =>
+        JsonSchema.FromText(File.ReadAllText(Path.Combine(
+            FindRoot(),
+            "schemas",
+            "release-channel-policy-report.schema.json"))));
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_AcceptsOneConsistentUnsignedCandidate()
+    public void Gate_HasNoActiveHumanOrProductionCredentialContract()
     {
-        var paths = WriteFixture(PackageHash);
-        var output = Path.Combine(_root, "decision.json");
+        var source = Read("verify-external-release-gate.ps1");
 
-        var result = await RunVerifierAsync(paths, output);
+        Assert.Contains("automated_release_channel_policy", source);
+        Assert.Contains("LongAuthenticodeVerifier", source);
+        Assert.Contains("WinVerifyTrust", source);
+        Assert.Contains("TestServiceEndpoint", source);
+        Assert.Contains("IsLoopback", source);
+        Assert.Contains("offline_fallback", source);
+        Assert.DoesNotContain("Reviewer", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Approval", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Receipt", source, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarketplaceRehearsalPath", source);
+        Assert.DoesNotContain("ExternalEcosystemDeferralPath", source);
+        Assert.DoesNotContain("approved_final_product_acceptance", source);
+    }
 
-        Assert.True(result.ExitCode == 0, result.Error);
-        using var decision = JsonDocument.Parse(await File.ReadAllTextAsync(output));
-        var root = decision.RootElement;
-        Assert.True(root.GetProperty("passed").GetBoolean());
-        Assert.Equal(Commit, root.GetProperty("source_commit").GetString());
+    [Fact]
+    public async Task Gate_AcceptsRealUnsignedOfflineHostAndPackagesSource()
+    {
+        var fixture = await WriteProductAcceptanceAsync(blocked: true);
+        var output = Path.Combine(_root, "offline-policy.json");
+
+        var result = await RunGateAsync(fixture, "offline", output: output);
+
+        Assert.True(
+            result.ExitCode == 0,
+            $"Exit {result.ExitCode}\nSTDOUT:\n{result.Output}\nSTDERR:\n{result.Error}");
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        AssertSchemaValid(report);
+        var root = report.RootElement;
         Assert.Equal("unsigned", root.GetProperty("distribution_channel").GetString());
-        Assert.False(root.GetProperty("signed").GetBoolean());
-        Assert.Equal("independent", root.GetProperty("review_model").GetString());
-        Assert.True(root.GetProperty("independent_review").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, root.GetProperty("risk_accepted_by").ValueKind);
+        Assert.Equal("NotSigned", root.GetProperty("authenticode_status").GetString());
+        Assert.Equal("offline", root.GetProperty("service_mode").GetString());
+        Assert.Equal("disabled_by_policy", root.GetProperty("service_status").GetString());
+        Assert.Equal("blocked_environment", root.GetProperty("policy_status").GetString());
+        Assert.False(root.GetProperty("release_eligible").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("test_service").ValueKind);
+        var source = root.GetProperty("product_acceptance");
+        var sourcePath = Path.Combine(
+            _root,
+            source.GetProperty("file").GetString()!
+                .Replace('/', Path.DirectorySeparatorChar));
+        Assert.True(File.Exists(sourcePath));
         Assert.Equal(
-            PackageHash,
-            root.GetProperty("package").GetProperty("sha256").GetString());
-        Assert.Equal(
-            "1.11.0",
-            root.GetProperty("candidate").GetProperty("version").GetString());
-        Assert.False(
-            root.GetProperty("candidate").GetProperty("source_dirty").GetBoolean());
-        Assert.Equal(
-            2,
-            root.GetProperty("candidate").GetProperty("package_count").GetInt32());
-        Assert.Equal(
-            1,
-            root.GetProperty("candidate").GetProperty("installer_count").GetInt32());
-        Assert.True(
-            root.GetProperty("candidate").GetProperty("artifact_files_verified").GetBoolean());
-        Assert.True(
-            root.GetProperty("candidate").GetProperty("checksum_file_verified").GetBoolean());
-        Assert.Equal(
-            "registry.example.test",
-            root.GetProperty("marketplace").GetProperty("destination_host").GetString());
-        Assert.Equal(
-            32,
-            root.GetProperty("evidence_contract")
-                .GetProperty("physical_dpi_capture_count")
-                .GetInt32());
-        Assert.Equal(
-            1,
-            root.GetProperty("evidence_contract")
-                .GetProperty("screen_reader_approval_count")
-                .GetInt32());
-        Assert.Equal(
-            3,
-            root.GetProperty("evidence_contract")
-                .GetProperty("physical_dpi_schema_version")
-                .GetInt32());
-        Assert.Equal(
-            4,
-            root.GetProperty("evidence_contract")
-                .GetProperty("accessibility_schema_version")
-                .GetInt32());
-        Assert.Equal(
-            2,
-            root.GetProperty("evidence_contract")
-                .GetProperty("download_schema_version")
-                .GetInt32());
-        Assert.Equal(
-            2,
-            root.GetProperty("evidence_contract")
-                .GetProperty("clean_environment_schema_version")
-                .GetInt32());
-        Assert.Equal(
-            2,
-            root.GetProperty("evidence_contract")
-                .GetProperty("marketplace_rehearsal_schema_version")
-                .GetInt32());
-        Assert.Equal(
-            5,
-            root.GetProperty("product_acceptance")
-                .GetProperty("approved_validation_count")
-                .GetInt32());
-        Assert.All(
-            root.GetProperty("inputs").EnumerateObject(),
-            input => Assert.Matches("^[0-9a-f]{64}$", input.Value.GetString()));
-        Assert.Empty(Directory.GetFiles(_root, ".*.tmp"));
+            source.GetProperty("sha256").GetString(),
+            Hash(await File.ReadAllBytesAsync(sourcePath)));
     }
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_AcceptsExplicitSingleMaintainerRisk()
+    public async Task Gate_ProbesRealLoopbackRegistryAndPackage()
     {
-        var paths = WriteFixture(
-            PackageHash,
-            reviewModel: "single_maintainer",
-            downloadOperator: "real-maintainer",
-            downloadReviewer: "real-maintainer",
-            cleanReviewer: "real-maintainer");
-        var output = Path.Combine(_root, "single-maintainer-decision.json");
+        var fixture = await WriteProductAcceptanceAsync(blocked: true);
+        var package = Encoding.UTF8.GetBytes("real loopback package payload");
+        await using var server = new LoopbackMarketplaceServer(
+            await GitAsync("rev-parse", "HEAD"),
+            package);
+        var output = Path.Combine(_root, "test-service-policy.json");
 
-        var result = await RunVerifierAsync(
-            paths,
+        var result = await RunGateAsync(
+            fixture,
+            "test_service",
             output,
-            reviewModel: "single_maintainer");
+            server.Endpoint,
+            server.CertificateSha256);
 
-        Assert.True(result.ExitCode == 0, result.Error);
-        using var decision = JsonDocument.Parse(await File.ReadAllTextAsync(output));
-        var root = decision.RootElement;
-        Assert.Equal(2, root.GetProperty("schema_version").GetInt32());
-        Assert.Equal("single_maintainer", root.GetProperty("review_model").GetString());
-        Assert.False(root.GetProperty("independent_review").GetBoolean());
-        Assert.Equal("real-maintainer", root.GetProperty("risk_accepted_by").GetString());
+        Assert.True(
+            result.ExitCode == 0,
+            $"Exit {result.ExitCode}\nSTDOUT:\n{result.Output}\nSTDERR:\n{result.Error}");
+        await server.Completion;
         Assert.Equal(
-            "no_second_machine_or_independent_reviewer",
-            root.GetProperty("risk_reason").GetString());
-        Assert.Equal("1.11.0", root.GetProperty("risk_accepted_version").GetString());
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_DefaultStrictModeRejectsSameIdentity()
-    {
-        var paths = WriteFixture(
-            PackageHash,
-            downloadOperator: "same-maintainer",
-            downloadReviewer: "same-maintainer");
-
-        var result = await RunVerifierAsync(paths, Path.Combine(_root, "strict-rejected.json"));
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Independent review requires distinct", result.Error);
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_SingleMaintainerRequiresExplicitFinalMode()
-    {
-        var paths = WriteFixture(
-            PackageHash,
-            reviewModel: "single_maintainer",
-            downloadOperator: "real-maintainer",
-            downloadReviewer: "real-maintainer",
-            cleanReviewer: "real-maintainer");
-
-        var result = await RunVerifierAsync(paths, Path.Combine(_root, "implicit-rejected.json"));
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("summary contract is incomplete", result.Error);
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsContradictorySingleMaintainerIdentity()
-    {
-        var paths = WriteFixture(
-            PackageHash,
-            reviewModel: "single_maintainer",
-            downloadOperator: "real-maintainer",
-            downloadReviewer: "different-name",
-            cleanReviewer: "real-maintainer");
-
-        var result = await RunVerifierAsync(
-            paths,
-            Path.Combine(_root, "identity-rejected.json"),
-            reviewModel: "single_maintainer");
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("one consistent operator and reviewer", result.Error);
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsRiskAcceptedForAnotherVersion()
-    {
-        var paths = WriteFixture(
-            PackageHash,
-            reviewModel: "single_maintainer",
-            downloadOperator: "real-maintainer",
-            downloadReviewer: "real-maintainer",
-            cleanReviewer: "real-maintainer",
-            riskAcceptedVersion: "1.10.0");
-
-        var result = await RunVerifierAsync(
-            paths,
-            Path.Combine(_root, "version-rejected.json"),
-            reviewModel: "single_maintainer");
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("version does not match", result.Error);
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_PreflightValidatesWithoutWritingDecision()
-    {
-        var paths = WriteFixture(PackageHash);
-
-        var result = await RunVerifierAsync(paths, output: null, preflightOnly: true);
-
-        Assert.True(result.ExitCode == 0, result.Error);
-        using var preflight = JsonDocument.Parse(result.Output);
+            new[] { "/registry.json", "/package.bin" },
+            server.RequestPaths);
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        AssertSchemaValid(report);
+        var probe = report.RootElement.GetProperty("test_service");
+        Assert.Equal(Hash(package), probe.GetProperty("package_sha256").GetString());
         Assert.Equal(
-            "external_release_gate_preflight",
-            preflight.RootElement.GetProperty("classification").GetString());
-        Assert.True(preflight.RootElement.GetProperty("passed").GetBoolean());
-        Assert.True(preflight.RootElement.GetProperty("preflight_only").GetBoolean());
-        Assert.Empty(Directory.GetFiles(_root, "*decision*.json"));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsIncompleteProductAcceptance()
-    {
-        var paths = WriteFixture(PackageHash);
-        var json = await File.ReadAllTextAsync(paths.ProductAcceptance);
-        await File.WriteAllTextAsync(
-            paths.ProductAcceptance,
-            json.Replace("\"approved_validation_count\":5", "\"approved_validation_count\":4"));
-
-        var result = await RunVerifierAsync(paths, Path.Combine(_root, "product-rejected.json"));
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("product-acceptance gate contract is incomplete", result.Error);
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_AcceptsExplicitExternalEcosystemDeferral()
-    {
-        var paths = WriteFixture(PackageHash, externalEcosystemDeferred: true);
-        var output = Path.Combine(_root, "deferred-decision.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.True(result.ExitCode == 0, result.Error);
-        using var decision = JsonDocument.Parse(await File.ReadAllTextAsync(output));
-        var root = decision.RootElement;
-        Assert.Equal(3, root.GetProperty("schema_version").GetInt32());
-        Assert.Equal("deferred", root.GetProperty("marketplace").GetProperty("status").GetString());
-        Assert.Equal(3, root.GetProperty("external_ecosystem").GetArrayLength());
-        Assert.All(
-            root.GetProperty("external_ecosystem").EnumerateArray(),
-            item =>
-            {
-                Assert.Equal("deferred", item.GetProperty("status").GetString());
-                Assert.Equal("1.12.0", item.GetProperty("target_version").GetString());
-                Assert.Equal("disabled", item.GetProperty("default_feature_state").GetString());
-            });
+            server.CertificateSha256,
+            probe.GetProperty("certificate_sha256").GetString());
+        Assert.Equal(package.Length, probe.GetProperty("package_bytes").GetInt64());
         Assert.Equal(
-            3,
-            root.GetProperty("product_acceptance")
-                .GetProperty("approved_validation_count").GetInt32());
-        Assert.Equal(
-            2,
-            root.GetProperty("product_acceptance")
-                .GetProperty("deferred_validation_count").GetInt32());
-        Assert.True(root.GetProperty("inputs").TryGetProperty(
-            "external_ecosystem_deferral_sha256", out _));
-        Assert.False(root.GetProperty("inputs").TryGetProperty(
-            "marketplace_rehearsal_sha256", out _));
+            "verified_test_service",
+            report.RootElement.GetProperty("service_status").GetString());
     }
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsDeferralMasqueradingAsPassed()
+    public async Task Gate_RejectsNonLoopbackTestServiceBeforeNetworkAccess()
     {
-        var paths = WriteFixture(
-            PackageHash,
-            externalEcosystemDeferred: true,
-            deferredItemStatus: "passed");
+        var fixture = await WriteProductAcceptanceAsync(blocked: true);
 
-        var result = await RunVerifierAsync(paths, Path.Combine(_root, "false-pass.json"));
+        var result = await RunGateAsync(
+            fixture,
+            "test_service",
+            output: Path.Combine(_root, "external.json"),
+            endpoint: "https://example.com/",
+            certificateSha256: new string('a', 64));
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("deferral item is invalid", result.Error);
+        Assert.Contains("loopback", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsDeferralForAnotherCandidateVersion()
+    public async Task Gate_RejectsTamperedPackageReturnedByRealService()
     {
-        var paths = WriteFixture(
-            PackageHash,
-            externalEcosystemDeferred: true,
-            deferredCandidateVersion: "1.10.0");
+        var fixture = await WriteProductAcceptanceAsync(blocked: true);
+        await using var server = new LoopbackMarketplaceServer(
+            await GitAsync("rev-parse", "HEAD"),
+            Encoding.UTF8.GetBytes("expected package"),
+            tamperPackageResponse: true);
 
-        var result = await RunVerifierAsync(paths, Path.Combine(_root, "wrong-version.json"));
+        var result = await RunGateAsync(
+            fixture,
+            "test_service",
+            Path.Combine(_root, "tampered-service.json"),
+            server.Endpoint,
+            server.CertificateSha256);
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("does not match the candidate", result.Error);
+        Assert.Contains("package bytes", result.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(Path.Combine(_root, "tampered-service.json")));
     }
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_PreflightRejectsOutputPath()
+    public async Task Gate_RejectsSignedChannelForActualUnsignedHost()
     {
-        var paths = WriteFixture(PackageHash);
-        var output = Path.Combine(_root, "preflight-must-not-write.json");
+        var fixture = await WriteProductAcceptanceAsync(blocked: true);
 
-        var result = await RunVerifierAsync(paths, output, preflightOnly: true);
+        var result = await RunGateAsync(
+            fixture,
+            "offline",
+            Path.Combine(_root, "signed.json"),
+            distributionChannel: "signed");
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("does not accept OutputPath", result.Error);
-        Assert.False(File.Exists(output));
+        Assert.Contains("valid Authenticode", result.Error);
     }
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_PreservesExistingDecision()
+    public async Task Gate_RejectsTamperedPortableFinalClosure()
     {
-        var paths = WriteFixture(PackageHash);
-        var output = Path.Combine(_root, "existing-decision.json");
-        const string existingContent = "previous immutable decision";
-        await File.WriteAllTextAsync(output, existingContent);
+        var fixture = await WriteProductAcceptanceAsync(blocked: true);
+        await File.AppendAllTextAsync(fixture.ClosurePath, "tampered");
 
-        var result = await RunVerifierAsync(paths, output);
+        var result = await RunGateAsync(
+            fixture,
+            "offline",
+            Path.Combine(_root, "tampered-closure.json"));
 
         Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("decision already exists", result.Error);
-        Assert.Equal(existingContent, await File.ReadAllTextAsync(output));
-        Assert.Empty(Directory.GetFiles(_root, ".*.tmp"));
+        Assert.Contains("closure hash mismatch", result.Error);
     }
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_AllowsOnlyOneConcurrentDecisionWriter()
+    public async Task Gate_RequireReleaseEligibleReturnsTwoWithDiagnosticReport()
     {
-        var paths = WriteFixture(PackageHash);
-        var output = Path.Combine(_root, "contended-decision.json");
+        var fixture = await WriteProductAcceptanceAsync(blocked: true);
+        var output = Path.Combine(_root, "required.json");
 
-        var results = await Task.WhenAll(
-            RunVerifierAsync(paths, output),
-            RunVerifierAsync(paths, output));
+        var result = await RunGateAsync(
+            fixture,
+            "offline",
+            output,
+            requireReleaseEligible: true);
 
-        Assert.Single(results, result => result.ExitCode == 0);
-        var rejected = Assert.Single(results, result => result.ExitCode != 0);
-        Assert.Contains("decision already exists", rejected.Error);
-        using var decision = JsonDocument.Parse(await File.ReadAllTextAsync(output));
-        Assert.True(decision.RootElement.GetProperty("passed").GetBoolean());
-        Assert.Empty(Directory.GetFiles(_root, ".*.tmp"));
+        Assert.Equal(2, result.ExitCode);
+        Assert.True(File.Exists(output));
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        AssertSchemaValid(report);
+        Assert.False(report.RootElement.GetProperty("release_eligible").GetBoolean());
     }
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsPackageIdentityMismatch()
+    public async Task Gate_ProductionModeRecordsExternalConfigurationBlocker()
     {
-        var paths = WriteFixture(
-            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
-        var output = Path.Combine(_root, "rejected.json");
+        var fixture = await WriteProductAcceptanceAsync(blocked: false);
+        var output = Path.Combine(_root, "production.json");
 
-        var result = await RunVerifierAsync(paths, output);
+        var result = await RunGateAsync(fixture, "production", output);
 
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("refer to different packages", result.Error, StringComparison.Ordinal);
-        Assert.False(File.Exists(output));
+        Assert.Equal(0, result.ExitCode);
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(output));
+        AssertSchemaValid(report);
+        var root = report.RootElement;
+        Assert.Equal("blocked_environment", root.GetProperty("policy_status").GetString());
+        Assert.Equal("blocked_environment", root.GetProperty("service_status").GetString());
+        Assert.Contains(
+            root.GetProperty("environment_blockers").EnumerateArray(),
+            item => item.GetProperty("id").GetString() == "production-marketplace");
     }
 
     [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsPreflightOnlyMarketplaceEvidence()
+    public async Task Gate_PreflightValidatesWithoutWritingFiles()
     {
-        var paths = WriteFixture(PackageHash, marketplacePreflightOnly: true);
-        var output = Path.Combine(_root, "preflight-rejected.json");
+        var fixture = await WriteProductAcceptanceAsync(blocked: true);
 
-        var result = await RunVerifierAsync(paths, output);
+        var result = await RunGateAsync(
+            fixture,
+            "offline",
+            preflightOnly: true);
 
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("complete passing deploy and rollback cycle", result.Error, StringComparison.Ordinal);
-        Assert.False(File.Exists(output));
+        Assert.Equal(0, result.ExitCode);
+        using var report = JsonDocument.Parse(result.Output);
+        AssertSchemaValid(report);
+        Assert.True(report.RootElement.GetProperty("preflight_only").GetBoolean());
+        Assert.Empty(Directory.GetFiles(_root, "preflight.json"));
+        Assert.False(Directory.Exists(Path.Combine(_root, "preflight.sources")));
     }
 
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsLegacyPhysicalDpiSummary()
-    {
-        var paths = WriteFixture(PackageHash, physicalDpiSchemaVersion: 2);
-        var output = Path.Combine(_root, "legacy-dpi-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Physical DPI gate schema version 3 is required", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsIncompletePhysicalDpiSummary()
-    {
-        var paths = WriteFixture(PackageHash, physicalDpiCaptureCount: 24);
-        var output = Path.Combine(_root, "incomplete-dpi-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("must contain exactly 32 captures", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsLegacyAccessibilitySummary()
-    {
-        var paths = WriteFixture(PackageHash, accessibilitySchemaVersion: 3);
-        var output = Path.Combine(_root, "legacy-accessibility-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Accessibility gate schema version 4 is required", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsLegacyAccessibilityPortableSource()
-    {
-        var paths = WriteFixture(PackageHash, accessibilitySourceSchemaVersion: 2);
-        var output = Path.Combine(_root, "legacy-accessibility-source-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("portable source content does not match its summary", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsMissingAccessibilityUiaEvents()
-    {
-        var paths = WriteFixture(PackageHash, accessibilitySourceFocusEventCount: 0);
-        var output = Path.Combine(_root, "accessibility-events-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Accessibility UIA event evidence is incomplete or inconsistent", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsInactiveScreenReaderSourceApproval()
-    {
-        var paths = WriteFixture(PackageHash, accessibilityScreenReaderActive: false);
-        var output = Path.Combine(_root, "accessibility-reader-source-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("screen-reader approvals do not match portable sources", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsAccessibilityWithoutScreenReader()
-    {
-        var paths = WriteFixture(PackageHash, screenReaderApprovalCount: 0);
-        var output = Path.Combine(_root, "screen-reader-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("requires at least one screen-reader approval", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsTamperedPhysicalDpiPortableSource()
-    {
-        var paths = WriteFixture(PackageHash);
-        await File.AppendAllTextAsync(paths.DpiSource, "tampered");
-        var output = Path.Combine(_root, "dpi-source-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Physical DPI evidence portable source hash mismatch", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsMissingAccessibilityPortableSource()
-    {
-        var paths = WriteFixture(PackageHash);
-        File.Delete(paths.AccessibilitySource);
-        var output = Path.Combine(_root, "accessibility-source-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Accessibility evidence portable source hash mismatch", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsIncompleteDownloadSummary()
-    {
-        var paths = WriteFixture(PackageHash, downloadSchemaVersion: 0);
-        var output = Path.Combine(_root, "download-contract-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Release-download gate summary contract is incomplete", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsIncompleteCleanEnvironmentSummary()
-    {
-        var paths = WriteFixture(PackageHash, cleanSchemaVersion: 0);
-        var output = Path.Combine(_root, "clean-contract-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Clean-environment gate summary contract is incomplete", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsTamperedDownloadSource()
-    {
-        var paths = WriteFixture(PackageHash);
-        await File.AppendAllTextAsync(paths.DownloadEvidence, "tampered");
-        var output = Path.Combine(_root, "download-source-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Release-download evidence source hash mismatch", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsMissingCleanEnvironmentSource()
-    {
-        var paths = WriteFixture(PackageHash);
-        File.Delete(paths.CleanEvidence);
-        var output = Path.Combine(_root, "clean-source-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Clean-environment evidence source hash mismatch", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsHashLockedDownloadContentMismatch()
-    {
-        var paths = WriteFixture(
-            PackageHash,
-            downloadSourcePackageMismatch: true);
-        var output = Path.Combine(_root, "download-content-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("evidence source content does not match its summary", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsHashLockedCleanReviewerMismatch()
-    {
-        var paths = WriteFixture(
-            PackageHash,
-            cleanSourceReviewerMismatch: true);
-        var output = Path.Combine(_root, "clean-content-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Clean-environment evidence source content", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsLegacyMarketplaceSummary()
-    {
-        var paths = WriteFixture(PackageHash, marketplaceSchemaVersion: 1);
-        var output = Path.Combine(_root, "marketplace-schema-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Marketplace rehearsal schema version 2 is required", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsTamperedMarketplaceEvidence()
-    {
-        var paths = WriteFixture(PackageHash);
-        File.AppendAllText(paths.MarketplaceDeploymentEvidence, "tampered");
-        var output = Path.Combine(_root, "marketplace-tamper-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Marketplace rehearsal evidence deployment source hash mismatch", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsHashLockedMarketplaceReleaseMismatch()
-    {
-        var paths = WriteFixture(
-            PackageHash,
-            marketplaceDeploymentReleaseMismatch: true);
-        var output = Path.Combine(_root, "marketplace-release-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("deployment report content does not match", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsHashLockedMarketplaceRollbackMismatch()
-    {
-        var paths = WriteFixture(
-            PackageHash,
-            marketplaceRollbackMismatch: true);
-        var output = Path.Combine(_root, "marketplace-rollback-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("did not restore the baseline Registry", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsLegacyReleaseManifest()
-    {
-        var paths = WriteFixture(PackageHash, releaseSchemaVersion: 0);
-        var output = Path.Combine(_root, "release-schema-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("candidate identity contract is incomplete", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsDirtyReleaseManifest()
-    {
-        var paths = WriteFixture(PackageHash, releaseSourceDirty: true);
-        var output = Path.Combine(_root, "dirty-release-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("candidate identity contract is incomplete", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsInvalidPackageInventory()
-    {
-        var paths = WriteFixture(PackageHash, invalidPackageInventory: true);
-        var output = Path.Combine(_root, "package-inventory-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Release Manifest package inventory is invalid", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsTamperedReleasePackage()
-    {
-        var paths = WriteFixture(PackageHash);
-        await File.AppendAllTextAsync(paths.Package, "tampered");
-        var output = Path.Combine(_root, "package-tamper-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("artifact file size does not match the Manifest", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsMissingReleasePackage()
-    {
-        var paths = WriteFixture(PackageHash);
-        File.Delete(paths.FrameworkPackage);
-        var output = Path.Combine(_root, "package-missing-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("Release artifact file was not found", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsTamperedInstaller()
-    {
-        var paths = WriteFixture(PackageHash);
-        await File.AppendAllTextAsync(paths.Installer, "tampered");
-        var output = Path.Combine(_root, "installer-tamper-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("artifact file size does not match the Manifest", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    [Fact]
-    public async Task VerifyExternalReleaseGate_RejectsIncompleteChecksumFile()
-    {
-        var paths = WriteFixture(PackageHash);
-        File.WriteAllLines(paths.Checksums, new[]
-        {
-            $"{PackageHash}  LongBetterWindows.zip",
-        });
-        var output = Path.Combine(_root, "checksums-rejected.json");
-
-        var result = await RunVerifierAsync(paths, output);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("exact Manifest artifact set", result.Error);
-        Assert.False(File.Exists(output));
-    }
-
-    private FixturePaths WriteFixture(
-        string cleanPackageHash,
-        bool marketplacePreflightOnly = false,
-        int physicalDpiSchemaVersion = 3,
-        int physicalDpiCaptureCount = 32,
-        int accessibilitySchemaVersion = 4,
-        int accessibilitySourceSchemaVersion = 3,
-        int accessibilityFocusEventCount = 1,
-        int accessibilityLiveRegionEventCount = 1,
-        int? accessibilitySourceFocusEventCount = null,
-        bool accessibilityScreenReaderActive = true,
-        int screenReaderApprovalCount = 1,
-        int downloadSchemaVersion = 2,
-        int cleanSchemaVersion = 2,
-        int marketplaceSchemaVersion = 2,
-        int releaseSchemaVersion = 1,
-        bool releaseSourceDirty = false,
-        bool invalidPackageInventory = false,
-        bool downloadSourcePackageMismatch = false,
-        bool cleanSourceReviewerMismatch = false,
-        bool marketplaceDeploymentReleaseMismatch = false,
-        bool marketplaceRollbackMismatch = false,
-        string reviewModel = "independent",
-        string downloadOperator = "capture-user",
-        string downloadReviewer = "review-user",
-        string cleanReviewer = "clean-reviewer",
-        string riskAcceptedVersion = "1.11.0",
-        bool externalEcosystemDeferred = false,
-        string deferredItemStatus = "deferred",
-        string deferredCandidateVersion = "1.11.0")
+    private async Task<ProductFixture> WriteProductAcceptanceAsync(bool blocked)
     {
         Directory.CreateDirectory(_root);
-        var packagePath = Path.Combine(_root, "LongBetterWindows.zip");
-        var frameworkPackagePath = Path.Combine(
-            _root,
-            "LongBetterWindows-framework-dependent.zip");
-        File.WriteAllBytes(packagePath, PackageContent);
-        File.WriteAllBytes(frameworkPackagePath, FrameworkPackageContent);
-        var installerPath = Path.Combine(_root, "LongAssistant-Setup.exe");
-        File.WriteAllBytes(installerPath, InstallerContent);
-        var frameworkPackageHash = Hash(FrameworkPackageContent);
-        var installerHash = Hash(InstallerContent);
-        var release = WriteJson("release.json", new
-        {
-            schema_version = releaseSchemaVersion,
-            product = "Long Assistant",
-            version = "1.11.0",
-            runtime = "win-x64",
-            created_at = "2026-07-29T00:00:00Z",
-            commit = Commit,
-            source_dirty = releaseSourceDirty,
-            distribution_channel = "unsigned",
-            publisher_identity = "unverified",
-            security_notice = "Publisher identity is unverified; validate SHA-256.",
-            release_eligible = true,
-            signed = false,
-            packages = new[]
-            {
-                ReleasePackage(
-                    "LongBetterWindows.zip",
-                    "self-contained",
-                    PackageHash,
-                    PackageContent.LongLength,
-                    commandCount: invalidPackageInventory ? 41 : 42),
-                ReleasePackage(
-                    "LongBetterWindows-framework-dependent.zip",
-                    "framework-dependent",
-                    frameworkPackageHash,
-                    FrameworkPackageContent.LongLength,
-                    commandCount: 42),
-            },
-            installers = new[]
-            {
-                new
-                {
-                    file = "LongAssistant-Setup.exe",
-                    kind = "installer",
-                    format = "inno-setup-exe",
-                    install_scope = "current-user",
-                    requires_elevation = false,
-                    sha256 = installerHash,
-                    bytes = InstallerContent.LongLength,
-                    plugins = 25,
-                    commands = 42,
-                    signed = false,
-                },
-            },
-        });
-        var checksumsPath = Path.Combine(_root, "SHA256SUMS.txt");
-        File.WriteAllLines(checksumsPath, new[]
-        {
-            $"{PackageHash}  LongBetterWindows.zip",
-            $"{frameworkPackageHash}  LongBetterWindows-framework-dependent.zip",
-            $"{installerHash}  LongAssistant-Setup.exe",
-        });
-        var downloadEvidencePath = Path.Combine(_root, "download-evidence.json");
-        var downloadApprovalPath = Path.Combine(_root, "download-approval.json");
-        var cleanEvidencePath = Path.Combine(_root, "clean-environment-evidence.json");
-        const string riskAcceptedAt = "2026-08-14T04:00:00.0000000Z";
-        var riskAcceptance = reviewModel == "single_maintainer"
-            ? new
-            {
-                risk_accepted_by = downloadOperator,
-                risk_accepted_at = riskAcceptedAt,
-                risk_reason = "no_second_machine_or_independent_reviewer",
-                risk_accepted_version = riskAcceptedVersion,
-            }
-            : null;
-        WritePortableSource("download-evidence.json", new
-        {
-            classification = "verified_release_download_provenance",
-            passed = true,
-            release = new
-            {
-                source_commit = Commit,
-                distribution_channel = "unsigned",
-            },
-            package = new
-            {
-                file = "LongBetterWindows.zip",
-                sha256 = downloadSourcePackageMismatch
-                    ? new string('f', 64)
-                    : PackageHash,
-            },
-            windows_origin = new { host = new { host = "github.com" } },
-        });
-        WritePortableSource("download-approval.json", new
+        var commit = await GitAsync("rev-parse", "HEAD");
+        var dirty = (await GitAsync("status", "--porcelain", "--untracked-files=no"))
+            .Length > 0;
+        var hostPath = Path.Combine(
+            FindRoot(),
+            "src",
+            "LongBetterWindows.Host",
+            "bin",
+            "Release",
+            "net8.0-windows",
+            "LongBetterWindows.Host.exe");
+        Assert.True(File.Exists(hostPath));
+        var closureDirectory = Path.Combine(_root, "product.sources");
+        Directory.CreateDirectory(closureDirectory);
+        var closurePath = Path.Combine(closureDirectory, "final-closure.json");
+        var closure = new
         {
             schema_version = 2,
-            classification = "release_download_human_approval",
-            source_commit = Commit,
-            distribution_channel = "unsigned",
-            version = "1.11.0",
-            review_model = reviewModel,
-            independent_review = reviewModel == "independent",
-            package = new
-            {
-                file = "LongBetterWindows.zip",
-                sha256 = PackageHash,
-            },
-            evidence = EvidenceEntry("download-evidence.json"),
-            @operator = downloadOperator,
-            reviewer = downloadReviewer,
-            risk_acceptance = riskAcceptance,
-        });
-        WritePortableSource("clean-environment-evidence.json", new
-        {
-            classification = "clean_windows_release_evidence",
-            release = new
-            {
-                version = "1.11.0",
-                source_commit = Commit,
-                distribution_channel = "unsigned",
-                package_sha256 = cleanPackageHash,
-                signed = false,
-            },
-            environment = new { label = "clean-vm" },
-            automated_checks = new { passed = true },
-            human_review = new
-            {
-                status = "approved",
-                reviewer = cleanSourceReviewerMismatch
-                    ? "different-reviewer"
-                    : cleanReviewer,
-            },
-        });
-        var download = WriteJson("download.json", new
-        {
-            schema_version = reviewModel == "single_maintainer"
-                ? 3
-                : downloadSchemaVersion,
-            classification = "approved_release_download_gate",
-            passed = true,
-            source_commit = Commit,
-            distribution_channel = "unsigned",
-            version = "1.11.0",
-            review_model = reviewModel,
-            independent_review = reviewModel == "independent",
-            package_file = "LongBetterWindows.zip",
-            package_sha256 = PackageHash,
-            download_host = "github.com",
-            @operator = downloadOperator,
-            reviewer = downloadReviewer,
-            risk_acceptance = riskAcceptance,
-            evidence = EvidenceEntry("download-evidence.json"),
-            approval = EvidenceEntry("download-approval.json"),
-        });
-        var clean = WriteJson("clean.json", new
-        {
-            schema_version = cleanSchemaVersion,
-            classification = "approved_clean_windows_release_gate",
-            passed = true,
-            version = "1.11.0",
-            source_commit = Commit,
-            distribution_channel = "unsigned",
-            signed = false,
-            package_sha256 = cleanPackageHash,
-            environment_label = "clean-vm",
-            reviewer = cleanReviewer,
-            evidence_manifest = EvidenceEntry("clean-environment-evidence.json"),
-        });
-        var dpiEvidence = new[] { 100, 125, 150, 200 }.Select(scale =>
-        {
-            var relativePath = $"dpi.sources/physical-dpi-{scale}.json";
-            WritePortableSource(relativePath, new
-            {
-                schema_version = 2,
-                classification = "physical_device_dpi_evidence",
-                source_commit = Commit,
-                expected_scale_percent = scale,
-                human_review = new { status = "approved" },
-            });
-            return new
-            {
-                scale_percent = scale,
-                source_commit = Commit,
-                capture_count = 8,
-                source_manifest = EvidenceEntry(relativePath),
-            };
-        }).ToArray();
-        var dpi = WriteJson("dpi.json", new
-        {
-            schema_version = physicalDpiSchemaVersion,
-            classification = "approved_physical_device_dpi_matrix",
-            passed = true,
-            source_commit = Commit,
-            required_scales = new[] { 100, 125, 150, 200 },
-            capture_count = physicalDpiCaptureCount,
-            evidence = dpiEvidence,
-        });
-        var accessibilityProfiles = new[]
-        {
-            "high_contrast",
-            "reduced_motion",
-            "combined",
+            classification = "final_closure",
+            source_commit = commit,
+            source_dirty = dirty,
         };
-        var accessibilityEvidence = accessibilityProfiles.Select((profile, index) =>
+        await File.WriteAllTextAsync(closurePath, JsonSerializer.Serialize(closure));
+        var hostHash = Hash(await File.ReadAllBytesAsync(hostPath));
+        var product = new
         {
-            var usesScreenReader = index == 0;
-            var relativePath = $"accessibility.sources/accessibility-{profile}.json";
-            WritePortableSource(relativePath, new
-            {
-                schema_version = accessibilitySourceSchemaVersion,
-                classification = "physical_accessibility_evidence",
-                source_commit = Commit,
-                expected_profile = profile,
-                assistive_technology_events = new
-                {
-                    transport = "windows_ui_automation_events",
-                    physical_keyboard_validated = true,
-                    focus_event_count = accessibilitySourceFocusEventCount
-                        ?? accessibilityFocusEventCount,
-                    live_region_event_count = accessibilityLiveRegionEventCount,
-                    expected_announcement = "fixture announcement",
-                    screen_reader_active_during_capture = usesScreenReader
-                        && accessibilityScreenReaderActive,
-                },
-                screen_reader = new
-                {
-                    name = usesScreenReader ? "Narrator" : "None",
-                    process_detected = usesScreenReader,
-                },
-                human_review = new
-                {
-                    status = "approved",
-                    checklist = new
-                    {
-                        screen_reader_announcements = usesScreenReader,
-                        management_close_announcements = usesScreenReader,
-                    },
-                },
-            });
-            return new
-            {
-                profile,
-                source_commit = Commit,
-                focus_event_count = accessibilityFocusEventCount,
-                live_region_event_count = accessibilityLiveRegionEventCount,
-                source_manifest = EvidenceEntry(relativePath),
-            };
-        }).ToArray();
-        var accessibility = WriteJson("accessibility.json", new
-        {
-            schema_version = accessibilitySchemaVersion,
-            classification = "approved_physical_accessibility_matrix",
-            passed = true,
-            source_commit = Commit,
-            required_profiles = accessibilityProfiles,
-            screen_reader_approval_count = screenReaderApprovalCount,
-            evidence = accessibilityEvidence,
-        });
-        var marketplaceEvidence = WriteMarketplaceEvidence(
-            marketplaceDeploymentReleaseMismatch,
-            marketplaceRollbackMismatch);
-        var marketplace = WriteJson("marketplace.json", new
-        {
-            schema_version = marketplaceSchemaVersion,
-            started_at = "2026-07-29T00:00:00Z",
-            classification = "marketplace_https_rehearsal",
-            passed = true,
-            destination = "https://registry.example.test/releases/",
-            preflight_only = marketplacePreflightOnly,
-            release_id = "release-20260723",
-            preflight_dry_run_verified = true,
-            baseline_verified = true,
-            deployment_started = true,
-            deployment_completed = true,
-            deployment_verified = true,
-            rollback_completed = true,
-            rollback_verified = true,
-            failure = (string?)null,
-            rollback_failure = (string?)null,
-            rollback_verification_failure = (string?)null,
-            completed_at = "2026-07-29T00:00:06Z",
-            evidence = new
-            {
-                preflight_dry_run = EvidenceEntry("preflight-dry-run.json"),
-                baseline_verification = EvidenceEntry("baseline-verification.json"),
-                deployment = EvidenceEntry("deployment.json"),
-                deployed_verification = EvidenceEntry("deployed-verification.json"),
-                rollback_verification = EvidenceEntry("rollback-verification.json"),
-            },
-        });
-        var validationIds = new[]
-        {
-            "taskbar-visual-grouping",
-            "native-performance",
-            "lpwp-long-grid-e2e",
-            "lpwp-widget-desktop",
-            "lpwp-signed-reference",
-        };
-        var approvedValidationIds = externalEcosystemDeferred
-            ? new[] { "taskbar-visual-grouping", "native-performance", "lpwp-widget-desktop" }
-            : validationIds;
-        var productApprovals = approvedValidationIds.Select(id =>
-        {
-            var relativePath = $"product.sources/{id}.json";
-            WritePortableSource(relativePath, new
-            {
-                schema_version = 1,
-                classification = "final_validation_approval",
-                validation_id = id,
-                source_commit = Commit,
-                status = "passed",
-                reviewer = "product-reviewer",
-            });
-            return new
-            {
-                validation_id = id,
-                source_commit = Commit,
-                source_manifest = EvidenceEntry(relativePath),
-            };
-        }).ToArray();
-        const string pluginMatrixRelative = "product.sources/plugin-positive-matrix.json";
-        WritePortableSource(pluginMatrixRelative, new
-        {
-            schema_version = 1,
-            classification = "plugin_positive_matrix",
-            source_commit = Commit,
-            source_dirty = false,
+            schema_version = 3,
+            classification = "automated_final_product_acceptance",
+            source_commit = commit,
+            source_dirty = dirty,
+            acceptance_status = blocked ? "blocked_environment" : "passed",
             plugin_count = 25,
             command_count = 42,
-            approval_receipt_count = 25,
+            automated_gate_count = 94,
+            passed_gate_count = blocked ? 93 : 94,
+            failed_gate_count = 0,
+            environment_blocked_gate_count = blocked ? 1 : 0,
+            not_run_gate_count = 0,
+            not_applicable_gate_count = 0,
             contract_valid = true,
-            release_eligible = true,
-        });
-        string? externalDeferral = null;
-        object? deferralSource = null;
-        object[]? deferredItems = null;
-        if (externalEcosystemDeferred)
-        {
-            deferredItems = new object[]
+            release_eligible = !blocked && !dirty,
+            release_host = new { path = hostPath, sha256 = hostHash },
+            final_closure = new
             {
-                new { id = "lpwp-long-grid-e2e", status = deferredItemStatus, reason = "missing_long_grid_repository", target_version = "1.12.0", default_feature_state = "disabled" },
-                new { id = "lpwp-signed-reference", status = deferredItemStatus, reason = "missing_approved_plugin_publisher_identity", target_version = "1.12.0", default_feature_state = "disabled" },
-                new { id = "production-marketplace-rehearsal", status = deferredItemStatus, reason = "missing_production_registry_or_cdn_credentials", target_version = "1.12.0", default_feature_state = "disabled" },
-            };
-            var deferralDocument = new
-            {
-                schema_version = 1,
-                classification = "external_ecosystem_deferral",
-                status = "deferred",
-                source_commit = Commit,
-                candidate_version = deferredCandidateVersion,
-                target_version = "1.12.0",
-                default_feature_state = "disabled",
-                accepted_by = "release-maintainer",
-                accepted_at = "2026-08-14T00:00:00Z",
-                items = deferredItems,
-            };
-            externalDeferral = WriteJson("external-ecosystem-deferral.json", deferralDocument);
-            const string deferralRelative = "product.sources/external-ecosystem-deferral.json";
-            WritePortableSource(deferralRelative, deferralDocument);
-            deferralSource = EvidenceEntry(deferralRelative);
-        }
-        var productDocument = new Dictionary<string, object?>
-        {
-            ["schema_version"] = externalEcosystemDeferred ? 2 : 1,
-            ["classification"] = "approved_final_product_acceptance",
-            ["passed"] = true,
-            ["source_commit"] = Commit,
-            ["plugin_count"] = 25,
-            ["command_count"] = 42,
-            ["plugin_approval_receipt_count"] = 25,
-            ["required_validation_ids"] = validationIds,
-            ["approved_validation_count"] = approvedValidationIds.Length,
-            ["plugin_matrix"] = EvidenceEntry(pluginMatrixRelative),
-            ["approvals"] = productApprovals,
-        };
-        if (externalEcosystemDeferred)
-        {
-            productDocument["deferred_validation_count"] = 2;
-            productDocument["external_ecosystem"] = deferredItems;
-            productDocument["external_ecosystem_deferral"] = deferralSource;
-        }
-        var productAcceptance = WriteJson("product.json", productDocument);
-        return new FixturePaths(
-            release,
-            download,
-            clean,
-            dpi,
-            accessibility,
-            marketplace,
-            productAcceptance,
-            externalDeferral,
-            marketplaceEvidence,
-            packagePath,
-            frameworkPackagePath,
-            installerPath,
-            checksumsPath,
-            downloadEvidencePath,
-            cleanEvidencePath,
-            Path.Combine(_root, "dpi.sources", "physical-dpi-100.json"),
-            Path.Combine(
-                _root,
-                "accessibility.sources",
-                "accessibility-high_contrast.json"));
-    }
-
-    private static object ReleasePackage(
-        string file,
-        string kind,
-        string sha256,
-        long bytes,
-        int commandCount) =>
-        new
-        {
-            file,
-            kind,
-            sha256,
-            bytes,
-            plugins = 25,
-            manifests = 25,
-            unique_plugin_ids = 25,
-            commands = commandCount,
-            command_smoke_exit_code = 0,
-            added_webview_processes = 0,
-        };
-
-    private static string Hash(byte[] content) =>
-        Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
-
-    private string WriteMarketplaceEvidence(
-        bool deploymentReleaseMismatch,
-        bool rollbackMismatch)
-    {
-        var deploymentFiles = new[]
-        {
-            new
-            {
-                RemotePath = "registry.json",
-                Sha256 = new string('a', 64),
-                Bytes = 512,
-                Kind = "RegistryCommit",
+                file = "product.sources/final-closure.json",
+                sha256 = Hash(await File.ReadAllBytesAsync(closurePath)),
             },
-        };
-        WriteJson("preflight-dry-run.json", new
-        {
-            SchemaVersion = 1,
-            ReleaseId = "release-20260723",
-            ExecutedAt = "2026-07-29T00:00:01Z",
-            Mode = "dry_run",
-            Target = "Https",
-            Destination = "https://registry.example.test/releases/",
-            Files = deploymentFiles,
-        });
-        WriteMarketplaceVerification(
-            "baseline-verification.json",
-            "2026-07-29T00:00:02Z",
-            "2026-07-28T00:00:00Z",
-            "baseline.plugin");
-        WriteJson("deployment.json", new
-        {
-            SchemaVersion = 1,
-            ReleaseId = deploymentReleaseMismatch
-                ? "release-different"
-                : "release-20260723",
-            ExecutedAt = "2026-07-29T00:00:03Z",
-            Mode = "deployed",
-            Target = "Https",
-            Destination = "https://registry.example.test/releases/",
-            Files = deploymentFiles,
-        });
-        WriteMarketplaceVerification(
-            "deployed-verification.json",
-            "2026-07-29T00:00:04Z",
-            "2026-07-29T00:00:00Z",
-            "deployed.plugin");
-        WriteMarketplaceVerification(
-            "rollback-verification.json",
-            "2026-07-29T00:00:05Z",
-            rollbackMismatch
-                ? "2026-07-27T00:00:00Z"
-                : "2026-07-28T00:00:00Z",
-            "baseline.plugin");
-        return Path.Combine(_root, "deployment.json");
-    }
-
-    private void WriteMarketplaceVerification(
-        string fileName,
-        string verifiedAt,
-        string registryGeneratedAt,
-        string pluginId)
-    {
-        WriteJson(fileName, new
-        {
-            SchemaVersion = 1,
-            VerifiedAt = verifiedAt,
-            RegistryUri = "https://registry.example.test/releases/registry.json",
-            RegistryGeneratedAt = registryGeneratedAt,
-            EntryCount = 1,
-            PackageCount = 1,
-            TotalPackageBytes = 128,
-            TrustedPublisherKeyCount = 1,
-            DurationMilliseconds = 25,
-            Packages = new[]
-            {
-                new
+            environment_blockers = blocked
+                ? new object[]
                 {
-                    PluginId = pluginId,
-                    Version = "1.0.0",
-                    Sha256 = new string('b', 64),
-                    PublisherKeyId = "publisher",
-                    Bytes = 128,
-                },
-            },
-        });
-    }
-
-    private object EvidenceEntry(string fileName)
-    {
-        var path = Path.Combine(_root, fileName);
-        return new
-        {
-            file = fileName,
-            sha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))
-                .ToLowerInvariant(),
+                    new
+                    {
+                        gate_id = "native-performance-preflight",
+                        reason = "administrator is unavailable",
+                    },
+                }
+                : Array.Empty<object>(),
         };
+        var productPath = Path.Combine(_root, "product.json");
+        await File.WriteAllTextAsync(productPath, JsonSerializer.Serialize(product));
+        return new ProductFixture(productPath, closurePath, hostPath);
     }
 
-    private void WritePortableSource(string relativePath, object value)
+    private async Task<ProcessResult> RunGateAsync(
+        ProductFixture fixture,
+        string serviceMode,
+        string? output = null,
+        string? endpoint = null,
+        string? certificateSha256 = null,
+        string distributionChannel = "unsigned",
+        bool requireReleaseEligible = false,
+        bool preflightOnly = false)
     {
-        var path = Path.Combine(_root, relativePath);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllText(path, JsonSerializer.Serialize(value));
-    }
-
-    private string WriteJson(string fileName, object value)
-    {
-        var path = Path.Combine(_root, fileName);
-        File.WriteAllText(path, JsonSerializer.Serialize(value));
-        return path;
-    }
-
-    private async Task<ProcessResult> RunVerifierAsync(
-        FixturePaths paths,
-        string? output,
-        bool preflightOnly = false,
-        string? reviewModel = null)
-    {
-        var start = new ProcessStartInfo
+        var arguments = new List<string>
         {
-            FileName = "powershell.exe",
+            "-File",
+            Path.Combine(FindRoot(), "verify-external-release-gate.ps1"),
+            "-ProductAcceptanceGatePath",
+            fixture.ProductPath,
+            "-SubjectExecutable",
+            fixture.HostPath,
+            "-ExpectedSourceCommit",
+            await GitAsync("rev-parse", "HEAD"),
+            "-ExpectedDistributionChannel",
+            distributionChannel,
+            "-ServiceMode",
+            serviceMode,
+            "-AllowDirty",
+        };
+        if (output is not null)
+        {
+            arguments.Add("-OutputPath");
+            arguments.Add(output);
+        }
+        if (endpoint is not null)
+        {
+            arguments.Add("-TestServiceEndpoint");
+            arguments.Add(endpoint);
+        }
+        if (certificateSha256 is not null)
+        {
+            arguments.Add("-TestServiceCertificateSha256");
+            arguments.Add(certificateSha256);
+        }
+        if (preflightOnly)
+            arguments.Add("-PreflightOnly");
+        if (requireReleaseEligible)
+            arguments.Add("-RequireReleaseEligible");
+        return await RunPowerShellAsync(arguments);
+    }
+
+    private static async Task<ProcessResult> RunPowerShellAsync(
+        IEnumerable<string> arguments)
+    {
+        var start = new ProcessStartInfo("powershell.exe")
+        {
+            WorkingDirectory = FindRoot(),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var argument in new[]
-        {
-            "-NoProfile", "-ExecutionPolicy", "Bypass",
-            "-File", Path.Combine(FindRepositoryRoot(), "verify-external-release-gate.ps1"),
-            "-ReleaseManifestPath", paths.Release,
-            "-DownloadGatePath", paths.Download,
-            "-CleanEnvironmentGatePath", paths.Clean,
-            "-PhysicalDpiGatePath", paths.Dpi,
-            "-AccessibilityGatePath", paths.Accessibility,
-            "-ProductAcceptanceGatePath", paths.ProductAcceptance,
-            "-ExpectedSourceCommit", Commit,
-            "-ExpectedDistributionChannel", "unsigned",
-        })
-        {
+        start.ArgumentList.Add("-NoProfile");
+        start.ArgumentList.Add("-ExecutionPolicy");
+        start.ArgumentList.Add("Bypass");
+        foreach (var argument in arguments)
             start.ArgumentList.Add(argument);
-        }
-        if (paths.ExternalDeferral is null)
-        {
-            start.ArgumentList.Add("-MarketplaceRehearsalPath");
-            start.ArgumentList.Add(paths.Marketplace);
-        }
-        else
-        {
-            start.ArgumentList.Add("-ExternalEcosystemDeferralPath");
-            start.ArgumentList.Add(paths.ExternalDeferral);
-        }
-        if (preflightOnly)
-            start.ArgumentList.Add("-PreflightOnly");
-        if (reviewModel is not null)
-        {
-            start.ArgumentList.Add("-ReviewModel");
-            start.ArgumentList.Add(reviewModel);
-        }
-        if (output is not null)
-        {
-            start.ArgumentList.Add("-OutputPath");
-            start.ArgumentList.Add(output);
-        }
-
         using var process = Process.Start(start)!;
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
-        return new ProcessResult(
-            process.ExitCode,
-            await standardOutput,
-            await standardError);
+        return new ProcessResult(process.ExitCode, await output, await error);
     }
 
-    private static string FindRepositoryRoot()
+    private static async Task<string> GitAsync(params string[] arguments)
+    {
+        var start = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = FindRoot(),
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var argument in arguments)
+            start.ArgumentList.Add(argument);
+        using var process = Process.Start(start)!;
+        var output = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        Assert.Equal(0, process.ExitCode);
+        return output.Trim();
+    }
+
+    private static void AssertSchemaValid(JsonDocument report)
+    {
+        var evaluation = ReportSchema.Value.Evaluate(
+            report.RootElement,
+            new EvaluationOptions { OutputFormat = OutputFormat.List });
+        Assert.True(evaluation.IsValid, JsonSerializer.Serialize(evaluation.Details));
+    }
+
+    private static string Hash(byte[] content) =>
+        Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+
+    private static string Read(string name) =>
+        File.ReadAllText(Path.Combine(FindRoot(), name));
+
+    private static string FindRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
              directory is not null;
@@ -1374,32 +414,167 @@ public sealed class ExternalReleaseGateTests : IDisposable
             if (File.Exists(Path.Combine(directory.FullName, "LongBetterWindows.sln")))
                 return directory.FullName;
         }
-        throw new DirectoryNotFoundException("Could not locate repository root.");
+        throw new DirectoryNotFoundException("Repository root was not found.");
     }
 
     public void Dispose()
     {
-        if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true);
+        if (Directory.Exists(_root))
+            Directory.Delete(_root, recursive: true);
     }
 
-    private sealed record FixturePaths(
-        string Release,
-        string Download,
-        string Clean,
-        string Dpi,
-        string Accessibility,
-        string Marketplace,
-        string ProductAcceptance,
-        string? ExternalDeferral,
-        string MarketplaceDeploymentEvidence,
-        string Package,
-        string FrameworkPackage,
-        string Installer,
-        string Checksums,
-        string DownloadEvidence,
-        string CleanEvidence,
-        string DpiSource,
-        string AccessibilitySource);
+    private sealed record ProductFixture(
+        string ProductPath,
+        string ClosurePath,
+        string HostPath);
 
-    private sealed record ProcessResult(int ExitCode, string Output, string Error);
+    private sealed record ProcessResult(
+        int ExitCode,
+        string Output,
+        string Error);
+
+    private sealed class LoopbackMarketplaceServer : IAsyncDisposable
+    {
+        private readonly TcpListener _listener;
+        private readonly byte[] _registry;
+        private readonly byte[] _packageResponse;
+        private readonly X509Certificate2 _certificate;
+        private readonly List<string> _requestPaths = [];
+
+        public LoopbackMarketplaceServer(
+            string sourceCommit,
+            byte[] package,
+            bool tamperPackageResponse = false)
+        {
+            _listener = new TcpListener(IPAddress.Loopback, 0);
+            using var key = RSA.Create(2048);
+            var request = new CertificateRequest(
+                "CN=127.0.0.1",
+                key,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            var names = new SubjectAlternativeNameBuilder();
+            names.AddIpAddress(IPAddress.Loopback);
+            request.CertificateExtensions.Add(names.Build());
+            using var ephemeralCertificate = request.CreateSelfSigned(
+                DateTimeOffset.UtcNow.AddMinutes(-5),
+                DateTimeOffset.UtcNow.AddDays(1));
+            const string password = "long-a007-loopback";
+#pragma warning disable SYSLIB0057
+            _certificate = new X509Certificate2(
+                ephemeralCertificate.Export(
+                    X509ContentType.Pfx,
+                    password),
+                password,
+                X509KeyStorageFlags.UserKeySet |
+                X509KeyStorageFlags.Exportable);
+#pragma warning restore SYSLIB0057
+            CertificateSha256 = Hash(_certificate.RawData);
+            _listener.Start();
+            var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+            Endpoint = $"https://127.0.0.1:{port}/";
+            var registry = new
+            {
+                schema_version = 1,
+                classification = "long_marketplace_test_service_registry",
+                source_commit = sourceCommit,
+                capabilities = new[]
+                {
+                    "registry_fetch",
+                    "package_fetch",
+                    "rollback",
+                    "offline_fallback",
+                },
+                package = new
+                {
+                    path = "package.bin",
+                    sha256 = Hash(package),
+                    bytes = package.Length,
+                },
+            };
+            _registry = JsonSerializer.SerializeToUtf8Bytes(registry);
+            _packageResponse = tamperPackageResponse
+                ? Encoding.UTF8.GetBytes("tampered package response")
+                : package;
+            Completion = ServeAsync();
+        }
+
+        public string Endpoint { get; }
+        public string CertificateSha256 { get; }
+        public Task Completion { get; }
+        public IReadOnlyList<string> RequestPaths => _requestPaths;
+
+        private async Task ServeAsync()
+        {
+            try
+            {
+                for (var request = 0; request < 2; request++)
+                {
+                    using var client = await _listener.AcceptTcpClientAsync();
+                    await using var network = client.GetStream();
+                    await using var stream = new SslStream(network, leaveInnerStreamOpen: false);
+                    await stream.AuthenticateAsServerAsync(
+                        _certificate,
+                        clientCertificateRequired: false,
+                        SslProtocols.Tls12 | SslProtocols.Tls13,
+                        checkCertificateRevocation: false);
+                    var header = await ReadHeaderAsync(stream);
+                    var firstLine = header.Split("\r\n", StringSplitOptions.None)[0];
+                    var path = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries)[1];
+                    _requestPaths.Add(path);
+                    var body = path == "/registry.json"
+                        ? _registry
+                        : _packageResponse;
+                    var responseHeader = Encoding.ASCII.GetBytes(
+                        $"HTTP/1.1 200 OK\r\nContent-Length: {body.Length}\r\n" +
+                        "Content-Type: application/octet-stream\r\nConnection: close\r\n\r\n");
+                    await stream.WriteAsync(responseHeader);
+                    await stream.WriteAsync(body);
+                    await stream.FlushAsync();
+                }
+            }
+            catch (SocketException) when (!_listener.Server.IsBound)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        private static async Task<string> ReadHeaderAsync(Stream stream)
+        {
+            var bytes = new List<byte>();
+            var buffer = new byte[1];
+            while (bytes.Count < 16 * 1024)
+            {
+                var read = await stream.ReadAsync(buffer);
+                if (read == 0)
+                    break;
+                bytes.Add(buffer[0]);
+                if (bytes.Count >= 4 &&
+                    bytes[^4] == '\r' &&
+                    bytes[^3] == '\n' &&
+                    bytes[^2] == '\r' &&
+                    bytes[^1] == '\n')
+                    break;
+            }
+            return Encoding.ASCII.GetString(bytes.ToArray());
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _listener.Stop();
+            _certificate.Dispose();
+            try
+            {
+                await Completion.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            catch (TimeoutException)
+            {
+            }
+            catch (SocketException)
+            {
+            }
+        }
+    }
 }

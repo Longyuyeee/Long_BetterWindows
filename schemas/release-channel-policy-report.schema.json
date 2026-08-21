@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://long-assistant.local/schemas/release-channel-policy-report.schema.json",
+  "title": "Long Assistant Automated Release Channel Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schema_version", "generated_at_utc", "classification",
+    "preflight_only", "source_commit", "source_dirty", "policy_status",
+    "distribution_channel", "authenticode_status", "service_mode",
+    "service_status", "product_acceptance", "release_host", "test_service",
+    "environment_blockers", "release_eligible"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://long-assistant.local/schemas/release-channel-policy-report.schema.json"
+    },
+    "schema_version": { "const": 1 },
+    "generated_at_utc": { "type": "string", "format": "date-time" },
+    "classification": { "const": "automated_release_channel_policy" },
+    "preflight_only": { "type": "boolean" },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_dirty": { "type": "boolean" },
+    "policy_status": {
+      "enum": ["passed", "blocked_environment", "not_eligible"]
+    },
+    "distribution_channel": { "enum": ["unsigned", "signed"] },
+    "authenticode_status": { "enum": ["NotSigned", "Valid"] },
+    "service_mode": { "enum": ["offline", "test_service", "production"] },
+    "service_status": {
+      "enum": [
+        "disabled_by_policy",
+        "verified_test_service",
+        "blocked_environment"
+      ]
+    },
+    "product_acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "sha256", "release_eligible"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^[^/]+\\.sources/final-product-acceptance\\.json$"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "release_eligible": { "type": "boolean" }
+      }
+    },
+    "release_host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "test_service": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endpoint", "certificate_sha256", "registry_sha256", "package_file",
+            "package_sha256", "package_bytes", "capabilities"
+          ],
+          "properties": {
+            "endpoint": { "type": "string", "format": "uri" },
+            "certificate_sha256": { "$ref": "#/$defs/sha256" },
+            "registry_sha256": { "$ref": "#/$defs/sha256" },
+            "package_file": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "package_sha256": { "$ref": "#/$defs/sha256" },
+            "package_bytes": { "type": "integer", "minimum": 1 },
+            "capabilities": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "registry_fetch",
+                  "package_fetch",
+                  "rollback",
+                  "offline_fallback"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "environment_blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "reason"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,191}$"
+          },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "release_eligible": { "type": "boolean" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
