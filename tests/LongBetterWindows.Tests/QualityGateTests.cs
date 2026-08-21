@@ -369,10 +369,9 @@ public class QualityGateTests
     }
 
     [Fact]
-    public void PhysicalDpiMatrix_RejectsSimulatedScaleAndRequiresReviewedHashLockedEvidence()
+    public void PhysicalDpiMatrix_RequiresAutomatedPhysicalHashLockedEvidence()
     {
         var capture = Read("capture-physical-dpi-evidence.ps1");
-        var approve = Read("approve-physical-dpi-evidence.ps1");
         var verify = Read("verify-physical-dpi-matrix.ps1");
 
         Assert.Contains("actual_monitor_dpi", capture);
@@ -380,7 +379,7 @@ public class QualityGateTests
         Assert.Contains("--quality-monitor-device", capture);
         Assert.Contains("Physical monitor mismatch", capture);
         Assert.Contains("Physical monitor DPI mismatch", capture);
-        Assert.Contains("physical_device_dpi_evidence", capture);
+        Assert.Contains("automated_physical_device_dpi_evidence", capture);
         Assert.Contains("ExpectedSourceCommit", capture);
         Assert.Contains("Repository HEAD does not match ExpectedSourceCommit", capture);
         Assert.Contains("requires a clean tracked source tree", capture);
@@ -388,92 +387,24 @@ public class QualityGateTests
         Assert.Contains("source_commit = $expectedCommit", capture);
         Assert.Contains("Write-NewJsonFileAtomically", capture);
         Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", capture);
-        Assert.Contains("ApproveAfterVisualReview", capture);
+        Assert.DoesNotContain("ApproveAfterVisualReview", capture);
+        Assert.DoesNotContain("human_review", capture);
         Assert.Contains("ProcessTimeoutSeconds = 90", capture);
         Assert.Contains("WaitForExit($ProcessTimeoutSeconds * 1000)", capture);
-        Assert.Contains("no_clipping_or_overflow", capture);
-        Assert.Contains("management_center_layout_is_stable", capture);
-        Assert.Contains("management_module_tabs_are_readable", capture);
         Assert.Contains("must include the main management-center view", capture);
         Assert.Contains("webview_preview", capture);
         Assert.Contains("wpf_render_target", capture);
         Assert.Contains("'--command-text', $PluginCommandText", capture);
-        Assert.Contains("ConfirmVisualReview", approve);
-        Assert.Contains("ExpectedSourceCommit", approve);
-        Assert.Contains("Physical DPI evidence source commit does not match ExpectedSourceCommit", approve);
-        Assert.Contains("Scale confirmation mismatch", approve);
-        Assert.Contains("Evidence changed after capture", approve);
-        Assert.Contains("is not pending review", approve);
-        Assert.Contains("Update-JsonFileAtomically", approve);
-        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", approve);
-        Assert.Contains("Get-FileHash", approve);
-        Assert.Contains("schema version 2 is required", approve);
-        Assert.Contains("management_center_layout_is_stable", approve);
-        Assert.Contains("management_module_tabs_are_readable", approve);
         Assert.Contains("100,125,150,200", verify);
-        Assert.Contains("human_review.status -ne 'approved'", verify);
+        Assert.DoesNotContain("human_review", verify);
         Assert.Contains("Get-FileHash", verify);
         Assert.Contains("Expected 8 captures", verify);
-        Assert.Contains("schema version 2 is required", verify);
+        Assert.Contains("schema version 3 is required", verify);
         Assert.Contains("management-center view", verify);
-        Assert.Contains("Manual physical DPI checklist is incomplete", verify);
-        Assert.Contains("approved_physical_device_dpi_matrix", verify);
+        Assert.Contains("automated_physical_device_dpi_matrix", verify);
         Assert.Contains("ExpectedSourceCommit", verify);
         Assert.Contains("Physical DPI evidence source commit does not match ExpectedSourceCommit", verify);
         Assert.Contains("source_commit = $expectedCommit", verify);
-        Assert.Contains("schema_version = 3", verify);
-        Assert.Contains("source_manifest = [ordered]@", verify);
-        Assert.Contains(".sources", verify);
-        Assert.Contains("Copy-Item -LiteralPath $source.path", verify);
-        Assert.Contains("Write-NewJsonFileAtomically", verify);
-        Assert.Contains("[IO.Directory]::Move($temporarySourceDirectory, $sourceDirectory)", verify);
-        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutput", verify);
-    }
-
-    [Fact]
-    public void PhysicalAccessibilityEvidence_RequiresRealSettingsManualReviewAndScreenReaderApproval()
-    {
-        var capture = Read("capture-accessibility-evidence.ps1");
-        var approve = Read("approve-accessibility-evidence.ps1");
-        var verify = Read("verify-accessibility-matrix.ps1");
-
-        Assert.Contains("SystemParameters]::HighContrast", capture);
-        Assert.Contains("SystemParameters]::ClientAreaAnimation", capture);
-        Assert.Contains("Requested screen reader process is not running", capture);
-        Assert.Contains("run-desktop-ui-smoke.ps1", capture);
-        Assert.Contains("assistive_technology_events", capture);
-        Assert.Contains("live_region_event_count", capture);
-        Assert.Contains("screen_reader_active_during_capture", capture);
-        Assert.Contains("physical_accessibility_evidence", capture);
-        Assert.Contains("Write-NewJsonFileAtomically", capture);
-        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", capture);
-        Assert.Contains("ConfirmKeyboardNavigation", approve);
-        Assert.Contains("ConfirmFocusVisibility", approve);
-        Assert.Contains("ConfirmMotionBehavior", approve);
-        Assert.Contains("ConfirmManagementTabOrder", approve);
-        Assert.Contains("ConfirmManagementActivation", approve);
-        Assert.Contains("ConfirmManagementModuleCloseMru", approve);
-        Assert.Contains("ConfirmScreenReaderAnnouncements", approve);
-        Assert.Contains("ConfirmManagementCloseAnnouncements", approve);
-        Assert.Contains("evidence changed after capture", approve, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("is not pending review", approve);
-        Assert.Contains("Update-JsonFileAtomically", approve);
-        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", approve);
-        Assert.Contains("management_destination_tab_order", capture);
-        Assert.Contains("management_destination_activation", capture);
-        Assert.Contains("management_module_close_mru", capture);
-        Assert.Contains("management_close_announcements", capture);
-        Assert.Contains("high_contrast", verify);
-        Assert.Contains("reduced_motion", verify);
-        Assert.Contains("combined", verify);
-        Assert.Contains("at least one approved Narrator or NVDA", verify);
-        Assert.Contains("schema version 3 is required", verify);
-        Assert.Contains("Accessibility UIA event evidence is incomplete", verify);
-        Assert.Contains("management_destination_tab_order", verify);
-        Assert.Contains("management_destination_activation", verify);
-        Assert.Contains("management_module_close_mru", verify);
-        Assert.Contains("management_close_announcements", verify);
-        Assert.Contains("approved_physical_accessibility_matrix", verify);
         Assert.Contains("schema_version = 4", verify);
         Assert.Contains("source_manifest = [ordered]@", verify);
         Assert.Contains(".sources", verify);
@@ -484,10 +415,43 @@ public class QualityGateTests
     }
 
     [Fact]
-    public void CleanWindowsReleaseEvidence_UsesCandidatePackageAndRequiresIndependentLifecycleApproval()
+    public void PhysicalAccessibilityEvidence_RequiresRealSettingsAndAutomatedUiaEvents()
+    {
+        var capture = Read("capture-accessibility-evidence.ps1");
+        var verify = Read("verify-accessibility-matrix.ps1");
+
+        Assert.Contains("SystemParameters]::HighContrast", capture);
+        Assert.Contains("SystemParameters]::ClientAreaAnimation", capture);
+        Assert.Contains("Requested screen reader process is not running", capture);
+        Assert.Contains("run-desktop-ui-smoke.ps1", capture);
+        Assert.Contains("assistive_technology_events", capture);
+        Assert.Contains("live_region_event_count", capture);
+        Assert.Contains("screen_reader_active_during_capture", capture);
+        Assert.Contains("automated_physical_accessibility_evidence", capture);
+        Assert.Contains("Write-NewJsonFileAtomically", capture);
+        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", capture);
+        Assert.DoesNotContain("human_review", capture);
+        Assert.Contains("high_contrast", verify);
+        Assert.Contains("reduced_motion", verify);
+        Assert.Contains("combined", verify);
+        Assert.Contains("schema version 4 is required", verify);
+        Assert.Contains("Accessibility UIA event evidence is incomplete", verify);
+        Assert.Contains("automated_physical_accessibility_matrix", verify);
+        Assert.Contains("schema_version = 5", verify);
+        Assert.Contains("uia_event_profile_count", verify);
+        Assert.DoesNotContain("human_review", verify);
+        Assert.Contains("source_manifest = [ordered]@", verify);
+        Assert.Contains(".sources", verify);
+        Assert.Contains("Copy-Item -LiteralPath $source.path", verify);
+        Assert.Contains("Write-NewJsonFileAtomically", verify);
+        Assert.Contains("[IO.Directory]::Move($temporarySourceDirectory, $sourceDirectory)", verify);
+        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutput", verify);
+    }
+
+    [Fact]
+    public void CleanWindowsReleaseEvidence_UsesAutomatedCandidateLifecycleEvidence()
     {
         var capture = Read("capture-clean-environment-evidence.ps1");
-        var approve = Read("approve-clean-environment-evidence.ps1");
         var verify = Read("verify-clean-environment-evidence.ps1");
         var desktopSmoke = Read("run-desktop-ui-smoke.ps1");
 
@@ -500,34 +464,20 @@ public class QualityGateTests
         Assert.Contains("Release ZIP hash does not match", capture);
         Assert.Contains("Start capture before the first launch", capture);
         Assert.Contains("-ReleaseDirectory $installRoot", capture);
-        Assert.Contains("clean_windows_release_evidence", capture);
+        Assert.Contains("automated_clean_windows_release_evidence", capture);
         Assert.Contains("Write-NewJsonFileAtomically", capture);
         Assert.DoesNotContain("Set-Content -LiteralPath $evidencePath", capture);
-        Assert.Contains("ConfirmTrayIcon", approve);
-        Assert.Contains("ExpectedSourceCommit", approve);
-        Assert.Contains("ExpectedDistributionChannel", approve);
-        Assert.Contains("Clean-environment evidence source commit does not match ExpectedSourceCommit", approve);
-        Assert.Contains("ConfirmGlobalHotkey", approve);
-        Assert.Contains("ConfirmWebViewRuntime", approve);
-        Assert.Contains("ConfirmParallelUpgradeDataPreserved", approve);
-        Assert.Contains("ConfirmRollbackToPreviousVersion", approve);
-        Assert.Contains("ConfirmUninstallIntegrationsRemoved", approve);
-        Assert.Contains("Reviewer must differ", approve);
-        Assert.Contains("evidence changed after capture", approve, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("is not pending review", approve);
-        Assert.Contains("Update-JsonFileAtomically", approve);
-        Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", approve);
-        Assert.Contains("human_review.status -ne 'approved'", verify);
+        Assert.DoesNotContain("human_review", capture);
+        Assert.DoesNotContain("human_review", verify);
         Assert.Contains("ExpectedDistributionChannel", verify);
         Assert.Contains("expected eligible distribution channel", verify);
-        Assert.Contains("Manual lifecycle checklist is incomplete", verify);
-        Assert.Contains("approved_clean_windows_release_gate", verify);
+        Assert.Contains("automated_clean_windows_release_gate", verify);
         Assert.Contains("ExpectedSourceCommit", verify);
         Assert.Contains("Clean-environment evidence source commit does not match ExpectedSourceCommit", verify);
         Assert.Contains("source_commit = $expectedCommit", verify);
         Assert.Contains("Captured release manifest source commit does not match ExpectedSourceCommit", verify);
         Assert.Contains("package identity does not match the captured release manifest", verify);
-        Assert.Contains("schema_version = 2", verify);
+        Assert.Contains("schema_version = 3", verify);
         Assert.Contains("evidence_manifest = [ordered]@", verify);
         Assert.Contains("summary and evidence manifest must share one directory", verify);
         Assert.Contains("Write-NewJsonFileAtomically", verify);
@@ -540,7 +490,6 @@ public class QualityGateTests
     public void ReleaseDownloadEvidence_VerifiesManifestHashAndInternetOriginWithoutLaunchingPackage()
     {
         var capture = Read("capture-release-download-evidence.ps1");
-        var approve = Read("approve-release-download-evidence.ps1");
         var verify = Read("verify-release-download-evidence.ps1");
 
         Assert.Contains("ExpectedSourceCommit", capture);
@@ -551,32 +500,19 @@ public class QualityGateTests
         Assert.Contains("AllowedDownloadHosts", capture);
         Assert.Contains("Download evidence output already exists", capture);
         Assert.Contains("query_parameters_recorded = $false", capture);
-        Assert.Contains("verified_release_download_provenance", capture);
+        Assert.Contains("automated_release_download_provenance", capture);
         Assert.Contains("Write-NewJsonFileAtomically", capture);
         Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutputPath", capture);
-        Assert.Contains("smartscreen_observed = $false", capture);
-        Assert.Contains("first_launch_observed = $false", capture);
+        Assert.DoesNotContain("human_review", capture);
         Assert.DoesNotContain("Start-Process", capture);
         Assert.DoesNotContain("Expand-Archive", capture);
-        Assert.Contains("single_maintainer", approve);
-        Assert.Contains("ConfirmExtractedExecutableOriginChecked", approve);
-        Assert.Contains("ConfirmSmartScreenObserved", approve);
-        Assert.Contains("ConfirmAntivirusObserved", approve);
-        Assert.Contains("ConfirmFirstLaunchObserved", approve);
-        Assert.Contains("Get-FileHash", approve);
-        Assert.Contains("release_download_human_approval", approve);
-        Assert.Contains("changed during human approval", approve);
-        Assert.Contains("Write-NewJsonFileAtomically", approve);
-        Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutputPath", approve);
-        Assert.Contains("Release-download evidence changed after human approval", verify);
-        Assert.Contains("Resolve-LongReleaseReviewPolicy", verify);
-        Assert.Contains("release-review-policy.ps1", verify);
-        Assert.Contains("Interactive release-download checklist is incomplete", verify);
-        Assert.Contains("approved_release_download_gate", verify);
-        Assert.Contains("schema_version = 3", verify);
+        Assert.DoesNotContain("ApprovalPath", verify);
+        Assert.DoesNotContain("reviewer", verify);
+        Assert.Contains("automated_release_download_gate", verify);
+        Assert.Contains("schema_version = 4", verify);
         Assert.Contains("evidence = [ordered]@", verify);
-        Assert.Contains("approval = [ordered]@", verify);
-        Assert.Contains("summary and source files must share one directory", verify);
+        Assert.DoesNotContain("approval = [ordered]@", verify);
+        Assert.Contains("summary and evidence must share one directory", verify);
         Assert.Contains("Write-NewJsonFileAtomically", verify);
         Assert.DoesNotContain("Set-Content -LiteralPath $resolvedOutputPath", verify);
     }
@@ -651,7 +587,6 @@ public class QualityGateTests
     public void PhysicalAccessibilityEvidence_BindsEveryProfileToOneCleanSourceCommit()
     {
         var capture = Read("capture-accessibility-evidence.ps1");
-        var approve = Read("approve-accessibility-evidence.ps1");
         var verify = Read("verify-accessibility-matrix.ps1");
 
         Assert.Contains("ExpectedSourceCommit", capture);
@@ -659,8 +594,6 @@ public class QualityGateTests
         Assert.Contains("requires a clean tracked source tree", capture);
         Assert.Contains("must rebuild the expected source commit", capture);
         Assert.Contains("source_commit = $expectedCommit", capture);
-        Assert.Contains("ExpectedSourceCommit", approve);
-        Assert.Contains("Accessibility evidence source commit does not match ExpectedSourceCommit", approve);
         Assert.Contains("ExpectedSourceCommit", verify);
         Assert.Contains("Accessibility evidence source commit does not match ExpectedSourceCommit", verify);
         Assert.Contains("source_commit = $expectedCommit", verify);

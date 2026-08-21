@@ -71,7 +71,7 @@ v0.6 真实搜索补充数据：
 - 新增应用内确定性截图入口，以 WPF 逻辑尺寸分别输出 96、120、144、192 DPI PNG，并在伴随元数据中分别记录 `render_dpi` 与当前显示器真实 `actual_monitor_dpi`。
 - 亮/暗主题 × 主界面/插件市场/命令面板 × 4 档目标渲染 DPI 共 24 张工程矩阵已生成；24 / 24 文件存在且 SHA-256 与清单一致，代表性 100%、150%、200% 图像抽查未发现裁切、错位、系统白底或滚动条异常。
 - 当前显示器真实值为 240 DPI（250%）。工程离屏渲染不能替代物理 100%、125%、150%、200% 显示设备，因此正式设备矩阵仍保持未签核状态。
-- 已建立 `capture-physical-dpi-evidence.ps1`、`approve-physical-dpi-evidence.ps1` 与 `verify-physical-dpi-matrix.ps1` 三段式门禁：采集时拒绝声明 DPI 与真实显示器 DPI 不一致，批准时复核证据哈希，汇总时要求四档各 8 张且具备明确人工署名。
+- 物理 DPI 已迁移为 `capture-physical-dpi-evidence.ps1` 与 `verify-physical-dpi-matrix.ps1` 两段式自动门禁：采集时拒绝声明 DPI 与真实显示器 DPI 不一致，汇总时要求四档各 8 张并复算图片和元数据哈希。
 - 当前 250% 设备已生成亮/暗 × 主界面/市场/命令面板/Web 插件共 8 张补充证据；实际 DPI 均为 240，自动检查通过，人工状态为 `pending`，且明确标记为非正式四档矩阵成员。
 
 视觉基线：
@@ -134,7 +134,7 @@ v0.6 真实搜索补充数据：
 
 v1.9 当前主线桌面可访问性证据：`artifacts/quality/desktop-ui-accessibility-semantics-20260720-final/desktop-ui-smoke.json`。该轮在原有键盘路径、窗口交接、Web 插件生命周期和市场确认取消基础上，进一步读取命令中心、超级面板、主窗口、分离插件窗口和市场核心控件的 UI Automation 名称、Window/Edit/List/Button 类型、可用状态与键盘焦点能力；三种高对比度/减少动画模式均确认搜索框名称、Edit 类型和焦点。市场错误、目录状态、结果数量、命令状态、上下文摘要和通知已补充 Polite/Assertive Live Region。该工程验证不能替代 Narrator/NVDA 实际朗读与真实 Windows 辅助功能设置下的人工签核。
 
-真实辅助功能人工门禁已由 `capture-accessibility-evidence.ps1`、`approve-accessibility-evidence.ps1` 和 `verify-accessibility-matrix.ps1` 固化。采集器读取 Windows 实际高对比度与客户端动画状态，并可要求 Narrator/NVDA 进程已运行；批准器锁定桌面 UI 报告和日志哈希；汇总器要求高对比度、减少动画、组合三种配置全部人工批准，且至少一组确认读屏器朗读。当前机器状态为高对比度关闭、动画开启、无读屏器，负向测试确认组合模式会在创建证据目录前被拒绝，因此正式人工矩阵继续保持未签核。
+真实辅助功能门禁已由 `capture-accessibility-evidence.ps1` 和 `verify-accessibility-matrix.ps1` 固化。采集器读取 Windows 实际高对比度与客户端动画状态，并执行真实键盘输入和 UIA 焦点/live-region 事件验证；汇总器要求三种配置完整并复算桌面 UI 报告和日志哈希。Narrator/NVDA 仍可用于探索体验，但不再形成影响发布资格的人工签字字段。
 
 第六批网络韧性证据：`artifacts/quality/marketplace-network-resilience-20260720-final/network-resilience.json`。受控传输测试确认瞬时断网可有限重试恢复、持续超时在预算内终止、相同包并发请求合并为一次传输、异常退出遗留分片自动回收、可信目录离线回退保持可用；并发版本安装由事务门串行化，最终 Manifest 有效且无事务目录残留。
 

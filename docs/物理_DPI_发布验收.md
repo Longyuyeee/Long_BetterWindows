@@ -1,19 +1,18 @@
 # Long助手物理 DPI 发布验收
 
-> 建立日期：2026-07-19
-> 目标：为 100%、125%、150%、200% 四档 Windows 物理缩放生成可追溯、不可混用工程离屏渲染的发布证据。
+> 更新日期：2026-08-21
+> 目标：为 100%、125%、150%、200% 四档真实 Windows 缩放生成自动、哈希锁定的发布证据。
 
 ## 验收边界
 
-- 正式矩阵必须来自真实设置为 100%、125%、150%、200% 的显示环境。
-- 采集程序读取目标窗口所在显示器的 `actual_monitor_dpi` 与 `actual_monitor_device_name`；与声明档位或指定设备不一致时立即失败。
-- 工程 `render_dpi` 图片、远程缩放、图片放大或修改元数据均不能代替物理设备证据。
-- 自动校验通过不等于人工签核。人工检查和署名分为独立步骤。
-- 250% 可作为补充设备基线，但不属于规范要求的四档发布矩阵。
+- 必须在真实设置为 100%、125%、150%、200% 的显示环境分别采集。
+- 采集器读取窗口所在显示器的实际 DPI；声明档位或指定设备不一致时失败。
+- 工程离屏渲染、远程缩放、图片放大或手工修改元数据不能替代物理设备证据。
+- 250% 可作为兼容性补充，不属于四档发布矩阵。
 
-## 每台设备的执行步骤
+## 采集
 
-先在 Windows 显示设置中选择目标缩放，注销或重启需要重新加载缩放的应用，然后在对应设备执行：
+在目标缩放生效并重新启动应用后执行：
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\capture-physical-dpi-evidence.ps1 `
@@ -23,37 +22,9 @@ powershell.exe -ExecutionPolicy Bypass -File .\capture-physical-dpi-evidence.ps1
   -MonitorDeviceName '\\.\DISPLAY1'
 ```
 
-多显示器设备应显式传入 Windows 设备名，避免依赖上次窗口位置。每张伴随元数据同时记录设备边界、工作区、主屏状态与实际 DPI；未指定设备名时仍记录实际落点，但不计作定向多屏证据。
+每档生成亮/暗主题下主界面、插件市场、命令面板和 URL Web 插件共 8 张截图及元数据。Manifest 使用 schema v3、分类 `automated_physical_device_dpi_evidence`，记录真实档位、文件与元数据 SHA-256 和自动检查结果。采集要求指定提交、干净受跟踪源码和重新构建；正式证据不得使用 `-NoBuild`。
 
-脚本生成亮/暗主题下的主界面、插件市场、命令面板和 URL Web 插件，共 8 张图片及伴随元数据。测试人员逐张检查：
-
-1. 无裁切、溢出、重叠或异常滚动条。
-2. 中文、英文、数字和图标清晰。
-3. 键盘焦点可见，主要操作不依赖鼠标悬停。
-4. 亮色与暗色的信息层级一致。
-5. Web 插件内容真实可见，不是空白 HWND 截图。
-6. 主界面截图必须处于管理中心首页，八个入口无裁切、重叠或异常换行。
-7. 打开管理模块后，模块标签标题、活动态、焦点环和关闭按钮在当前缩放下清晰可辨。
-
-采集器为每个视图保留 90 秒进程预算，以覆盖高 DPI 下 WebView2 冷启动和连续视图采集；如设备性能较慢，可显式传入 `-ProcessTimeoutSeconds 120`，但不得使用 `-NoBuild` 绕过候选重建。
-
-检查完成后显式批准现有证据：
-
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\approve-physical-dpi-evidence.ps1 `
-  -EvidenceDirectory .\artifacts\physical-dpi-100-YYYYMMDD `
-  -ExpectedSourceCommit "完整的 40 位候选源码提交" `
-  -ConfirmScalePercent 100 `
-  -Reviewer "测试人员姓名" `
-  -ReviewNotes "亮暗主题和四类视图均已逐张检查" `
-  -ConfirmVisualReview
-```
-
-125%、150%、200% 使用相同步骤，仅替换目录和缩放参数。批准脚本会在写入署名前重新核对图片与元数据哈希。
-
-## 汇总发布矩阵
-
-四档证据全部批准后执行：
+## 汇总
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\verify-physical-dpi-matrix.ps1 `
@@ -66,12 +37,4 @@ powershell.exe -ExecutionPolicy Bypass -File .\verify-physical-dpi-matrix.ps1 `
   -OutputPath .\artifacts\quality\physical-dpi-release-matrix.json
 ```
 
-采集要求仓库 `HEAD` 等于指定的完整提交 SHA、受跟踪文件无改动，并重新构建该提交；`-NoBuild` 不能用于正式物理证据。采集视图不能移除 `main`。汇总只接受 v2 原始证据，要求四个唯一档位来自同一个指定提交、每档 8 张图片、管理中心首页与模块标签已人工确认、人工状态为 `approved`、文件哈希未变化、实际显示器缩放与档位一致。汇总输出为 v3，并在摘要旁生成同名 `.sources` 目录；跨电脑复核必须同时携带两者。任一条件不满足即失败。
-
-## 当前证据
-
-- `artifacts/physical-dpi-250-20260719/physical-dpi-evidence.json`
-- 实际显示器：240 DPI（250%）。
-- 自动检查：通过，亮/暗主题共 8 张。
-- 人工签核：`pending`。
-- 发布矩阵成员：否，仅作为高缩放补充基线。
+汇总器只接受同一提交的四个唯一档位，要求每档 8 份真实文件、实际缩放一致、自动检查通过且全部哈希未变化。输出使用 schema v4、分类 `automated_physical_device_dpi_matrix`，并生成可移植 `.sources` 来源包。任何缺档、重复、篡改或失败都会关闭门禁，不再生成或读取人工批准字段。

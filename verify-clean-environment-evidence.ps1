@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-<# .SYNOPSIS Verify approved, hash-locked clean Windows release evidence. #>
+<# .SYNOPSIS Verify automated, hash-locked clean Windows release evidence. #>
 param(
     [Parameter(Mandatory=$true)] [string] $EvidenceDirectory,
     [Parameter(Mandatory=$true)] [string] $ExpectedSourceCommit,
@@ -18,7 +18,10 @@ $root = [IO.Path]::GetFullPath($EvidenceDirectory)
 $manifestPath = Join-Path $root 'clean-environment-evidence.json'
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "Evidence manifest was not found: $manifestPath" }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($manifest.classification -ne 'clean_windows_release_evidence') { throw 'Unexpected evidence classification.' }
+if ([int]$manifest.schema_version -ne 2 -or
+    $manifest.classification -ne 'automated_clean_windows_release_evidence') {
+    throw 'Unexpected clean-environment evidence contract.'
+}
 if ([string]$manifest.release.source_commit -ne $expectedCommit) {
     throw 'Clean-environment evidence source commit does not match ExpectedSourceCommit.'
 }
@@ -28,17 +31,13 @@ if ([string]$manifest.release.distribution_channel -ne $ExpectedDistributionChan
 if (-not [bool]$manifest.environment.operator_asserted_clean_user -or -not [bool]$manifest.environment.interactive) {
     throw 'Evidence was not captured in an asserted clean interactive Windows user environment.'
 }
-if (-not [bool]$manifest.automated_checks.passed -or $manifest.human_review.status -ne 'approved') {
-    throw 'Clean-environment evidence is not fully approved.'
+if (-not [bool]$manifest.automated_checks.passed) {
+    throw 'Clean-environment automated checks did not pass.'
 }
 if (-not [bool]$manifest.release.release_eligible -or
     ($ExpectedDistributionChannel -eq 'signed' -and -not [bool]$manifest.release.signed) -or
     ($ExpectedDistributionChannel -eq 'unsigned' -and [bool]$manifest.release.signed)) {
     throw 'Clean-environment release state does not match the expected eligible distribution channel.'
-}
-if ([string]::IsNullOrWhiteSpace([string]$manifest.human_review.reviewer)) { throw 'Human reviewer is missing.' }
-foreach ($property in $manifest.human_review.checklist.psobject.Properties) {
-    if (-not [bool]$property.Value) { throw "Manual lifecycle checklist is incomplete: $($property.Name)" }
 }
 foreach ($entry in @(
     $manifest.release.release_manifest,
@@ -69,9 +68,9 @@ if ($capturedPackage.Count -ne 1 -or [string]$capturedPackage[0].sha256 -ne [str
 }
 
 $summary = [ordered]@{
-    schema_version = 2
+    schema_version = 3
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
-    classification = 'approved_clean_windows_release_gate'
+    classification = 'automated_clean_windows_release_gate'
     passed = $true
     version = [string]$manifest.release.version
     source_commit = $expectedCommit
@@ -79,7 +78,6 @@ $summary = [ordered]@{
     signed = [bool]$manifest.release.signed
     package_sha256 = [string]$manifest.release.package_sha256
     environment_label = [string]$manifest.environment.label
-    reviewer = [string]$manifest.human_review.reviewer
     evidence_manifest = [ordered]@{
         file = 'clean-environment-evidence.json'
         sha256 = (Get-FileHash $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()

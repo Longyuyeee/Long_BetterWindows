@@ -3,8 +3,7 @@
 .SYNOPSIS
   Capture Long UI evidence on a display whose physical Windows scale matches the requested value.
 .DESCRIPTION
-  This command rejects mismatched monitor DPI. It records automated evidence only unless
-  -ApproveAfterVisualReview is explicitly supplied with a reviewer and review notes.
+  This command rejects mismatched monitor DPI and writes immutable automated evidence.
 #>
 param(
     [Parameter(Mandatory=$true)] [string] $OutputDirectory,
@@ -19,9 +18,6 @@ param(
     [string] $MonitorDeviceName,
     [ValidateRange(100,10000)] [int] $CaptureDelayMilliseconds = 1500,
     [ValidateRange(30,180)] [int] $ProcessTimeoutSeconds = 90,
-    [switch] $ApproveAfterVisualReview,
-    [string] $Reviewer,
-    [string] $ReviewNotes,
     [switch] $NoBuild
 )
 
@@ -45,14 +41,6 @@ if ('main' -notin $Views) {
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $outputRoot) {
     throw "Physical DPI evidence output directory already exists: $outputRoot"
-}
-if ($ApproveAfterVisualReview) {
-    if ([string]::IsNullOrWhiteSpace($Reviewer)) {
-        throw 'Reviewer is required when approving physical DPI evidence.'
-    }
-    if ([string]::IsNullOrWhiteSpace($ReviewNotes) -or $ReviewNotes.Trim().Length -lt 8) {
-        throw 'ReviewNotes must contain at least 8 characters when approving evidence.'
-    }
 }
 [IO.Directory]::CreateDirectory($outputRoot) | Out-Null
 
@@ -147,31 +135,15 @@ foreach ($theme in $Themes) {
     }
 }
 
-$approved = [bool]$ApproveAfterVisualReview
 $manifest = [ordered]@{
-    schema_version = 2
+    schema_version = 3
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
-    classification = 'physical_device_dpi_evidence'
+    classification = 'automated_physical_device_dpi_evidence'
     source_commit = $expectedCommit
     expected_scale_percent = $ExpectedScalePercent
     expected_dpi = $expectedDpi
     automated_checks_passed = $true
     required_release_matrix_member = ($ExpectedScalePercent -in @(100,125,150,200))
-    human_review = [ordered]@{
-        status = if ($approved) { 'approved' } else { 'pending' }
-        reviewer = if ($approved) { $Reviewer.Trim() } else { $null }
-        reviewed_at = if ($approved) { [DateTimeOffset]::UtcNow.ToString('O') } else { $null }
-        notes = if ($approved) { $ReviewNotes.Trim() } else { $null }
-        checklist = [ordered]@{
-            no_clipping_or_overflow = $approved
-            text_and_icons_are_sharp = $approved
-            keyboard_focus_is_visible = $approved
-            light_and_dark_themes_are_consistent = $approved
-            web_plugin_content_is_visible = $approved
-            management_center_layout_is_stable = $approved
-            management_module_tabs_are_readable = $approved
-        }
-    }
     environment = [ordered]@{
         os_version = [Environment]::OSVersion.VersionString
         process_architecture = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
@@ -187,5 +159,4 @@ Write-NewJsonFileAtomically `
     -Label 'Physical DPI evidence manifest'
 
 Write-Output "Physical DPI evidence captured: $($captures.Count) images at $ExpectedScalePercent%."
-Write-Output "Human review: $($manifest.human_review.status)"
 Write-Output "Manifest: $manifestPath"

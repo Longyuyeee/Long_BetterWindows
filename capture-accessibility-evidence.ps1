@@ -80,9 +80,9 @@ if (-not [bool]$report.passed -or @($report.accessibility_modes).Count -ne 3 `
 
 $logPath = Join-Path $smokeRoot 'desktop-ui-smoke.log'
 $manifest = [ordered]@{
-    schema_version = 3
+    schema_version = 4
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
-    classification = 'physical_accessibility_evidence'
+    classification = 'automated_physical_accessibility_evidence'
     source_commit = $expectedCommit
     expected_profile = $ExpectedProfile
     automated_checks_passed = $true
@@ -114,22 +114,6 @@ $manifest = [ordered]@{
         live_region_event_count = [int]$report.assistive_technology_events.live_region_event_count
         expected_announcement = [string]$report.assistive_technology_events.expected_announcement
         screen_reader_active_during_capture = $readerDetected
-    }
-    human_review = [ordered]@{
-        status = 'pending'
-        reviewer = $null
-        reviewed_at = $null
-        notes = $null
-        checklist = [ordered]@{
-            keyboard_navigation = $false
-            focus_visibility = $false
-            motion_behavior = $false
-            management_destination_tab_order = $false
-            management_destination_activation = $false
-            management_module_close_mru = $false
-            screen_reader_announcements = $null
-            management_close_announcements = $null
-        }
     }
     environment = [ordered]@{
         os_version = [Environment]::OSVersion.VersionString

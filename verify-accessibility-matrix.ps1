@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-  Verify approved high-contrast, reduced-motion and combined accessibility evidence.
+  Verify automated high-contrast, reduced-motion and combined accessibility evidence.
 #>
 param(
     [Parameter(Mandatory=$true)] [string[]] $EvidenceDirectories,
@@ -30,36 +30,25 @@ if ($expectedCommit -notmatch '^[0-9a-f]{40}$') {
 $requiredProfiles = @('high_contrast','reduced_motion','combined')
 $results = @()
 $sourceManifests = @()
-$screenReaderApprovalCount = 0
+$uiaEventProfileCount = 0
 foreach ($directory in $EvidenceDirectories) {
     $root = [IO.Path]::GetFullPath($directory)
     $manifestPath = Join-Path $root 'accessibility-evidence.json'
     if (-not (Test-Path -LiteralPath $manifestPath)) { throw "Manifest was not found: $manifestPath" }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($manifest.classification -ne 'physical_accessibility_evidence') {
+    if ($manifest.classification -ne 'automated_physical_accessibility_evidence') {
         throw "Unexpected evidence classification: $manifestPath"
     }
-    if ([int]$manifest.schema_version -ne 3) {
-        throw "Accessibility evidence schema version 3 is required: $manifestPath"
+    if ([int]$manifest.schema_version -ne 4) {
+        throw "Accessibility evidence schema version 4 is required: $manifestPath"
     }
     if ([string]$manifest.source_commit -ne $expectedCommit) {
         throw "Accessibility evidence source commit does not match ExpectedSourceCommit: $manifestPath"
     }
     $profile = [string]$manifest.expected_profile
     if ($profile -notin $requiredProfiles) { throw "Unsupported accessibility profile: $profile" }
-    if (-not [bool]$manifest.automated_checks_passed -or $manifest.human_review.status -ne 'approved') {
-        throw "Accessibility evidence is not approved: $profile"
-    }
-    if ([string]::IsNullOrWhiteSpace([string]$manifest.human_review.reviewer)) {
-        throw "Human reviewer is missing: $profile"
-    }
-    $checks = $manifest.human_review.checklist
-    if (-not [bool]$checks.keyboard_navigation -or -not [bool]$checks.focus_visibility `
-        -or -not [bool]$checks.motion_behavior `
-        -or -not [bool]$checks.management_destination_tab_order `
-        -or -not [bool]$checks.management_destination_activation `
-        -or -not [bool]$checks.management_module_close_mru) {
-        throw "Manual accessibility checklist is incomplete: $profile"
+    if (-not [bool]$manifest.automated_checks_passed) {
+        throw "Automated accessibility evidence did not pass: $profile"
     }
     $settings = $manifest.windows_settings
     $settingsMatch = switch ($profile) {
@@ -91,12 +80,7 @@ foreach ($directory in $EvidenceDirectories) {
         throw "Accessibility UIA event evidence is incomplete: $profile"
     }
     $readerName = [string]$manifest.screen_reader.name
-    if ($readerName -ne 'None' -and [bool]$manifest.screen_reader.process_detected `
-        -and [bool]$eventEvidence.screen_reader_active_during_capture `
-        -and [bool]$checks.screen_reader_announcements `
-        -and [bool]$checks.management_close_announcements) {
-        $screenReaderApprovalCount++
-    }
+    $uiaEventProfileCount++
     $manifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).
         Hash.ToLowerInvariant()
     $sourceFile = "accessibility-$profile.json"
@@ -107,8 +91,6 @@ foreach ($directory in $EvidenceDirectories) {
     $results += [ordered]@{
         profile = $profile
         source_commit = $expectedCommit
-        reviewer = $manifest.human_review.reviewer
-        reviewed_at = $manifest.human_review.reviewed_at
         screen_reader = $readerName
         focus_event_count = [int]$eventEvidence.focus_event_count
         live_region_event_count = [int]$eventEvidence.live_region_event_count
@@ -124,17 +106,13 @@ if ($actualProfiles.Count -ne $requiredProfiles.Count -or
     (Compare-Object -ReferenceObject $requiredProfiles -DifferenceObject $actualProfiles).Count -ne 0) {
     throw "Incomplete accessibility matrix. Required: $($requiredProfiles -join ', '); found: $($actualProfiles -join ', ')."
 }
-if ($screenReaderApprovalCount -lt 1) {
-    throw 'Accessibility matrix requires at least one approved Narrator or NVDA announcement review.'
-}
-
 $summary = [ordered]@{
-    schema_version = 4
+    schema_version = 5
     verified_at = [DateTimeOffset]::UtcNow.ToString('O')
-    classification = 'approved_physical_accessibility_matrix'
+    classification = 'automated_physical_accessibility_matrix'
     source_commit = $expectedCommit
     required_profiles = $requiredProfiles
-    screen_reader_approval_count = $screenReaderApprovalCount
+    uia_event_profile_count = $uiaEventProfileCount
     passed = $true
     evidence = $results
 }

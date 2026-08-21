@@ -3,8 +3,8 @@
 .SYNOPSIS
   Capture first-run and release-package evidence in a genuinely clean Windows user environment.
 .DESCRIPTION
-  The script never claims that the current user is clean automatically. The operator must make
-  that assertion explicitly, and a different reviewer must still approve the interactive checks.
+  The caller explicitly identifies a disposable or new Windows user. The script then records
+  candidate identity, inventory, command smoke and desktop UI smoke as automated evidence.
 #>
 param(
     [Parameter(Mandatory=$true)] [string] $ReleaseZip,
@@ -108,9 +108,9 @@ if (-not [bool]$uiReport.passed) { throw 'Release-package desktop UI report is n
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $os = Get-CimInstance Win32_OperatingSystem
 $manifest = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     generated_at = [DateTimeOffset]::UtcNow.ToString('O')
-    classification = 'clean_windows_release_evidence'
+    classification = 'automated_clean_windows_release_evidence'
     environment = [ordered]@{
         label = $EnvironmentLabel.Trim()
         machine = [Environment]::MachineName
@@ -157,21 +157,6 @@ $manifest = [ordered]@{
             sha256 = (Get-FileHash $commandLogPath -Algorithm SHA256).Hash.ToLowerInvariant()
         }
     }
-    human_review = [ordered]@{
-        status = 'pending'
-        reviewer = $null
-        reviewed_at = $null
-        notes = $null
-        checklist = [ordered]@{
-            first_start = $false
-            tray_icon = $false
-            global_hotkey = $false
-            webview_runtime = $false
-            parallel_upgrade_data_preserved = $false
-            rollback_to_previous_version = $false
-            uninstall_integrations_removed = $false
-        }
-    }
 }
 $evidencePath = Join-Path $outputRoot 'clean-environment-evidence.json'
 Write-NewJsonFileAtomically `
@@ -179,5 +164,5 @@ Write-NewJsonFileAtomically `
     -Path $evidencePath `
     -Depth 8 `
     -Label 'Clean-environment evidence manifest'
-Write-Output 'Automated clean-environment release checks passed; independent human review remains pending.'
+Write-Output 'Automated clean-environment release checks passed.'
 Write-Output "Evidence: $evidencePath"

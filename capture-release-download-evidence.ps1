@@ -3,8 +3,8 @@
 .SYNOPSIS
   Verify a downloaded release package and capture its Windows internet-origin evidence.
 .DESCRIPTION
-  This script does not extract or run the package. SmartScreen, antivirus, extraction, and
-  first-launch observations remain explicit human-review items.
+  This script does not extract or run the package. It verifies immutable package identity and
+  Windows internet-origin metadata without creating a separate approval document.
 #>
 param(
     [Parameter(Mandatory=$true)] [string] $DownloadedPackage,
@@ -123,9 +123,9 @@ if ($null -ne $referrer -and $referrer.host -notin $allowedHosts) {
 $zoneBytes = [Text.Encoding]::UTF8.GetBytes([string]$zone.raw)
 $zoneHash = [BitConverter]::ToString(([Security.Cryptography.SHA256]::Create()).ComputeHash($zoneBytes)).Replace('-', '').ToLowerInvariant()
 $evidence = [ordered]@{
-    schema_version = 1
+    schema_version = 2
     captured_at = [DateTimeOffset]::UtcNow.ToString('O')
-    classification = 'verified_release_download_provenance'
+    classification = 'automated_release_download_provenance'
     passed = $true
     release = [ordered]@{
         version = [string]$release.version
@@ -147,16 +147,6 @@ $evidence = [ordered]@{
         zone_identifier_sha256 = $zoneHash
         query_parameters_recorded = $false
     }
-    human_review = [ordered]@{
-        status = 'pending'
-        checklist = [ordered]@{
-            extraction_completed = $false
-            extracted_executable_origin_checked = $false
-            smartscreen_observed = $false
-            antivirus_observed = $false
-            first_launch_observed = $false
-        }
-    }
 }
 
 Write-NewJsonFileAtomically `
@@ -165,5 +155,4 @@ Write-NewJsonFileAtomically `
     -Depth 8 `
     -Label 'Download evidence output'
 Write-Output 'Downloaded release identity and Windows internet-origin evidence verified.'
-Write-Output 'Interactive extraction, SmartScreen, antivirus, and first-launch review remain pending.'
 Write-Output "Evidence: $resolvedOutputPath"

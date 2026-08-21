@@ -16,7 +16,7 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
     public PhysicalEvidenceGateScriptTests() => Directory.CreateDirectory(_root);
 
     [Fact]
-    public async Task AccessibilityVerifier_AcceptsCompleteV3Evidence()
+    public async Task AccessibilityVerifier_AcceptsCompleteV4Evidence()
     {
         var directories = WriteAccessibilityMatrix("accessibility-valid");
         var output = Path.Combine(_root, "accessibility-valid.json");
@@ -31,56 +31,56 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             $"Exit={result.ExitCode}{Environment.NewLine}{result.StandardError}");
         using var summary = JsonDocument.Parse(File.ReadAllText(output));
         Assert.True(summary.RootElement.GetProperty("passed").GetBoolean());
-        Assert.Equal(4, summary.RootElement.GetProperty("schema_version").GetInt32());
+        Assert.Equal(5, summary.RootElement.GetProperty("schema_version").GetInt32());
         Assert.Equal(
-            1,
+            3,
             summary.RootElement
-                .GetProperty("screen_reader_approval_count")
+                .GetProperty("uia_event_profile_count")
                 .GetInt32());
         AssertPortableSources(summary.RootElement, output, expectedCount: 3);
         AssertNoTemporaryOutputs(output);
     }
 
     [Fact]
-    public async Task AccessibilityVerifier_RejectsV2Evidence()
+    public async Task AccessibilityVerifier_RejectsV3Evidence()
     {
         var directories = WriteAccessibilityMatrix(
-            "accessibility-v2",
-            schemaVersion: 2);
+            "accessibility-v3",
+            schemaVersion: 3);
 
         var result = await RunMatrixVerifierAsync(
             "verify-accessibility-matrix.ps1",
             directories,
-            Path.Combine(_root, "accessibility-v2.json"));
+            Path.Combine(_root, "accessibility-v3.json"));
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains(
-            "schema version 3 is required",
+            "schema version 4 is required",
             result.StandardError,
             StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task AccessibilityVerifier_RejectsMissingManagementReview()
+    public async Task AccessibilityVerifier_RejectsFailedAutomatedChecks()
     {
         var directories = WriteAccessibilityMatrix(
-            "accessibility-incomplete",
-            managementTabOrderApproved: false);
+            "accessibility-failed",
+            automatedChecksPassed: false);
 
         var result = await RunMatrixVerifierAsync(
             "verify-accessibility-matrix.ps1",
             directories,
-            Path.Combine(_root, "accessibility-incomplete.json"));
+            Path.Combine(_root, "accessibility-failed.json"));
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains(
-            "Manual accessibility checklist is incomplete",
+            "Automated accessibility evidence did not pass",
             result.StandardError,
             StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task PhysicalDpiVerifier_AcceptsCompleteV2Evidence()
+    public async Task PhysicalDpiVerifier_AcceptsCompleteV3Evidence()
     {
         var directories = WritePhysicalDpiMatrix("dpi-valid");
         var output = Path.Combine(_root, "dpi-valid.json");
@@ -95,7 +95,7 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             $"Exit={result.ExitCode}{Environment.NewLine}{result.StandardError}");
         using var summary = JsonDocument.Parse(File.ReadAllText(output));
         Assert.True(summary.RootElement.GetProperty("passed").GetBoolean());
-        Assert.Equal(3, summary.RootElement.GetProperty("schema_version").GetInt32());
+        Assert.Equal(4, summary.RootElement.GetProperty("schema_version").GetInt32());
         Assert.Equal(32, summary.RootElement.GetProperty("capture_count").GetInt32());
         AssertPortableSources(summary.RootElement, output, expectedCount: 4);
         AssertNoTemporaryOutputs(output);
@@ -125,45 +125,45 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
     }
 
     [Fact]
-    public async Task PhysicalDpiVerifier_RejectsV1Evidence()
+    public async Task PhysicalDpiVerifier_RejectsV2Evidence()
     {
-        var directories = WritePhysicalDpiMatrix("dpi-v1", schemaVersion: 1);
+        var directories = WritePhysicalDpiMatrix("dpi-v2", schemaVersion: 2);
 
         var result = await RunMatrixVerifierAsync(
             "verify-physical-dpi-matrix.ps1",
             directories,
-            Path.Combine(_root, "dpi-v1.json"));
+            Path.Combine(_root, "dpi-v2.json"));
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains(
-            "schema version 2 is required",
+            "schema version 3 is required",
             result.StandardError,
             StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task PhysicalDpiVerifier_RejectsMissingManagementReview()
+    public async Task PhysicalDpiVerifier_RejectsFailedAutomatedChecks()
     {
         var directories = WritePhysicalDpiMatrix(
-            "dpi-incomplete",
-            managementLayoutApproved: false);
+            "dpi-failed",
+            automatedChecksPassed: false);
 
         var result = await RunMatrixVerifierAsync(
             "verify-physical-dpi-matrix.ps1",
             directories,
-            Path.Combine(_root, "dpi-incomplete.json"));
+            Path.Combine(_root, "dpi-failed.json"));
 
         Assert.NotEqual(0, result.ExitCode);
         Assert.Contains(
-            "Manual physical DPI checklist is incomplete",
+            "Automated checks did not pass",
             result.StandardError,
             StringComparison.Ordinal);
     }
 
     private string[] WriteAccessibilityMatrix(
         string fixtureName,
-        int schemaVersion = 3,
-        bool managementTabOrderApproved = true)
+        int schemaVersion = 4,
+        bool automatedChecksPassed = true)
     {
         var profiles = new[]
         {
@@ -186,10 +186,10 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             var manifest = new
             {
                 schema_version = schemaVersion,
-                classification = "physical_accessibility_evidence",
+                classification = "automated_physical_accessibility_evidence",
                 source_commit = Commit,
                 expected_profile = profile.Item1,
-                automated_checks_passed = true,
+                automated_checks_passed = automatedChecksPassed,
                 windows_settings = new
                 {
                     high_contrast = profile.Item2,
@@ -219,26 +219,6 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
                     expected_announcement = "fixture announcement",
                     screen_reader_active_during_capture = usesScreenReader,
                 },
-                human_review = new
-                {
-                    status = "approved",
-                    reviewer = "fixture-reviewer",
-                    reviewed_at = "2026-07-29T00:00:00Z",
-                    checklist = new
-                    {
-                        keyboard_navigation = true,
-                        focus_visibility = true,
-                        motion_behavior = true,
-                        management_destination_tab_order =
-                            managementTabOrderApproved,
-                        management_destination_activation = true,
-                        management_module_close_mru = true,
-                        screen_reader_announcements =
-                            usesScreenReader ? true : (bool?)null,
-                        management_close_announcements =
-                            usesScreenReader ? true : (bool?)null,
-                    },
-                },
             };
             File.WriteAllText(
                 Path.Combine(directory, "accessibility-evidence.json"),
@@ -249,8 +229,8 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
 
     private string[] WritePhysicalDpiMatrix(
         string fixtureName,
-        int schemaVersion = 2,
-        bool managementLayoutApproved = true)
+        int schemaVersion = 3,
+        bool automatedChecksPassed = true)
     {
         return new[] { 100, 125, 150, 200 }.Select(scale =>
         {
@@ -282,27 +262,10 @@ public sealed class PhysicalEvidenceGateScriptTests : IDisposable
             var manifest = new
             {
                 schema_version = schemaVersion,
-                classification = "physical_device_dpi_evidence",
+                classification = "automated_physical_device_dpi_evidence",
                 source_commit = Commit,
                 expected_scale_percent = scale,
-                automated_checks_passed = true,
-                human_review = new
-                {
-                    status = "approved",
-                    reviewer = "fixture-reviewer",
-                    reviewed_at = "2026-07-29T00:00:00Z",
-                    checklist = new
-                    {
-                        no_clipping_or_overflow = true,
-                        text_and_icons_are_sharp = true,
-                        keyboard_focus_is_visible = true,
-                        light_and_dark_themes_are_consistent = true,
-                        web_plugin_content_is_visible = true,
-                        management_center_layout_is_stable =
-                            managementLayoutApproved,
-                        management_module_tabs_are_readable = true,
-                    },
-                },
+                automated_checks_passed = automatedChecksPassed,
                 captures,
             };
             File.WriteAllText(
