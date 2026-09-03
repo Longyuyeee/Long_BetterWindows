@@ -83,6 +83,19 @@ public sealed class OneClickEntryPointTests
         Assert.DoesNotContain("verify-plugin-runtime-matrix.ps1", workflow);
         Assert.DoesNotContain("& $dotnet build", release);
         Assert.DoesNotContain("& $dotnet test", release);
+
+        foreach (var scriptName in new[]
+        {
+            "verify-final-closure.ps1",
+            "verify-plugin-runtime-matrix.ps1",
+            "build-reference-widget.ps1",
+            "pack-plugin.ps1",
+        })
+        {
+            var script = File.ReadAllText(Path.Combine(root, scriptName));
+            Assert.Contains("(Get-Process -Id $PID).Path", script);
+            Assert.DoesNotContain("& powershell", script);
+        }
     }
 
     [Fact]

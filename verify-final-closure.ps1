@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+$powerShellHost = (Get-Process -Id $PID).Path
 . (Join-Path $PSScriptRoot "release-evidence-io.ps1")
 . (Join-Path $PSScriptRoot "automated-acceptance-policy.ps1")
 
@@ -118,7 +119,7 @@ if (-not $SkipBuildAndTests) {
 }
 
 $resolvedMatrixPath = Resolve-RepositoryPath $PluginMatrixPath
-$matrixOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass `
+$matrixOutput = @(& $powerShellHost -NoProfile -ExecutionPolicy Bypass `
     -File (Join-Path $PSScriptRoot "verify-plugin-positive-matrix.ps1") `
     -MatrixPath $resolvedMatrixPath 2>&1)
 $matrixExitCode = $LASTEXITCODE
@@ -138,7 +139,7 @@ $matrixFileSha256 = if (Test-Path -LiteralPath $resolvedMatrixPath -PathType Lea
     $null
 }
 
-$nativePreflightOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass `
+$nativePreflightOutput = @(& $powerShellHost -NoProfile -ExecutionPolicy Bypass `
     -File (Join-Path $PSScriptRoot "capture-native-performance-evidence.ps1") `
     -PreflightOnly 2>&1)
 $nativePreflightExitCode = $LASTEXITCODE
@@ -160,7 +161,7 @@ if (-not $SkipBuildAndTests) {
     $lpwpOutputRoot = Join-Path ([IO.Path]::GetTempPath()) (
         "long-lpwp-final-" + [Guid]::NewGuid().ToString("N"))
     try {
-        $lpwpOutput = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass `
+        $lpwpOutput = @(& $powerShellHost -NoProfile -ExecutionPolicy Bypass `
             -File (Join-Path $PSScriptRoot "verify-lpwp-compatibility.ps1") `
             -OutputDirectory $lpwpOutputRoot -NoBuild 2>&1)
         $lpwpExitCode = $LASTEXITCODE

@@ -22,6 +22,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$powerShellHost = (Get-Process -Id $PID).Path
 $solution = Join-Path $root "LongBetterWindows.sln"
 $validatorScript = Join-Path $root "validate-plugin.ps1"
 $packerScript = Join-Path $root "pack-plugin.ps1"
@@ -44,7 +45,7 @@ if (-not (Test-Path -LiteralPath $dotnet -PathType Leaf)) {
 function Invoke-Validation {
     param([string] $Target)
 
-    $output = & powershell -NoProfile -ExecutionPolicy Bypass `
+    $output = & $powerShellHost -NoProfile -ExecutionPolicy Bypass `
         -File $validatorScript -Path $Target -NoBuild 2>&1
     $toolExitCode = $LASTEXITCODE
     try {
@@ -64,7 +65,7 @@ function Invoke-Package {
         [string] $PackageDirectory
     )
 
-    $output = & powershell -NoProfile -ExecutionPolicy Bypass `
+    $output = & $powerShellHost -NoProfile -ExecutionPolicy Bypass `
         -File $packerScript `
         -PluginDir $PluginDirectory `
         -OutputDir $PackageDirectory 2>&1

@@ -14,6 +14,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$powerShellHost = (Get-Process -Id $PID).Path
 $pluginDirectory = Join-Path $root "samples\LongWidgetReference"
 $expectedHashFile = Join-Path $root "samples\LongWidgetReference.package.sha256"
 $packer = Join-Path $root "pack-plugin.ps1"
@@ -39,7 +40,7 @@ if ($Force) {
     $packerArguments += "-Force"
 }
 
-& powershell @packerArguments
+& $powerShellHost @packerArguments
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

@@ -24,6 +24,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$powerShellHost = (Get-Process -Id $PID).Path
 $validatorScript = Join-Path $root "validate-plugin.ps1"
 $fixedTimestamp = [DateTimeOffset]::new(
     1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
@@ -59,7 +60,7 @@ function Invoke-ProductionValidation {
         $arguments += "-NoBuild"
     }
 
-    $output = & powershell @arguments
+    $output = & $powerShellHost @arguments
     $exitCode = $LASTEXITCODE
     try {
         $report = $output | ConvertFrom-Json
