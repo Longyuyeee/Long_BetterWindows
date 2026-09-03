@@ -21,6 +21,10 @@ public sealed class NativePerformanceEvidenceScriptTests
         Assert.Contains("-cancel", source);
         Assert.Contains("release-evidence-io.ps1", source);
         Assert.Contains("Write-NewJsonFileAtomically", source);
+        Assert.Contains("PreflightOutputPath", source);
+        Assert.Contains("Native performance preflight report", source);
+        Assert.Contains("$isWindowsPlatform", source);
+        Assert.DoesNotContain("$isWindows =", source);
         Assert.DoesNotContain("Set-Content -LiteralPath $manifestPath", source);
     }
 

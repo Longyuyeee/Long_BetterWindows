@@ -88,7 +88,6 @@ public sealed class OneClickEntryPointTests
         {
             "verify-final-closure.ps1",
             "verify-plugin-runtime-matrix.ps1",
-            "build-reference-widget.ps1",
             "pack-plugin.ps1",
         })
         {
@@ -96,6 +95,10 @@ public sealed class OneClickEntryPointTests
             Assert.Contains("(Get-Process -Id $PID).Path", script);
             Assert.DoesNotContain("& powershell", script);
         }
+
+        var referenceBuilder = File.ReadAllText(Path.Combine(
+            root, "build-reference-widget.ps1"));
+        Assert.Contains("& powershell @packerArguments", referenceBuilder);
     }
 
     [Fact]

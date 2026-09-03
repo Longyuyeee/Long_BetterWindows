@@ -6,7 +6,8 @@ param(
     [int]$TimeoutSeconds = 90,
     [string]$WprPath = "$env:SystemRoot\System32\wpr.exe",
     [switch]$NoBuild,
-    [switch]$PreflightOnly
+    [switch]$PreflightOnly,
+    [string]$PreflightOutputPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,8 +28,8 @@ function Test-IsAdministrator {
         [Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-$isWindows = [Environment]::OSVersion.Platform -eq "Win32NT"
-$isAdministrator = $isWindows -and (Test-IsAdministrator)
+$isWindowsPlatform = [Environment]::OSVersion.Platform -eq "Win32NT"
+$isAdministrator = $isWindowsPlatform -and (Test-IsAdministrator)
 $wprAvailable = Test-Path -LiteralPath $WprPath -PathType Leaf
 $profileOutput = if ($wprAvailable) {
     @(& $WprPath -profiles 2>&1) -join "`n"
@@ -41,24 +42,33 @@ $requiredProfilesAvailable = (
 $wpaExporter = Get-Command wpaexporter.exe -ErrorAction SilentlyContinue
 $preflight = [ordered]@{
     schema_version = 1
-    windows = $isWindows
+    windows = $isWindowsPlatform
     administrator = $isAdministrator
     wpr_available = $wprAvailable
     required_profiles_available = $requiredProfilesAvailable
     wpa_exporter_available = $null -ne $wpaExporter
     requested_profiles = @("CPU.Light", "DesktopComposition.Verbose")
-    ready = $isWindows -and $isAdministrator -and $wprAvailable `
+    ready = $isWindowsPlatform -and $isAdministrator -and $wprAvailable `
         -and $requiredProfilesAvailable
 }
 if ($PreflightOnly) {
-    $preflight | ConvertTo-Json -Depth 4
+    if ([string]::IsNullOrWhiteSpace($PreflightOutputPath)) {
+        $preflight | ConvertTo-Json -Depth 4
+    }
+    else {
+        Write-NewJsonFileAtomically `
+            -Path (Resolve-RepositoryPath $PreflightOutputPath) `
+            -Value $preflight `
+            -Depth 4 `
+            -Label "Native performance preflight report"
+    }
     exit 0
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     throw "OutputDirectory is required unless PreflightOnly is used."
 }
-if (-not $isWindows) {
+if (-not $isWindowsPlatform) {
     throw "Native performance capture requires Windows."
 }
 if (-not $isAdministrator) {

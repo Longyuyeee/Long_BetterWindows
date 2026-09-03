@@ -14,7 +14,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$powerShellHost = (Get-Process -Id $PID).Path
 $pluginDirectory = Join-Path $root "samples\LongWidgetReference"
 $expectedHashFile = Join-Path $root "samples\LongWidgetReference.package.sha256"
 $packer = Join-Path $root "pack-plugin.ps1"
@@ -40,7 +39,10 @@ if ($Force) {
     $packerArguments += "-Force"
 }
 
-& $powerShellHost @packerArguments
+# Keep the package builder on Windows PowerShell/.NET Framework. ZIP deflate
+# output is runtime-specific, and the checked-in package hash is intentionally
+# stable across developer and CI checkouts.
+& powershell @packerArguments
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

@@ -139,17 +139,31 @@ $matrixFileSha256 = if (Test-Path -LiteralPath $resolvedMatrixPath -PathType Lea
     $null
 }
 
-$nativePreflightOutput = @(& $powerShellHost -NoProfile -ExecutionPolicy Bypass `
-    -File (Join-Path $PSScriptRoot "capture-native-performance-evidence.ps1") `
-    -PreflightOnly 2>&1)
-$nativePreflightExitCode = $LASTEXITCODE
-$nativePreflightJson = $nativePreflightOutput -join "`n"
 $nativePreflight = $null
+$nativePreflightJson = ""
+$nativePreflightRoot = Join-Path ([IO.Path]::GetTempPath()) (
+    "long-native-preflight-" + [Guid]::NewGuid().ToString("N"))
+$nativePreflightPath = Join-Path $nativePreflightRoot "preflight.json"
+[IO.Directory]::CreateDirectory($nativePreflightRoot) | Out-Null
 try {
-    $nativePreflight = $nativePreflightJson | ConvertFrom-Json
+    $nativePreflightOutput = @(& $powerShellHost `
+        -NoProfile -ExecutionPolicy Bypass `
+        -File (Join-Path $PSScriptRoot "capture-native-performance-evidence.ps1") `
+        -PreflightOnly -PreflightOutputPath $nativePreflightPath 2>&1)
+    $nativePreflightExitCode = $LASTEXITCODE
+    if (Test-Path -LiteralPath $nativePreflightPath -PathType Leaf) {
+        $nativePreflightJson = Get-Content -LiteralPath $nativePreflightPath `
+            -Raw -Encoding UTF8
+        $nativePreflight = $nativePreflightJson | ConvertFrom-Json
+    }
+    else {
+        $nativePreflightJson = $nativePreflightOutput -join "`n"
+    }
 }
-catch {
-    $nativePreflight = $null
+finally {
+    if (Test-Path -LiteralPath $nativePreflightRoot -PathType Container) {
+        Remove-Item -LiteralPath $nativePreflightRoot -Recurse -Force
+    }
 }
 
 $lpwp = $null
