@@ -15,42 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build and test
+  automated-closure:
+    name: Automated closure
     runs-on: windows-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Restore
-        run: dotnet restore LongBetterWindows.sln
-
-      - name: Build release
-        run: dotnet build LongBetterWindows.sln --configuration Release --no-restore --nologo
-
-      - name: Run full test suite
-        shell: powershell
-        run: dotnet test tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=repository-ci.trx"
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: repository-test-results
-          path: tests/LongBetterWindows.Tests/TestResults/**/*.trx
-          if-no-files-found: ignore
-
-  plugin-platform:
-    name: Plugin platform
-    runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v7
@@ -67,20 +35,21 @@ jobs:
           cache: npm
           cache-dependency-path: sdk/web/package-lock.json
 
-      - name: Restore .NET projects
-        run: dotnet restore LongBetterWindows.sln
-
-      - name: Verify SDK and loader boundaries
-        run: dotnet test tests/LongBetterWindows.Tests/LongBetterWindows.Tests.csproj --configuration Release --no-restore --filter "FullyQualifiedName~PluginSdkBoundaryTests|FullyQualifiedName~PluginTestingSdkTests|FullyQualifiedName~PluginIpcFoundationTests"
-
-      - name: Verify Web SDK
-        run: |
-          npm ci --prefix sdk/web
-          npm test --prefix sdk/web
-
-      - name: Verify four plugin runtimes
+      - name: Run repository automated closure
         shell: pwsh
-        run: ./verify-plugin-runtime-matrix.ps1
+        run: |
+          ./invoke-automated-closure.ps1 `
+            -Configuration Release `
+            -OutputPath artifacts/quality/repository-ci/final-closure.json `
+            -NoConsoleReport
+
+      - name: Upload automated closure report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: repository-automated-closure
+          path: artifacts/quality/repository-ci/final-closure.json
+          if-no-files-found: error
 
       - name: Build LPWP reference widget
         shell: pwsh

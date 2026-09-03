@@ -54,7 +54,35 @@ public sealed class OneClickEntryPointTests
         Assert.Contains("sourceDirty", package);
         Assert.Contains("Inno Setup 6", package);
         Assert.Contains("ReplaceExisting", package);
-        Assert.Contains("Manual release gates still apply", package);
+        Assert.Contains("Automated release eligibility still applies", package);
+    }
+
+    [Fact]
+    public void FormalValidationEntryPoints_UseSingleAutomatedClosure()
+    {
+        var root = FindRepositoryRoot();
+        var build = File.ReadAllText(Path.Combine(root, "build_test.ps1"));
+        var release = File.ReadAllText(Path.Combine(root, "release.ps1"));
+        var package = File.ReadAllText(Path.Combine(root, "package-long.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(
+            root, ".github", "workflows", "build.yml"));
+        var closure = File.ReadAllText(Path.Combine(
+            root, "invoke-automated-closure.ps1"));
+
+        Assert.Contains("[string] $Configuration = 'Release'", build);
+        Assert.Contains("RequireReleaseEligible", build);
+        Assert.Contains("invoke-automated-closure.ps1", build);
+        Assert.Contains("invoke-automated-closure.ps1", release);
+        Assert.Contains("verify-final-closure.ps1", closure);
+        Assert.Contains("invoke-automated-closure.ps1", workflow);
+        Assert.Contains("release.ps1", package);
+
+        Assert.DoesNotContain("dotnet build", workflow);
+        Assert.DoesNotContain("dotnet test", workflow);
+        Assert.DoesNotContain("npm test", workflow);
+        Assert.DoesNotContain("verify-plugin-runtime-matrix.ps1", workflow);
+        Assert.DoesNotContain("& $dotnet build", release);
+        Assert.DoesNotContain("& $dotnet test", release);
     }
 
     [Fact]

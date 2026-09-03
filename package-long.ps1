@@ -153,7 +153,7 @@ Write-Host $releaseRoot
 }
 Write-Host "  HASH  SHA256SUMS.txt"
 Write-Host ""
-Write-Host "This is a candidate build. Manual release gates still apply."
+Write-Host "This is a candidate build. Automated release eligibility still applies."
 
 if ($OpenOutput) {
     Start-Process explorer.exe -ArgumentList @($releaseRoot)

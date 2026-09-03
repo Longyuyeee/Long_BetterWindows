@@ -1,28 +1,31 @@
 ﻿#!/usr/bin/env pwsh
 param(
     [ValidateSet('Debug', 'Release')]
-    [string] $Configuration = 'Debug'
+    [string] $Configuration = 'Release',
+    [string] $OutputPath,
+    [switch] $AllowDirty,
+    [switch] $RequireReleaseEligible
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$dotnet = 'C:\Program Files\dotnet\dotnet.exe'
-
-if (-not (Test-Path -LiteralPath $dotnet)) {
-    $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
-    if ($null -eq $dotnetCommand) {
-        throw '未找到 dotnet CLI。请安装 .NET 8 SDK 或更新脚本中的路径。'
-    }
-    $dotnet = $dotnetCommand.Source
-}
+$automatedClosure = Join-Path $repoRoot 'invoke-automated-closure.ps1'
 
 Push-Location $repoRoot
 try {
-    & $dotnet build 'LongBetterWindows.sln' -c $Configuration
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-    & $dotnet test 'tests\LongBetterWindows.Tests\LongBetterWindows.Tests.csproj' `
-        -c $Configuration --no-build --logger 'console;verbosity=minimal'
+    $arguments = @{
+        Configuration = $Configuration
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
+        $arguments.OutputPath = $OutputPath
+    }
+    if ($AllowDirty) {
+        $arguments.AllowDirty = $true
+    }
+    if ($RequireReleaseEligible) {
+        $arguments.RequireReleaseEligible = $true
+    }
+    & $automatedClosure @arguments
     exit $LASTEXITCODE
 }
 finally {

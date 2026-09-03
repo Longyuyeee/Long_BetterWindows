@@ -18,11 +18,15 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $evidenceIo = Join-Path $repoRoot 'release-evidence-io.ps1'
 $releasePolicyScript = Join-Path $repoRoot 'release-policy.ps1'
+$automatedClosureScript = Join-Path $repoRoot 'invoke-automated-closure.ps1'
 if (-not (Test-Path -LiteralPath $evidenceIo -PathType Leaf)) {
     throw "Release evidence writer was not found: $evidenceIo"
 }
 if (-not (Test-Path -LiteralPath $releasePolicyScript -PathType Leaf)) {
     throw "Release policy was not found: $releasePolicyScript"
+}
+if (-not (Test-Path -LiteralPath $automatedClosureScript -PathType Leaf)) {
+    throw "Automated closure entry point was not found: $automatedClosureScript"
 }
 . $evidenceIo
 . $releasePolicyScript
@@ -132,6 +136,32 @@ if ($declaredVersion -ne $Version) {
 }
 $releasePolicy = New-LongUnsignedReleasePolicy -Version $Version
 
+$validationRoot = Join-Path ([IO.Path]::GetTempPath()) `
+    ("long-release-validation-{0}" -f [guid]::NewGuid().ToString("N"))
+[IO.Directory]::CreateDirectory($validationRoot) | Out-Null
+$validationReport = Join-Path $validationRoot 'automated-closure.json'
+try {
+    & $automatedClosureScript `
+        -Configuration Release `
+        -OutputPath $validationReport `
+        -NoConsoleReport
+    if ($LASTEXITCODE -ne 0) {
+        throw "Automated release closure failed with exit code $LASTEXITCODE."
+    }
+    $validation = Get-Content -LiteralPath $validationReport `
+        -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not [bool]$validation.automated_acceptance.contract_valid -or
+        [int]$validation.automated_acceptance.failed_gate_count -gt 0 -or
+        [int]$validation.automated_acceptance.not_run_gate_count -gt 0) {
+        throw 'Automated release closure returned an incomplete or failed gate set.'
+    }
+}
+finally {
+    if (Test-Path -LiteralPath $validationRoot -PathType Container) {
+        Remove-Item -LiteralPath $validationRoot -Recurse -Force
+    }
+}
+
 if (Test-Path -LiteralPath $releaseRoot) {
     if (-not $Force) { throw "候选目录已存在：$releaseRoot。确认覆盖时使用 -Force。" }
     $resolvedBase = [IO.Path]::GetFullPath($releaseBase).TrimEnd('\') + '\'
@@ -148,12 +178,6 @@ New-Item -ItemType Directory -Path $smokeDirectory | Out-Null
 
 Push-Location $repoRoot
 try {
-    & $dotnet build 'LongBetterWindows.sln' -c Release
-    if ($LASTEXITCODE -ne 0) { throw 'Release 构建失败。' }
-
-    & $dotnet test $tests -c Release --no-build --logger 'console;verbosity=minimal'
-    if ($LASTEXITCODE -ne 0) { throw 'Release 自动化测试失败。' }
-
     $variants = switch ($PackageKind) {
         'FrameworkDependent' { @(@{ Name = 'framework-dependent'; SelfContained = $false }) }
         'SelfContained' { @(@{ Name = 'self-contained'; SelfContained = $true }) }
